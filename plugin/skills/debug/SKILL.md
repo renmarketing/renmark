@@ -28,16 +28,31 @@ State lives in `.renmark/debug/<session-id>/`. A debug session survives `/clear`
 - For new features — use `/renmark:brainstorm` → `/renmark:plan` → `/renmark:orchestrate`
 - For code review — use `/renmark:codereview`
 
-## Status note (v0.0.1)
+## Module support (v0.1.5+)
 
-Phase 3 work. The skill ships as a documented workflow; the per-step model routing (NIM for greps, Codex for traces) requires Phase 1 dispatch to be online first. For v0.0.1 you can follow the loop manually with Opus driving — the structure below is the playbook.
+The `renmark.debug` Python module exposes the session helpers the skill drives:
+
+- `debug.new_session(repo, symptom)` — creates `.renmark/debug/<id>/session.md`
+- `debug.add_hypothesis(session, idx, title, likely)` — appends to Hypotheses section
+- `debug.log_investigation(session, hypothesis, inspector, finding, rules_out)` — appends to log
+- `debug.set_root_cause(session, text)` — replaces the Root cause section
+- `debug.close_session(session, repo, title, severity, symptom, root_cause, fix, lesson)` — finalizes + writes a `bugs.md` entry
+- `debug.suggest_inspector(intent)` — returns the cheapest executor for a step:
+  - `nim` for grep / file-read / line-count / regex
+  - `codex` for multi-file-trace / find-usages / context-gather
+  - `opus` for reasoning / race-condition / architecture
+- `debug.latest_session(repo)` — resume the most recent session
+
+Call from inside the skill via:
+```bash
+python3 -c "from renmark import debug; s = debug.new_session('.', '<symptom>'); print(s.session_id)"
+```
 
 ## The loop
 
 ### 1. Capture the bug
 
-Open a new session dir: `.renmark/debug/$(date +%Y%m%d-%H%M%S)/`. Write `session.md` with:
-- Symptom (what the user reported)
+Call `debug.new_session(repo, symptom)`. This creates `.renmark/debug/<id>/session.md` with skeleton sections (Symptom, Hypotheses, Investigation log, Root cause, Fix, Verification). Update `session.md` with:
 - Expected vs. actual
 - Where it happens (file, function, command)
 - Repro steps

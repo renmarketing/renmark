@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.1.5 — 2026-05-12 (Phase 3: /renmark:debug helper module)
+
+Adds `renmark/debug.py` — file-format helpers + executor-suggestion routing for the debug loop. The skill now has a real backend instead of being a pure playbook.
+
+- `debug.new_session(repo, symptom)` — creates `.renmark/debug/<id>/session.md` with H2 sections (Symptom / Hypotheses / Investigation log / Root cause / Fix / Verification)
+- `debug.add_hypothesis(session, idx, title, likely)` — ranked list under Hypotheses
+- `debug.log_investigation(session, hypothesis, inspector, finding, rules_out=False)` — append step with which model inspected it
+- `debug.set_root_cause(session, text)` — replace the placeholder
+- `debug.close_session(session, repo, ...)` — finalize and write a structured entry to `.renmark/memory/bugs.md` (with auto-cross-post to `learnings.md`)
+- `debug.latest_session(repo)` — resume the most recent debug session (survives `/clear`)
+- `debug.suggest_inspector(intent)` — returns the cheapest executor for a step:
+  - `nim` for grep / file-read / line-count / regex
+  - `codex` for multi-file-trace / find-usages / context-gather / api-check
+  - `opus` for reasoning / race-condition / architecture
+- `/renmark:debug` SKILL.md updated to point at these helpers
+
+7 new tests. 111 passing (104 before + 7 debug tests).
+
+**Still pending (lower priority):**
+- `dispatch.py` calling `resolve_provider` to route non-nim/codex executors through the new Phase 4 providers
+- `/renmark:codereview` writing review findings into `bugs.md`/`decisions.md` automatically
+
 ## v0.1.4 — 2026-05-12 (Phase 4: native multi-provider clients)
 
 Adds three native providers + a resolver. Zero new third-party deps.
