@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Renmark CLI wrapper. install.sh symlinks this to ~/.local/bin/renmark-execute.
+set -euo pipefail
+
+# Resolve symlinks to find the real install dir.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+INSTALL_DIR="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+
+if [ ! -d "$INSTALL_DIR/renmark" ]; then
+    echo "renmark-execute: package not found at $INSTALL_DIR/renmark" >&2
+    exit 127
+fi
+
+if [ -x "$INSTALL_DIR/.venv/bin/python" ]; then
+    PY="$INSTALL_DIR/.venv/bin/python"
+else
+    PY="python3"
+fi
+
+PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m renmark "$@"
