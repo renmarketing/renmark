@@ -1,13 +1,14 @@
 {
   "name": "renmark",
-  "version": "0.0.1",
-  "description": "Multi-LLM orchestration plugin: brainstorm, plan, orchestrate, debug, codereview across NIM, Codex, Opus, Sonnet with persistent project memory in .renmark/",
+  "version": "0.0.3",
+  "description": "Multi-LLM orchestration plugin: brainstorm, plan, orchestrate, debug, codereview, help across NIM, Codex, Opus, Sonnet with persistent project memory in .renmark/",
   "author": "renmark",
   "skills": [
     "brainstorm",
     "plan",
     "orchestrate",
     "debug",
-    "codereview"
+    "codereview",
+    "help"
   ]
 }

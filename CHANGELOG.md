@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.0.3 — 2026-05-12 (Phase 1, +memory + help)
+
+**Persistent memory module + `/renmark:help` skill.**
+
+- `renmark/memory.py` — read/write helpers for `.renmark/memory/`. Functions: `ensure_memory(repo)`, `read_index(repo)`, `read_file(repo, name)`, `log_feature(...)`, `log_bug(...)`, `log_decision(...)`, `append_routing(...)`, `append_learning(...)`. Section-aware appends (newest-first per CHANGELOG convention). Lessons in `log_bug` auto-cross-post to `learnings.md`. 8 new tests.
+- Memory templates rewritten so the files act as **living documentation**:
+  - `features.md` — shipped / in-progress / planned (CHANGELOG style)
+  - `bugs.md` — open / fixed with severity, symptom, root cause, fix, lesson
+  - `decisions.md` — ADR format (context, decision, alternatives, consequences) with auto-numbered IDs
+  - `stack.md` — languages, libs, runtime env, external APIs
+  - `architecture.md` — components, data flow, module boundaries, invariants
+  - `conventions.md`, `routing.md`, `learnings.md` — auto-tuned + hand-edited
+  - `INDEX.md` is a cheap top-of-file index loaded first by every skill
+- `/renmark:help` skill (new) — prints all six commands with one-sentence descriptions and the typical workflow order. Pure documentation, no API calls.
+- `plugin.json` updated to declare 6 skills.
+
+52 tests total (44 from baseline + 8 memory tests).
+
 ## v0.0.2 — 2026-05-12 (Phase 1, partial — skills visible)
 
 **Plugin manifest + all five `/renmark:*` SKILL.md files** so the commands appear in Claude Code's skill list after install. Template files for empty-folder bootstrap. install.sh hardened.
