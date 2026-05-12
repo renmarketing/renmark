@@ -15,6 +15,7 @@ RENMARK_DIR_NAME = ".renmark"
 STATE_SUBDIR = "state"
 MEMORY_SUBDIR = "memory"
 DEBUG_SUBDIR = "debug"
+LOGS_SUBDIR = "logs"
 USAGE_LEDGER = "usage.jsonl"
 PAUSED_FILE = "PAUSED"
 ESCALATIONS_DIR = "escalations"
@@ -129,6 +130,66 @@ def escalation_dir(repo_root: str | Path, task_index: int) -> Path:
     d = state_dir(repo_root) / ESCALATIONS_DIR / f"task-{task_index}"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+# --- Logs (.renmark/logs/) -------------------------------------------------
+# Per-invocation troubleshooting logs. One file per command run.
+# Gitignored — transient runtime data, regenerable.
+
+def logs_dir(repo_root: str | Path) -> Path:
+    d = Path(repo_root) / RENMARK_DIR_NAME / LOGS_SUBDIR
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def open_log(repo_root: str | Path, command: str, run_id: str | None = None) -> Path:
+    """Open (create + return path) a log file for one command invocation.
+
+    Filename is `<command>-<run_id>.log`. If run_id is omitted, a fresh one is
+    generated. The file is created empty; callers append text as the run
+    progresses. Returns the path so callers can decide buffered vs unbuffered.
+    """
+    safe_cmd = "".join(c if c.isalnum() or c in "-_" else "_" for c in command)
+    rid = run_id or new_run_id()
+    path = logs_dir(repo_root) / f"{safe_cmd}-{rid}.log"
+    if not path.exists():
+        path.write_text(
+            f"# renmark log\ncommand: {command}\nrun_id: {rid}\nstarted: {now_iso()}\n\n",
+            encoding="utf-8",
+        )
+    return path
+
+
+def append_log(log_path: Path, *messages: str) -> None:
+    """Append one or more lines to a log file. Adds an ISO timestamp prefix."""
+    ts = now_iso()
+    with log_path.open("a", encoding="utf-8") as fh:
+        for m in messages:
+            fh.write(f"[{ts}] {m}\n")
+
+
+def recent_logs(repo_root: str | Path, n: int = 10) -> list[dict]:
+    """Return the n most-recent log entries with name, size, modified-time.
+
+    Sorted newest first.
+    """
+    d = logs_dir(repo_root)
+    items: list[dict] = []
+    for f in d.glob("*.log"):
+        st = f.stat()
+        items.append({
+            "name": f.name,
+            "path": str(f),
+            "size": st.st_size,
+            "mtime": dt.datetime.fromtimestamp(st.st_mtime, dt.timezone.utc).isoformat(timespec="seconds"),
+            "_raw_mtime": st.st_mtime,
+        })
+    # Sort by raw float so logs created within the same second still order
+    # deterministically by actual write time.
+    items.sort(key=lambda x: x["_raw_mtime"], reverse=True)
+    for it in items:
+        it.pop("_raw_mtime", None)
+    return items[:n]
 
 
 def completed_task_indices(repo_root: str | Path, since_ref: str | None = None) -> set[int]:

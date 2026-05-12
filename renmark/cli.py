@@ -699,6 +699,21 @@ def cmd_roadmap(repo: Path) -> int:
     return 0
 
 
+def cmd_logs(repo: Path, n: int = 10) -> int:
+    from . import state as _state
+    items = _state.recent_logs(repo, n=n)
+    if not items:
+        print(f"No logs yet at {repo}/.renmark/logs/")
+        return 0
+    print(f"{'when':<26} {'size':>8}  file")
+    print("-" * 60)
+    for it in items:
+        kb = it["size"] / 1024
+        print(f"{it['mtime']:<26} {kb:>6.1f}K  {it['name']}")
+    print(f"\nFull paths in {repo}/.renmark/logs/")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     ap = argparse.ArgumentParser(prog="renmark-execute")
@@ -708,6 +723,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--usage", action="store_true", help="show usage and exit")
     ap.add_argument("--roadmap", action="store_true",
                     help="print task | llm | status | tokens | $ | commit table; also writes .renmark/memory/roadmap.md")
+    ap.add_argument("--logs", action="store_true",
+                    help="list recent .renmark/logs/ files for troubleshooting")
+    ap.add_argument("--logs-n", type=int, default=10,
+                    help="how many logs to list (with --logs; default 10)")
     ap.add_argument("--no-commit", action="store_true",
                     help="apply tasks and run verifier but do not git-commit (skill batches commits per wave)")
     ap.add_argument("--repo", default=".", help="repo root (default: current dir)")
@@ -719,9 +738,11 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_usage(repo)
     if args.roadmap:
         return cmd_roadmap(repo)
+    if args.logs:
+        return cmd_logs(repo, n=args.logs_n)
 
     if not args.plan:
-        ap.error("plan path is required unless --usage")
+        ap.error("plan path is required unless --usage / --roadmap / --logs")
     return execute_plan(args.plan, repo=repo, resume=args.resume, dry_run=args.dry_run)
 
 

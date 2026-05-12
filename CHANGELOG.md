@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.1.1 — 2026-05-12 (logs dir + codereview simplified to codex-only)
+
+**Added: `.renmark/logs/`** for per-invocation troubleshooting logs (gitignored). One log file per command run named `<command>-<run_id>.log`.
+
+- `renmark/state.py`:
+  - New constants: `LOGS_SUBDIR = "logs"`
+  - `logs_dir(repo)`, `open_log(repo, command, run_id=None)`, `append_log(path, *messages)`, `recent_logs(repo, n=10)`
+  - 6 tests
+- `renmark-execute --logs` — lists the n most-recent log files with size + mtime
+- `renmark-execute --logs-n <N>` — adjust the count (default 10)
+- `bootstrap.py` updated: `.gitignore` template now includes `.renmark/logs/`
+- `plugin/templates/memory/INDEX.md.template` updated to reference all `.renmark/` subdirs (specs, plans, reviews, state, debug, logs)
+
+**Changed: `/renmark:codereview` is now single-pass (codex-only)**, no Sonnet/Opus passes.
+
+The earlier multi-pass design put code into the conversation, which defeats the context-hygiene goal renmark is built for. Codex stays in its own sandbox; Opus only reads the severity summary. Output format and storage path unchanged (`.renmark/reviews/YYYY-MM-DD-<sha>.review.md`). Recommended cadence: end-of-plan, not per-task.
+
+Tests: 91 passing (up from 85).
+
+**Still pending (v0.1.2+):**
+
+- CLI `execute_plan` integration with `dispatch.group_tasks_by_wave` + `dispatch_wave` — parallel waves not yet wired into the live loop
+- `--no-commit` runtime behavior (flag accepted, not yet effective)
+- Cost preview in `--dry-run`
+- Routing memory auto-updates from run outcomes
+- `/renmark:debug` per-step routing actually wired
+- Additional native providers (Ollama, OpenRouter, OpenAI-compat) — Phase 4
+- LiteLLM plug-in slot — Phase 5
+
 ## v0.1.0 — 2026-05-12 (Phase 1 module landing + roadmap reporter)
 
 **First minor release.** The Phase 1 modules are all in place with tests; the CLI's `execute_plan` loop still uses the v0.0.x single-task code path. Integrating that loop with the new dispatcher is the v0.1.1 work.

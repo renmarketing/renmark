@@ -1,13 +1,19 @@
 ---
 name: codereview
-description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Runs multi-pass review: codex adversarial (find bugs) → sonnet quality (style/naming/readability) → opus architecture/security on hot files. Produces structured markdown at .renmark/reviews/YYYY-MM-DD-<sha>.review.md with severity-ranked findings.
+description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Runs a single codex-based review pass in a read-only sandbox; codex emits a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean.
 ---
 
 # codereview
 
 ## Overview
 
-Reviews a diff in three passes, each routed to the model best suited for that lens. Output is a structured review file with findings ranked by severity. NEVER auto-applies fixes — the human or `/renmark:orchestrate` does that.
+**Single-pass codex review.** Codex runs in `--sandbox read-only` mode, reads the diff, and emits a structured findings report. Opus orchestrates but never ingests the diff body — that's the whole point of routing this to codex.
+
+No Sonnet or Opus passes. Earlier designs included them; experience showed that putting code into the conversation defeats the context-hygiene goal renmark is built for. Codex is purpose-built for adversarial bug-finding and that's the most valuable single lens.
+
+Output: structured markdown at `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` with findings grouped by severity (Critical / Major / Minor / Nit).
+
+Recommended cadence: **after a full plan completes**, not after every task. `/renmark:orchestrate` offers a hand-off prompt at the end of a successful run.
 
 ## When to Use
 
@@ -19,88 +25,66 @@ Reviews a diff in three passes, each routed to the model best suited for that le
 - For debugging a runtime failure — use `/renmark:debug`
 - For implementing fixes — review only; fixes go through orchestrate or direct edit
 
-## Status note (v0.0.1)
+## How it runs (one pass, codex)
 
-Phase 3 work. The skill ships as a documented workflow; routing through Sonnet/Opus subagents requires the Phase 1 dispatch layer. For v0.0.1, the adversarial pass (codex) is available today via `codex review`; quality and architecture passes can be invoked manually with the Agent tool.
-
-## The three passes
-
-### Pass 1 — Adversarial (find bugs)
-
-**Model:** Codex CLI, read-only sandbox.
-
-Run:
 ```bash
-codex exec --sandbox read-only "Review the diff <ref>..HEAD. Find runtime bugs, logic errors, off-by-ones, race conditions, and bad assumptions. List each finding with: file:line, severity, why it's wrong, suggested fix. Do not modify any files."
+codex exec --sandbox read-only -
 ```
 
-Capture output to `.renmark/reviews/<sha>/adversarial.md`.
+The skill pipes a prompt like:
 
-### Pass 2 — Quality (style, naming, readability)
+```
+Review the diff <range>. Find: runtime bugs, logic errors, off-by-ones,
+race conditions, security issues (injection, auth, data leaks), bad
+assumptions, edge cases the code doesn't handle.
 
-**Model:** Sonnet via Agent tool with model override.
+For each finding:
+  - file:line
+  - severity: Critical | Major | Minor | Nit
+  - one-sentence description
+  - one-sentence fix suggestion
 
-Prompt the subagent with the diff and ask for:
-- Naming clarity
-- Function size / single responsibility
-- Comments where the WHY isn't obvious
-- Redundancy / repetition
-- Test coverage gaps
+Top of report: summary counts per severity.
+Do not modify any files. Do not exit until the review is complete.
+```
 
-Capture to `.renmark/reviews/<sha>/quality.md`.
-
-### Pass 3 — Architecture / Security (hot files only)
-
-**Model:** Opus via Agent tool.
-
-Apply only to "hot" files:
-- Files >150 lines in the diff
-- Files touching auth, crypto, SQL, user input
-- Files implementing public APIs
-
-Ask Opus for:
-- Architectural concerns (coupling, layering, premature abstractions)
-- Security issues (injection vectors, auth bypass, data leaks)
-- Edge cases the diff doesn't handle
-
-Capture to `.renmark/reviews/<sha>/architecture.md`.
+Codex writes its review to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` directly (or the skill captures stdout and writes it).
 
 ## Steps
 
 ### 1. Determine scope
 
-If user gave a ref range (`HEAD~3..HEAD`, `main..feature`), use that. Otherwise default to `git diff --name-only HEAD` (working tree).
+If the user gave a ref range (`HEAD~3..HEAD`, `main..feature`), use that. Otherwise default to `git diff --name-only HEAD` (working tree). Show a `git diff --stat <range>` summary and confirm with the user.
 
-### 2. Show diff summary
+### 2. Run codex
 
-```bash
-git diff --stat <range>
-```
+Shell out via the renmark CLI (or directly) with the prompt above. Streaming output goes to `.renmark/logs/codereview-<run_id>.log` for troubleshooting if codex misbehaves.
 
-Confirm with the user. Ask: *"Run all three passes, or just one? [all/adversarial/quality/architecture]"*
+### 3. Capture the review
 
-### 3. Run passes
+Codex output is parsed (or written through verbatim) and saved to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md`.
 
-In order: adversarial → quality → architecture. Each writes its own file under `.renmark/reviews/<short-sha>/`.
+### 4. Hand off
 
-### 4. Consolidate
+Tell the user — using ONLY the summary, never the diff body:
 
-Merge the three pass files into `.renmark/reviews/YYYY-MM-DD-<sha>.review.md`:
-- Findings grouped by severity (Critical / Major / Minor / Nit)
-- Each finding cites pass (which model found it) + file:line
-- Top of doc summarizes counts per severity
-
-### 5. Hand off
-
-Tell the user: *"Review written to `<path>`. <N critical, M major, K minor> findings."*
+> *"Review at `<path>`. <N critical, M major, K minor> findings.*
+> *What's next?*
+> *  [o] Open the review file*
+> *  [f] Fix the criticals — kick off a new `/renmark:plan` from the findings*
+> *  [n] Done"*
 
 Don't auto-fix. The human reads and decides.
 
-## Focus modes
+## When to invoke
 
-`/renmark:codereview HEAD~3..HEAD --focus security` runs only Opus pass with security framing.
-`--focus perf` runs only architecture pass with performance framing.
-`--focus all` (default) runs all three.
+Recommended cadence (for context hygiene):
+
+- **Auto-suggested by `/renmark:orchestrate`** after a successful plan run completes — one review for the whole feature, not one per task.
+- **Before merge** when you're about to land work to main.
+- **Ad-hoc** when you want a sanity check on a specific range.
+
+Avoid: running codereview after every single task. That creates one review per file and floods the reviews directory.
 
 ## Reference
 

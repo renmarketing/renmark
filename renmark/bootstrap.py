@@ -88,7 +88,7 @@ def bootstrap(
 
     # .gitignore — append if missing or doesn't have .renmark/state/
     gi = repo_p / ".gitignore"
-    needed_lines = (".renmark/state/", ".renmark/debug/")
+    needed_lines = (".renmark/state/", ".renmark/debug/", ".renmark/logs/")
     if gi.exists():
         text = gi.read_text(encoding="utf-8")
         missing = [ln for ln in needed_lines if ln not in text]
@@ -100,7 +100,7 @@ def bootstrap(
         gi.write_text(
             "__pycache__/\n*.pyc\n.venv/\nvenv/\nnode_modules/\n"
             ".pytest_cache/\n.env\n.env.local\n\n# renmark\n"
-            ".renmark/state/\n.renmark/debug/\n",
+            ".renmark/state/\n.renmark/debug/\n.renmark/logs/\n",
             encoding="utf-8",
         )
         created.append(str(gi))

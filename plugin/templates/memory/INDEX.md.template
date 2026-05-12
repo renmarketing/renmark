@@ -30,4 +30,13 @@ Renmark's persistent project memory. Each file follows a documented format and i
 - All files are newest-first (CHANGELOG.md style). New entries go at the top of their section.
 - Each entry has an explicit date (`YYYY-MM-DD`).
 - Skills append; they do not rewrite history. Hand-edit if needed.
-- Files are committed to git — `.renmark/state/` and `.renmark/debug/` are gitignored; `memory/` is preserved.
+- Files are committed to git — `.renmark/state/`, `.renmark/debug/`, and `.renmark/logs/` are gitignored; `memory/` is preserved.
+
+## Other `.renmark/` dirs (not memory)
+
+- `.renmark/specs/` — `/renmark:brainstorm` output (committed)
+- `.renmark/plans/` — `/renmark:plan` output (committed)
+- `.renmark/reviews/` — `/renmark:codereview` output (committed)
+- `.renmark/state/` — runtime: usage ledger, pause file, escalations (gitignored)
+- `.renmark/debug/` — debug session state (gitignored)
+- `.renmark/logs/` — per-invocation logs for troubleshooting (gitignored, list via `renmark-execute --logs`)
