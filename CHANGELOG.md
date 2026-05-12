@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.1.4 — 2026-05-12 (Phase 4: native multi-provider clients)
+
+Adds three native providers + a resolver. Zero new third-party deps.
+
+- `renmark/providers/openai_compat.py` — generic OpenAI-compatible client. Speaks `/chat/completions` against any base URL with a bearer token. Retry on 429/503, fail on 401, parse `choices[0].message.content` + `usage.{prompt,completion}_tokens`.
+- `renmark/providers/ollama.py` — delegates to `openai_compat` against `http://localhost:11434/v1` by default. Executor: `ollama_chat/<model>` (e.g. `ollama_chat/qwen2.5-coder:7b`).
+- `renmark/providers/openrouter.py` — delegates to `openai_compat` against `https://openrouter.ai/api/v1`. Executor: `openrouter/<provider>/<model>`. Reads `OPENROUTER_API_KEY` from env.
+- `renmark/providers/__init__.py` — new `resolve_provider(executor)` function maps any executor string to `(module_name, model_arg)`. Unknown `<prefix>/<model>` strings fall through to `openai_compat` so Together / Anyscale / Groq / etc. work with the right env vars.
+- 13 new tests for resolver + each provider (all mocked HTTP).
+
+Executor strings that now work:
+
+| Executor | Routes to |
+|---|---|
+| `nim` | NIM client (existing) |
+| `codex` | Codex CLI (existing) |
+| `opus`, `sonnet` | Agent tool — skill must dispatch |
+| `ollama_chat/<model>` | Local Ollama (default `:11434`) |
+| `openrouter/<provider>/<model>` | OpenRouter gateway |
+| `openai_compat/<model>` | Any OpenAI-compatible API (needs `OPENAI_COMPAT_BASE_URL` + `OPENAI_COMPAT_API_KEY`) |
+| `<unknown>/<model>` | Falls through to openai_compat |
+
+104 tests pass (91 before + 13 provider tests).
+
+**Still pending:**
+- Wiring `resolve_provider` into `dispatch.py`'s actual call path (right now `dispatch.dispatch_wave` only knows nim/codex/opus/sonnet)
+- `/renmark:debug` per-step routing
+- `/renmark:debug` and `/renmark:codereview` writing to `bugs.md` automatically
+
 ## v0.1.3 — 2026-05-12 (cost preview + --no-commit + routing-memory + perm snippet)
 
 Phase 1 polish landed:
