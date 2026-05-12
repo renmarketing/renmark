@@ -1,0 +1,9 @@
+# Memory index
+
+Load this file first. Fetch the others as needed for the current command.
+
+- `project.md` — tech stack, file layout, what this project is
+- `conventions.md` — code/test conventions
+- `decisions.md` — decision log (what, why, when)
+- `learnings.md` — patterns learned from past runs (failures, costs)
+- `routing.md` — which executor for which task signature (auto-updated)

@@ -1,0 +1,49 @@
+# {{PROJECT_NAME}}
+
+> Scaffolded by `/renmark:brainstorm` on {{DATE}}. Edit freely.
+
+## What this project is
+
+(Filled in by `/renmark:brainstorm` — replace with a 2-3 sentence description.)
+
+## Tooling — renmark workflow
+
+This project uses the **renmark** plugin for multi-LLM orchestration. Five slash commands:
+
+| Command | When to use |
+|---|---|
+| `/renmark:brainstorm <topic>` | Fleshing out an idea into a spec |
+| `/renmark:plan <spec>` | Decomposing a spec into atomic, executor-tagged tasks |
+| `/renmark:orchestrate <plan>` | Executing a plan (dispatches to NIM, Codex, Opus, Sonnet) |
+| `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
+| `/renmark:codereview <ref>` | Multi-pass diff review (adversarial + quality + architecture) |
+
+## File conventions
+
+- Specs: `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`
+- Plans: `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`
+- Reviews: `.renmark/reviews/YYYY-MM-DD-<sha>.review.md`
+- Project memory: `.renmark/memory/` (committed) — `INDEX.md`, `project.md`, `conventions.md`, `decisions.md`, `learnings.md`, `routing.md`
+- Runtime state: `.renmark/state/` (gitignored)
+
+## Executor preferences (auto-maintained)
+
+`.renmark/memory/routing.md` records which model worked best for which task signature. `/renmark:plan` reads this when auto-routing future tasks.
+
+Common defaults:
+- Mechanical files (`.gitignore`, simple CSS, JSON config) → `nim`
+- Test scaffolding → `codex`
+- Game/state-machine/coord-math/DOM → `opus`
+- Mid-complexity refactors → `sonnet`
+
+## Code conventions
+
+(Fill in as the project develops — language version, style guide, test framework, etc.)
+
+## Testing
+
+(How to run tests. Verifiers in renmark plans should match this command.)
+
+---
+
+*Update this file as the project evolves. Renmark also auto-maintains `.renmark/memory/` — these two stay in sync over time.*

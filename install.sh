@@ -14,16 +14,14 @@ LOCAL_BIN_DIR="$HOME/.local/bin"
 
 mkdir -p "$CLAUDE_SKILLS_DIR" "$CLAUDE_PLUGINS_DIR" "$LOCAL_BIN_DIR"
 
-# Step 1: back up /orchestrator if it exists and isn't already a symlink to us.
+# Step 1: remove the old /orchestrator skill if present.
+# No backup — the original source lives at /home/renmark/projects/ai-inference/ and
+# in its own git history. Backing it up here was paranoia and caused a phantom-
+# skill bug in v0.0.1 (Claude Code picked up the dotted backup name).
 old_orch="$CLAUDE_SKILLS_DIR/orchestrator"
 if [ -e "$old_orch" ] && [ ! -L "$old_orch" ]; then
-    backup="$CLAUDE_SKILLS_DIR/.orchestrator.bak"
-    if [ -e "$backup" ]; then
-        echo "WARN: $backup already exists; not overwriting. Skipping orchestrator backup."
-    else
-        mv "$old_orch" "$backup"
-        echo "Moved $old_orch → $backup"
-    fi
+    rm -rf "$old_orch"
+    echo "Removed old skill: $old_orch  (source remains at ~/projects/ai-inference/)"
 elif [ -L "$old_orch" ]; then
     # Existing symlink (maybe from a prior run) — remove if it points outside our install
     target="$(readlink "$old_orch")"
@@ -62,8 +60,8 @@ renmark installed.
   Skills available:  /renmark:brainstorm /renmark:plan /renmark:orchestrate /renmark:debug /renmark:codereview
   CLI on PATH:       renmark-execute
 
-The old /orchestrator skill is backed up at $CLAUDE_SKILLS_DIR/.orchestrator.bak
-  (mv it back to "$old_orch" if you ever need to revert)
+If /orchestrator existed, it was removed. Source still lives at ~/projects/ai-inference/
+  (cd there and reinstall the old skill manually if you ever need to revert).
 
 Next: start a Claude Code session in any project folder and try /renmark:brainstorm.
 EOF

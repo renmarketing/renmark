@@ -1,0 +1,28 @@
+# {{PROJECT_NAME}} — agent guide
+
+> For non-Claude AI agents (Codex, Cursor, etc.). Mirror of `CLAUDE.md`, shorter.
+
+## What this project is
+
+(Filled in by `/renmark:brainstorm`.)
+
+## Conventions
+
+- Plans live in `.renmark/plans/`
+- Specs live in `.renmark/specs/`
+- Project memory is in `.renmark/memory/` — read `INDEX.md` first, fetch others as needed
+- Tests are in `tests/`, run via the command in `CLAUDE.md` § Testing
+
+## What renmark expects
+
+When asked to implement a task from `.renmark/plans/*.plan.md`:
+- Modify exactly the file in the task's `target` field
+- Do not modify other files unless the spec says so
+- Do not run `git commit` — the orchestrator handles commits
+- Run the task's `verifier` to self-check before declaring done
+
+## Key files
+
+- `CLAUDE.md` — full project context
+- `PLAN.md` — current renmark plan being implemented (if any)
+- `.renmark/memory/conventions.md` — code/test conventions for this project
