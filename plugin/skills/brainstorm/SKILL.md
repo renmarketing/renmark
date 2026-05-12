@@ -63,9 +63,16 @@ Save to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`. Include: context, goals, no
 
 Also update `.renmark/memory/project.md` with any new project facts learned (tech stack, conventions).
 
-### 6. Hand off
+### 6. Hand off (wizard step)
 
-Tell the user: *"Spec written to `<path>`. Next: run `/renmark:plan <path>` to decompose into tasks with per-task model assignments."*
+Renmark is a wizard pipeline: `brainstorm → plan → orchestrate`. After writing the spec, prompt explicitly:
+
+> *"I have everything to write the plan. The spec is at `<path>`.*
+> *Move on to `/renmark:plan` now? [Y/n/wait]"*
+
+- **Y / yes** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
+- **n / no** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
+- **wait / pause** → same as no, but log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
 
 ## Common Mistakes
 

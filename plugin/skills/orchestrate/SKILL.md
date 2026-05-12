@@ -72,10 +72,26 @@ Read `.renmark/state/escalations/task-N/{metadata.json,prompt.txt,response.txt,v
 
 ### 6. Update memory
 
-After the run, append to `.renmark/memory/learnings.md` and `routing.md`:
-- Tasks that succeeded on which executor
-- Tasks that failed and on what model
-- Cost surprises
+After the run, use `renmark.memory` helpers to append:
+- `log_feature(...)` to `.renmark/memory/features.md` — one entry per shipped task (or one batched entry for the full plan)
+- `append_routing(...)` to `.renmark/memory/routing.md` — each task's executor + outcome (passed/failed/retried)
+- `append_learning(...)` to `.renmark/memory/learnings.md` — cost surprises, model behaviors observed
+- `log_bug(...)` to `.renmark/memory/bugs.md` — if escalation surfaced a real bug rather than a NIM hiccup
+
+### 7. Hand off (wizard step)
+
+Renmark is a wizard pipeline. After a clean run (exit 0), offer the next step:
+
+> *"All N tasks committed (M commits, ~$X spent).*
+> *What's next?*
+> *  [c] Code review — run /renmark:codereview HEAD~N..HEAD*
+> *  [s] Smoke test — open a shell and verify behavior manually*
+> *  [n] Nothing — done"*
+
+On **c** → invoke `/renmark:codereview <range>` with the appropriate ref range.
+On **s/n** → stop, leave the user in a clean state.
+
+If exit != 0 (paused / escalated), do NOT offer the next step. Surface the failure and the resume command first.
 
 ## Reference
 

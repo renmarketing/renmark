@@ -690,13 +690,26 @@ def cmd_usage(repo: Path) -> int:
     return 0
 
 
+def cmd_roadmap(repo: Path) -> int:
+    from . import roadmap as _roadmap
+    rows = _roadmap.build_rows(repo)
+    print(_roadmap.render_table(rows))
+    _roadmap.write_roadmap_md(repo)
+    print(f"\n(Snapshot written to {repo}/.renmark/memory/roadmap.md)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
-    ap = argparse.ArgumentParser(prog="nim-execute")
+    ap = argparse.ArgumentParser(prog="renmark-execute")
     ap.add_argument("plan", nargs="?", help="path to plan file")
     ap.add_argument("--resume", action="store_true", help="resume a paused run")
     ap.add_argument("--dry-run", action="store_true", help="parse plan, list tasks, exit")
     ap.add_argument("--usage", action="store_true", help="show usage and exit")
+    ap.add_argument("--roadmap", action="store_true",
+                    help="print task | llm | status | tokens | $ | commit table; also writes .renmark/memory/roadmap.md")
+    ap.add_argument("--no-commit", action="store_true",
+                    help="apply tasks and run verifier but do not git-commit (skill batches commits per wave)")
     ap.add_argument("--repo", default=".", help="repo root (default: current dir)")
     args = ap.parse_args(argv)
 
@@ -704,6 +717,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.usage:
         return cmd_usage(repo)
+    if args.roadmap:
+        return cmd_roadmap(repo)
 
     if not args.plan:
         ap.error("plan path is required unless --usage")

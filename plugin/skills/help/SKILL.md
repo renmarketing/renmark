@@ -16,9 +16,13 @@ Print exactly this block (or its current equivalent if commands have been added/
 ```
 renmark — multi-LLM orchestration plugin (v0.0.x)
 
-Typical workflow:
-  /renmark:brainstorm  →  /renmark:plan  →  /renmark:orchestrate
-  /renmark:debug and /renmark:codereview can run anytime.
+Renmark is a wizard pipeline. Start anywhere; each command offers to
+hand off to the next when its job is done:
+
+  /renmark:brainstorm  →  /renmark:plan  →  /renmark:orchestrate  →  /renmark:codereview
+
+Each transition is an explicit user prompt (Y / n / wait), so nothing
+spends tokens without your approval. /renmark:debug runs ad-hoc, anytime.
 
 Commands:
   /renmark:brainstorm <topic>

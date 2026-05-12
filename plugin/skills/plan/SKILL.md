@@ -83,9 +83,27 @@ Save to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`. Include:
 - Task blocks in the format above
 - Cost preview at the bottom
 
-### 8. Hand off
+### 8. Hand off (wizard step — review gate before any LLM spend)
 
-Tell the user: *"Plan written to `<path>` with N tasks (M parallel groups, ~$X estimated). Next: run `/renmark:orchestrate <path>` to execute."*
+This is the critical approval gate. Once `/renmark:orchestrate` runs, real API tokens start flowing. Make the user actively approve.
+
+Show a clear summary:
+
+> *"Plan written to `.renmark/plans/<name>.plan.md`*
+> *Tasks: N (M parallel groups)*
+> *Est. tokens: ~T, est. cost: ~$X*
+> *Executors: nim×a, codex×b, opus×c, sonnet×d*
+>
+> *What's next?*
+> *  [r] Review — open the file so you can read every task*
+> *  [d] Dispatch — approve and run /renmark:orchestrate now*
+> *  [e] Edit — describe what to change and I'll rewrite the plan*
+> *  [n] No — stop. You can run /renmark:orchestrate <path> later."*
+
+On **r** → cat/open the plan file in the conversation, then re-ask the same prompt.
+On **d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.
+On **e** → ask what to change, rewrite the plan, re-show the summary.
+On **n** → stop. Plan stays on disk for later.
 
 ## Plan file format example
 

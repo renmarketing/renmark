@@ -34,7 +34,12 @@ class Task:
     verifier: str = ""
     verifier_timeout_s: int = 60
     spec: str = ""
-    executor: str = "nim"            # "nim" (default) or "codex"
+    executor: str = "nim"            # "nim" | "codex" | "opus" | "sonnet" | <litellm-string>
+    # Phase 1 fields (v0.0.3+):
+    complexity: str = "medium"       # "simple" | "medium" | "hard"
+    parallel_group: int | None = None  # tasks sharing a group run concurrently; default None = serial (each in its own group = index)
+    est_tokens: int | None = None    # planner estimate (informational)
+    est_cost_usd: float | None = None  # planner estimate (informational)
 
 
 _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
@@ -128,7 +133,28 @@ def parse_plan(path: str | Path) -> list[Task]:
                 raise PlanError(
                     f"line {line_no}: verifier_timeout_s must be int, got {value!r}"
                 ) from e
-        elif key in ("mode", "target", "model", "verifier", "executor"):
+        elif key == "parallel_group":
+            try:
+                current["parallel_group"] = int(value)
+            except ValueError as e:
+                raise PlanError(
+                    f"line {line_no}: parallel_group must be int, got {value!r}"
+                ) from e
+        elif key == "est_tokens":
+            try:
+                current["est_tokens"] = int(value)
+            except ValueError as e:
+                raise PlanError(
+                    f"line {line_no}: est_tokens must be int, got {value!r}"
+                ) from e
+        elif key == "est_cost_usd":
+            try:
+                current["est_cost_usd"] = float(value)
+            except ValueError as e:
+                raise PlanError(
+                    f"line {line_no}: est_cost_usd must be float, got {value!r}"
+                ) from e
+        elif key in ("mode", "target", "model", "verifier", "executor", "complexity"):
             current[key] = value
         else:
             raise PlanError(f"line {line_no}: unknown field {key!r}")
@@ -186,8 +212,17 @@ def _build_task(d: dict) -> Task:
         raise PlanError("spec is empty")
 
     executor = (d.get("executor") or "nim").strip().lower()
-    if executor not in ("nim", "codex"):
-        raise PlanError(f"executor must be 'nim' or 'codex', got {executor!r}")
+    # Allow nim, codex, opus, sonnet, or any provider-string of form "<provider>/<model>".
+    if executor not in ("nim", "codex", "opus", "sonnet") and "/" not in executor:
+        raise PlanError(
+            f"executor must be one of nim, codex, opus, sonnet, or a provider/model string, got {executor!r}"
+        )
+
+    complexity = (d.get("complexity") or "medium").strip().lower()
+    if complexity not in ("simple", "medium", "hard"):
+        raise PlanError(
+            f"complexity must be simple, medium, or hard, got {complexity!r}"
+        )
 
     return Task(
         index=d["index"],
@@ -199,6 +234,10 @@ def _build_task(d: dict) -> Task:
         verifier=verifier,
         verifier_timeout_s=d["verifier_timeout_s"],
         spec=spec,
+        complexity=complexity,
+        parallel_group=d.get("parallel_group"),
+        est_tokens=d.get("est_tokens"),
+        est_cost_usd=d.get("est_cost_usd"),
         executor=executor,
     )
 

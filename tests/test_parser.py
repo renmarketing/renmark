@@ -199,3 +199,157 @@ def test_executor_invalid_rejected(tmp_path: Path) -> None:
     )
     with pytest.raises(PlanError, match="executor must be"):
         parse_plan(plan)
+
+
+def test_executor_opus_and_sonnet_accepted(tmp_path: Path) -> None:
+    for ex in ("opus", "sonnet"):
+        plan = _write(
+            tmp_path,
+            "# X\n\n## Tasks\n\n"
+            "### Task 1: x\n"
+            "- **mode:** A\n"
+            f"- **target:** a_{ex}.py\n"
+            f"- **executor:** {ex}\n"
+            "- **verifier:** true\n"
+            "- **spec:**\n"
+            "  noop\n",
+        )
+        tasks = parse_plan(plan)
+        assert tasks[0].executor == ex
+
+
+def test_executor_provider_string_accepted(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: ollama task\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **executor:** ollama_chat/qwen2.5-coder:7b\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].executor == "ollama_chat/qwen2.5-coder:7b"
+
+
+def test_complexity_field_parses(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: hard one\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **complexity:** hard\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].complexity == "hard"
+
+
+def test_complexity_defaults_to_medium(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].complexity == "medium"
+
+
+def test_complexity_invalid_rejected(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **complexity:** trivial\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="complexity must be"):
+        parse_plan(plan)
+
+
+def test_parallel_group_field_parses(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: a\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **parallel_group:** 2\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n\n"
+        "### Task 2: b\n"
+        "- **mode:** A\n"
+        "- **target:** b.py\n"
+        "- **parallel_group:** 2\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].parallel_group == 2
+    assert tasks[1].parallel_group == 2
+
+
+def test_parallel_group_non_int_rejected(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: a\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **parallel_group:** wave-one\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="parallel_group must be int"):
+        parse_plan(plan)
+
+
+def test_est_tokens_and_cost_parse(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **est_tokens:** 4500\n"
+        "- **est_cost_usd:** 0.07\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].est_tokens == 4500
+    assert tasks[0].est_cost_usd == 0.07
+
+
+def test_est_tokens_non_int_rejected(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **est_tokens:** lots\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="est_tokens must be int"):
+        parse_plan(plan)
