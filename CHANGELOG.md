@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.1.2 — 2026-05-12 (cli uses dispatch.py — parallel waves live)
+
+**Headline:** `renmark-execute` now uses `dispatch.py` for wave-based parallel execution. Tasks sharing a `parallel_group` run concurrently on separate threads; tasks with `executor: opus | sonnet` are marked `needs_agent` and surfaced so the `/renmark:orchestrate` skill can dispatch them via the Agent tool.
+
+Changes:
+- `cli.py`:
+  - Module-level `_GIT_LOCK = threading.Lock()` serializes `_git_tag`, `_git_commit`, `_git_restore_target` across parallel task threads (git index isn't multi-thread-safe).
+  - `execute_plan` refactored to use `dispatch.group_tasks_by_wave` + `validate_wave` + `dispatch_wave` instead of a flat per-task loop. Existing `_execute_task` is now invoked through a `_runner` adapter that returns `dispatch.TaskResult`.
+  - End-of-run summary now reports `needs-agent` count and wave count.
+  - If a wave validation fails (overlapping targets, context-into-target conflicts), the plan is rejected with exit 2 before any LLM call.
+- `dispatch.py` tests (11) already covered the parallel semantics; cli.py integration verified by the existing 91-test suite — all still pass.
+
+**LiteLLM dropped from roadmap.** Per user decision: native providers cover all realistic use cases. Future providers go in as one-file `providers/*.py` modules following the `openai_compat.py` pattern.
+- PLAN.md "Phase 5" struck through with rationale
+- CHANGELOG pending-list updated
+- "What to steal from" table notes LiteLLM was considered and rejected
+
+**Still pending (v0.1.3+):**
+- `--no-commit` runtime behavior (argparse flag accepted, not yet effective in the commit path — would let skills batch-commit per wave manually)
+- Cost preview in `--dry-run` (per-task estimate before any LLM call)
+- Routing memory auto-updates from run outcomes
+- `/renmark:debug` per-step routing actually wired
+- Additional native providers (Ollama, OpenRouter, OpenAI-compat) — Phase 4
+
+91 tests pass.
+
 ## v0.1.1 — 2026-05-12 (logs dir + codereview simplified to codex-only)
 
 **Added: `.renmark/logs/`** for per-invocation troubleshooting logs (gitignored). One log file per command run named `<command>-<run_id>.log`.
@@ -27,7 +53,7 @@ Tests: 91 passing (up from 85).
 - Routing memory auto-updates from run outcomes
 - `/renmark:debug` per-step routing actually wired
 - Additional native providers (Ollama, OpenRouter, OpenAI-compat) — Phase 4
-- LiteLLM plug-in slot — Phase 5
+- ~~LiteLLM plug-in slot — Phase 5~~ (dropped — native providers cover the realistic use cases)
 
 ## v0.1.0 — 2026-05-12 (Phase 1 module landing + roadmap reporter)
 
@@ -80,7 +106,7 @@ The eight `.renmark/memory/` files now have proper documentation-grade templates
 - `/renmark:debug` per-step routing (NIM grep / codex trace / opus reasoning)
 - `/renmark:codereview` Sonnet + Opus passes
 - Additional native providers (Ollama, OpenRouter, OpenAI-compat) — Phase 4
-- LiteLLM plug-in slot — Phase 5 (optional)
+- ~~LiteLLM plug-in slot — Phase 5~~ (dropped — native providers cover the realistic use cases) (optional)
 
 ## v0.0.3 — 2026-05-12 (Phase 1, +memory + help)
 

@@ -89,7 +89,7 @@ Extends nim-execute's format with three new fields. Backwards-compatible (existi
   ... prose ...
 ```
 
-Executor values: `nim` | `codex` | `opus` | `sonnet` | `<litellm-provider-string>` (e.g. `ollama_chat/qwen2.5-coder:32b`, `openrouter/anthropic/claude-haiku`).
+Executor values: `nim` | `codex` | `opus` | `sonnet` | `<provider>/<model>` for native Phase-4 providers (`ollama_chat/qwen2.5-coder:32b`, `openrouter/anthropic/claude-haiku`, etc.). **No LiteLLM dependency** — renmark owns the HTTP code for each supported provider. Phase 5 (LiteLLM plug-in slot) was dropped by user decision; native providers cover all realistic use cases.
 
 ## Executor dispatch & permission economy
 
@@ -217,8 +217,9 @@ Templates ship inside the plugin at `~/.claude/plugins/renmark/templates/`.
 │       ├── claude_agent.py                   # opus/sonnet — *skill-side* helper (Agent tool dispatch)
 │       ├── ollama.py                         # local Ollama HTTP (Phase 4)
 │       ├── openrouter.py                     # OpenRouter HTTP (Phase 4)
-│       ├── openai_compat.py                  # any OpenAI-compatible endpoint (Phase 4)
-│       └── litellm_plugin.py                 # OPTIONAL slot (Phase 5), off by default
+│       └── openai_compat.py                  # any OpenAI-compatible endpoint (Phase 4)
+# Note: LiteLLM plug-in slot was considered and dropped (user decision).
+# Future providers go in as one-file native clients.
 ├── bin/renmark-execute                       # shell shim → python -m renmark
 ├── tests/                                    # pytest suite (copied + extended from nim_execute tests)
 ├── install.sh                                # symlinks plugin/ → ~/.claude/plugins/renmark/, bin/ → ~/.local/bin/
@@ -241,8 +242,9 @@ Install model: `install.sh` symlinks `plugin/` into `~/.claude/plugins/renmark/`
 | `claude-mem` | File-based persistent memory pattern (we build a lightweight project-local version) |
 | Plandex | Per-role model config; cost preview; persistent state ledger |
 | Aider (architect/editor) | Planner-emitter role separation |
-| LiteLLM | Multi-provider HTTP unification |
 | Goose recipes | Plans-as-portable-units shape |
+
+(LiteLLM was considered as a multi-provider HTTP wrapper; user dropped it in favor of one native provider file per service. Adds zero deps; new providers = ~50 lines copying the openai_compat pattern.)
 
 ## Phasing
 
@@ -292,10 +294,9 @@ Install model: `install.sh` symlinks `plugin/` into `~/.claude/plugins/renmark/`
 - Provider-string executors (`ollama_chat/qwen2.5-coder:32b`, `openrouter/anthropic/claude-haiku`) work out of the box
 - Token tracking unified through each provider's native usage emission
 
-### Phase 5 (optional) — LiteLLM plug-in slot
-- `providers/litellm_plugin.py` opt-in: user installs `pip install litellm` themselves; renmark imports lazily
-- Routes provider strings not in the native registry through LiteLLM
-- Disabled by default — renmark owns its own HTTP code and only delegates to LiteLLM if the user explicitly opts in
+### Phase 5 — DROPPED (LiteLLM plug-in slot)
+
+Originally planned. Dropped by user decision: native providers (Phase 4) cover all realistic use cases. If a future need for Bedrock/Vertex/Replicate arises, add it as a one-file native provider following the `openai_compat.py` pattern.
 
 ## Files to create
 
@@ -359,7 +360,7 @@ Per phase:
 ## Resolved decisions
 
 - **Parallelism is in MVP (Phase 1).** Wave dispatch + disjoint-target validation ship from day one.
-- **No LiteLLM dependency.** Renmark owns its own provider HTTP code under `providers/`. LiteLLM may be added later as an opt-in plug-in slot (`providers/litellm_plugin.py`), loaded lazily only if the user explicitly enables it. Default install has zero third-party LLM-adapter dependencies.
+- **No LiteLLM, ever.** Renmark owns its own provider HTTP code under `providers/`. Future providers go in as one-file native clients (~50 lines each, following the `openai_compat.py` pattern). Phase 5 (LiteLLM plug-in slot) dropped by user decision — most of what LiteLLM uniquely covers (Bedrock, Vertex, Replicate) is out of scope for this project.
 - **Fresh repo at `/home/renmark/projects/ai-system/`.** Not modifying `ai-inference`; code is copied in as starting material.
 - **`/renmark:*` replaces `/orchestrator`.** `install.sh` backs up the old skill to `~/.claude/skills/.orchestrator.bak/` then registers the renmark plugin so the only orchestration surface going forward is renmark's five commands.
 

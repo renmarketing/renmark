@@ -116,27 +116,38 @@ def _ensure_git_repo(cwd: Path) -> None:
     )
 
 
+# Serialize git operations across parallel task threads. Wave members write to
+# disjoint files (validated by dispatch) so the apply/verify steps are safe to
+# parallelize, but the git index is not — index lock contention would
+# manifest as "Another git process seems to be running" errors.
+import threading as _threading
+_GIT_LOCK = _threading.Lock()
+
+
 def _git_tag(cwd: Path, name: str) -> None:
-    _git("tag", "-f", name, cwd=cwd)
+    with _GIT_LOCK:
+        _git("tag", "-f", name, cwd=cwd)
 
 
 def _git_commit(cwd: Path, target: str, message: str, trailer: str) -> str:
-    add = _git("add", "--", target, cwd=cwd)
-    if add.returncode != 0:
-        return ""
-    full = message + "\n\n" + trailer + "\n"
-    commit = subprocess.run(
-        ["git", "commit", "-q", "-F", "-"],
-        cwd=str(cwd), input=full, capture_output=True, text=True,
-    )
-    if commit.returncode != 0:
-        return ""
-    sha = _git("rev-parse", "--short", "HEAD", cwd=cwd).stdout.strip()
-    return sha
+    with _GIT_LOCK:
+        add = _git("add", "--", target, cwd=cwd)
+        if add.returncode != 0:
+            return ""
+        full = message + "\n\n" + trailer + "\n"
+        commit = subprocess.run(
+            ["git", "commit", "-q", "-F", "-"],
+            cwd=str(cwd), input=full, capture_output=True, text=True,
+        )
+        if commit.returncode != 0:
+            return ""
+        sha = _git("rev-parse", "--short", "HEAD", cwd=cwd).stdout.strip()
+        return sha
 
 
 def _git_restore_target(cwd: Path, target: str) -> None:
-    _git("checkout", "--", target, cwd=cwd)
+    with _GIT_LOCK:
+        _git("checkout", "--", target, cwd=cwd)
 
 
 def _choose_model(task: Task, cfg: Config) -> str:
@@ -257,79 +268,130 @@ def execute_plan(
     failure_kind: str | None = None
     skipped: list[int] = []
 
-    for task in tasks:
-        if task.index in done:
-            _print(_format_status_line(
-                task.index, len(tasks), task.title, "DONE", 0.0, 0, "(prev run)",
-            ))
-            passed.append(task.index)
-            continue
-        if failed_task is not None:
-            skipped.append(task.index)
-            _print(_format_status_line(
-                task.index, len(tasks), task.title, "SKIP", 0.0, 0, "(after fail)",
-            ))
-            continue
-        if tokens_used >= cfg.max_tokens_per_run:
-            failure_kind = "token_budget"
-            skipped.append(task.index)
-            continue
-        if time.monotonic() > deadline:
-            failure_kind = "time_budget"
-            skipped.append(task.index)
+    # Group tasks into waves for parallel execution. Tasks sharing a
+    # `parallel_group` run concurrently; defaults to one wave per task.
+    from . import dispatch as _dispatch
+    try:
+        waves = _dispatch.group_tasks_by_wave(tasks)
+        for w in waves:
+            _dispatch.validate_wave(w)
+    except ValueError as e:
+        _print(f"ERROR: plan has invalid wave: {e}")
+        return 2
+
+    needs_agent: list[int] = []   # tasks executor=opus/sonnet, skill must dispatch
+
+    def _runner(task: Task, _repo: Path):
+        """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
+        ok, reason, used, sha = _execute_task(
+            task=task, repo=_repo, run_id=run_id, cfg=cfg, client=client,
+            remaining_token_budget=max(0, cfg.max_tokens_per_run - tokens_used),
+            total=len(tasks),
+        )
+        return _dispatch.TaskResult(
+            task_index=task.index, executor=task.executor,
+            status="passed" if ok else "failed",
+            sha=sha, tokens_out=used, note=reason,
+        )
+
+    for wave in waves:
+        # Already-committed tasks (from --resume) just emit DONE lines.
+        for t in wave:
+            if t.index in done:
+                _print(_format_status_line(
+                    t.index, len(tasks), t.title, "DONE", 0.0, 0, "(prev run)",
+                ))
+                if t.index not in passed:
+                    passed.append(t.index)
+
+        runnable = [t for t in wave if t.index not in done]
+        if not runnable or failed_task is not None:
             continue
 
+        # Wave-level budget gates.
+        if tokens_used >= cfg.max_tokens_per_run:
+            failure_kind = "token_budget"
+            for t in runnable:
+                skipped.append(t.index)
+            break
+        if time.monotonic() > deadline:
+            failure_kind = "time_budget"
+            for t in runnable:
+                skipped.append(t.index)
+            break
+
+        # Dispatch the wave. nim/codex run in parallel; opus/sonnet are
+        # marked `needs_agent` for the skill to handle via Agent tool.
         try:
-            ok, reason, used_tokens, sha = _execute_task(
-                task=task, repo=repo, run_id=run_id, cfg=cfg, client=client,
-                remaining_token_budget=cfg.max_tokens_per_run - tokens_used,
-                total=len(tasks),
+            wave_result = _dispatch.dispatch_wave(
+                runnable, repo=repo, run_task=_runner,
             )
         except Exception as exc:  # pragma: no cover — defense in depth
-            # Any uncaught exception inside the task pipeline (e.g., a
-            # response shape we didn't anticipate, a verifier shell quirk).
-            # Escalate cleanly instead of crashing the whole run.
             import traceback as _tb
             tb = _tb.format_exc()
-            _record_escalation(
-                repo, task, run_id, _choose_model(task, cfg),
-                base_prompt="(unexpected exception — see traceback)",
-                response="", verifier_log=tb,
-                retry_count=cfg.max_task_retries,
-                prompt_tokens=0, completion_tokens=0,
-            )
-            _print(_format_status_line(
-                task.index, len(tasks), task.title, "FAIL", 0.0, 0,
-                f"unexpected: {type(exc).__name__}: {str(exc)[:60]}",
-            ))
-            failed_task = task
-            failure_kind = "unexpected_exception"
-            continue
-        tokens_used += used_tokens
-        if ok:
-            passed.append(task.index)
-        else:
-            failed_task = task
-            failure_kind = reason
+            _print(f"ERROR dispatching wave: {type(exc).__name__}: {str(exc)[:100]}")
+            for t in runnable:
+                _record_escalation(
+                    repo, t, run_id, _choose_model(t, cfg),
+                    base_prompt="(wave dispatch failed)", response="",
+                    verifier_log=tb, retry_count=0,
+                    prompt_tokens=0, completion_tokens=0,
+                )
+            failed_task = runnable[0]
+            failure_kind = "wave_dispatch_failed"
+            break
+
+        # Process results in task-index order so the log reads naturally.
+        for r in sorted(wave_result.tasks, key=lambda x: x.task_index):
+            if r.status == "passed":
+                passed.append(r.task_index)
+                tokens_used += r.tokens_out
+            elif r.status == "needs_agent":
+                needs_agent.append(r.task_index)
+                _print(_format_status_line(
+                    r.task_index, len(tasks),
+                    next(t.title for t in runnable if t.index == r.task_index),
+                    "NEEDS-AGENT", 0.0, 0,
+                    f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
+                ))
+            else:  # failed
+                failed_task = next(t for t in runnable if t.index == r.task_index)
+                failure_kind = r.note or "task_failed"
+                tokens_used += r.tokens_out
+                break  # stop wave processing; outer loop also breaks via failed_task check
 
     # End-of-run summary.
     _print("")
-    _print(
-        f"{len(passed)}/{len(tasks)} passed, "
-        f"{1 if failed_task else 0} failed, "
-        f"{len(skipped)} skipped"
-    )
+    parts = [
+        f"{len(passed)}/{len(tasks)} passed",
+        f"{1 if failed_task else 0} failed",
+        f"{len(skipped)} skipped",
+    ]
+    if needs_agent:
+        parts.append(f"{len(needs_agent)} needs-agent ({sorted(needs_agent)})")
+    _print(", ".join(parts))
     today = usage_today(repo)
     _print(
         f"Tokens this run: {tokens_used} / {cfg.max_tokens_per_run} "
         f"({100 * tokens_used / max(cfg.max_tokens_per_run, 1):.1f}%) | "
         f"Today: {today} | Month: {usage_this_month(repo)}"
     )
+    waves_count = len(waves)
+    _print(f"Waves: {waves_count} (parallel-grouped from {len(tasks)} tasks)")
 
-    if failed_task is None:
+    if failed_task is None and not needs_agent:
         _git_tag(repo, f"nim-run-{run_id}-end")
         clear_pause(repo)
         _print("All tasks completed.")
+        return 0
+    if failed_task is None and needs_agent:
+        _print(
+            f"Note: tasks {sorted(needs_agent)} need Claude (opus/sonnet) dispatch "
+            f"via the /renmark:orchestrate skill's Agent-tool path. "
+            f"renmark-execute (CLI) doesn't dispatch Claude executors."
+        )
+        # We did not fail — orchestrate skill is expected to follow up.
+        # Don't tag run-end yet; that's the skill's job after Agent tasks land.
         return 0
 
     # Failure path: write pause state and exit non-zero.
