@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.3 — 2026-05-12 (cost preview + --no-commit + routing-memory + perm snippet)
+
+Phase 1 polish landed:
+
+- **Cost preview in `--dry-run`**: per-task line shows executor + complexity + estimated tokens + estimated $; totals at the bottom. Uses `est_tokens` / `est_cost_usd` from the plan if present, falls back to complexity heuristic. NIM = free, codex ≈ $0.05/kT, sonnet ≈ $0.003/kT, opus = in-context.
+- **`renmark-execute --no-commit`** runtime now wired through `_NO_COMMIT_MODE` module flag. `_git_commit` returns `"(no-commit)"` sentinel; the skill batches commits per wave.
+- **Routing memory auto-updates**: after each task completes (passed/failed), `_memory_log_outcome` appends to `routing.md` with the task signature (`target=*.py, complexity=medium, mode=A`), executor, and outcome. Failed tasks also append to `learnings.md` with the failure note. Future `/renmark:plan` runs read these to inform auto-routing.
+- **Permission-allowlist snippet** added to README — paste-in `.claude/settings.local.json` block that eliminates Bash prompts for `renmark-execute *` calls.
+
+91 tests pass (no regressions from these changes — pure additions).
+
+**Still pending:**
+- `providers/ollama.py`, `openrouter.py`, `openai_compat.py` — Phase 4
+- `/renmark:debug` per-step routing — Phase 3
+
 ## v0.1.2 — 2026-05-12 (cli uses dispatch.py — parallel waves live)
 
 **Headline:** `renmark-execute` now uses `dispatch.py` for wave-based parallel execution. Tasks sharing a `parallel_group` run concurrently on separate threads; tasks with `executor: opus | sonnet` are marked `needs_agent` and surfaced so the `/renmark:orchestrate` skill can dispatch them via the Agent tool.

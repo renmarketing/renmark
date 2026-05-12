@@ -22,7 +22,28 @@ bash install.sh                  # symlinks plugin/ + bin/renmark-execute global
 2. Symlinks `plugin/` → `~/.claude/plugins/renmark/`
 3. Symlinks `bin/renmark-execute` → `~/.local/bin/renmark-execute`
 
-After install, the new `/renmark:*` skills appear in Claude Code's skill list; the old `/orchestrator` is gone (backup preserved for revert).
+After install, the new `/renmark:*` skills appear in Claude Code's skill list; the old `/orchestrator` is removed (source code still in `/home/renmark/projects/ai-inference/`).
+
+## Zero permission prompts (recommended)
+
+For non-auto-mode use, paste this into the target project's `.claude/settings.local.json` to pre-approve the renmark-execute command pattern. After this, Claude Code never prompts when the orchestrate skill shells out.
+
+```json
+{
+  "permissions": {
+    "Bash": {
+      "allow": [
+        "renmark-execute *",
+        "git status",
+        "git log *",
+        "git diff *"
+      ]
+    }
+  }
+}
+```
+
+(Adjust the path patterns to taste. The renmark-execute pattern covers all `--dry-run`, `--resume`, `--usage`, `--roadmap`, `--logs`, `--no-commit` variants.)
 
 ## Five skills
 

@@ -6,4 +6,4 @@ Opus, Sonnet, or any registered provider.
 
 Phase 0 baseline: copied from ai-inference v0.2.0 with module reshuffles.
 """
-__version__ = "0.1.2"
+__version__ = "0.1.3"

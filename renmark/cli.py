@@ -129,7 +129,15 @@ def _git_tag(cwd: Path, name: str) -> None:
         _git("tag", "-f", name, cwd=cwd)
 
 
+# When --no-commit is on, _git_commit becomes a no-op that returns a sentinel
+# string. The skill (`/renmark:orchestrate`) is then responsible for batching
+# commits per wave, in task-index order, after the wave finishes.
+_NO_COMMIT_MODE = False
+
+
 def _git_commit(cwd: Path, target: str, message: str, trailer: str) -> str:
+    if _NO_COMMIT_MODE:
+        return "(no-commit)"
     with _GIT_LOCK:
         add = _git("add", "--", target, cwd=cwd)
         if add.returncode != 0:
@@ -152,6 +160,42 @@ def _git_restore_target(cwd: Path, target: str) -> None:
 
 def _choose_model(task: Task, cfg: Config) -> str:
     return task.model or cfg.prefer_small_model
+
+
+def _default_tokens_for_complexity(complexity: str) -> int:
+    """Rough output-token estimate when the plan doesn't specify est_tokens."""
+    return {"simple": 200, "medium": 1000, "hard": 4000}.get(complexity, 1000)
+
+
+def _task_signature(task) -> str:
+    """Compact signature used in routing memory entries."""
+    import fnmatch  # noqa: F401
+    # Reduce target to a coarse glob: filename for short paths, directory prefix otherwise.
+    parts = task.target.split("/")
+    if len(parts) >= 2 and parts[0] in ("tests", "test"):
+        glob = f"{parts[0]}/**"
+    elif "." in parts[-1]:
+        glob = f"*.{parts[-1].rsplit('.', 1)[1]}"
+    else:
+        glob = task.target
+    return f"target={glob}, complexity={task.complexity}, mode={task.mode}"
+
+
+def _memory_log_outcome(repo: Path, task, outcome: str, run_id: str, note: str = "") -> None:
+    """Append a routing.md entry after each task completes. Best-effort."""
+    try:
+        from . import memory as _mem
+        _mem.append_routing(
+            repo, signature=_task_signature(task),
+            executor=task.executor, outcome=outcome, run_id=run_id,
+        )
+        if outcome == "failed" and note:
+            _mem.append_learning(
+                repo, signal=f"task {task.index} failed on {task.executor}",
+                observation=note[:200], source="run",
+            )
+    except Exception:
+        pass  # memory updates are non-critical
 
 
 def _build_prompt(task: Task, repo: Path) -> str:
@@ -189,7 +233,11 @@ def _format_status_line(
 
 def execute_plan(
     plan_path: str, *, repo: Path, resume: bool = False, dry_run: bool = False,
+    no_commit: bool = False,
 ) -> int:
+    global _NO_COMMIT_MODE
+    _NO_COMMIT_MODE = no_commit
+
     cfg = Config.from_env()
     try:
         tasks = parse_plan(plan_path)
@@ -237,10 +285,36 @@ def execute_plan(
     )
 
     if dry_run:
-        _print("\n[DRY RUN] would execute the following tasks:")
-        for t in tasks:
-            mark = "DONE" if t.index in done else "TODO"
-            _print(f"  [{mark}] task {t.index} mode={t.mode} → {t.target}  ({t.title})")
+        from . import dispatch as _d
+        waves = _d.group_tasks_by_wave(tasks)
+        _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
+        # Cost estimates per executor — approximate $/kT (output tokens).
+        cost_per_kt = {"codex": 0.05, "sonnet": 0.003, "opus": 0.0, "nim": 0.0}
+        total_tokens = 0
+        total_cost = 0.0
+        for w_idx, w in enumerate(waves, 1):
+            wave_tag = "(parallel)" if len(w) > 1 else ""
+            _print(f"  Wave {w_idx}: {len(w)} task(s) {wave_tag}")
+            for t in w:
+                mark = "DONE" if t.index in done else "TODO"
+                tok = t.est_tokens or _default_tokens_for_complexity(t.complexity)
+                ex = t.executor
+                cost = t.est_cost_usd
+                if cost is None:
+                    # Infer from executor.
+                    rate = cost_per_kt.get(ex, 0.0)
+                    if "/" in ex:           # provider/model — assume openai-compatible mid-tier
+                        rate = cost_per_kt.get("sonnet", 0.003)
+                    cost = (tok / 1000.0) * rate
+                cost_str = f"${cost:.3f}" if cost > 0 else "free"
+                _print(
+                    f"    [{mark}] task {t.index} {ex:<8} {t.complexity:<6} "
+                    f"~{tok:>5} tok  {cost_str:>8}  → {t.target}  ({t.title})"
+                )
+                total_tokens += tok
+                total_cost += cost
+        _print(f"\n  TOTAL estimate: ~{total_tokens:,} tokens · ~${total_cost:.3f}")
+        _print(f"  (NIM is free; codex/sonnet metered; opus = in-context, no separate API charge)")
         return 0
 
     # Pre-flight quota probe (cheap).
@@ -343,21 +417,23 @@ def execute_plan(
 
         # Process results in task-index order so the log reads naturally.
         for r in sorted(wave_result.tasks, key=lambda x: x.task_index):
+            task_obj = next(t for t in runnable if t.index == r.task_index)
             if r.status == "passed":
                 passed.append(r.task_index)
                 tokens_used += r.tokens_out
+                _memory_log_outcome(repo, task_obj, "passed", run_id)
             elif r.status == "needs_agent":
                 needs_agent.append(r.task_index)
                 _print(_format_status_line(
-                    r.task_index, len(tasks),
-                    next(t.title for t in runnable if t.index == r.task_index),
+                    r.task_index, len(tasks), task_obj.title,
                     "NEEDS-AGENT", 0.0, 0,
                     f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
                 ))
             else:  # failed
-                failed_task = next(t for t in runnable if t.index == r.task_index)
+                failed_task = task_obj
                 failure_kind = r.note or "task_failed"
                 tokens_used += r.tokens_out
+                _memory_log_outcome(repo, task_obj, "failed", run_id, note=r.note)
                 break  # stop wave processing; outer loop also breaks via failed_task check
 
     # End-of-run summary.
@@ -805,7 +881,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.plan:
         ap.error("plan path is required unless --usage / --roadmap / --logs")
-    return execute_plan(args.plan, repo=repo, resume=args.resume, dry_run=args.dry_run)
+    return execute_plan(
+        args.plan, repo=repo, resume=args.resume, dry_run=args.dry_run,
+        no_commit=args.no_commit,
+    )
 
 
 if __name__ == "__main__":
