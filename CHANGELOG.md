@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.0 — 2026-05-12 (Phase 0)
+## v0.0.1 — 2026-05-12 (Phase 0)
 
 **Bootstrap of the new `ai-system` repo.** Copies the working v0.2.0 baseline from `/home/renmark/projects/ai-inference/` and retargets the Python package from `nim_execute` to `renmark`.
 
