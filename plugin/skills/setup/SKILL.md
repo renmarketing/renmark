@@ -20,6 +20,10 @@ Prepares an existing project for the renmark workflow. Reads the current project
 
 ## Steps
 
+**Step 0 — Context check.** Call `state.context_budget_check(repo, 'setup', 'meta')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'setup', 'meta')`.
+
+**Lifecycle initialization.** As part of setup, if no `.renmark/state/lifecycle.json` exists, leave it that way — `/renmark:start` or `/renmark:feature` will create it when work actually begins. Setup itself does NOT seed a lifecycle (there's no in-flight feature yet).
+
 ### 1. Discover project state
 
 ```bash
@@ -60,6 +64,8 @@ git rev-parse --git-dir 2>/dev/null && echo "git repo" || echo "no git repo"
 | `failure-transparency-rule` | Outputs carry completion_state / confidence / validation_status |
 | `workflow-recovery-rule` | Multi-step workflows resumable via `.renmark/state/pipeline.json` |
 | `task-isolation-rule` | Orchestrate tasks run in isolated subagent contexts |
+| `context-budget-rule` | `/compact` at 60%, `/clear` on cross-domain skill changes |
+| `lifecycle-rule` | Every stage transition writes `.renmark/state/lifecycle.json` (G12) |
 
 If no renmark tooling table is present, append the full `## Tooling — renmark workflow` section.
 

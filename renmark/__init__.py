@@ -1,9 +1,13 @@
-"""Renmark — multi-LLM orchestration with persistent project memory.
+"""Renmark — vibe-coder development framework with multi-LLM orchestration.
 
-Five Claude Code skills (/renmark:brainstorm, plan, orchestrate, debug, codereview)
-backed by a CLI (renmark-execute) that dispatches tasks to Haiku, Codex,
-Sonnet, Opus, or any registered provider.
+13 Claude Code skills (/renmark:start, brainstorm, plan, check-plan,
+orchestrate, verify, codereview, debug, finish, feature, setup, resume,
+roadmap, help) backed by a CLI (renmark-execute) that dispatches tasks to
+Haiku, Codex, Sonnet, Opus, or any registered provider.
 
-Phase 0 baseline: copied from ai-inference v0.2.0 with module reshuffles.
+Core innovation: AI workflows that survive context death. Workflow state
+persists to `.renmark/state/lifecycle.json`; runtime state to
+`pipeline.json`. After `/clear`, `/renmark:resume` recovers in one file
+read.
 """
-__version__ = "0.2.0"
+__version__ = "0.3.0"

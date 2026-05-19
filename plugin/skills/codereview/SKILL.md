@@ -52,6 +52,10 @@ Codex writes its review to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` directl
 
 ## Steps
 
+**Step 0 — Context check.** Call `state.context_budget_check(repo, 'codereview', 'debug')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'codereview', 'debug')`.
+
+**Lifecycle note:** Codereview is orthogonal to stage progression but commonly runs as part of the Review stage. Skill should NOT bump `lifecycle.json.stage` directly — the wrapper `/renmark:feature` handles that after both codereview AND any secure audit complete.
+
 ### 1. Determine scope
 
 If the user gave a ref range (`HEAD~3..HEAD`, `main..feature`), use that. Otherwise default to `git diff --name-only HEAD` (working tree). Show a `git diff --stat <range>` summary and confirm with the user.

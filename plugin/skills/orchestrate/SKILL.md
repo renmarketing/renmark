@@ -1,34 +1,42 @@
 ---
 name: orchestrate
-description: Use when the user wants to execute an existing renmark plan — typed as /renmark:orchestrate or phrases like "deploy this plan", "execute the plan", "run the orchestrator", "build it". Reads the plan, dispatches each task to its assigned executor (opus, codex, sonnet, haiku), runs verifiers, commits per task, and writes summary state to .renmark/state/. Skill loads only summary lines into Opus context — generated code bodies stay in subprocesses or subagents.
+description: Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "build it", "run the plan". Reads the plan, dispatches each task in an isolated subagent context (G11), aggregates per-wave summaries to `.renmark/state/wave-summaries/`, commits passing tasks, updates `pipeline.json` + `lifecycle.json`. The orchestrator NEVER reads generated code into conversation — subagent transcripts, diffs, and bodies live in artifacts only.
 ---
 
 # orchestrate
 
 ## Overview
 
-Dispatches plan tasks in waves. Within a `parallel_group`, tasks run concurrently. **Two separate dispatch paths — never mix them:**
+Dispatches plan tasks in waves with **strict task isolation** (G11). Within a `parallel_group`, tasks run concurrently. Two dispatch paths — never mix them:
 
 | Executor | Dispatch path | Quota consumed |
 |---|---|---|
-| `codex` | Bash call to `renmark-execute` | Codex account (OpenAI subscription) |
+| `codex` | Bash call to `renmark-execute` (subprocess) | Codex account (OpenAI subscription) |
 | `haiku`, `sonnet`, `opus` | Agent tool calls (no model override) | Claude Code account (Anthropic subscription) |
 
-After each wave, the skill commits passing tasks serially in task-index order.
+After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (the per-task `SubagentOutput` dicts) and commits passing tasks serially in task-index order.
 
-**Token-isolation contract:** the skill NEVER reads generated code into the conversation. Only per-task summaries (PASS/FAIL/skip + sha + token count). On escalation, the skill reads `.renmark/state/escalations/task-N/` artifacts.
+**Token-isolation contract (G11):**
+- Every task runs in an **isolated subagent context**.
+- Each subagent receives only: task spec · required file paths · upstream artifact pointers · dependency summaries from the prior wave's `wave-summaries/` file · verifier expectations.
+- Each subagent emits only the `SubagentOutput` schema (status, artifact_path, touched_files, sha, summary_lines ≤ 5, dependency_notes, token_count, completion_state, confidence, retry_count).
+- The orchestrator validates the response via `renmark.dispatch.parse_subagent_response` — any extra field (transcript, diff, generated_code, reasoning) raises `IsolationViolation` and the task is FAIL.
+- **The orchestrator never reads generated code into the conversation.** Period.
 
 ## When to Use
 
 - User has a `.renmark/plans/*.plan.md` file ready and wants it executed
-- After `/renmark:plan` completes
+- After `/renmark:plan` + `/renmark:check-plan` complete (stage = `plan-validated`)
 - To `--resume` a paused run
 
 **Do NOT use:**
-- Without a plan file → `/renmark:plan` first
+- Without a validated plan → `/renmark:plan` first, then `/renmark:check-plan`
 - For brainstorming or design — that's `/renmark:brainstorm`
+- To "look at the generated code" — that's a context-hygiene violation; route to `/renmark:debug` instead
 
 ## Steps
+
+**Step 0 — Context check.** Call `state.context_budget_check(repo, 'orchestrate', 'build')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'orchestrate', 'build')`. Also check `state.read_pipeline_state(repo)` — if `current_phase == "orchestrate"` and `pipeline_is_resumable(repo)`, surface: *"Existing orchestrate run paused at wave N — use `--resume` to continue, or clear pipeline state to start fresh."*
 
 ### 1. Discover plan
 
@@ -42,120 +50,177 @@ Confirm the path with the user before continuing.
 
 ### 2. Pre-flight (free)
 
-Before running anything, check env vars for the executors the plan uses:
+**Pipeline state check** — `state.read_pipeline_state(repo)`. If a prior run was paused, offer resume vs reset. New runs initialize fresh state:
 
-```bash
-# codex CLI must be on PATH for any plan with executor: codex tasks
-command -v codex >/dev/null || echo "codex not found — install openai-codex CLI first."
+```python
+from renmark import state
+state.write_pipeline_state(repo, current_phase="orchestrate", current_plan=<plan>,
+                           wave_index=0, wave_total=<computed>, clear_tasks=True)
 ```
 
-If codex is missing and the plan has codex tasks, **stop and tell the user before running**.
-
-**Refactor safety check** — if the plan has any task with `complexity: hard` OR the spec mentions "refactor", "rename", "restructure", "migrate":
-1. Run `git status` — confirm working tree is clean
-2. Run a checkpoint commit: `git -c user.name="renmark-orchestrate" -c user.email="orchestrate@renmark.local" commit --allow-empty -m "chore: checkpoint before <plan name>"`
-3. Run each affected task's verifier once now as baseline — if any fail, **stop**: the plan cannot proceed into a broken baseline
-
-**Changelog check** — read the last 3 entries in `CHANGELOG.md` (if it exists) and flag any "Do not change" guards that overlap with the current plan's target files. Report them before proceeding.
+**Executor check** — `command -v codex` if the plan has any `executor: codex` tasks. If missing, stop and tell the user before running.
 
 **Plan validation** — invoke `/renmark:check-plan <plan>` before spending tokens. If it exits 1 (BLOCK), fix the plan first. WARNs can proceed.
 
-```bash
-renmark-execute --dry-run <plan>
+**Refactor safety** — if the plan has any `complexity: hard` task or the spec mentions "refactor"/"rename"/"restructure"/"migrate":
+1. Confirm clean working tree (`git status`).
+2. Checkpoint commit: `git -c user.name="renmark-orchestrate" -c user.email="orchestrate@renmark.local" commit --allow-empty -m "chore: checkpoint before <plan name>"`.
+3. Baseline each affected verifier — if any fails now, **stop**: do not orchestrate into a broken baseline.
+
+**Changelog check** — read the last 3 entries in `CHANGELOG.md`; flag any "Do not change" guards that overlap with the plan's target files.
+
+**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost. Ask: *"Proceed? [y/N]"*
+
+### 3. Dispatch tasks in waves (G11 isolation)
+
+For each wave in `dispatch.group_tasks_by_wave(plan.tasks)`:
+
+**3a. Build dependency context for this wave**
+
+Read prior wave summary if any:
+
+```python
+from renmark import state
+prior = state.read_wave_summary(repo, wave_index - 1) if wave_index > 0 else None
+dependency_summaries = []
+if prior:
+    for task_output in prior["task_outputs"]:
+        if task_output.get("dependency_notes"):
+            dependency_summaries.append(
+                f"task {task_output['task_id']}: {task_output['dependency_notes']}"
+            )
 ```
 
-Show the task list and cost preview. Ask: *"Proceed? [y/N]"*
+**The orchestrator does NOT load any wave's full output.** Only the `dependency_notes` field crosses the boundary.
 
-### 3. Run codex tasks
+**3b. Dispatch each task in this wave (parallel)**
 
-**RED FLAG — never dispatch a `codex` task as an Agent call.** Codex tasks run exclusively through `renmark-execute` (a Bash subprocess that calls the Codex CLI). Dispatching them as Agents runs them on the parent Claude model instead, consuming Anthropic credits and ignoring the cost/routing intent of the plan.
+For `executor: codex` tasks:
 
-Before starting a wave that has `executor: codex` tasks, pre-create the target directories so codex doesn't scaffold extra files to compensate for a missing directory context:
+> **RED FLAG — never dispatch a `codex` task as an Agent call.** Codex tasks run exclusively through `renmark-execute` (a Bash subprocess). Dispatching them as Agents runs them on the parent Claude model, consuming Anthropic credits and ignoring the cost/routing intent.
+>
+> **RED FLAG — never merge a subagent transcript into orchestrator context.** The subagent's reasoning lives in its artifact file. The orchestrator reads only the parsed `SubagentOutput` JSON.
+
 ```bash
-# For each codex task target in the wave:
+# Pre-create target dirs so codex doesn't scaffold extras
 mkdir -p "$(dirname <target>)"
-```
-
-```bash
+# Dispatch the whole wave (renmark-execute handles parallelism internally)
 renmark-execute <plan>
 ```
 
-Stream summary lines as they arrive. Do NOT cat generated files. Monitor the background process with the `Monitor` tool — do NOT use `sleep N && cat output` (blocked by hooks).
+`renmark-execute` returns one JSON line per task with the `SubagentOutput` shape. The orchestrator passes each through `dispatch.parse_subagent_response()`, which raises `IsolationViolation` on any extra field.
 
-After each successful wave commits, append a new entry to `CHANGELOG.md`:
+For `executor: haiku | sonnet | opus` tasks:
+
+Plain `Agent` call — no `model` override. Build the subagent prompt from `dispatch.build_subagent_input(task, dependency_summaries=...)`. The Agent prompt MUST instruct the subagent:
+
+> "Your final response MUST be valid JSON matching this shape:
+> ```json
+> {"status": "PASS|FAIL|SKIP", "artifact_path": "<path>",
+>  "touched_files": [...], "sha": "<sha or null>",
+>  "summary_lines": ["<≤5 lines>"], "dependency_notes": "<what downstream tasks need>",
+>  "token_count": <int>, "completion_state": "complete|partial|failed",
+>  "confidence": "low|medium|high", "retry_count": 0}
+> ```
+> The generated code goes in the artifact file at `<artifact_path>`, NOT in your response. Do not paste code or diffs back. If you cannot complete with the inputs provided, return `status: FAIL` with a one-line reason."
+
+After the Agent returns, parse its response through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark the task as FAIL with reason "subagent leaked forbidden fields" — do not retry.
+
+**3c. Run verifier per task**
+
+For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, tail_lines=3)`. Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
+
+### 4. Aggregate wave summary
+
+After all tasks in the wave finish:
+
+```python
+state.write_wave_summary(repo, wave_index, task_outputs=[out.to_dict() for out in outputs])
+state.write_pipeline_state(repo, wave_index=wave_index,
+                           add_completed_task=..., add_failed_task=...)
 ```
-## [YYYY-MM-DD] — [plan task title]
-**Request:** [1-2 sentence plain-English summary of what was asked]
-**Built:** [what was actually implemented]
+
+Then commit PASSing tasks serially in task-index order. For each commit, append to `CHANGELOG.md`:
+
+```markdown
+## [YYYY-MM-DD] — <task title>
+**Request:** <1-2 sentence summary>
+**Built:** <what was implemented (from task's summary_lines)>
 **Files changed:**
-- `<target>` — [what changed and why]
+- `<target>` — <touched_files[0]>
 **Do not change:**
-- [any invariants discovered during this task]
-```
-Include `CHANGELOG.md` in the same git add/commit as the task output.
-
-### 3b. Run haiku/sonnet/opus tasks (in-context Agent dispatch)
-
-`renmark-execute` does not call Claude — these are dispatched by **you** as Agent tool calls. See CLAUDE.md § Executor dispatch rules. For each task:
-
-- Plain `Agent` call — no `model` override (triggers worktree creation)
-- Specify absolute path in agent prompt: *"Working directory: `<abs_project_path>`. Write to `<abs_project_path>/<target>`."*
-- Pass full task spec, target file, verifier, and "do not commit" constraint
-- After agent returns, run the verifier yourself to confirm exit 0
-
-**CWD rule:** Run all verifiers and git with absolute paths. For Node.js, run `npm install --prefix <abs>` before any `node -e "require(...)"` verifier. Use absolute require paths: `node -e "require('/abs/path/file.js')"`.
-
-```bash
-git -c user.name="renmark-orchestrate" -c user.email="orchestrate@renmark.local" commit -m "..."
+- <invariants surfaced by the task or by check-plan>
 ```
 
-### 4. Interpret outcome
+Use the task's `summary_lines` and `touched_files` from `SubagentOutput` to fill these — never go read the actual file diff.
 
-| Exit | Meaning | Action |
-|---|---|---|
-| 0 | All tasks passed | Report totals; tag end |
-| 2 | Plan parse error | Route to `/renmark:plan` |
-| 10 | Paused | Read `.renmark/state/PAUSED` + escalation artifacts |
+### 5. Interpret outcome
 
-### 5. On escalation
-
-Read `.renmark/state/escalations/task-N/{metadata.json,prompt.txt,response.txt,verifier.log}`. Propose 2-3 options: fix manually + resume, switch executor in the plan + resume, skip the task.
+| Outcome | Action |
+|---|---|
+| All tasks PASS | Continue to next wave or finalize |
+| Any FAIL in wave | Pause via `state.write_pause(...)`; show resume command; stop |
+| `IsolationViolation` raised | Mark task FAIL; aggregate summary anyway; alert user to skill-side bug |
+| Plan parse error | Route to `/renmark:plan` |
 
 ### 6. Update memory
 
-Use `renmark.memory` helpers — **do NOT hand-edit memory files directly** (especially `routing.md` — direct edits corrupt its header table).
+Use `renmark.memory` helpers — do NOT hand-edit memory files directly:
 
 ```python
 from renmark.memory import log_feature, append_routing, append_learning, log_bug
-# log_feature → features.md | append_routing → routing.md (Learned overrides only)
-# append_learning → learnings.md | log_bug → bugs.md (escalations only)
 ```
 
-Run `python3 -c "from renmark import memory; help(memory)"` for full API.
+### 7. Finalize
 
-### 7. Hand off (wizard step)
+When all waves complete cleanly:
 
-**Re-verify before reporting done** — see CLAUDE.md § Verification before completion. Re-run all task verifiers in index order before showing the menu. Report any that now fail; do not claim success until all pass fresh.
+```python
+state.clear_pipeline_state(repo)
+lifecycle.write_lifecycle(repo, stage="created")
+```
 
-Renmark is a wizard pipeline. After a clean run (exit 0), offer the next step:
+The `created` stage is the canonical "code is written, not yet verified" state. The user's next step per `NEXT_BY_STAGE` is `/renmark:verify`.
+
+### 8. Hand off (wizard step)
+
+**Re-verify before reporting done** — see CLAUDE.md § verify-before-done-rule. Re-run all task verifiers in index order. Report any that now fail.
+
+After a clean run, offer the next step:
 
 > *"All N tasks committed (M commits, ~$X spent).*
 > *What's next?*
 > *  [v] Verify — run /renmark:verify to confirm the feature goal was achieved*
 > *  [c] Code review — run /renmark:codereview HEAD~N..HEAD*
-> *  [f] Finish — run /renmark:finish to create PR or merge*
-> *  [s] Smoke test — open a shell and verify manually*
+> *  [f] Finish — run /renmark:finish to mark ready-to-release*
 > *  [n] Nothing — done"*
 
 On **v** → invoke `/renmark:verify`.
-On **c** → invoke `/renmark:codereview <range>` with the appropriate ref range.
+On **c** → invoke `/renmark:codereview <range>`.
 On **f** → invoke `/renmark:finish`.
-On **s/n** → stop, leave the user in a clean state.
+On **n** → stop.
 
-If exit != 0 (paused / escalated), do NOT offer the next step. Surface the failure and the resume command first.
+If any task failed (paused / escalated), do NOT offer the next step. Surface the failure and the resume command first.
+
+## Governance compliance
+
+| # | Rule | How this skill complies |
+|---|---|---|
+| G2 | Canonical state | All workflow state lives in `lifecycle.json`; runtime state in `pipeline.json` + `wave-summaries/`. |
+| G3 | Summary boundary | Verifier output capped via `summary.verifier_tail(tail_lines=3)`. SubagentOutput.summary_lines capped at 5. |
+| G5 | Executor isolation | Codex tasks via `renmark-execute` subprocess; non-codex via Agent — never inlined. |
+| G6 | Artifact governance | Each task writes its own artifact with metadata; wave-summary aggregates only the SubagentOutput fields. |
+| G7 | Compact semantics | Pipeline state on disk; `/compact` mid-run preserves resumability. |
+| G8 | Compounding verification | Failed tasks append to `bugs.md` via `memory.log_bug`. Routing wins/losses append to `routing.md`. |
+| G9 | Failure transparency | SubagentOutput carries `completion_state` / `confidence` / `retry_count`; honest defaults if subagent omits. |
+| G10 | Workflow recovery | `pipeline.json` updated at wave boundaries; `--resume` reads it and continues from `wave_index`. |
+| G11 | Task isolation | `dispatch_task_isolated` enforced; `parse_subagent_response` refuses transcripts, diffs, generated_code, reasoning. |
+| G12 | Lifecycle persistence | `lifecycle.write_lifecycle(stage='created')` on completion. |
 
 ## Reference
 
 - CLI flags: `renmark-execute --help`
-- Plan format: `PLAN.md` § "Plan file format"
-- State dir: `.renmark/state/`
+- Plan format: `PLAN.md` § "Plan file format" (or `.renmark/plans/*.plan.md` examples)
+- State dir: `.renmark/state/{pipeline.json, wave-summaries/, escalations/}`
+- Memory dir: `.renmark/memory/`
+- Hygiene contract: `plugin/templates/CLAUDE.md.template` § `context-hygiene-rule`, `task-isolation-rule`, `summary-boundary-rule`

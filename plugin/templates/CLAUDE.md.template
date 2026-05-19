@@ -259,6 +259,75 @@ code, diff, long reasoning. The orchestrator decides whether to advance the
 wave based on summary fields alone — it does not "look at the work."
 <!-- END:task-isolation-rule -->
 
+<!-- BEGIN:context-budget-rule -->
+## Context budget — `/compact` at 60%, `/clear` on subject change
+
+The orchestrator is assumed to run on Sonnet 200k. Sonnet's window degrades
+well before it's full — track utilization and act early:
+
+- **At ~60% utilization (≈ 120k tokens):** suggest `/compact` to the user
+  before invoking the next skill. Do NOT auto-run /compact silently — surface
+  the recommendation as a one-line note: *"Context at ~60% — consider
+  `/compact` before continuing."*
+- **At ~80% utilization (≈ 160k tokens):** refuse to start a new long-running
+  skill (`orchestrate`, `research`, `map`, `secure`) until the user runs
+  `/compact` or `/clear`. Short skills (`roadmap`, `help`, `check-plan`,
+  `resume`) still run.
+- **On cross-domain skill transition** (per `context-contamination-rule`):
+  recommend `/clear`, with note that `.renmark/memory/` survives clears.
+
+The %-utilization side of this rule is enforced by the orchestrator
+self-monitoring — the harness does not reliably expose context size to
+skill code. The cross-domain side IS automated via
+`renmark.state.context_budget_check(repo, new_skill, new_domain)`, which
+every skill calls in Step 0.
+
+Domains for subject-change detection (per `renmark.lifecycle.DOMAIN_BY_SKILL`):
+
+| Domain | Skills |
+|---|---|
+| `debug` | debug, codereview |
+| `build` | start, brainstorm, plan, check-plan, orchestrate, verify, finish, feature |
+| `audit` | secure, document, map, research |
+| `meta` | setup, roadmap, help, resume, release, restore, approve, issue |
+
+Same-domain transitions don't trigger the prompt. Cross-domain ones do.
+<!-- END:context-budget-rule -->
+
+<!-- BEGIN:lifecycle-rule -->
+## Lifecycle persistence (G12)
+
+Every renmark workflow stage transition MUST write `.renmark/state/lifecycle.json`
+before the skill returns. Cold start from any `/clear` is one file read.
+Skills that don't update lifecycle.json on completion are bugs.
+
+The canonical lifecycle stages (in order):
+
+```
+init → brainstorm-complete → plan-drafted → plan-validated → created
+     → verified → reviewed → documented → ready-to-release → released
+```
+
+Plus `restored` (after `/renmark:restore`).
+
+**Cold-start recovery:** after `/clear`, run `/renmark:resume`. It reads
+lifecycle.json (≤ 1KB), prints the recommended next command, exits. Zero
+LLM calls. The cost of survival is one file read.
+
+**Strict separation:** lifecycle.json carries WORKFLOW state only (feature
+identity, stage, artifact pointers, human approval gates). RUNTIME state
+(wave indices, retry counts, subprocess pids) lives in `pipeline.json`.
+If lifecycle.json exceeds ~1KB, it's a bug — runtime cruft has leaked in.
+`renmark.lifecycle.write_lifecycle` raises `LifecycleBloatError` to catch
+this at write time.
+
+**Human approval gates:** lifecycle.json carries `human_review_required`,
+`human_review_completed`, `human_review_for` fields. Release, restore,
+merge, and security overrides MUST set these before destructive operations
+and MUST check them on re-entry. `/renmark:approve` is the only way to
+flip the bit. AI may generate code; the human owns merges and releases.
+<!-- END:lifecycle-rule -->
+
 ## Tooling — renmark workflow
 
 | Command | When to use |

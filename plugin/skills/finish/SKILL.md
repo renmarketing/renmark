@@ -18,6 +18,10 @@ Three steps: verify everything still passes → show what was built → offer ne
 
 ## Steps
 
+**Step 0 — Context check.** Call `state.context_budget_check(repo, 'finish', 'build')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'finish', 'build')`.
+
+**Final step — Lifecycle update.** After all verifiers pass, call `lifecycle.write_lifecycle(repo, stage='ready-to-release')`. The recommended next command becomes `/renmark:release` (per `NEXT_BY_STAGE`). In v0.4.0+, finish becomes a stage-marker only — PR/merge logic moves to `/renmark:release`.
+
 ### 1. Re-run verifiers
 
 Run each task's verifier from the plan, or `npm test` / `pytest -q` if a test suite exists. If any fail: **stop**, report which ones, route to `/renmark:debug`.

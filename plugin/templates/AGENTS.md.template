@@ -45,6 +45,10 @@
 
 **`/renmark:orchestrate` isolates tasks.** Each task or parallel group runs in an isolated subagent context. Subagents receive only spec + paths + upstream pointers + dependency summaries + verifier; they emit only status + artifact path + touched files + sha + ≤5-line summary + dependency notes. Transcripts and generated code never re-enter the orchestrator. See `CLAUDE.md` § `task-isolation-rule`.
 
+**Context budget — `/compact` at 60%, `/clear` on subject change.** At ~60% utilization, surface a `/compact` recommendation. At ~80%, refuse new long-running skills until /compact or /clear runs. Cross-domain transitions auto-recommend `/clear` via `renmark.state.context_budget_check`. See `CLAUDE.md` § `context-budget-rule`.
+
+**Lifecycle persists across `/clear`.** Every workflow stage transition writes `.renmark/state/lifecycle.json`. After `/clear`, run `/renmark:resume` to recover — one file read, zero LLM calls. Runtime state lives in `pipeline.json`, never lifecycle.json. Human approval gates (release/restore/merge/security override) flow through `human_review_required` / `human_review_completed` fields. See `CLAUDE.md` § `lifecycle-rule`.
+
 ## Conventions
 
 - Plans: `.renmark/plans/`

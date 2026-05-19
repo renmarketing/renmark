@@ -1,4 +1,4 @@
-# renmark v0.2.5
+# renmark v0.3.0
 
 A Claude Code plugin that turns Claude into a guided build assistant. Type `/renmark:start`, describe what you want to build, and renmark handles stack selection, scope, best practices, and the full build pipeline — no prior knowledge of specs, plans, or executors needed.
 
@@ -17,7 +17,7 @@ For experienced developers it also exposes the full wizard pipeline directly: br
 ## Install — Mac / Linux
 
 ```bash
-unzip ai-system-renmark-v0.2.5-*.zip
+unzip ai-system-renmark-v0.3.0-*.zip
 cd ai-system
 bash install.sh
 ```

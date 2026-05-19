@@ -32,6 +32,10 @@ The plan is consumed by `/renmark:orchestrate`.
 
 ## Steps
 
+**Step 0a — Context check.** Call `state.context_budget_check(repo, 'plan', 'build')`. If `'clear'` or `'compact'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'plan', 'build')`.
+
+**Final step — Lifecycle update.** After the plan is written to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`, call `lifecycle.write_lifecycle(repo, stage='plan-drafted', artifact_update=('plan', <plan-path>))`. The user should then run `/renmark:check-plan` (which is `next_recommended` for `plan-drafted`).
+
 ### 0. Establish Scope Contract
 
 Before decomposing a directly provided feature description, establish a lightweight scope contract to prevent silent assumptions about stack, deployment, or MVP scope.
