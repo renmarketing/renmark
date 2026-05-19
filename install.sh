@@ -1,37 +1,24 @@
 #!/usr/bin/env bash
-# Renmark installer. Idempotent — safe to re-run.
-#
-# Does three things:
-#   1. Back up any existing /orchestrator skill to ~/.claude/skills/.orchestrator.bak/
-#   2. Symlink plugin/ → ~/.claude/plugins/renmark/
-#   3. Symlink bin/renmark-execute → ~/.local/bin/renmark-execute
+# Renmark installer — idempotent, safe to re-run.
+# Usage: bash install.sh [--uninstall]
 set -euo pipefail
 
+VERSION="$(cat "$(dirname "${BASH_SOURCE[0]}")/VERSION" | tr -d '[:space:]')"
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_SKILLS_DIR="$HOME/.claude/skills"
 CLAUDE_PLUGINS_DIR="$HOME/.claude/plugins"
 LOCAL_BIN_DIR="$HOME/.local/bin"
 
-mkdir -p "$CLAUDE_SKILLS_DIR" "$CLAUDE_PLUGINS_DIR" "$LOCAL_BIN_DIR"
-
-# Step 1: remove the old /orchestrator skill if present.
-# No backup — the original source lives at /home/renmark/projects/ai-inference/ and
-# in its own git history. Backing it up here was paranoia and caused a phantom-
-# skill bug in v0.0.1 (Claude Code picked up the dotted backup name).
-old_orch="$CLAUDE_SKILLS_DIR/orchestrator"
-if [ -e "$old_orch" ] && [ ! -L "$old_orch" ]; then
-    rm -rf "$old_orch"
-    echo "Removed old skill: $old_orch  (source remains at ~/projects/ai-inference/)"
-elif [ -L "$old_orch" ]; then
-    # Existing symlink (maybe from a prior run) — remove if it points outside our install
-    target="$(readlink "$old_orch")"
-    case "$target" in
-        "$INSTALL_DIR"*) : ;;  # ours, leave alone
-        *) rm "$old_orch"; echo "Removed unrelated symlink $old_orch -> $target" ;;
-    esac
+# ── uninstall ──────────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "--uninstall" ]]; then
+    rm -f "$CLAUDE_PLUGINS_DIR/renmark"
+    rm -f "$LOCAL_BIN_DIR/renmark-execute"
+    echo "renmark uninstalled."
+    exit 0
 fi
 
-# Step 2: symlink the plugin.
+mkdir -p "$CLAUDE_PLUGINS_DIR" "$LOCAL_BIN_DIR"
+
+# ── plugin symlink ─────────────────────────────────────────────────────────────
 plugin_link="$CLAUDE_PLUGINS_DIR/renmark"
 if [ -L "$plugin_link" ]; then
     rm "$plugin_link"
@@ -40,9 +27,9 @@ elif [ -e "$plugin_link" ]; then
     exit 1
 fi
 ln -s "$INSTALL_DIR/plugin" "$plugin_link"
-echo "Symlinked $plugin_link → $INSTALL_DIR/plugin"
+echo "Plugin:  $plugin_link → $INSTALL_DIR/plugin"
 
-# Step 3: symlink the CLI.
+# ── CLI symlink ────────────────────────────────────────────────────────────────
 cli_link="$LOCAL_BIN_DIR/renmark-execute"
 if [ -L "$cli_link" ]; then
     rm "$cli_link"
@@ -52,16 +39,36 @@ elif [ -e "$cli_link" ]; then
 fi
 ln -s "$INSTALL_DIR/bin/renmark-execute" "$cli_link"
 chmod +x "$INSTALL_DIR/bin/renmark-execute"
-echo "Symlinked $cli_link → $INSTALL_DIR/bin/renmark-execute"
+echo "CLI:     $cli_link → $INSTALL_DIR/bin/renmark-execute"
+
+# ── Python package (editable) ─────────────────────────────────────────────────
+if command -v pip3 >/dev/null 2>&1; then
+    pip3 install -q -e "$INSTALL_DIR" 2>/dev/null && echo "Package: renmark editable install OK" \
+        || echo "Package: pip install skipped (no setup.py/pyproject.toml or already installed)"
+fi
 
 cat <<EOF
 
-renmark installed.
-  Skills available:  /renmark:brainstorm /renmark:plan /renmark:orchestrate /renmark:debug /renmark:codereview
-  CLI on PATH:       renmark-execute
+renmark v${VERSION} installed.
 
-If /orchestrator existed, it was removed. Source still lives at ~/projects/ai-inference/
-  (cd there and reinstall the old skill manually if you ever need to revert).
+Skills:
+  /renmark:start       — vibe coder entry: describe what you want, renmark builds the rest
+  /renmark:setup       — prepare any project for renmark workflow
+  /renmark:brainstorm  — design a feature into a spec
+  /renmark:plan        — decompose spec into executor-tagged tasks
+  /renmark:check-plan  — validate plan before spending tokens
+  /renmark:orchestrate — execute plan (Haiku / Codex / Sonnet / Opus)
+  /renmark:verify      — confirm feature goal was achieved
+  /renmark:finish      — create PR or merge branch
+  /renmark:feature     — full pipeline with branch isolation
+  /renmark:debug       — systematic root-cause loop
+  /renmark:codereview  — single-pass Codex diff review
+  /renmark:roadmap     — project status and token usage report
+  /renmark:help        — list all skills
 
-Next: start a Claude Code session in any project folder and try /renmark:brainstorm.
+CLI:
+  renmark-execute --help
+
+New to renmark?  /renmark:start  (describe what you want to build)
+Existing project: /renmark:setup  then  /renmark:start
 EOF

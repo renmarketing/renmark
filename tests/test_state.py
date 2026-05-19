@@ -116,12 +116,15 @@ def test_commit_pattern_variants_all_recognized(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True)
 
     variants = [
-        ("[nim] task 1: bracketed nim",           1),
-        ("[manual] task 2: bracketed manual",     2),
-        ("nim task 3: bare nim",                  3),
-        ("manual task 4: bare manual",            4),
-        ("nim task 5 (manual): bare with paren",  5),
-        ("manual task 6 (nim): bare with paren",  6),
+        ("[nim] task 1: bracketed nim",             1),
+        ("[manual] task 2: bracketed manual",       2),
+        ("nim task 3: bare nim",                    3),
+        ("manual task 4: bare manual",              4),
+        ("nim task 5 (manual): bare with paren",    5),
+        ("manual task 6 (nim): bare with paren",    6),
+        ("[renmark] task 7: bracketed renmark",     7),
+        ("[codex] task 8: bracketed codex",         8),
+        ("renmark task 9: bare renmark",            9),
     ]
     for i, (msg, _) in enumerate(variants):
         f = tmp_path / f"{i}.txt"
@@ -140,4 +143,4 @@ def test_commit_pattern_variants_all_recognized(tmp_path: Path) -> None:
     )
 
     completed = state.completed_task_indices(tmp_path)
-    assert completed == {1, 2, 3, 4, 5, 6}, completed
+    assert completed == {1, 2, 3, 4, 5, 6, 7, 8, 9}, completed

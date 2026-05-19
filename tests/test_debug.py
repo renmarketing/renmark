@@ -29,7 +29,7 @@ def test_add_hypothesis_inserts_under_header(tmp_path: Path) -> None:
 def test_log_investigation_appends(tmp_path: Path) -> None:
     s = debug.new_session(tmp_path, "x")
     debug.log_investigation(
-        s, hypothesis="Missing import", inspector="nim",
+        s, hypothesis="Missing import", inspector="haiku",
         finding="no `import foo` in src/", rules_out=False,
     )
     debug.log_investigation(
@@ -37,7 +37,7 @@ def test_log_investigation_appends(tmp_path: Path) -> None:
         finding="config says 8000 but server binds 8001", rules_out=True,
     )
     text = s.path.read_text()
-    assert "**Missing import** (via nim)" in text
+    assert "**Missing import** (via haiku)" in text
     assert "RULES OUT: config says 8000" in text
 
 
@@ -77,8 +77,8 @@ def test_latest_session_returns_newest(tmp_path: Path) -> None:
 
 
 def test_suggest_inspector_routing() -> None:
-    assert debug.suggest_inspector("grep") == "nim"
-    assert debug.suggest_inspector("file-read") == "nim"
+    assert debug.suggest_inspector("grep") == "haiku"
+    assert debug.suggest_inspector("file-read") == "haiku"
     assert debug.suggest_inspector("multi-file-trace") == "codex"
     assert debug.suggest_inspector("reasoning") == "opus"
     assert debug.suggest_inspector("race-condition") == "opus"

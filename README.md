@@ -1,75 +1,123 @@
-# renmark — multi-LLM orchestration for Claude Code
+# renmark v0.2.5
 
-A Claude Code plugin that owns the full feature-development workflow across multiple LLMs (NIM, Codex, Opus, Sonnet, plus Ollama and OpenRouter in later phases). Five slash commands, persistent project memory in `.renmark/`, parallel task execution, and permission-economy designed for non-auto-mode use.
+A Claude Code plugin that turns Claude into a guided build assistant. Type `/renmark:start`, describe what you want to build, and renmark handles stack selection, scope, best practices, and the full build pipeline — no prior knowledge of specs, plans, or executors needed.
 
-## Phase 0 status — bootstrap
+For experienced developers it also exposes the full wizard pipeline directly: brainstorm → plan → check-plan → orchestrate → verify → finish.
 
-This repo currently contains the v0.2.0 baseline copied from `/home/renmark/projects/ai-inference/`, retargeted to the `renmark` package. The five `/renmark:*` skills, the plugin manifest, and the multi-LLM dispatch layer are Phase 1 work.
+---
 
-## Install
+## Prerequisites
+
+- [Claude Code](https://claude.ai/code) (desktop app or CLI) — required
+- Python 3.10+ — required for `renmark-execute` (Codex task dispatch)
+- [Codex CLI](https://github.com/openai/codex) — optional; needed only for `executor: codex` tasks
+
+---
+
+## Install — Mac / Linux
 
 ```bash
-cd /home/renmark/projects/ai-system
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env             # then put your NVIDIA NIM key in .env
-bash install.sh                  # symlinks plugin/ + bin/renmark-execute globally
+unzip ai-system-renmark-v0.2.5-*.zip
+cd ai-system
+bash install.sh
 ```
 
-`install.sh` does three things:
+That's it. Restart Claude Code and the skills will appear.
 
-1. Backs up any existing `~/.claude/skills/orchestrator/` to `~/.claude/skills/.orchestrator.bak/`
-2. Symlinks `plugin/` → `~/.claude/plugins/renmark/`
-3. Symlinks `bin/renmark-execute` → `~/.local/bin/renmark-execute`
-
-After install, the new `/renmark:*` skills appear in Claude Code's skill list; the old `/orchestrator` is removed (source code still in `/home/renmark/projects/ai-inference/`).
-
-## Zero permission prompts (recommended)
-
-For non-auto-mode use, paste this into the target project's `.claude/settings.local.json` to pre-approve the renmark-execute command pattern. After this, Claude Code never prompts when the orchestrate skill shells out.
-
-```json
-{
-  "permissions": {
-    "Bash": {
-      "allow": [
-        "renmark-execute *",
-        "git status",
-        "git log *",
-        "git diff *"
-      ]
-    }
-  }
-}
+To uninstall:
+```bash
+bash install.sh --uninstall
 ```
 
-(Adjust the path patterns to taste. The renmark-execute pattern covers all `--dry-run`, `--resume`, `--usage`, `--roadmap`, `--logs`, `--no-commit` variants.)
+---
 
-## Five skills
+## Install — Windows
+
+1. Extract the zip
+2. Copy the `plugin\` folder contents into:
+   ```
+   %USERPROFILE%\.claude\plugins\renmark\
+   ```
+   The result should look like:
+   ```
+   %USERPROFILE%\.claude\plugins\renmark\
+     .claude-plugin\plugin.json
+     skills\start\SKILL.md
+     skills\brainstorm\SKILL.md
+     skills\plan\SKILL.md
+     ... (all 13 skill folders)
+     templates\
+   ```
+3. Restart the Claude Code desktop app
+
+For `renmark-execute` (Codex task dispatch) on Windows: copy `bin\renmark-execute` somewhere on your PATH and ensure Python 3.10+ is installed. This step is optional — skills work without it; only `executor: codex` tasks need it.
+
+---
+
+## Quick start
+
+```
+/renmark:start
+```
+
+Describe what you want to build. renmark asks at most 2 questions, confirms the plan in plain English, then builds it.
+
+**Setting up an existing project:**
+```
+/renmark:setup
+```
+
+---
+
+## All skills
 
 | Command | What it does |
 |---|---|
-| `/renmark:brainstorm <topic>` | One-question-at-a-time spec discovery; bootstraps fresh projects (creates `CLAUDE.md`, `AGENTS.md`, `.renmark/`) |
-| `/renmark:plan <spec>` | Decomposes into atomic single-file tasks; auto-routes each to nim/codex/opus/sonnet based on complexity; emits cost preview |
-| `/renmark:orchestrate <plan>` | Wave-based parallel dispatch; tasks in same `parallel_group` run concurrently; serial commits per wave |
-| `/renmark:debug <symptom>` | Systematic reproduce → hypothesize → investigate → fix loop with persistent debug session state |
-| `/renmark:codereview <ref>` | Multi-pass review (codex adversarial → sonnet quality → opus architecture on hot files) |
+| `/renmark:start` | Vibe coder entry — describe what you want, renmark builds the rest |
+| `/renmark:setup` | Add renmark to an existing project (creates CLAUDE.md, AGENTS.md, .renmark/) |
+| `/renmark:brainstorm` | Design a feature into a spec (one question at a time) |
+| `/renmark:plan` | Decompose a spec into executor-tagged tasks with cost preview |
+| `/renmark:check-plan` | Validate a plan before spending tokens |
+| `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus, wave-parallel) |
+| `/renmark:verify` | Confirm the feature goal was achieved after orchestrate |
+| `/renmark:finish` | Close branch — create PR, merge, or clean up |
+| `/renmark:feature` | Full pipeline with branch isolation |
+| `/renmark:debug` | Systematic root-cause loop for bugs |
+| `/renmark:codereview` | Multi-pass diff review |
+| `/renmark:roadmap` | Project status and token usage report |
+| `/renmark:help` | List all commands |
+
+---
+
+## renmark-execute
+
+`renmark-execute` is the Python CLI that runs `executor: codex` tasks as subprocesses. It is invoked automatically by `/renmark:orchestrate` — you never call it directly.
+
+It requires Python 3.10+ and the Codex CLI to be on your PATH. If Codex is unavailable, those tasks fall back to Sonnet automatically.
+
+Install as an editable package (already done by `install.sh` on Mac/Linux):
+```bash
+pip install -e .
+```
+
+---
+
+## Project memory
+
+renmark stores persistent project context in `.renmark/` inside each project:
+
+```
+.renmark/
+  memory/     — stack, decisions, features, bugs, learnings (committed)
+  plans/      — generated plan files (committed)
+  specs/      — design docs from brainstorm (committed)
+  state/      — runtime session state (gitignored)
+  debug/      — debug session logs (gitignored)
+```
+
+---
 
 ## See also
 
-- `PLAN.md` — full implementation plan
-- `CHANGELOG.md` — what landed in each version
-- `.env.example` — all config knobs
-
-## What's NOT here yet (Phase 1+)
-
-- The five skill SKILL.md files
-- `plugin/plugin.json` manifest
-- `renmark/dispatch.py` (wave-based parallel dispatcher)
-- `renmark/memory.py` (`.renmark/memory/` reader/writer)
-- `renmark/providers/claude_agent.py` (opus/sonnet Agent-tool helper)
-- Empty-folder bootstrap logic
-- Cost preview in dry-run
-- `install.sh`
-
-Phase 0 (this commit) is just the working baseline ready for Phase 1 to build on.
+- `CHANGELOG.md` — what changed in each version
+- `plugin/templates/CLAUDE.md.template` — the rules template injected into projects

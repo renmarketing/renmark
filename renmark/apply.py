@@ -1,4 +1,4 @@
-"""Apply NIM output to the repo: write file (mode A) or patch (mode B), with validation."""
+"""Apply agent output to the repo: write file (mode A) or patch (mode B), with validation."""
 from __future__ import annotations
 
 import re

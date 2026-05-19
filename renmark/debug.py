@@ -100,7 +100,7 @@ def log_investigation(
     session: DebugSession,
     *,
     hypothesis: str,
-    inspector: str,             # "nim" | "codex" | "opus" | other executor string
+    inspector: str,             # "haiku" | "codex" | "opus" | other executor string
     finding: str,
     rules_out: bool = False,
 ) -> None:
@@ -162,7 +162,7 @@ def suggest_inspector(intent: str) -> str:
     heavy = {"reasoning", "design", "race-condition", "concurrency", "architecture"}
     intent = intent.lower()
     if intent in cheap:
-        return "nim"
+        return "haiku"
     if intent in medium:
         return "codex"
     if intent in heavy:

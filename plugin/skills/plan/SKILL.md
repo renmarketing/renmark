@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases like "write a plan", "decompose this", "create the plan for X". Opus reads the spec, splits it into atomic single-file tasks, scores complexity, auto-routes each task to the cheapest model that can do it (nim, codex, opus, sonnet), groups tasks for parallel execution, and emits a cost preview.
+description: Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases like "write a plan", "decompose this", "create the plan for X". Opus reads the spec, splits it into atomic single-file tasks, scores complexity, auto-routes each task to the cheapest model that can do it (haiku, codex, sonnet, opus), groups tasks for parallel execution, and emits a cost preview.
 ---
 
 # plan
@@ -12,7 +12,7 @@ Reads a spec (from `/renmark:brainstorm` or any markdown file) and emits a renma
 - `mode` — A (new file) or B (edit existing)
 - `target` — exactly one file path
 - `complexity` — simple / medium / hard
-- `executor` — nim / codex / opus / sonnet (auto-assigned)
+- `executor` — opus / codex / sonnet / haiku (auto-assigned, ordered by capability)
 - `parallel_group` — tasks sharing a group run concurrently
 - `verifier` — shell command that exits 0 when the task is done
 - `est_tokens` and `est_cost_usd` — planner's estimates
@@ -32,9 +32,49 @@ The plan is consumed by `/renmark:orchestrate`.
 
 ## Steps
 
+### 0. Establish Scope Contract
+
+Before decomposing a directly provided feature description, establish a lightweight scope contract to prevent silent assumptions about stack, deployment, or MVP scope.
+
+**When to run discovery** — all of the following must be true:
+- The user provided a feature description directly (not a path to an existing `.spec.md` or `.plan.md`)
+- The request is for new functionality, a new project, or a major feature
+- No sufficient scope/stack decisions exist in `.renmark/memory/stack.md`, `CHANGELOG.md`, or an existing spec/plan
+
+**Skip discovery and go to Step 1 when:**
+- The user provided an existing `.spec.md` or `.plan.md`
+- `stack.md` clearly covers the requested work
+- `CHANGELOG.md` already has a recent `project scope` or `bootstrap` entry covering stack and deployment
+- The request is a small change inside an already-scoped project
+
+**Do not skip if the new request conflicts with existing stack or scope records.** When a conflict exists, ask first:
+> I found an existing scope/stack decision, but this request may conflict with it: [brief conflict]. Should I preserve the existing decision or create a new scope entry for this plan?
+
+---
+
+**Discovery flow** — ask at most 3 questions, one at a time. See `scope-contract.md` for the full Q1–Q3 question text, stack inference rules, and option menus. Do not decompose until discovery is complete.
+
+---
+
+**Confirm decisions.** After Q3, summarize:
+> I'll plan this with:
+> - Tech stack: [confirmed stack]
+> - Deployment: [confirmed target]
+> - MVP boundary / out of scope: [confirmed exclusions]
+
+Proceed only after the user explicitly confirms the summarized scope contract, selects an option that clearly implies confirmation, or gives a direct instruction to continue. Do not rely on silence, lack of objection, or ambiguous replies as confirmation.
+
+---
+
+**Record decisions.** See `scope-contract.md` for the CHANGELOG scope entry format and `stack.md` template. Write both before decomposing. The generated task plan must respect all locked decisions — do not introduce new major stack choices during decomposition unless the user asks.
+
+---
+
 ### 1. Read the spec
 
 Open the spec file. Also read `.renmark/memory/INDEX.md` (cheap) and pull any of `routing.md`, `conventions.md`, `learnings.md` that look relevant.
+
+If `CHANGELOG.md` exists at the project root, read the last 5 entries. Use the "Do not change" guards to avoid re-introducing removed approaches and to populate each task's spec with known constraints.
 
 ### 2. Decompose into atomic tasks
 
@@ -57,10 +97,12 @@ Default routing (override if `.renmark/memory/routing.md` says otherwise):
 
 | Signal | Executor |
 |---|---|
-| simple, mechanical | `nim` |
-| `tests/**`, fixtures, multi-file context | `codex` |
-| hard / state machines / coord math / DOM / threading | `opus` |
-| medium domain reasoning, refactors | `sonnet` |
+| hard / state machines / coord math / DOM APIs / cross-file reasoning / architecture | `opus` |
+| `tests/**`, fixtures, scaffolding, single well-defined file with verifier | `codex` |
+| well-scoped algorithms, refactors, moderate domain logic | `sonnet` |
+| simple, mechanical (config, JSON, `.gitignore`, plain HTML, simple CSS) | `haiku` |
+
+Complexity → executor mapping: `hard` → opus, `medium` → codex (file-write + verifier) or sonnet (reasoning-heavy), `simple` → haiku.
 
 ### 5. Assign parallel_group
 
@@ -69,10 +111,12 @@ Tasks that touch disjoint files AND don't depend on each other's outputs get the
 ### 6. Estimate cost
 
 For each task:
-- `nim` → free (NVIDIA free tier)
+- `haiku` → ~$0.0001/kT × estimated output tokens (cheapest Claude tier)
 - `codex` → ~$0.01-$0.05/kT × estimated output tokens
-- `opus` → in-context (no separate API charge; consumes orchestrator's context)
 - `sonnet` → ~$0.003/kT × estimated output tokens
+- `opus` → in-context Agent dispatch (consumes orchestrator's context; estimate ~$0.015/kT)
+
+**Agent call overhead:** Every haiku/sonnet/opus task costs ~10-18k tokens of context overhead on top of output tokens — the agent receives a full system prompt + task spec. The estimates above only cover output. Total real spend ≈ `est_tokens + 10,000` per Claude-model task. Surface this in the cost preview as a footnote: *"Haiku/sonnet/opus tasks: ~10k context overhead per call not included above."*
 
 Show a per-task and total cost preview.
 
@@ -83,6 +127,10 @@ Save to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`. Include:
 - Task blocks in the format above
 - Cost preview at the bottom
 
+**Before writing, check task count.** `renmark-execute` caps at 15 tasks per run (default). If the plan exceeds this, split at a wave boundary into two plan files (`...-part1.plan.md`, `...-part2.plan.md`) and tell the user before showing the hand-off prompt.
+
+**Node.js projects:** If the plan has a `package.json` task, add a `npm install` setup task immediately after it in the same wave or the next wave — before any task whose verifier does `node -e "require(...)"`. The verifier will fail if `node_modules` doesn't exist yet. Mark it `executor: haiku`, `complexity: simple`, `verifier: test -d node_modules`.
+
 ### 8. Hand off (wizard step — review gate before any LLM spend)
 
 This is the critical approval gate. Once `/renmark:orchestrate` runs, real API tokens start flowing. Make the user actively approve.
@@ -92,7 +140,7 @@ Show a clear summary:
 > *"Plan written to `.renmark/plans/<name>.plan.md`*
 > *Tasks: N (M parallel groups)*
 > *Est. tokens: ~T, est. cost: ~$X*
-> *Executors: nim×a, codex×b, opus×c, sonnet×d*
+> *Executors: haiku×a, codex×b, sonnet×c, opus×d*
 >
 > *What's next?*
 > *  [r] Review — open the file so you can read every task*
@@ -112,7 +160,7 @@ On **n** → stop. Plan stays on disk for later.
 - **mode:** A
 - **target:** .gitignore
 - **complexity:** simple
-- **executor:** nim
+- **executor:** haiku
 - **parallel_group:** 1
 - **est_tokens:** 150
 - **est_cost_usd:** 0.00
@@ -124,10 +172,10 @@ On **n** → stop. Plan stays on disk for later.
 - **mode:** A
 - **target:** server.py
 - **complexity:** medium
-- **executor:** nim
-- **parallel_group:** 1
+- **executor:** codex
+- **parallel_group:** 2
 - **est_tokens:** 900
-- **est_cost_usd:** 0.00
+- **est_cost_usd:** 0.02
 - **verifier:** python3 -m py_compile server.py
 - **spec:**
   ...

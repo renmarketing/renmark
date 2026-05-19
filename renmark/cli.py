@@ -1,4 +1,4 @@
-"""nim-execute CLI: orchestrates plan execution against NVIDIA NIM."""
+"""renmark-execute CLI: orchestrates plan execution via Codex and Claude agents."""
 from __future__ import annotations
 
 import argparse
@@ -17,14 +17,6 @@ from .providers.codex import (
     check_only_target_modified,
     codex_available,
     run_codex_task,
-)
-from .providers.nim import (
-    NIMAuthError,
-    NIMClient,
-    NIMError,
-    NIMQuotaError,
-    NIMRateLimitError,
-    NIMResponse,
 )
 from .parser import PlanError, Task, parse_plan
 from .prompts import format_reminder_prompt, mode_a_prompt, mode_b_prompt, retry_prompt
@@ -62,21 +54,17 @@ class Config:
     @classmethod
     def from_env(cls) -> "Config":
         return cls(
-            prefer_small_model=os.environ.get(
-                "NIM_PREFER_SMALL_MODEL", "mistralai/codestral-22b-instruct-v0.1"
-            ),
-            big_model=os.environ.get(
-                "NIM_BIG_MODEL", "mistralai/mistral-large-3-675b-instruct-2512"
-            ),
-            max_tokens_per_run=int(os.environ.get("NIM_MAX_TOKENS_PER_RUN", "50000")),
-            max_minutes_per_run=int(os.environ.get("NIM_MAX_MINUTES_PER_RUN", "30")),
-            max_tasks_per_run=int(os.environ.get("NIM_MAX_TASKS_PER_RUN", "15")),
-            max_task_retries=int(os.environ.get("NIM_MAX_TASK_RETRIES", "2")),
+            prefer_small_model=os.environ.get("RENMARK_PREFER_SMALL_MODEL", ""),
+            big_model=os.environ.get("RENMARK_BIG_MODEL", ""),
+            max_tokens_per_run=int(os.environ.get("RENMARK_MAX_TOKENS_PER_RUN", "50000")),
+            max_minutes_per_run=int(os.environ.get("RENMARK_MAX_MINUTES_PER_RUN", "30")),
+            max_tasks_per_run=int(os.environ.get("RENMARK_MAX_TASKS_PER_RUN", "15")),
+            max_task_retries=int(os.environ.get("RENMARK_MAX_TASK_RETRIES", "2")),
             default_verifier_timeout_s=int(
-                os.environ.get("NIM_DEFAULT_VERIFIER_TIMEOUT_S", "60")
+                os.environ.get("RENMARK_DEFAULT_VERIFIER_TIMEOUT_S", "60")
             ),
-            temperature=float(os.environ.get("NIM_TEMPERATURE", "0.2")),
-            max_output_tokens=int(os.environ.get("NIM_MAX_OUTPUT_TOKENS", "4096")),
+            temperature=float(os.environ.get("RENMARK_TEMPERATURE", "0.2")),
+            max_output_tokens=int(os.environ.get("RENMARK_MAX_OUTPUT_TOKENS", "4096")),
         )
 
 
@@ -106,12 +94,12 @@ def _ensure_git_repo(cwd: Path) -> None:
     )
     name = _git("config", "user.name", cwd=cwd)
     if name.returncode != 0 or not name.stdout.strip():
-        _git("config", "user.name", "nim-execute", cwd=cwd)
+        _git("config", "user.name", "renmark", cwd=cwd)
     email = _git("config", "user.email", cwd=cwd)
     if email.returncode != 0 or not email.stdout.strip():
-        _git("config", "user.email", "nim-execute@local", cwd=cwd)
+        _git("config", "user.email", "renmark@local", cwd=cwd)
     subprocess.run(
-        ["git", "commit", "-q", "--allow-empty", "-m", "init (nim-execute)"],
+        ["git", "commit", "-q", "--allow-empty", "-m", "init (renmark)"],
         cwd=str(cwd), check=True,
     )
 
@@ -253,13 +241,6 @@ def execute_plan(
         return 2
 
     if not dry_run:
-        if not os.environ.get("NVIDIA_NIM_API_KEY"):
-            _print(
-                "ERROR: NVIDIA_NIM_API_KEY not set.\n"
-                "Either export it in your shell, or create a .env file in "
-                f"{repo} with:\n  NVIDIA_NIM_API_KEY=nvapi-..."
-            )
-            return 3
         if not _is_git_repo(repo):
             _ensure_git_repo(repo)
 
@@ -279,7 +260,7 @@ def execute_plan(
     run_id = new_run_id()
     state_dir(repo)  # ensure exists
     _print(
-        f"nim-execute  plan: {plan_path}  run: {run_id}\n"
+        f"renmark  plan: {plan_path}  run: {run_id}\n"
         f"model_default: {cfg.prefer_small_model}   "
         f"budget: {cfg.max_tokens_per_run} tok / {cfg.max_minutes_per_run} min"
     )
@@ -289,7 +270,7 @@ def execute_plan(
         waves = _d.group_tasks_by_wave(tasks)
         _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
         # Cost estimates per executor — approximate $/kT (output tokens).
-        cost_per_kt = {"codex": 0.05, "sonnet": 0.003, "opus": 0.0, "nim": 0.0}
+        cost_per_kt = {"haiku": 0.0001, "codex": 0.05, "sonnet": 0.003, "opus": 0.015}
         total_tokens = 0
         total_cost = 0.0
         for w_idx, w in enumerate(waves, 1):
@@ -314,25 +295,11 @@ def execute_plan(
                 total_tokens += tok
                 total_cost += cost
         _print(f"\n  TOTAL estimate: ~{total_tokens:,} tokens · ~${total_cost:.3f}")
-        _print(f"  (NIM is free; codex/sonnet metered; opus = in-context, no separate API charge)")
+        _print(f"  (codex/sonnet metered; opus = in-context, no separate API charge)")
         return 0
 
-    # Pre-flight quota probe (cheap).
-    client = NIMClient.from_env()
-    try:
-        client.preflight_probe(cfg.prefer_small_model)
-    except NIMAuthError as e:
-        _print(f"ERROR: auth failed during pre-flight ({e}). Check NVIDIA_NIM_API_KEY.")
-        return 3
-    except NIMQuotaError as e:
-        _print(f"ERROR: quota exhausted during pre-flight ({e}). Try later.")
-        return 4
-    except NIMError as e:
-        _print(f"ERROR: NIM unavailable during pre-flight ({e}).")
-        return 5
-
     # Start anchor tag.
-    _git_tag(repo, f"nim-run-{run_id}-start")
+    _git_tag(repo, f"renmark-run-{run_id}-start")
     clear_pause(repo)
 
     deadline = time.monotonic() + (cfg.max_minutes_per_run * 60)
@@ -358,7 +325,7 @@ def execute_plan(
     def _runner(task: Task, _repo: Path):
         """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
         ok, reason, used, sha = _execute_task(
-            task=task, repo=_repo, run_id=run_id, cfg=cfg, client=client,
+            task=task, repo=_repo, run_id=run_id, cfg=cfg,
             remaining_token_budget=max(0, cfg.max_tokens_per_run - tokens_used),
             total=len(tasks),
         )
@@ -394,7 +361,7 @@ def execute_plan(
                 skipped.append(t.index)
             break
 
-        # Dispatch the wave. nim/codex run in parallel; opus/sonnet are
+        # Dispatch the wave. codex/haiku run in parallel; opus/sonnet are
         # marked `needs_agent` for the skill to handle via Agent tool.
         try:
             wave_result = _dispatch.dispatch_wave(
@@ -456,7 +423,7 @@ def execute_plan(
     _print(f"Waves: {waves_count} (parallel-grouped from {len(tasks)} tasks)")
 
     if failed_task is None and not needs_agent:
-        _git_tag(repo, f"nim-run-{run_id}-end")
+        _git_tag(repo, f"renmark-run-{run_id}-end")
         clear_pause(repo)
         _print("All tasks completed.")
         return 0
@@ -485,13 +452,13 @@ def execute_plan(
 
 
 def _execute_task(
-    *, task: Task, repo: Path, run_id: str, cfg: Config, client: NIMClient,
+    *, task: Task, repo: Path, run_id: str, cfg: Config,
     remaining_token_budget: int, total: int,
 ) -> tuple[bool, str, int, str]:
     """Execute one task. Returns (ok, failure_reason_or_blank, tokens_used, sha_or_blank)."""
-    if task.executor == "codex":
-        return _execute_task_codex(task=task, repo=repo, run_id=run_id, cfg=cfg, total=total)
-    model = _choose_model(task, cfg)
+    # nim executor removed in v0.2.0; only codex reaches this function now.
+    return _execute_task_codex(task=task, repo=repo, run_id=run_id, cfg=cfg, total=total)
+    model = _choose_model(task, cfg)  # noqa: F401 — dead code, preserved for reference
     start = time.monotonic()
     try:
         base_prompt = _build_prompt(task, repo)
@@ -578,7 +545,7 @@ def _execute_task(
         if vres.ok:
             sha = _git_commit(
                 repo, task.target,
-                message=f"[nim] task {task.index}: {task.title}",
+                message=f"[renmark] task {task.index}: {task.title}",
                 trailer=f"Co-Authored-By: NIM-{model.split('/')[-1]} <noreply@nvidia.com>",
             )
             _print(_format_status_line(
@@ -705,7 +672,7 @@ def _execute_task_codex(
         if vres.ok:
             sha = _git_commit(
                 repo, task.target,
-                message=f"[nim] task {task.index}: {task.title}",
+                message=f"[renmark] task {task.index}: {task.title}",
                 trailer="Co-Authored-By: Codex-CLI <noreply@openai.com>",
             )
             _print(_format_status_line(
@@ -852,6 +819,121 @@ def cmd_logs(repo: Path, n: int = 10) -> int:
     return 0
 
 
+def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
+    """Ad-hoc Codex task mode (v0.3.0+).
+
+    Reads a task-spec markdown file (prompt + context paths, no inline code),
+    dispatches to Codex, writes the artifact to <output_path>. Emits a
+    SubagentOutput-shaped JSON dict to stdout for the orchestrator to consume.
+    Honors G5 (executor isolation) and G11 (task isolation).
+    """
+    import json as _json
+    from .summary import write_artifact, emit_pointer, hash_artifact, git_head_sha
+
+    spec_path = Path(task_spec_path)
+    out_path = Path(output_path)
+    if not spec_path.exists():
+        print(_json.dumps({
+            "status": "FAIL",
+            "artifact_path": str(out_path),
+            "summary_lines": [f"task spec not found at {spec_path}"],
+            "completion_state": "failed",
+            "confidence": "high",
+            "retry_count": 0,
+        }))
+        return 2
+
+    task_prompt = spec_path.read_text(encoding="utf-8")
+
+    # Resolve the codex CLI. If not present, return FAIL early — the framework
+    # falls back to Sonnet via Agent calls, but ad-hoc mode is codex-only by design
+    # (the whole point is to push bulk work outside the orchestrator's window).
+    import shutil
+    if shutil.which("codex") is None:
+        print(_json.dumps({
+            "status": "FAIL",
+            "artifact_path": str(out_path),
+            "summary_lines": [
+                "codex CLI not found on PATH",
+                "Install codex (https://github.com/openai/codex) or call this task via Agent."
+            ],
+            "completion_state": "failed",
+            "confidence": "high",
+            "retry_count": 0,
+        }))
+        return 127
+
+    # Run codex with the task spec as input. We tell it to write the artifact
+    # to <output_path> with the standard ## Summary section. Codex's stdout
+    # is NOT what we surface — we only consume the artifact body it writes.
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Build the wrapper prompt that instructs Codex on artifact format.
+    wrapper = (
+        f"You are a renmark task executor. Read the task spec below and write your "
+        f"complete output to {out_path}. The output file MUST be valid renmark artifact "
+        f"format: YAML frontmatter metadata + body + a '## Summary' section with at most "
+        f"5 bullet lines. Do NOT print the body to stdout. Only the artifact file matters.\n\n"
+        f"--- TASK SPEC ---\n{task_prompt}\n--- END TASK SPEC ---\n"
+    )
+
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ["codex", "exec", "-"],
+            input=wrapper,
+            text=True,
+            capture_output=True,
+            timeout=600,
+            cwd=str(repo),
+        )
+    except subprocess.TimeoutExpired:
+        print(_json.dumps({
+            "status": "FAIL",
+            "artifact_path": str(out_path),
+            "summary_lines": ["codex timed out after 600s"],
+            "completion_state": "failed",
+            "confidence": "high",
+            "retry_count": 0,
+        }))
+        return 124
+
+    if proc.returncode != 0 or not out_path.exists():
+        # codex either errored or didn't write the artifact. Surface a bounded summary.
+        stderr_tail = (proc.stderr or "").splitlines()[-3:]
+        print(_json.dumps({
+            "status": "FAIL",
+            "artifact_path": str(out_path),
+            "summary_lines": [
+                f"codex exit {proc.returncode}",
+                *[line[:200] for line in stderr_tail],
+            ][:5],
+            "completion_state": "failed",
+            "confidence": "high",
+            "retry_count": 0,
+        }))
+        return proc.returncode or 1
+
+    # Artifact exists. Parse its Summary section into our SubagentOutput shape.
+    # Note: codex may not have written valid renmark format — be defensive.
+    pointer = emit_pointer(out_path, "task")
+    sha = git_head_sha(repo)
+    output = {
+        "status": "PASS",
+        "artifact_path": str(out_path),
+        "touched_files": [str(out_path)],
+        "sha": sha,
+        "summary_lines": pointer.splitlines()[1:6],  # skip header line, take ≤5
+        "dependency_notes": "",
+        "token_count": 0,  # codex CLI doesn't surface this; orchestrator may estimate
+        "completion_state": "complete",
+        "confidence": "medium",
+        "retry_count": 0,
+    }
+    print(_json.dumps(output))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     ap = argparse.ArgumentParser(prog="renmark-execute")
@@ -868,6 +950,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-commit", action="store_true",
                     help="apply tasks and run verifier but do not git-commit (skill batches commits per wave)")
     ap.add_argument("--repo", default=".", help="repo root (default: current dir)")
+    # v0.3.0: ad-hoc Codex task mode (G5/G11)
+    ap.add_argument("--task", metavar="SPEC_PATH",
+                    help="ad-hoc mode: read a task-spec markdown file, dispatch to Codex, write artifact to --output. Emits SubagentOutput JSON to stdout.")
+    ap.add_argument("--output", metavar="ARTIFACT_PATH",
+                    help="(with --task) where Codex writes its artifact")
     args = ap.parse_args(argv)
 
     repo = Path(args.repo).resolve()
@@ -878,9 +965,13 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_roadmap(repo)
     if args.logs:
         return cmd_logs(repo, n=args.logs_n)
+    if args.task:
+        if not args.output:
+            ap.error("--task requires --output ARTIFACT_PATH")
+        return cmd_task(args.task, args.output, repo=repo)
 
     if not args.plan:
-        ap.error("plan path is required unless --usage / --roadmap / --logs")
+        ap.error("plan path is required unless --usage / --roadmap / --logs / --task")
     return execute_plan(
         args.plan, repo=repo, resume=args.resume, dry_run=args.dry_run,
         no_commit=args.no_commit,

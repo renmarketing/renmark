@@ -21,7 +21,7 @@ from pathlib import Path
 from ..parser import Task
 
 
-CLAUDE_EXECUTORS = ("opus", "sonnet")
+CLAUDE_EXECUTORS = ("haiku", "sonnet", "opus")
 
 
 @dataclass

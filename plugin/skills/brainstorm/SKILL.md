@@ -36,12 +36,17 @@ If none exist, ask the user: *"This looks like a fresh project. Scaffold `CLAUDE
 On yes:
 - Read templates from `~/.claude/plugins/renmark/templates/` (CLAUDE.md.template, AGENTS.md.template, memory/INDEX.md, etc.).
 - Substitute placeholders for project name and date.
-- Write `CLAUDE.md`, `AGENTS.md`, `.gitignore` (with `.renmark/state/` and `.renmark/debug/` entries), and the `.renmark/` directory tree.
-- `git init -b main && git add -A && git commit -q -m "chore: renmark scaffold"`
+- Write `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore` (with `.renmark/state/` and `.renmark/debug/` entries), and the `.renmark/` directory tree.
+- `CHANGELOG.md` starts with a single bootstrap entry (date, "project bootstrap", files created, standard "Do not change" guards for `.renmark/memory/` and CLAUDE.md↔AGENTS.md sync).
+- Run `git init -b main && git add -A`. Then attempt the scaffold commit:
+  ```bash
+  git -c user.name="renmark-scaffold" -c user.email="scaffold@renmark.local" commit -q -m "chore: renmark scaffold"
+  ```
+  If the commit is blocked (impersonation guard, no global config), skip it and tell the user: *"Scaffold files created. Run `git commit -m 'chore: renmark scaffold'` once you've set your git user config."*
 
 ### 2. Brainstorm
 
-Ask the user questions ONE at a time. Prefer multiple-choice when possible. Cover:
+Ask the user questions ONE at a time. Prefer multiple-choice when possible. **Cap multiselect options at 4** — `AskUserQuestion` rejects arrays with >4 items. Bundle related options if more are needed. Cover:
 - Goal / problem being solved (the WHY)
 - Constraints (deadlines, environment, dependencies)
 - Success criteria (how do you know it worked?)
@@ -65,7 +70,7 @@ Also update `.renmark/memory/project.md` with any new project facts learned (tec
 
 ### 6. Hand off (wizard step)
 
-Renmark is a wizard pipeline: `brainstorm → plan → orchestrate`. After writing the spec, prompt explicitly:
+Renmark is a wizard pipeline: `brainstorm → plan → check-plan → orchestrate → verify → finish`. After writing the spec, prompt explicitly:
 
 > *"I have everything to write the plan. The spec is at `<path>`.*
 > *Move on to `/renmark:plan` now? [Y/n/wait]"*

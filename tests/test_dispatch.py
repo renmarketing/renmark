@@ -11,7 +11,7 @@ from renmark.dispatch import TaskResult, WaveResult
 from renmark.parser import Task
 
 
-def _task(idx: int, target: str, executor: str = "nim",
+def _task(idx: int, target: str, executor: str = "codex",
           parallel_group: int | None = None,
           context_files: list[str] | None = None) -> Task:
     return Task(
@@ -80,7 +80,7 @@ def test_dispatch_wave_marks_claude_tasks_needs_agent(tmp_path: Path) -> None:
         return TaskResult(task_index=task.index, executor=task.executor, status="passed")
 
     wave = [
-        _task(1, "a", executor="nim", parallel_group=1),
+        _task(1, "a", executor="codex", parallel_group=1),
         _task(2, "b", executor="opus", parallel_group=1),
         _task(3, "c", executor="sonnet", parallel_group=1),
     ]

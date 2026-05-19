@@ -19,7 +19,7 @@ Recommended cadence: **after a full plan completes**, not after every task. `/re
 
 - "Review my changes" / "review this PR"
 - After completing a feature, before merging
-- After `/renmark:orchestrate` finishes — sanity check what NIM/Codex wrote
+- After `/renmark:orchestrate` finishes — sanity check what agents wrote
 
 **Do NOT use:**
 - For debugging a runtime failure — use `/renmark:debug`

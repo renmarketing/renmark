@@ -29,7 +29,7 @@ Show the rendered table to the user. Also write the current snapshot to `.renmar
 
 | Status | Meaning |
 |---|---|
-| `shipped` | a `[nim] task N:` (or `[manual] task N:`) commit exists in git |
+| `shipped` | a `[renmark] task N:` (or `[codex] task N:` or `[manual] task N:`) commit exists in git |
 | `in-progress` | usage.jsonl has an entry for the task but no matching commit |
 | `retried` | multiple usage entries for the same task without a commit (likely escalated) |
 | `planned` | listed in features.md "Planned" but no usage yet |

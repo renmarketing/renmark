@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Use when the user reports a bug or unexpected behavior — typed as /renmark:debug or phrases like "debug this", "why is X failing", "investigate the error", "find the root cause". Systematic reproduce → hypothesize → investigate → fix loop. Routes cheap investigation (greps, line counts) to NIM, multi-file traces to Codex, and cross-system reasoning to Opus. State preserved in .renmark/debug/<session-id>/ so the session survives /clear.
+description: Use when the user reports a bug or unexpected behavior — typed as /renmark:debug or phrases like "debug this", "why is X failing", "investigate the error", "find the root cause". Systematic reproduce → hypothesize → investigate → fix loop. Routes cheap investigation (greps, line counts) to Haiku/Bash, multi-file traces to Codex, and cross-system reasoning to Opus. State preserved in .renmark/debug/<session-id>/ so the session survives /clear.
 ---
 
 # debug
@@ -12,7 +12,7 @@ Modeled after `superpowers:systematic-debugging` + `context-mode:diagnose`. The 
 1. **Reproduce** — get a minimal repro from the user; verify you can trigger the bug
 2. **Hypothesize** — generate 3–5 ranked hypotheses for what's going wrong
 3. **Investigate** — route each inspection to the cheapest model that can do it
-4. **Fix** — Opus drafts the fix; route emission to NIM/Codex if it's a clean single-file change, else Opus edits directly
+4. **Fix** — Opus drafts the fix; route emission to Codex if it's a clean single-file change, else Opus edits directly
 5. **Verify** — the repro fails (bug gone), regression test added
 
 State lives in `.renmark/debug/<session-id>/`. A debug session survives `/clear`.
@@ -38,7 +38,7 @@ The `renmark.debug` Python module exposes the session helpers the skill drives:
 - `debug.set_root_cause(session, text)` — replaces the Root cause section
 - `debug.close_session(session, repo, title, severity, symptom, root_cause, fix, lesson)` — finalizes + writes a `bugs.md` entry
 - `debug.suggest_inspector(intent)` — returns the cheapest executor for a step:
-  - `nim` for grep / file-read / line-count / regex
+  - `haiku` (or direct Bash) for grep / file-read / line-count / regex
   - `codex` for multi-file-trace / find-usages / context-gather
   - `opus` for reasoning / race-condition / architecture
 - `debug.latest_session(repo)` — resume the most recent session
@@ -71,7 +71,7 @@ For each hypothesis, plan an inspection:
 
 | Inspection type | Suggested model |
 |---|---|
-| Grep for a symbol, count lines, check file existence | NIM (cheap, fast) |
+| Grep for a symbol, count lines, check file existence | Haiku or Bash (cheap, fast) |
 | Trace a function across multiple files, find usages | Codex (agentic, reads context) |
 | Reason about race conditions, async flow, architecture | Opus |
 
@@ -82,6 +82,8 @@ Run the inspection. Update `session.md` with findings — eliminate or confirm h
 Once you've isolated WHY the bug exists (not just what fixes it), write the root-cause statement in `session.md`.
 
 ### 6. Fix
+
+**Gate — before writing any code:** the root cause must be written as a single sentence in `session.md`. If you cannot state WHY the bug exists (not what fixes it), return to step 4. Patching symptoms without a confirmed root cause creates new bugs.
 
 Draft the fix. If it's a clean single-file change, write a 1-task renmark plan and run `/renmark:orchestrate` on it. Otherwise Opus edits directly.
 
@@ -97,7 +99,7 @@ Append to `.renmark/memory/learnings.md`:
 
 ## Iron Law
 
-**No fixes without a confirmed root cause.** Don't patch symptoms. If you can't articulate the root cause in one sentence, keep investigating.
+**No fixes without a confirmed root cause.** See CLAUDE.md § Root cause before any fix. Don't patch symptoms. If you can't articulate the root cause in one sentence, keep investigating.
 
 ## Reference
 

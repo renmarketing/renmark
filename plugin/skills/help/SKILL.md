@@ -31,7 +31,7 @@ Commands:
 
   /renmark:plan <spec>
       Decompose a spec into atomic single-file tasks. Auto-routes each to
-      nim, codex, opus, or sonnet based on complexity. Emits cost preview.
+      opus, codex, sonnet, or haiku based on complexity. Emits cost preview.
 
   /renmark:orchestrate <plan>
       Execute a plan. Tasks in the same parallel_group run concurrently;
@@ -39,7 +39,7 @@ Commands:
 
   /renmark:debug <symptom>
       Systematic reproduce → hypothesize → investigate → fix loop. Routes
-      cheap inspection to NIM, multi-file traces to Codex, reasoning to Opus.
+      cheap inspection to Haiku/Bash, multi-file traces to Codex, reasoning to Opus.
 
   /renmark:codereview <ref>
       Multi-pass diff review: codex (adversarial bug-finding), sonnet
@@ -58,8 +58,7 @@ Where things live:
   .renmark/state/    — runtime: usage ledger, pause file, escalations (gitignored)
   .renmark/debug/    — debug session state (gitignored)
 
-Reference: PLAN.md in the install dir (~/.claude/plugins/renmark/ via symlink
-to /home/renmark/projects/ai-system/).
+Reference: ~/.claude/plugins/renmark/ (plugin install directory)
 ```
 
 Adapt the version number if it has changed. If the user asks for more detail on a specific command, refer them to that skill's SKILL.md or invoke it directly.

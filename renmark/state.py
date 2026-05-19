@@ -1,4 +1,4 @@
-"""Persistent state for nim-execute: usage ledger, pause file, completed-task detection."""
+"""Persistent state for renmark-execute: usage ledger, pause file, completed-task detection."""
 from __future__ import annotations
 
 import datetime as dt
@@ -24,13 +24,12 @@ ESCALATIONS_DIR = "escalations"
 # .renmark/state/ is the canonical runtime state directory in v0.1.0+.
 STATE_DIR_NAME = f"{RENMARK_DIR_NAME}/{STATE_SUBDIR}"
 
-# Recognizes any of: "[nim] task N: ...", "[manual] task N: ...",
-# "nim task N: ...", "manual task N: ...", "nim task N (manual): ...",
-# "manual task N (nim): ...". A bracketed or bare "nim"/"manual" prefix
-# is REQUIRED — bare "task N:" is rejected so we don't false-positive on
-# unrelated commits.
+# Recognizes: "[renmark] task N: ...", "[codex] task N: ...", "[nim] task N: ...",
+# "[manual] task N: ...", and bare (unbracketed) variants of each.
+# A recognized prefix is REQUIRED — bare "task N:" is rejected to avoid
+# false-positives on unrelated commits.
 _COMMIT_TASK_RE = re.compile(
-    r"^\[?(?:nim|manual)\]?\s+task\s+(\d+)\s*(?:\([^)]*\))?\s*:",
+    r"^\[?(?:renmark|codex|nim|manual)\]?\s+task\s+(\d+)\s*(?:\([^)]*\))?\s*:",
     re.IGNORECASE,
 )
 
@@ -193,7 +192,7 @@ def recent_logs(repo_root: str | Path, n: int = 10) -> list[dict]:
 
 
 def completed_task_indices(repo_root: str | Path, since_ref: str | None = None) -> set[int]:
-    """Scan git log for commits matching '[nim] task N:' or '[manual] task N:'.
+    """Scan git log for commits matching '[renmark] task N:', '[codex] task N:', etc.
 
     Returns the set of completed task indices. Empty set if not a git repo or
     no matching commits.
@@ -217,3 +216,202 @@ def completed_task_indices(repo_root: str | Path, since_ref: str | None = None) 
 
 def now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+# --- Pipeline state (.renmark/state/pipeline.json) -------------------------
+# G10 (workflow recovery) + G11 (task isolation) runtime state.
+# Strict separation from lifecycle.json: pipeline.json carries RUNTIME fields
+# only (wave indices, task indices, retry counts, subprocess state). Workflow
+# fields (feature identity, stage names, approval state) live in lifecycle.json.
+
+PIPELINE_JSON = "pipeline.json"
+WAVE_SUMMARIES_SUBDIR = "wave-summaries"
+LAST_SKILL_FILE = "last-skill.json"
+
+
+@dataclass
+class PipelineState:
+    """Runtime state of an in-flight /renmark:orchestrate execution."""
+
+    current_phase: str = "idle"                  # idle | orchestrate | paused
+    current_plan: str = ""                       # path to plan file
+    wave_index: int = 0
+    wave_total: int = 0
+    completed_tasks: list[int] = None           # type: ignore[assignment]
+    failed_tasks: list[int] = None              # type: ignore[assignment]
+    last_updated: str = ""
+
+    def __post_init__(self) -> None:
+        if self.completed_tasks is None:
+            self.completed_tasks = []
+        if self.failed_tasks is None:
+            self.failed_tasks = []
+        if not self.last_updated:
+            self.last_updated = now_iso()
+
+
+def _pipeline_path(repo_root: str | Path) -> Path:
+    return state_dir(repo_root) / PIPELINE_JSON
+
+
+def read_pipeline_state(repo_root: str | Path) -> PipelineState | None:
+    """Return the current PipelineState, or None if none exists."""
+    path = _pipeline_path(repo_root)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    known = {f for f in PipelineState.__dataclass_fields__}
+    filtered = {k: v for k, v in data.items() if k in known}
+    return PipelineState(**filtered)
+
+
+def write_pipeline_state(
+    repo_root: str | Path,
+    *,
+    current_phase: str | None = None,
+    current_plan: str | None = None,
+    wave_index: int | None = None,
+    wave_total: int | None = None,
+    add_completed_task: int | None = None,
+    add_failed_task: int | None = None,
+    clear_tasks: bool = False,
+) -> PipelineState:
+    """Update pipeline.json. Read-modify-write preserves unrelated fields."""
+    current = read_pipeline_state(repo_root) or PipelineState()
+    if current_phase is not None:
+        current.current_phase = current_phase
+    if current_plan is not None:
+        current.current_plan = current_plan
+    if wave_index is not None:
+        current.wave_index = wave_index
+    if wave_total is not None:
+        current.wave_total = wave_total
+    if clear_tasks:
+        current.completed_tasks = []
+        current.failed_tasks = []
+    if add_completed_task is not None and add_completed_task not in current.completed_tasks:
+        current.completed_tasks.append(add_completed_task)
+    if add_failed_task is not None and add_failed_task not in current.failed_tasks:
+        current.failed_tasks.append(add_failed_task)
+    current.last_updated = now_iso()
+
+    path = _pipeline_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(asdict(current), indent=2), encoding="utf-8")
+    return current
+
+
+def clear_pipeline_state(repo_root: str | Path) -> None:
+    path = _pipeline_path(repo_root)
+    if path.exists():
+        path.unlink()
+
+
+def pipeline_is_resumable(repo_root: str | Path) -> bool:
+    """G10: True if an interrupted orchestrate run has resumable state."""
+    state = read_pipeline_state(repo_root)
+    if state is None:
+        return False
+    return state.current_phase in {"orchestrate", "paused"} and state.wave_index < state.wave_total
+
+
+# --- Wave summaries (.renmark/state/wave-summaries/) -----------------------
+# G11: per-wave aggregated subagent outputs. Next wave reads dependency_notes
+# from here, never from prior conversation.
+
+def _wave_summaries_dir(repo_root: str | Path) -> Path:
+    d = state_dir(repo_root) / WAVE_SUMMARIES_SUBDIR
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def write_wave_summary(repo_root: str | Path, wave_index: int, task_outputs: list[dict]) -> Path:
+    """Write the aggregated per-task summaries for one wave.
+
+    task_outputs is a list of dicts conforming to SubagentOutput (status,
+    artifact_path, summary_lines, dependency_notes, etc.). The orchestrator
+    reads this file for the next wave's dependency context — NOT the conversation.
+    """
+    payload = {
+        "wave_index": wave_index,
+        "completed_at": now_iso(),
+        "task_outputs": task_outputs,
+    }
+    path = _wave_summaries_dir(repo_root) / f"wave-{wave_index}.json"
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return path
+
+
+def read_wave_summary(repo_root: str | Path, wave_index: int) -> dict | None:
+    path = _wave_summaries_dir(repo_root) / f"wave-{wave_index}.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def list_wave_summaries(repo_root: str | Path) -> list[int]:
+    """Return sorted list of wave indices that have summaries on disk."""
+    d = _wave_summaries_dir(repo_root)
+    indices: list[int] = []
+    for f in d.glob("wave-*.json"):
+        try:
+            indices.append(int(f.stem.split("-", 1)[1]))
+        except (ValueError, IndexError):
+            continue
+    return sorted(indices)
+
+
+# --- Skill invocation tracking (.renmark/state/last-skill.json) ------------
+# G4: subject-change detection for context-contamination prompts.
+
+def _last_skill_path(repo_root: str | Path) -> Path:
+    return state_dir(repo_root) / LAST_SKILL_FILE
+
+
+def record_skill_invocation(repo_root: str | Path, skill_name: str, domain: str) -> None:
+    """Append-style record of which skill ran last and in which domain.
+
+    Used by context_budget_check to detect cross-domain transitions and
+    suggest /clear (per G4 / context-contamination-rule).
+    """
+    payload = {
+        "skill": skill_name,
+        "domain": domain,
+        "timestamp": now_iso(),
+    }
+    path = _last_skill_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def last_skill_invocation(repo_root: str | Path) -> dict | None:
+    path = _last_skill_path(repo_root)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def context_budget_check(repo_root: str | Path, new_skill: str, new_domain: str) -> str | None:
+    """Return 'clear' if cross-domain transition detected; else None.
+
+    The %-utilization branch ('compact' recommendation) is NOT detectable from
+    inside a skill — the harness doesn't expose context size. That side lives
+    in the rule prose (context-budget-rule in CLAUDE.md) which the orchestrator
+    self-monitors. This helper handles only the local-state half.
+    """
+    last = last_skill_invocation(repo_root)
+    if last is None:
+        return None
+    prev_domain = last.get("domain")
+    if prev_domain and prev_domain != new_domain:
+        return "clear"
+    return None

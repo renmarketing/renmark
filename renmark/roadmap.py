@@ -3,7 +3,7 @@
 Synthesizes a status report from three sources:
 - `.renmark/memory/features.md` — declared features (planned/in-progress/shipped)
 - `.renmark/state/usage.jsonl` — token spend per LLM call (run_id, task_id, model, tokens)
-- git log — commit shas for `[nim|manual] task N:` entries
+- git log — commit shas for `[renmark|codex|nim|manual] task N:` entries
 
 Output: a per-task table with columns:
   task | llm | status | tokens | $ | commit
@@ -23,10 +23,11 @@ from .state import read_usage, RENMARK_DIR_NAME
 
 # Approximate per-token costs (USD) for cost estimates. Update as pricing shifts.
 COST_PER_KT = {
-    "nim": 0.0,                     # free tier
+    "haiku": 0.0001,                # cheapest Claude tier
     "codex": 0.05,                  # rough est for OpenAI Codex CLI calls
-    "opus": 0.0,                    # in-context — Anthropic billing, not separately tracked
     "sonnet": 0.003,
+    "opus": 0.0,                    # in-context — Anthropic billing, not separately tracked
+    "nim": 0.0,                     # legacy: NIM removed in v0.2.0
 }
 
 
@@ -42,7 +43,7 @@ class RoadmapRow:
 
 
 def _git_commits_for_tasks(repo: str | Path) -> dict[int, str]:
-    """Map task_index → short sha by scanning git log for `[nim|manual] task N:` commits."""
+    """Map task_index → short sha by scanning git log for `[renmark|codex|nim|manual] task N:` commits."""
     try:
         out = subprocess.run(
             ["git", "-C", str(repo), "log", "--pretty=%h %s"],
@@ -51,7 +52,7 @@ def _git_commits_for_tasks(repo: str | Path) -> dict[int, str]:
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return {}
     pattern = re.compile(
-        r"^([0-9a-f]+)\s+\[?(?:nim|manual)\]?\s+task\s+(\d+)\s*(?:\([^)]*\))?\s*:",
+        r"^([0-9a-f]+)\s+\[?(?:renmark|codex|nim|manual)\]?\s+task\s+(\d+)\s*(?:\([^)]*\))?\s*:",
         re.IGNORECASE,
     )
     out_map: dict[int, str] = {}

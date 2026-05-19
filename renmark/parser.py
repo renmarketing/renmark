@@ -1,4 +1,4 @@
-"""Plan file parser for nim-execute.
+"""Plan file parser for renmark-execute.
 
 Parses markdown plan files of the form:
 
@@ -34,7 +34,7 @@ class Task:
     verifier: str = ""
     verifier_timeout_s: int = 60
     spec: str = ""
-    executor: str = "nim"            # "nim" | "codex" | "opus" | "sonnet" | <litellm-string>
+    executor: str = "codex"          # "haiku" | "codex" | "sonnet" | "opus" | <litellm-string>
     # Phase 1 fields (v0.0.3+):
     complexity: str = "medium"       # "simple" | "medium" | "hard"
     parallel_group: int | None = None  # tasks sharing a group run concurrently; default None = serial (each in its own group = index)
@@ -211,11 +211,12 @@ def _build_task(d: dict) -> Task:
     if not spec:
         raise PlanError("spec is empty")
 
-    executor = (d.get("executor") or "nim").strip().lower()
-    # Allow nim, codex, opus, sonnet, or any provider-string of form "<provider>/<model>".
-    if executor not in ("nim", "codex", "opus", "sonnet") and "/" not in executor:
+    executor = (d.get("executor") or "codex").strip().lower()
+    # Allow haiku, codex, sonnet, opus, or any provider-string of form "<provider>/<model>".
+    # nim was removed in v0.2.0 — use haiku for simple tasks instead.
+    if executor not in ("haiku", "codex", "sonnet", "opus") and "/" not in executor:
         raise PlanError(
-            f"executor must be one of nim, codex, opus, sonnet, or a provider/model string, got {executor!r}"
+            f"executor must be one of haiku, codex, sonnet, opus, or a provider/model string, got {executor!r}"
         )
 
     complexity = (d.get("complexity") or "medium").strip().lower()

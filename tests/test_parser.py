@@ -154,7 +154,7 @@ def test_unknown_field_rejected(tmp_path: Path) -> None:
         parse_plan(plan)
 
 
-def test_executor_defaults_to_nim(tmp_path: Path) -> None:
+def test_executor_defaults_to_codex(tmp_path: Path) -> None:
     plan = _write(
         tmp_path,
         "# X\n\n## Tasks\n\n"
@@ -166,7 +166,7 @@ def test_executor_defaults_to_nim(tmp_path: Path) -> None:
         "  noop\n",
     )
     tasks = parse_plan(plan)
-    assert tasks[0].executor == "nim"
+    assert tasks[0].executor == "codex"
 
 
 def test_executor_codex_parses(tmp_path: Path) -> None:
@@ -201,8 +201,8 @@ def test_executor_invalid_rejected(tmp_path: Path) -> None:
         parse_plan(plan)
 
 
-def test_executor_opus_and_sonnet_accepted(tmp_path: Path) -> None:
-    for ex in ("opus", "sonnet"):
+def test_executor_claude_models_accepted(tmp_path: Path) -> None:
+    for ex in ("haiku", "sonnet", "opus"):
         plan = _write(
             tmp_path,
             "# X\n\n## Tasks\n\n"
@@ -216,6 +216,22 @@ def test_executor_opus_and_sonnet_accepted(tmp_path: Path) -> None:
         )
         tasks = parse_plan(plan)
         assert tasks[0].executor == ex
+
+
+def test_executor_nim_rejected(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **executor:** nim\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="executor must be"):
+        parse_plan(plan)
 
 
 def test_executor_provider_string_accepted(tmp_path: Path) -> None:

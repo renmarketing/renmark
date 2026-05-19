@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "renmark"
+version = "0.2.5"
+description = "Multi-LLM orchestration: brainstorm, plan, orchestrate, debug, codereview. Persistent project memory."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "renmark" }]
+license = { text = "MIT" }
+keywords = ["orchestration", "multi-llm", "codex", "haiku", "sonnet", "opus", "claude-code"]
+dependencies = [
+    "requests>=2.32.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+# Note: no [project.scripts] entry — the canonical CLI is the bash wrapper at
+# bin/renmark-execute, which install.sh symlinks to ~/.local/bin/. On Windows or
+# where the wrapper is unavailable, invoke via `python -m renmark` instead.
+
+[tool.setuptools.packages.find]
+include = ["renmark*"]
+exclude = ["tests*", "plugin*", "bin*"]

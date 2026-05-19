@@ -1,9 +1,9 @@
 """Renmark — multi-LLM orchestration with persistent project memory.
 
 Five Claude Code skills (/renmark:brainstorm, plan, orchestrate, debug, codereview)
-backed by a CLI (renmark-execute) that dispatches tasks to NIM, Codex,
-Opus, Sonnet, or any registered provider.
+backed by a CLI (renmark-execute) that dispatches tasks to Haiku, Codex,
+Sonnet, Opus, or any registered provider.
 
 Phase 0 baseline: copied from ai-inference v0.2.0 with module reshuffles.
 """
-__version__ = "0.1.5"
+__version__ = "0.2.0"

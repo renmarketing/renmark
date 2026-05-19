@@ -1,5 +1,152 @@
 # Changelog
 
+## v0.2.5 — 2026-05-18 (governance charter codification)
+
+**Patch release — documentation only, no code or skill behavior changes.**
+
+The orchestrator (Sonnet 200k typical) is now treated as a degrading systems resource. Nine new governance rules codify how every renmark skill must behave to protect orchestration integrity against context rot. The rules ship as `BEGIN/END` blocks in CLAUDE.md.template so `/renmark:setup` merges them into existing projects without overwriting.
+
+**New CLAUDE.md rule blocks** (9, all in `plugin/templates/CLAUDE.md.template`):
+- `orchestrator-role-rule` — coordinator, not memory container
+- `canonical-state-rule` — truth lives in `.renmark/` and CHANGELOG, not conversation
+- `summary-boundary-rule` — orchestrator-visible output ≤ 5 lines or ≤ 300 tokens
+- `context-contamination-rule` — cross-domain skill changes recommend `/clear` (domains: debug, build, audit, meta)
+- `artifact-governance-rule` — every artifact carries provenance + freshness metadata
+- `compact-semantics-rule` — `/compact` preserves goals, blockers, pipeline state, artifact refs, verification status
+- `failure-transparency-rule` — outputs carry `completion_state` / `confidence` / `validation_status` / `retry_count` / `parser_success` / `schema_compliance`
+- `workflow-recovery-rule` — multi-step workflows resumable from `.renmark/state/pipeline.json`, not conversational reconstruction
+- `task-isolation-rule` — `/renmark:orchestrate` runs each task in an isolated subagent context; subagent transcripts and generated code never re-enter the orchestrator
+
+**AGENTS.md.template:** 9 corresponding one-liner mirrors, each pointing at the longer block in CLAUDE.md.
+
+**`/renmark:setup`:** merge table extended from 6 to 15 blocks. Existing projects get the new rules merged on next setup run without overwriting custom content.
+
+**New file `plugin/skills/CONTRIBUTING.md`:** governance acceptance bar for new skills — 9-rule compliance checklist (G2–G11). A new skill that cannot tick all 9 boxes does not merge. Includes the canonical SKILL.md structure with the `Governance compliance` table every new skill must include.
+
+**Files changed:**
+- `plugin/templates/CLAUDE.md.template` — 9 new rule blocks inserted between `verify-before-done-rule` and the tooling table
+- `plugin/templates/AGENTS.md.template` — 9 one-liner mirrors added between `Verification before completion` and `Conventions`
+- `plugin/skills/setup/SKILL.md` — merge table updated with 9 new entries
+- `plugin/skills/CONTRIBUTING.md` — new file
+- `VERSION` — bumped `0.2.4` → `0.2.5`
+
+**Do not change:**
+- The 9 rule blocks ship as one cohesive set; do not split them into separate releases. Each rule reinforces the others (e.g., G6 artifact metadata depends on G3 summary boundaries; G10 recovery depends on G2 canonical state).
+- AGENTS.md mirrors stay one-liners that reference the long-form block in CLAUDE.md — do not duplicate the full rule text in AGENTS.md.
+- Block names use the `<topic>-rule` suffix convention. Do not rename existing blocks; downstream merge logic depends on the names.
+- The `task-isolation-rule` block describes a contract that Phase 1 code (next release v0.3.0) will enforce. Rules ship first so plans drafted against v0.2.5 already obey them — the code that mechanically blocks violations comes in v0.3.0.
+
+---
+
+## v0.2.4 — 2026-05-15 (vibe coder entry point)
+
+**New skill:**
+- `/renmark:start` — plain-English entry point for vibe coders. Asks what you want to build, infers stack and scope from the description, asks at most 2 follow-up questions (reach and lifespan), presents a confirmation summary with a brief best-practices mention, then routes to `/renmark:plan` (simple requests) or `/renmark:brainstorm` (complex/multi-feature). Best practices (error handling, README, .env, .gitignore, smoke test) are woven into task specs automatically — no separate tasks, no jargon exposed to the user.
+
+**plugin.json:** version bumped to 0.2.4; description updated to lead with vibe coder framing; added `vibe-coder` keyword.
+
+**install.sh:** `/renmark:start` added as first skill in success message; start message updated to show `start` as the entry point for new users.
+
+**CLAUDE.md template:** `/renmark:start` added as first row in tooling table.
+
+**Do not change:**
+- The 2-question cap in `start` — more questions break the adaptive/frictionless contract
+- Stack inference happens silently — never prompt the user to choose a framework
+
+---
+
+## v0.2.3 — 2026-05-15 (setup skill + install.sh rewrite)
+
+**New skill:**
+- `/renmark:setup` — prepares any existing project for renmark workflow. Detects tech stack from project files, creates or merges missing CLAUDE.md rule blocks (using BEGIN/END markers), syncs AGENTS.md, creates CHANGELOG.md if absent, scaffolds `.renmark/` directory tree with seed memory files, adds `.gitignore` entries, offers optional `git init`. Safe to re-run — merge-only, never overwrites existing content. Prompts to continue to brainstorm or plan on completion.
+
+**install.sh rewrite:**
+- Added `--uninstall` flag (`bash install.sh --uninstall`)
+- Removed stale `/orchestrator` cleanup step (ai-inference project artifact)
+- Added optional `pip3 install -q -e` step for Python editable package
+- Success message now lists all 12 skills with descriptions
+- VERSION read dynamically from `./VERSION` file
+
+**VERSION:** bumped `0.1.5` → `0.2.3`
+
+**Do not change:**
+- `install.sh` symlinks are idempotent — stale symlinks are removed and recreated; non-symlink collisions abort with an error rather than overwriting
+
+---
+
+## v0.2.2 — 2026-05-14 (skill quality gates + CLAUDE.md discipline rules)
+
+Skills-only release — no Python module changes.
+
+**New skills:**
+- `/renmark:check-plan` — lightweight plan validator (task count ≤ 15, verifier presence, parallel group safety). Invoked automatically by orchestrate pre-flight. Returns PASS / WARN / BLOCK.
+- `/renmark:verify` — goal-backward smoke test after orchestrate. Reads plan context paragraph, runs one functional command per stated behavior, reports N/M requirements verified. Never reads source files.
+- `/renmark:finish` — branch close wrapper. Re-runs verifiers, shows git log summary, offers [p] PR / [m] merge / [n] nothing.
+
+**Skill updates:**
+- `orchestrate`: pre-flight now invokes `/renmark:check-plan`; step 7 re-runs all verifiers before reporting done; hand-off menu adds `[v] Verify` and `[f] Finish` options.
+- `debug`: Iron Law cross-references CLAUDE.md § Root cause before any fix; step 6 has explicit gate requiring root cause sentence before any code change.
+
+**Template updates (CLAUDE.md.template + AGENTS.md.template):**
+- Added `## Context hygiene` — never read generated file contents into conversation
+- Added `## Executor dispatch rules` — codex → renmark-execute only, never Agent calls
+- Added `## Root cause before any fix` — no code changes without written root cause
+- Added `## Verification before completion` — re-run verifiers fresh before claiming done
+- Added 3 new commands to tooling table (check-plan, verify, finish)
+- AGENTS.md: added absolute paths, single-file scope, root cause, verify-before-done rules
+
+**plugin.json:** version bumped to 0.2.2; description updated (NIM removed, new skills listed); keywords updated.
+
+**Do not change:**
+- CLAUDE.md.template rule blocks use BEGIN/END comment markers for tooling that parses them — preserve the `<!-- BEGIN:x -->` / `<!-- END:x -->` wrapper format
+
+---
+
+## v0.2.1 — 2026-05-14 (dispatch routing fix + scope contract + subscription language)
+
+Skills-only release — no Python module changes.
+
+**Fixed:**
+- `orchestrate` overview: corrected dispatch table — `codex` → `renmark-execute` (Codex subscription quota), `haiku/sonnet/opus` → Agent calls (Claude Code subscription quota). Added RED FLAG to Step 3 explicitly forbidding codex tasks from being dispatched as Agent calls (was the root cause of all agents running on Sonnet 4.6 in test).
+- `orchestrate` overview: replaced "OpenAI credits / Anthropic credits" language with "Codex account / Claude Code account" — both are subscription-based, not API billing.
+
+**Added:**
+- `/renmark:plan` Step 0 Scope Contract: 3-question discovery phase (tech stack with inference rules, deployment target, MVP boundary) before any task decomposition. Writes locked decisions to `CHANGELOG.md` and `.renmark/memory/stack.md`. Explicit confirmation gate — no silence-as-confirmation.
+- `debug` Step 6: root-cause gate added — must write root cause sentence before drafting any fix.
+
+**Do not change:**
+- Scope Contract confirmation gate language: "Do not rely on silence, lack of objection, or ambiguous replies as confirmation" — this wording was specifically required
+
+---
+
+## v0.2.0 — 2026-05-14 (NIM executor removal — multi-executor architecture)
+
+**Breaking change:** NIM executor removed. All NIM references replaced with multi-executor architecture (Haiku / Codex / Sonnet / Opus).
+
+**Python changes:**
+- `cli.py`: removed `NIMClient.from_env()` pre-flight block (was blocking all non-dry-run execution without `NVIDIA_NIM_API_KEY`); renamed `NIM_*` env vars → `RENMARK_*`; git tags `nim-run-*` → `renmark-run-*`; commit prefix `[nim]` → `[renmark]`; cleared stale Mistral model defaults to `""`
+- `state.py`: `_COMMIT_TASK_RE` updated to match `renmark|codex|nim|manual` prefixes (nim kept for backward-compat with existing git history)
+- `roadmap.py`: git log pattern updated; `COST_PER_KT` adds `haiku: 0.0001`
+- `debug.py`: `suggest_inspector()` returns `"haiku"` for cheap intents (was `"nim"`)
+- `parser.py`: default `executor` changed from `"nim"` to `"codex"`
+- `__init__.py`: version bumped to `0.2.0`; description updated to list Haiku/Codex/Sonnet/Opus
+- `apply.py`: module docstring updated to generic "agent output"
+
+**Skill updates:**
+- `orchestrate`: NIM pre-flight removed; refactor safety check + changelog check added; haiku added to Agent dispatch section; NIM error codes removed
+- `plan`: executor list updated (NIM → Haiku); CHANGELOG.md integration added; routing table updated
+
+**Tests:**
+- `test_dispatch.py`: default executor `"nim"` → `"codex"`
+- `test_debug.py`: `inspector="nim"` → `inspector="haiku"`; `suggest_inspector` assertions updated
+- `test_state.py`: 3 new commit variants (`[renmark]`, `[codex]`, bare `renmark`) added; 113 tests pass
+
+**Do not change:**
+- `_COMMIT_TASK_RE` still matches `nim` — required for backward-compat with git history from pre-v0.2.0 runs
+- `RENMARK_PREFER_SMALL_MODEL` and `RENMARK_BIG_MODEL` env var defaults are intentionally `""` — let users set them explicitly
+
+---
+
 ## v0.1.5 — 2026-05-12 (Phase 3: /renmark:debug helper module)
 
 Adds `renmark/debug.py` — file-format helpers + executor-suggestion routing for the debug loop. The skill now has a real backend instead of being a pure playbook.

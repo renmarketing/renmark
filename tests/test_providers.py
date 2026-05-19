@@ -17,10 +17,15 @@ from renmark.providers import (
 # --- resolver -----------------------------------------------------------
 
 def test_resolver_native_executors() -> None:
-    assert resolve_provider("nim") == ("nim", "")
     assert resolve_provider("codex") == ("codex", "")
-    assert resolve_provider("opus") == ("claude_agent", "opus")
+    assert resolve_provider("haiku") == ("claude_agent", "haiku")
     assert resolve_provider("sonnet") == ("claude_agent", "sonnet")
+    assert resolve_provider("opus") == ("claude_agent", "opus")
+
+
+def test_resolver_nim_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown executor"):
+        resolve_provider("nim")
 
 
 def test_resolver_ollama_strips_prefix() -> None:

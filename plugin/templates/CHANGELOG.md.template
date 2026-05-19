@@ -1,0 +1,25 @@
+# Changelog
+
+<!-- Each entry records: date, short title, user's request in plain English,
+     what was actually built, files changed + why, and "Do not change" guards.
+     The orchestrator reads the last 5 entries before each wave and appends
+     a new entry after each successful wave commit. -->
+
+## [{{DATE}}] — project bootstrap
+
+**Request:** New project initialized with renmark scaffold.
+**Built:** CLAUDE.md, AGENTS.md, CHANGELOG.md, .renmark/ memory structure, .gitignore.
+
+**Files changed:**
+- `CLAUDE.md` — project memory, agent rules, parallelism/commit/changelog/refactor-safety policies
+- `AGENTS.md` — agent-neutral mirror of CLAUDE.md (shorter)
+- `CHANGELOG.md` — this file; persistent project history
+- `.renmark/` — memory directory (project.md, routing.md, conventions.md, decisions.md, learnings.md)
+- `.gitignore` — ignores `.renmark/state/` and `.renmark/debug/`
+
+**Do not change:**
+- Do not delete or restructure `.renmark/memory/` — renmark skills read from these files
+- Keep `CLAUDE.md` and `AGENTS.md` in sync; any rule change in one must appear in the other in the same commit
+- Do not gitignore `CHANGELOG.md` — it must be committed and version-controlled
+
+**Open items:** Fill in the Project Architecture section of `CLAUDE.md` after brainstorm completes.
