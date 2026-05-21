@@ -1,0 +1,8 @@
+{
+  "response": {
+    "status": "PASS",
+    "artifact_path": "x.md",
+    "summary_lines": ["ok"],
+    "transcript": "USER: hi\nASSISTANT: ok\nUSER: continue"
+  }
+}

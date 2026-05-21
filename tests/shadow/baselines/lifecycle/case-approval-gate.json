@@ -1,0 +1,12 @@
+{
+  "artifacts": {},
+  "branch": "x",
+  "feature": "x",
+  "github_issue": null,
+  "human_review_completed": false,
+  "human_review_for": "release-v0.3.1",
+  "human_review_required": true,
+  "next_recommended": "/renmark:finish",
+  "stage": "documented",
+  "stages_completed": []
+}

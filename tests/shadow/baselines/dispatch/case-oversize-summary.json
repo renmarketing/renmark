@@ -1,0 +1,4 @@
+{
+  "error": "IsolationViolation",
+  "message": "SubagentOutput.summary_lines has 6 entries; max 5 (G3)"
+}

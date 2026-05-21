@@ -1,0 +1,11 @@
+{
+  "response": {
+    "status": "FAIL",
+    "artifact_path": ".renmark/reviews/x.review.md",
+    "touched_files": [],
+    "summary_lines": ["verifier exited 1", "AssertionError"],
+    "completion_state": "failed",
+    "confidence": "low",
+    "retry_count": 2
+  }
+}

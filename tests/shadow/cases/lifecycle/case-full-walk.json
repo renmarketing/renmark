@@ -1,0 +1,13 @@
+{
+  "calls": [
+    {"stage": "init", "feature": "demo", "branch": "feature/demo"},
+    {"stage": "brainstorm-complete"},
+    {"stage": "plan-drafted"},
+    {"stage": "plan-validated"},
+    {"stage": "created"},
+    {"stage": "verified"},
+    {"stage": "reviewed"},
+    {"stage": "documented"},
+    {"stage": "ready-to-release"}
+  ]
+}

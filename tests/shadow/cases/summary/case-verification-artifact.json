@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "artifact_type": "verification",
+    "source_sha": "abc123",
+    "related_plan": ".renmark/plans/x.plan.md",
+    "generator": "renmark.verify",
+    "completion_state": "complete",
+    "confidence": "high",
+    "validation_status": "validated"
+  }
+}

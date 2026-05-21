@@ -1,0 +1,14 @@
+{
+  "response": {
+    "status": "PASS",
+    "artifact_path": ".renmark/reviews/2026-05-21-abc.review.md",
+    "touched_files": ["src/greeting.py"],
+    "sha": "abc123",
+    "summary_lines": ["wrote constant", "verifier green"],
+    "dependency_notes": "",
+    "token_count": 1234,
+    "completion_state": "complete",
+    "confidence": "high",
+    "retry_count": 0
+  }
+}

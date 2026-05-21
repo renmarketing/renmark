@@ -1,0 +1,17 @@
+{
+  "artifacts": {
+    "plan": ".renmark/plans/x.plan.md",
+    "spec": ".renmark/specs/x.spec.md"
+  },
+  "branch": "feature/auth",
+  "feature": "auth",
+  "github_issue": null,
+  "human_review_completed": false,
+  "human_review_for": null,
+  "human_review_required": false,
+  "next_recommended": "/renmark:check-plan",
+  "stage": "plan-drafted",
+  "stages_completed": [
+    "brainstorm-complete"
+  ]
+}

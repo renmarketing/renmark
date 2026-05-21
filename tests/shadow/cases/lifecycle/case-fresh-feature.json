@@ -1,0 +1,7 @@
+{
+  "calls": [
+    {"stage": "init", "feature": "auth", "branch": "feature/auth"},
+    {"stage": "brainstorm-complete", "artifact_update": ["spec", ".renmark/specs/x.spec.md"]},
+    {"stage": "plan-drafted", "artifact_update": ["plan", ".renmark/plans/x.plan.md"]}
+  ]
+}

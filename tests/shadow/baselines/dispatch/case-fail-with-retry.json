@@ -1,0 +1,15 @@
+{
+  "artifact_path": ".renmark/reviews/x.review.md",
+  "completion_state": "failed",
+  "confidence": "low",
+  "dependency_notes": "",
+  "retry_count": 2,
+  "sha": null,
+  "status": "FAIL",
+  "summary_lines": [
+    "verifier exited 1",
+    "AssertionError"
+  ],
+  "token_count": 0,
+  "touched_files": []
+}

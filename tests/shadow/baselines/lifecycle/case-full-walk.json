@@ -1,0 +1,20 @@
+{
+  "artifacts": {},
+  "branch": "feature/demo",
+  "feature": "demo",
+  "github_issue": null,
+  "human_review_completed": false,
+  "human_review_for": null,
+  "human_review_required": false,
+  "next_recommended": "/renmark:release",
+  "stage": "ready-to-release",
+  "stages_completed": [
+    "brainstorm-complete",
+    "plan-drafted",
+    "plan-validated",
+    "created",
+    "verified",
+    "reviewed",
+    "documented"
+  ]
+}

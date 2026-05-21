@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "artifact_type": "review",
+    "generator": "renmark.codereview",
+    "completion_state": "failed",
+    "confidence": "low",
+    "validation_status": "failed",
+    "retry_count": 3,
+    "parser_success": false,
+    "schema_compliance": false
+  }
+}

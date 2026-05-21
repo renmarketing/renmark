@@ -1,0 +1,4 @@
+{
+  "error": "IsolationViolation",
+  "message": "subagent response includes forbidden fields ['transcript']. Only these fields are permitted: artifact_path, completion_state, confidence, dependency_notes, retry_count, sha, status, summary_lines, token_count, touched_files"
+}

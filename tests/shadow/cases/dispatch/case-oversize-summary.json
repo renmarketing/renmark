@@ -1,0 +1,7 @@
+{
+  "response": {
+    "status": "PASS",
+    "artifact_path": "x.md",
+    "summary_lines": ["one", "two", "three", "four", "five", "six"]
+  }
+}

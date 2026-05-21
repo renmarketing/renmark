@@ -10,4 +10,4 @@ persists to `.renmark/state/lifecycle.json`; runtime state to
 `pipeline.json`. After `/clear`, `/renmark:resume` recovers in one file
 read.
 """
-__version__ = "0.3.0"
+__version__ = "0.3.1"

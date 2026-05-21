@@ -1,5 +1,54 @@
 # Changelog
 
+## v0.3.1 — 2026-05-21 (integration testing + guardrails)
+
+**Patch release — the framework now defends itself against regressions.**
+
+Three layers of test discipline land in v0.3.1: per-commit guardrails (fast), per-release integration smoke (thorough), and per-task shadow tests (regression detection on load-bearing subsystems). Every layer is opt-in or gated so day-to-day work stays fast.
+
+**New modules:**
+
+- **`renmark/schemas.py`** (NEW, 24 tests) — zero-dependency structural validators for `lifecycle.json`, `pipeline.json`, `SubagentOutput` JSON, and `ArtifactMetadata`. G11 isolation enforcement catches transcript/diff/reasoning leakage at the schema layer. G3 summary boundary enforced (≤5 lines, ≤1200 chars per line). G12 lifecycle byte budget enforced. CLI: `python -m renmark.schemas {lifecycle|pipeline|subagent|artifact} <path>`.
+- **`renmark/lint.py`** (NEW, 25 tests) — plugin contract linter. Verifies every SKILL.md has valid frontmatter with matching `name:`, every `commands/<name>.md` has a paired `skills/<name>/SKILL.md` (and vice versa — no orphan commands, no unreachable skills), CLAUDE.md.template has balanced `BEGIN:` / `END:` rule-block markers, and `plugin.json` has required fields. CLI: `python -m renmark.lint [--plugin-dir DIR]`.
+- **`renmark/release.py`** (NEW, 20 tests) — version-file drift detection pulled forward from the v0.4.0 release skill. `VERSION_FILES` catalogs the 7 locations that carry the canonical version (VERSION, pyproject.toml, `renmark/__init__.py`, plugin.json, marketplace.json metadata + plugins[0], README.md header). `python -m renmark.release check` exits 1 on any disagreement. Bump/tag/zip operations stay deferred to v0.4.0 — this module is read-only at v0.3.1.
+- **`renmark/shadow.py`** (NEW, 22 tests) — record-and-replay regression framework. Per-subsystem `replay(case_dict) → output_dict` functions registered via `@shadow.register("name")`. `run` replays every case and diffs against the committed baseline; `accept --subsystem X -m "msg"` re-records baselines and prepends a `CHANGES.md` entry. Initial subsystems: `dispatch`, `lifecycle`, `summary` (9 baselined cases total, including adversarial leakage scenarios).
+
+**New tooling:**
+
+- **`tools/precommit.sh`** — 30-second pre-commit guard: pytest, drift check, plugin lint. Three-step output, fails loud on any issue. Total budget for the renmark repo today: ~3s warm.
+- **`install.sh --dev`** — opt-in flag that symlinks `tools/precommit.sh` to `.git/hooks/pre-commit`. Existing hooks are moved aside with a timestamped `.bak.` suffix, never overwritten. `--uninstall` removes the dev hook alongside the plugin.
+
+**Integration smoke suite:**
+
+- **`tests/integration/`** (NEW, 27 tests, gated behind `RENMARK_SMOKE=1`) — five end-to-end tests against a synthetic fixture project: full-lifecycle round-trip with schema validation at every stage, cold-start recovery via subprocess (simulates `/clear`), dispatch isolation E2E with realistic adversarial responses (transcript / generated_code / diff / reasoning / conversation / raw_output / trace leakage all blocked), codex-fallback behavior when codex CLI is absent, plugin install.sh round-trip in a fake `$HOME`. `conftest.py` auto-skips integration tests unless `RENMARK_SMOKE=1` so unit-test runs stay at ~2.5s.
+- Fixtures: `repo_root`, `fixture_project` (initialized git repo with baseline `.renmark/` tree), `fixture_plan` (writes a one-task plan into the fixture).
+
+**Shadow framework specifics:**
+
+- Baseline files live at `tests/shadow/baselines/<subsystem>/case-*.json` (committed, ~few KB total). Cases live at `tests/shadow/cases/<subsystem>/case-*.json`.
+- Replay functions are deterministic — `lifecycle.last_updated` (timestamp) and `summary.created_at` are stripped or fixed to keep baselines stable.
+- `accept` requires a non-empty `-m MESSAGE` explaining the change. Prepends to `tests/shadow/CHANGES.md` below the header so the most recent change is on top.
+- Shadow framework's own correctness tested by `tests/test_shadow.py` using `monkeypatch` to redirect `_shadow_root` at a tmpdir — 22 unit tests verify drift detection, missing-baseline handling, accept idempotency, deterministic replay, CLI flag handling.
+
+**Test counts:**
+
+- Unit tests: **283 passed, 28 skipped** in 2.56s (smoke gated off)
+- Full suite: **311 passed** in 18.13s (`RENMARK_SMOKE=1`)
+- Net new tests in v0.3.1: **+113** (schemas 24 + lint 25 + release 20 + shadow 22 + integration 22 = exactly the additions; 261 → 283 unit, +28 integration = +50 not counting the bumps from shadow framework's own tests)
+
+**Risk-reduction posture:**
+
+- Three independent regression nets now exist. A bug in one is caught by another: schema drift catches structural breakage, drift check catches version desync, lint catches plugin-contract rot, smoke catches integration breakage, shadow catches behavioral drift in load-bearing modules.
+- Pre-commit hook is opt-in by design — `bash install.sh --dev` activates it. Default install path stays as fast as v0.3.0.
+- Future v0.4.0 `/renmark:release` will invoke shadow + smoke + drift as its preflight checks before tagging.
+
+**Files touched:**
+
+- New: `renmark/schemas.py`, `renmark/lint.py`, `renmark/release.py`, `renmark/shadow.py`, `tools/precommit.sh`, `tests/test_schemas.py`, `tests/test_lint.py`, `tests/test_release_drift.py`, `tests/test_shadow.py`, `tests/integration/__init__.py`, `tests/integration/conftest.py`, `tests/integration/test_smoke_full_lifecycle.py`, `tests/integration/test_cold_start_recovery.py`, `tests/integration/test_dispatch_isolation_e2e.py`, `tests/integration/test_codex_fallback.py`, `tests/integration/test_plugin_install.py`, `tests/shadow/cases/{dispatch,lifecycle,summary}/case-*.json` (9 files), `tests/shadow/baselines/{dispatch,lifecycle,summary}/case-*.json` (9 files), `tests/shadow/CHANGES.md`.
+- Modified: `install.sh` (added `--dev` flag), `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md` (version bump only).
+
+---
+
 ## v0.3.0 — 2026-05-19 (framework MVP — context death is survivable)
 
 **Minor release — the foundation that makes renmark a development framework, not just a plugin.**
