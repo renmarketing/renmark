@@ -133,6 +133,18 @@ def test_lint_command_shims_catches_skill_without_command(tmp_path: Path):
     assert any("unreachable" in i for i in issues)
 
 
+def test_lint_ignores_underscore_shared_dirs(tmp_path: Path):
+    """`_shared/` holds cross-skill reference files — not a skill, not orphaned.
+    It must not trip 'missing SKILL.md' or 'unreachable' checks."""
+    plugin = _make_plugin(tmp_path, skills={"start": _valid_skill_md("start")},
+                          commands={"start": _valid_command_md("start")})
+    shared = plugin / "skills" / "_shared"
+    shared.mkdir()
+    (shared / "scope-contract.md").write_text("# shared reference\n")
+    assert lint.lint_skill_files(plugin) == []
+    assert lint.lint_command_shims(plugin) == []
+
+
 def test_lint_command_shims_catches_missing_skill_reference(tmp_path: Path):
     bad_command = (
         "---\ndescription: wrong\n---\n\n"

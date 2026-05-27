@@ -1,8 +1,8 @@
-# renmark v0.3.2
+# renmark v0.3.3
 
 A Claude Code plugin that turns Claude into a guided build assistant. Type `/renmark:start`, describe what you want to build, and renmark handles stack selection, scope, best practices, and the full build pipeline — no prior knowledge of specs, plans, or executors needed.
 
-For experienced developers it also exposes the full wizard pipeline directly: brainstorm → plan → check-plan → orchestrate → verify → finish.
+For experienced developers it also exposes the full wizard pipeline directly: brainstorm → plan → orchestrate → finish. Validation (check-plan) and verification run automatically inside plan and orchestrate, so the day-to-day path is four commands, not six.
 
 ---
 
@@ -75,11 +75,11 @@ Describe what you want to build. renmark asks at most 2 questions, confirms the 
 |---|---|
 | `/renmark:start` | Vibe coder entry — describe what you want, renmark builds the rest |
 | `/renmark:setup` | Add renmark to an existing project (creates CLAUDE.md, AGENTS.md, .renmark/) |
-| `/renmark:brainstorm` | Design a feature into a spec (one question at a time) |
-| `/renmark:plan` | Decompose a spec into executor-tagged tasks with cost preview |
-| `/renmark:check-plan` | Validate a plan before spending tokens |
-| `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus, wave-parallel) |
-| `/renmark:verify` | Confirm the feature goal was achieved after orchestrate |
+| `/renmark:brainstorm` | Design a feature into a spec — researches prior art + best practices, sets the scope contract |
+| `/renmark:plan` | Decompose a spec into executor-tagged tasks with cost preview (auto-validates via check-plan) |
+| `/renmark:check-plan` | Validate a plan before spending tokens (runs automatically inside plan) |
+| `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus, wave-parallel) — auto-verifies on completion |
+| `/renmark:verify` | Confirm the feature goal was achieved (runs automatically after orchestrate) |
 | `/renmark:finish` | Close branch — create PR, merge, or clean up |
 | `/renmark:feature` | Full pipeline with branch isolation |
 | `/renmark:debug` | Systematic root-cause loop for bugs |

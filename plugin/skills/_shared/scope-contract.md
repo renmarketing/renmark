@@ -1,6 +1,15 @@
-# Scope Contract — Discovery Reference
+# Scope Contract — Discovery Reference (single source of truth)
 
-Referenced by `/renmark:plan` Step 0. Full question text, option menus, and record formats.
+**Shared by `/renmark:brainstorm` and `/renmark:plan`.** This is the one place
+the stack / deployment / MVP-boundary questions live, so the two skills can't
+drift apart. Whichever skill runs first establishes the contract (Q1–Q3 below)
+and writes the records (CHANGELOG scope entry + `stack.md`); the other detects
+those records and skips re-asking.
+
+- `brainstorm` runs this during design discovery (its Step 3), then researches
+  around the chosen stack.
+- `plan` runs this in its Step 0 **only if** no spec/stack.md/CHANGELOG scope
+  entry already covers the work — i.e. only when brainstorm was skipped.
 
 ---
 

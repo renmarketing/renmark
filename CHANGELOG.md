@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.3.3 — 2026-05-27 (pipeline streamlining + research + write boundary)
+
+**Fewer commands, more done per command. The day-to-day path is now four steps (brainstorm → plan → orchestrate → finish) because validation and verification auto-run inside the steps they belong to. brainstorm gained research; the project-write boundary is now a hard rule.**
+
+**Pipeline auto-chaining (commands stay standalone-callable):**
+
+- **`/renmark:plan` auto-runs `/renmark:check-plan`.** After writing the plan, validation runs automatically before the dispatch gate. BLOCK loops back to fix; PASS/WARN advances the lifecycle to `plan-validated` and shows the cost-approval gate. The critical cost gate stays in `plan` — auto-validation never silently dispatches. `/renmark:check-plan` remains callable on any plan.
+- **`/renmark:orchestrate` auto-runs `/renmark:verify`.** A fully clean run (all tasks pass) flows straight into goal-backward verification, which advances the stage to `verified` and presents the review/finish hand-off. On any task failure the run pauses and does NOT auto-verify. `/renmark:verify` remains callable standalone.
+
+**brainstorm upgrades:**
+
+- **Research phase (new).** Before proposing approaches, brainstorm researches best practices, prior art (existing software that solves the problem), and live GitHub reference implementations via `WebSearch` / `WebFetch` / Context7. Findings are written to a `.renmark/research/` artifact; only a ≤5-line summary enters the conversation (G3/G6). The design is now informed, not invented. (Folds in the previously-planned `/renmark:research` gap.)
+- **Owns the scope contract.** brainstorm now runs the stack/deployment/MVP questions and writes the records (`stack.md` + CHANGELOG scope entry), so `/renmark:plan` detects them and skips re-asking.
+
+**Single source of truth:**
+
+- **`scope-contract.md` moved to `plugin/skills/_shared/`** and is now referenced by both `brainstorm` and `plan`. The stack/deployment/MVP questions live in exactly one place and can't drift. The plugin linter now skips `_`-prefixed shared dirs (they're reference files, not skills). (+1 lint test)
+
+**Hard rule — project-write boundary:**
+
+- **renmark must never write outside the project.** All specs, plans, reviews, research, logs, and memory go under the project's `.renmark/` subtree (or project-root docs). The global plugin install (`${CLAUDE_PLUGIN_ROOT}`, `~/.claude/...`) is read-only — reading templates/reference files from it is fine, writing to it is forbidden. Codified as `project-write-boundary-rule` in `CLAUDE.md.template` and mirrored in `AGENTS.md.template`.
+
+**Verification:** 292 unit tests pass (+1 lint test), 28 integration skipped, shadow baselines clean, plugin lint clean. These are skill-prose + linter changes; the lifecycle stage machine already supported the auto-chained flow, so no Python state changes were required beyond the linter.
+
 ## v0.3.2 — 2026-05-27 (context-hygiene + maintainability audit)
 
 **Patch release — seven audit fixes hardening the isolation boundary, spend reporting, and module structure. No breaking changes; the public import surface is preserved.**

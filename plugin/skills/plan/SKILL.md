@@ -34,7 +34,7 @@ The plan is consumed by `/renmark:orchestrate`.
 
 **Step 0a — Context check.** Call `lifecycle.skill_preamble(repo, 'plan')`. If it returns a non-None hint, surface as a one-line note.
 
-**Final step — Lifecycle update.** After the plan is written to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`, call `lifecycle.write_lifecycle(repo, stage='plan-drafted', artifact_update=('plan', <plan-path>))`. The user should then run `/renmark:check-plan` (which is `next_recommended` for `plan-drafted`).
+**Final step — Lifecycle update.** After the plan is written to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`, call `lifecycle.write_lifecycle(repo, stage='plan-drafted', artifact_update=('plan', <plan-path>))`. **Validation then runs automatically** (Step 8 below auto-invokes `/renmark:check-plan`) — the user does not run it by hand.
 
 ### 0. Establish Scope Contract
 
@@ -56,7 +56,7 @@ Before decomposing a directly provided feature description, establish a lightwei
 
 ---
 
-**Discovery flow** — ask at most 3 questions, one at a time. See `scope-contract.md` for the full Q1–Q3 question text, stack inference rules, and option menus. Do not decompose until discovery is complete.
+**Discovery flow** — ask at most 3 questions, one at a time. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md` (the single source of truth shared with `/renmark:brainstorm`) for the full Q1–Q3 question text, stack inference rules, and option menus. Do not decompose until discovery is complete.
 
 ---
 
@@ -70,7 +70,7 @@ Proceed only after the user explicitly confirms the summarized scope contract, s
 
 ---
 
-**Record decisions.** See `scope-contract.md` for the CHANGELOG scope entry format and `stack.md` template. Write both before decomposing. The generated task plan must respect all locked decisions — do not introduce new major stack choices during decomposition unless the user asks.
+**Record decisions.** See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md` for the CHANGELOG scope entry format and `stack.md` template. Write both before decomposing (skip if brainstorm already wrote them — they're the shared contract). The generated task plan must respect all locked decisions — do not introduce new major stack choices during decomposition unless the user asks.
 
 ---
 
@@ -140,28 +140,33 @@ Save to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`. Include:
 
 **Node.js projects:** If the plan has a `package.json` task, add a `npm install` setup task immediately after it in the same wave or the next wave — before any task whose verifier does `node -e "require(...)"`. The verifier will fail if `node_modules` doesn't exist yet. Mark it `executor: haiku`, `complexity: simple`, `verifier: test -d node_modules`.
 
-### 8. Hand off (wizard step — review gate before any LLM spend)
+### 8. Auto-validate, then hand off (wizard step — review gate before any LLM spend)
 
-This is the critical approval gate. Once `/renmark:orchestrate` runs, real API tokens start flowing. Make the user actively approve.
+**8a. Validate automatically.** Immediately after writing the plan, run the `/renmark:check-plan` validation against it — the user does NOT invoke it separately. Run check-plan's checks (Steps 1–3 of that skill) but **do not trigger check-plan's own orchestrate hand-off**: plan owns the dispatch gate below, so check-plan here is validation-only.
+
+- **BLOCK** → report the blocking issues, fix them in the plan file (or tell the user what to change), and re-validate. Do not show the dispatch gate until the plan passes. Lifecycle stays `plan-drafted`.
+- **PASS / WARN** → surface any WARNs as one-liners, then call `lifecycle.write_lifecycle(repo, stage='plan-validated')` and continue to 8b. (This is why the user never runs check-plan by hand — a clean plan lands at `plan-validated` automatically.)
+
+**8b. Dispatch gate.** This is the critical approval gate. Once `/renmark:orchestrate` runs, real API tokens start flowing. Make the user actively approve.
 
 Show a clear summary:
 
-> *"Plan written to `.renmark/plans/<name>.plan.md`*
+> *"Plan written to `.renmark/plans/<name>.plan.md` — validated ✓ (check-plan: PASS, W warnings)*
 > *Tasks: N (M parallel groups)*
 > *Total tokens (incl. ~10k Agent overhead/task): ~T*
 > *Total cost: ~$X*
 > *Executors: haiku×a, codex×b, sonnet×c, opus×d*
 >
 > *What's next?*
-> *  [r] Review — open the file so you can read every task*
-> *  [d] Dispatch — approve and run /renmark:orchestrate now*
-> *  [e] Edit — describe what to change and I'll rewrite the plan*
-> *  [n] No — stop. You can run /renmark:orchestrate <path> later."*
+> *  [r] Review — open the plan file so you can read every task before approving*
+> *  [d] Dispatch — spin up AI subagents to implement the plan, then auto-verify on completion*
+> *  [e] Edit — tell me what to change; I'll rewrite the plan and re-validate it*
+> *  [n] No — stop here; the validated plan stays on disk to dispatch later"*
 
 On **r** → cat/open the plan file in the conversation, then re-ask the same prompt.
 On **d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.
-On **e** → ask what to change, rewrite the plan, re-show the summary.
-On **n** → stop. Plan stays on disk for later.
+On **e** → ask what to change, rewrite the plan, re-run 8a (re-validate), then re-show the summary.
+On **n** → stop. Plan stays on disk for later (already validated at `plan-validated`).
 
 ## Plan file format example
 

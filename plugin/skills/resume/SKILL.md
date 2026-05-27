@@ -96,15 +96,4 @@ Resume is a reporting skill — there is no automatic handoff. The user reads th
 
 ## Governance compliance
 
-| # | Rule | How this skill complies |
-|---|---|---|
-| G2 | Canonical state | Reads lifecycle.json; doesn't depend on conversation. |
-| G3 | Summary boundary | Output capped at 5 lines. |
-| G5 | Executor isolation | N/A — no heavy cognition; pure file IO. |
-| G6 | Artifact governance | N/A — emits no artifact. |
-| G7 | Compact semantics | Resume IS the compact-safety mechanism: it works the moment after `/compact` because lifecycle.json survived. |
-| G8 | Compounding verification | N/A — not a verifier. |
-| G9 | Failure transparency | If lifecycle.json is corrupt or missing, reports cleanly and recommends `/renmark:start`. |
-| G10 | Workflow recovery | This skill IS the recovery surface — reads pipeline state to recommend `/renmark:orchestrate --resume` if a partial wave is in flight. |
-| G11 | Task isolation | N/A — dispatches nothing. |
-| G12 | Lifecycle persistence | Reads lifecycle.json; doesn't write workflow state. |
+Resume IS the G7/G10/G12 recovery surface — it reads `lifecycle.json` (+ `pipeline.json` for `--resume` hints) and recommends the next step in ≤5 lines (G3), zero LLM calls, writing no workflow state. Other G-rules are N/A (it dispatches nothing and emits no artifact). See `CLAUDE.md` governance rules for definitions.

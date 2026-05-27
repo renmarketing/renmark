@@ -39,9 +39,9 @@ Present: N commits, M files changed, brief note on each commit.
 
 > *"All verifiers pass. N commits, M files changed.*
 > *What's next?*
-> *  [p] Pull request — gh pr create with CHANGELOG summary as body*
-> *  [m] Merge to main — local merge + push*
-> *  [n] Nothing — done, leave as-is"*
+> *  [p] Pull request — open a PR with gh, using the CHANGELOG summary as the body*
+> *  [m] Merge — merge the branch into main locally and push*
+> *  [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
 
 **[p] PR:**
 Pull the `**Built:**` lines from CHANGELOG.md entries written during this run and use them as bullet points in the PR body.

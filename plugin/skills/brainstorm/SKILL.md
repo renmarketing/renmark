@@ -1,13 +1,15 @@
 ---
 name: brainstorm
-description: Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's brainstorm this", "I have an idea", "help me think through X". Asks one question at a time using Opus, writes a design doc at the end. Bootstraps fresh projects by creating CLAUDE.md, AGENTS.md, and .renmark/ when invoked in an empty folder.
+description: Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's brainstorm this", "I have an idea", "help me think through X". Asks one question at a time using Opus, researches best practices and prior art (similar software, live GitHub repos) before proposing approaches, establishes the shared scope contract, and writes a design doc at the end. Bootstraps fresh projects by creating CLAUDE.md, AGENTS.md, and .renmark/ when invoked in an empty folder.
 ---
 
 # brainstorm
 
 ## Overview
 
-One-question-at-a-time spec discovery, Opus-driven. Output: a design doc at `.renmark/specs/YYYY-MM-DD-<topic>.spec.md` that `/renmark:plan` consumes next.
+One-question-at-a-time spec discovery, Opus-driven, **research-backed**. Output: a design doc at `.renmark/specs/YYYY-MM-DD-<topic>.spec.md` that `/renmark:plan` consumes next.
+
+Brainstorm does two things `plan` does not: it **researches prior art** (best practices, software that solves the same problem, reference implementations on GitHub) so the design is informed rather than invented, and it **establishes the scope contract** (stack / deployment / MVP boundary) using the shared source of truth at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md`. Because brainstorm writes the scope records, `/renmark:plan` detects them and skips re-asking — the two skills never double-question you.
 
 If the current directory has no `CLAUDE.md`, no `AGENTS.md`, and no `.renmark/`, ask the user whether to scaffold a fresh project before starting the brainstorm.
 
@@ -17,10 +19,12 @@ If the current directory has no `CLAUDE.md`, no `AGENTS.md`, and no `.renmark/`,
 - "I have an idea for a CLI tool"
 - "Help me design X"
 - Empty/near-empty directory + user wants to start a new project
+- Any time you want the design informed by prior art / best practices, not invented from scratch
 
 **Do NOT use:**
 - For executing existing plans — use `/renmark:orchestrate`
 - For debugging — use `/renmark:debug`
+- For a small change inside an already-scoped project — go straight to `/renmark:plan` (its scope contract is the lightweight fallback when brainstorm is skipped)
 
 ## Steps
 
@@ -40,7 +44,7 @@ If none exist, ask the user: *"This looks like a fresh project. Scaffold `CLAUDE
 On yes:
 - Read templates from `~/.claude/plugins/renmark/templates/` (CLAUDE.md.template, AGENTS.md.template, memory/INDEX.md, etc.).
 - Substitute placeholders for project name and date.
-- Write `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore` (with `.renmark/state/` and `.renmark/debug/` entries), and the `.renmark/` directory tree.
+- Write `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore` (with `.renmark/state/`, `.renmark/debug/`, and `.renmark/logs/` entries — transient runtime), and the `.renmark/` directory tree.
 - `CHANGELOG.md` starts with a single bootstrap entry (date, "project bootstrap", files created, standard "Do not change" guards for `.renmark/memory/` and CLAUDE.md↔AGENTS.md sync).
 - Run `git init -b main && git add -A`. Then attempt the scaffold commit:
   ```bash
@@ -48,7 +52,7 @@ On yes:
   ```
   If the commit is blocked (impersonation guard, no global config), skip it and tell the user: *"Scaffold files created. Run `git commit -m 'chore: renmark scaffold'` once you've set your git user config."*
 
-### 2. Brainstorm
+### 2. Brainstorm + establish the scope contract
 
 Ask the user questions ONE at a time. Prefer multiple-choice when possible. **Cap multiselect options at 4** — `AskUserQuestion` rejects arrays with >4 items. Bundle related options if more are needed. Cover:
 - Goal / problem being solved (the WHY)
@@ -56,32 +60,75 @@ Ask the user questions ONE at a time. Prefer multiple-choice when possible. **Ca
 - Success criteria (how do you know it worked?)
 - Out-of-scope explicitly
 
-Stop asking once you can describe what's being built in 2-3 paragraphs.
+**Run the scope contract here.** As part of discovery, ask the Q1–Q3 stack / deployment / MVP-boundary questions from the shared source of truth at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md` (same questions `/renmark:plan` would ask — do NOT improvise your own). You will record these in Step 6 so `plan` skips re-asking.
 
-### 3. Propose 2-3 approaches
+Stop asking once you can describe what's being built in 2-3 paragraphs AND you have a confirmed stack / deployment / MVP boundary.
 
-With trade-offs. Lead with your recommendation.
+### 3. Research prior art (context-bounded)
 
-### 4. Present the design
+Before proposing approaches, research the problem space so the design is informed, not invented. Scale effort to novelty: skip for trivial/throwaway work; research thoroughly for anything novel, public-facing, or where you're unsure of the idiomatic approach.
+
+**What to look for:**
+- **Best practices** for this class of solution (idiomatic patterns, common pitfalls, security/perf gotchas) for the confirmed stack.
+- **Prior art** — existing software/libraries that already solve this problem (build-vs-reuse signal).
+- **Reference implementations** — live GitHub repos doing something similar, to learn structure and avoid reinventing.
+
+**Tools:** `WebSearch` for best-practices and prior-art discovery; `WebFetch` to read a specific doc/README/repo page; `Context7` (if available) for authoritative library/framework docs. Prefer 2–4 focused queries over a broad sweep.
+
+**Context hygiene (G3/G6 — this is critical):** do NOT dump search results or fetched pages into the conversation. Write findings to a research artifact and surface only a bounded summary:
+
+```python
+from renmark import summary
+summary.write_artifact(
+    ".renmark/research/YYYY-MM-DD-<topic>.research.md",
+    artifact_type="research",
+    body=full_findings,                # sources, quotes, repo links, notes
+    summary_lines=[                    # ≤5 lines — the ONLY thing the conversation sees
+        "best practice: <one-liner>",
+        "prior art: <tool/lib> — reuse vs build: <call>",
+        "reference repo: <owner/name> — <what to borrow>",
+        "key risk surfaced: <one-liner>",
+        "stack confirmed idiomatic: <yes/adjust>",
+    ],
+    generator="brainstorm-research",
+    confidence="medium",
+    validation_status="unvalidated",
+)
+```
+
+Cite the artifact path to the user. Let the findings shape the approaches in Step 4 — call out explicitly when research changed your recommendation (e.g. "an existing library covers 80% of this, so the plan should wrap it, not rebuild it").
+
+### 4. Propose 2-3 approaches
+
+With trade-offs, **informed by the research**. Lead with your recommendation and name the prior art / best practice that backs it.
+
+### 5. Present the design
 
 In sections, scaled to complexity. Get approval per section. Cover: architecture, components, data flow, error handling, testing.
 
-### 5. Write the spec
+### 6. Write the spec + scope records
 
-Save to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`. Include: context, goals, non-goals, architecture, components, success criteria.
+Save the spec to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`. Include: context, goals, non-goals, architecture, components, success criteria, and a **Prior art & references** section pointing at the research artifact.
 
-Also update `.renmark/memory/project.md` with any new project facts learned (tech stack, conventions).
+**Write the scope contract records** so `/renmark:plan` skips re-discovery (this is the shared-source-of-truth payoff). Using the formats in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md`:
+- Append a `## [date] — project scope: <feature>` entry to `CHANGELOG.md` with the confirmed stack / deployment / MVP boundary / out-of-scope.
+- Write/update `.renmark/memory/stack.md` with the confirmed stack.
 
-### 6. Hand off (wizard step)
+Also update `.renmark/memory/project.md` with any new project facts learned.
 
-Renmark is a wizard pipeline: `brainstorm → plan → check-plan → orchestrate → verify → finish`. After writing the spec, prompt explicitly:
+### 7. Hand off (wizard step)
 
-> *"I have everything to write the plan. The spec is at `<path>`.*
-> *Move on to `/renmark:plan` now? [Y/n/wait]"*
+Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestrate (auto-verifies) → finish`. After writing the spec, prompt explicitly:
 
-- **Y / yes** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
-- **n / no** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
-- **wait / pause** → same as no, but log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
+> *"Spec written to `<path>`.*
+> *What's next?*
+> *  [p] Plan — decompose the spec into executor-tagged tasks via /renmark:plan (auto-validates)*
+> *  [w] Wait — stop here; the spec stays on disk to plan later*
+> *  [n] No — stop, and log why planning was deferred"*
+
+- **p** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
+- **w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
+- **n** → stop, and log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
 
 ## Common Mistakes
 

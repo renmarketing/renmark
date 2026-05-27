@@ -74,9 +74,9 @@ Tell the user — using ONLY the summary, never the diff body:
 
 > *"Review at `<path>`. <N critical, M major, K minor> findings.*
 > *What's next?*
-> *  [o] Open the review file*
-> *  [f] Fix the criticals — kick off a new `/renmark:plan` from the findings*
-> *  [n] Done"*
+> *  [o] Open — open the review file to read the full findings*
+> *  [f] Fix — kick off a new /renmark:plan built from the critical findings*
+> *  [n] Done — stop here; the review stays on disk"*
 
 Don't auto-fix. The human reads and decides.
 

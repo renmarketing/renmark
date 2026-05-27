@@ -122,8 +122,8 @@ stack.md    — Node.js + Express + SQLite (detected — verify in .renmark/memo
 Then prompt:
 
 > *"Project is ready for renmark.*
-> *  [b] Brainstorm — design a new feature*
-> *  [p] Plan — I already have a feature description*
-> *  [n] Nothing — setup only"*
+> *  [b] Brainstorm — design a new feature into a spec via /renmark:brainstorm*
+> *  [p] Plan — I already have a description; go straight to /renmark:plan*
+> *  [n] Nothing — setup only, stop here"*
 
 On **b** → invoke `/renmark:brainstorm`. On **p** → invoke `/renmark:plan`. On **n** → stop.

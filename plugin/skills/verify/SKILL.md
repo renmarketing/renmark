@@ -15,13 +15,14 @@ Goal-backward smoke test. Reads the plan's intent paragraph via `parser.parse_pl
 
 ## When to Use
 
-- After `/renmark:orchestrate` completes successfully (`pipeline_state.current_phase` cleared, `lifecycle.stage == "created"`)
-- Before `/renmark:finish`
+- **Automatically by `/renmark:orchestrate`** after a fully clean run (v0.3.3+) — orchestrate clears pipeline state, sets stage `created`, then invokes this. You rarely run it by hand.
+- Manually to re-verify an already-built feature (stage `created` or later).
+- Before `/renmark:finish`.
 
 **Do NOT use:**
 - As a substitute for a test suite — this is feature-level smoke testing, not unit coverage
 - To fix failures — route those to `/renmark:debug`
-- When the orchestrate pipeline is still in flight — refuse if `pipeline_is_resumable(repo)` is True
+- When the orchestrate pipeline is still in flight — refuse if `pipeline_is_resumable(repo)` is True (this is also why orchestrate only auto-verifies on a fully clean run)
 
 ## Steps
 
@@ -157,30 +158,19 @@ After reporting results:
 
 - **All pass** → prompt:
   > *"N/N requirements verified. Artifact: PATH. Ready for review?*
-  > *  [c] Code review — run /renmark:codereview*
-  > *  [f] Finish — skip review, mark ready-to-release*
-  > *  [n] Nothing — done"*
+  > *  [c] Code review — run an adversarial Codex pass over the diff via /renmark:codereview*
+  > *  [f] Finish — skip review and close the branch (PR or merge) via /renmark:finish*
+  > *  [n] Nothing — stop here; the feature is verified and committed"*
 
   On **c** → invoke `/renmark:codereview`. On **f** → invoke `/renmark:finish`. On **n** → stop.
 
 - **Any fail** → prompt:
   > *"N/M requirements verified. Artifact: PATH. Route failures to /renmark:debug?*
-  > *  [d] Debug — start a debug session for the first failure*
-  > *  [n] No — I'll handle it manually"*
+  > *  [d] Debug — start a /renmark:debug session on the first failed smoke test*
+  > *  [n] No — stop here; I'll handle the failures manually"*
 
   On **d** → invoke `/renmark:debug` with the first failed command's symptom. Do not attempt fixes here.
 
 ## Governance compliance
 
-| # | Rule | How this skill complies |
-|---|---|---|
-| G2 | Canonical state | Reads plan via parser; writes verification artifact + lifecycle update; never relies on conversation. |
-| G3 | Summary boundary | Output bounded via `summary.verifier_tail(tail_lines=3)`; artifact summary capped at 5 lines. |
-| G5 | Executor isolation | N/A — verify runs shell commands locally; no LLM dispatch. |
-| G6 | Artifact governance | Verification artifact carries full metadata via `summary.write_artifact`. |
-| G7 | Compact semantics | All state on disk (artifact + lifecycle + memory); `/compact` mid-run is safe. |
-| G8 | Compounding verification | Every run appends to `learnings.md`; every fail appends to `bugs.md`. Next verify reads bugs.md and adds regression tests. |
-| G9 | Failure transparency | Artifact metadata sets `completion_state=partial` and `confidence=medium` on partial fails — honest about uncertainty. |
-| G10 | Workflow recovery | Refuses if pipeline state is dirty; lifecycle.json updated on completion. |
-| G11 | Task isolation | N/A — no subagent dispatch. |
-| G12 | Lifecycle persistence | `lifecycle.write_lifecycle(stage='verified', artifact_update=...)` at end. |
+Upholds G2/G3/G6/G7/G8/G9/G10/G12 — see `CLAUDE.md` governance rules for definitions. Skill-specific load-bearing behavior: G8 compounding is the differentiator — every run appends to `learnings.md`, every fail to `bugs.md`, and the next verify reads `bugs.md` to expand its regression set (Step 5). Output is bounded via `summary.verifier_tail(tail_lines=3)` (G3); the artifact carries full metadata (G6). G5/G11 are N/A — verify runs local shell commands, no LLM dispatch.

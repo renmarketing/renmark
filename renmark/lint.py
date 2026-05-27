@@ -65,6 +65,10 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
     for skill_path in sorted(skills_dir.iterdir()):
         if not skill_path.is_dir():
             continue
+        # Underscore-prefixed dirs (e.g. _shared/) hold cross-skill reference
+        # files, not skills — they have no SKILL.md and no paired command.
+        if skill_path.name.startswith("_"):
+            continue
         skill_md = skill_path / "SKILL.md"
         if not skill_md.exists():
             issues.append(f"skills/{skill_path.name}/: missing SKILL.md")
@@ -99,7 +103,8 @@ def lint_command_shims(plugin_dir: Path) -> list[str]:
         return [f"plugin: missing skills/ directory at {skills_dir}"]
 
     command_names = {p.stem for p in commands_dir.glob("*.md")}
-    skill_names = {p.name for p in skills_dir.iterdir() if p.is_dir()}
+    # Skip underscore-prefixed support dirs (e.g. _shared/) — not user-facing skills.
+    skill_names = {p.name for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith("_")}
 
     for orphan in sorted(command_names - skill_names):
         issues.append(f"commands/{orphan}.md: no matching skills/{orphan}/SKILL.md")

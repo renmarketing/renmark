@@ -128,6 +128,29 @@ conversation. If you find yourself relying on "what was said earlier" to
 continue work, write that fact to disk instead.
 <!-- END:canonical-state-rule -->
 
+<!-- BEGIN:project-write-boundary-rule -->
+## All renmark output stays inside the project
+Every file renmark generates — specs, plans, reviews, research, audits,
+verification artifacts, logs, memory — MUST be written inside **this project**,
+under the project's `.renmark/` subtree or a project-root doc (CLAUDE.md,
+CHANGELOG.md, stack.md). Canonical artifact homes:
+
+- specs → `.renmark/specs/`
+- plans → `.renmark/plans/`
+- reviews / verification → `.renmark/reviews/`
+- research → `.renmark/research/`
+- runtime state → `.renmark/state/`
+- memory → `.renmark/memory/`
+- logs → `.renmark/logs/`
+
+**Never write outside the project.** Do NOT create or modify files in the global
+plugin install (`~/.claude/plugins/...`, `${CLAUDE_PLUGIN_ROOT}`), in `$HOME`, or
+anywhere above the project root. Reading FROM the plugin dir (templates, the
+shared `_shared/scope-contract.md`) is fine — it's reference data — but the
+plugin install is read-only. One project's work must never leak into the plugin
+or into another project.
+<!-- END:project-write-boundary-rule -->
+
 <!-- BEGIN:summary-boundary-rule -->
 ## Orchestrator-visible output is bounded
 Every long-running or high-context task MUST terminate in (1) a durable artifact
@@ -279,8 +302,10 @@ well before it's full — track utilization and act early:
 The %-utilization side of this rule is enforced by the orchestrator
 self-monitoring — the harness does not reliably expose context size to
 skill code. The cross-domain side IS automated via
-`renmark.state.context_budget_check(repo, new_skill, new_domain)`, which
-every skill calls in Step 0.
+`renmark.lifecycle.skill_preamble(repo, skill)` — the single Step-0 helper
+every skill calls, which resolves the domain from `DOMAIN_BY_SKILL`, runs
+`context_budget_check`, records the invocation, and returns the hint string
+to surface. Skills no longer inline these calls (consolidated v0.3.2).
 
 Domains for subject-change detection (per `renmark.lifecycle.DOMAIN_BY_SKILL`):
 

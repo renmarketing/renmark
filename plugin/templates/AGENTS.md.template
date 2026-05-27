@@ -11,7 +11,7 @@
 
 **Parallelize large plans.** Independent file scopes run concurrently. Two agents touching the same file must be sequential.
 
-**Stay on main.** No feature branches, no git worktrees. Everything lands on `main`.
+**Stay on main for small changes.** Hotfixes, config edits, and single-file changes land directly on `main`. New features and significant refactors go through `/renmark:feature`, which creates a `feature/<slug>` branch and offers a PR on finish. See `CLAUDE.md` § `single-branch-rule`.
 
 **Commit per chunk.** One commit per logical change. Each commit must compile. Don't batch unrelated work.
 
@@ -30,6 +30,8 @@
 **Orchestrator coordinates; does not accumulate.** Context degrades before it fills. Prefer artifacts, summaries, and persistent state over inline context. See `CLAUDE.md` § `orchestrator-role-rule`.
 
 **Canonical state lives outside the conversation.** Truth lives in `.renmark/specs/`, `.renmark/reviews/`, `.renmark/memory/`, `.renmark/state/`, and CHANGELOG.md — not in chat history. See `CLAUDE.md` § `canonical-state-rule`.
+
+**All renmark output stays inside the project.** Specs, plans, reviews, research, logs, memory — everything goes under this project's `.renmark/` subtree or a project-root doc. Never write to the global plugin install (`${CLAUDE_PLUGIN_ROOT}`, `~/.claude/...`), `$HOME`, or above the project root. Reading templates/reference files from the plugin is fine; the install is read-only. See `CLAUDE.md` § `project-write-boundary-rule`.
 
 **Orchestrator-visible output ≤ 5 lines or ≤ 300 tokens.** Long task results live in artifact files; the orchestrator reads only a structured summary. Never paste diffs, generated code, or audit bodies back into conversation. See `CLAUDE.md` § `summary-boundary-rule`.
 

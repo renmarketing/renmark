@@ -23,11 +23,14 @@ Lightweight plan validator. Structural + hygiene + isolation checks before any t
 
 ## When to Use
 
-- Automatically by `/renmark:orchestrate` pre-flight
-- Manually after `/renmark:plan` if you want to review before dispatching
+- **Automatically by `/renmark:plan`** — plan runs this validation right after writing the plan, before the dispatch gate (v0.3.3+). You rarely invoke it by hand.
+- Automatically by `/renmark:orchestrate` pre-flight (defense in depth).
+- Manually on any existing `.plan.md` you want to re-check.
 
 **Do NOT use:**
 - As a substitute for `/renmark:plan` — this validates an existing plan, it does not create one
+
+**Note on auto-invocation:** when `/renmark:plan` runs these checks, it suppresses this skill's own orchestrate hand-off (Step 4) — plan owns the dispatch/cost-approval gate. The hand-off below fires only when check-plan is invoked directly.
 
 ## Steps
 
@@ -116,7 +119,7 @@ Renmark is a wizard pipeline. After reporting results:
 - **PASS or WARN** → prompt:
 
 > *"Plan validated. Ready to dispatch?*
-> *  [y] Yes — run /renmark:orchestrate now*
-> *  [n] No — stop, I'll run it later"*
+> *  [d] Dispatch — spin up AI subagents to implement the validated plan, then auto-verify on completion*
+> *  [n] No — stop here; the plan stays validated on disk to run later"*
 
-On **y** → immediately invoke `/renmark:orchestrate`. On **n** → stop.
+On **d** → immediately invoke `/renmark:orchestrate`. On **n** → stop.

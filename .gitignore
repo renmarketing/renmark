@@ -12,4 +12,5 @@ node_modules/
 # renmark runtime (regenerable per project)
 .renmark/state/
 .renmark/debug/
+.renmark/logs/
 .env - Copy.example:Zone.Identifier

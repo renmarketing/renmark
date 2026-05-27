@@ -88,7 +88,7 @@ Then call `state.record_skill_invocation(repo, '<skill>', '<domain>')`.
 
 ## Long-form rules
 
-If a skill's full rule set runs more than ~50 lines, extract the long-form rules into a sibling file (pattern: `plan/scope-contract.md` referenced from `plan/SKILL.md`). Skill files stay scannable; depth lives next to them.
+If a skill's full rule set runs more than ~50 lines, extract the long-form rules into a sibling file (pattern: `_shared/scope-contract.md` referenced from both `plan/SKILL.md` and `brainstorm/SKILL.md`). Skill files stay scannable; depth lives next to them. Rules shared by 2+ skills go in `skills/_shared/` so they have a single source of truth.
 
 ## Adding a new rule block
 

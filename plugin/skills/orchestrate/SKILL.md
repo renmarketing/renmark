@@ -197,42 +197,29 @@ state.clear_pipeline_state(repo)
 lifecycle.write_lifecycle(repo, stage="created")
 ```
 
-The `created` stage is the canonical "code is written, not yet verified" state. The user's next step per `NEXT_BY_STAGE` is `/renmark:verify`.
+The `created` stage is the canonical "code is written, not yet verified" state. **Verification then runs automatically** (Step 8 below auto-invokes `/renmark:verify`) — clearing pipeline state first is what lets verify run without tripping its in-flight guard.
 
-### 8. Hand off (wizard step)
+### 8. Auto-verify, then hand off (wizard step)
 
-**Re-verify before reporting done** — see CLAUDE.md § verify-before-done-rule. Re-run all task verifiers in index order. Report any that now fail.
+**Re-verify task verifiers before proceeding** — see CLAUDE.md § verify-before-done-rule. Re-run all task verifiers in index order. Report any that now fail.
 
-After a clean run, offer the next step:
+**Then run `/renmark:verify` automatically.** A clean orchestrate run flows straight into feature-level verification — the user does NOT invoke it separately. Pipeline state was cleared in Step 7 and the stage is `created`, so verify's in-flight/stage guards pass. Verify runs its goal-backward smoke tests, writes its artifact, advances the stage to `verified`, and presents its own hand-off (codereview / finish / debug-on-failure).
 
-> *"All N tasks committed (M commits, ~$X spent).*
-> *What's next?*
-> *  [v] Verify — run /renmark:verify to confirm the feature goal was achieved*
-> *  [c] Code review — run /renmark:codereview HEAD~N..HEAD*
-> *  [f] Finish — run /renmark:finish to mark ready-to-release*
-> *  [n] Nothing — done"*
+Report the orchestrate completion line first, then let verify take over:
 
-On **v** → invoke `/renmark:verify`.
-On **c** → invoke `/renmark:codereview <range>`.
-On **f** → invoke `/renmark:finish`.
-On **n** → stop.
+> *"All N tasks committed (M commits, ~$X spent). Running verification…"*
 
-If any task failed (paused / escalated), do NOT offer the next step. Surface the failure and the resume command first.
+→ invoke `/renmark:verify`. From here the user follows verify's hand-off:
+> *  [c] Code review — run an adversarial Codex pass over the diff via /renmark:codereview*
+> *  [f] Finish — close the branch (PR or merge) via /renmark:finish*
+> *  [d] Debug — investigate the failure verify surfaced via /renmark:debug*
+> *  [n] Nothing — stop here; work stays committed*
+
+**Only auto-verify on a fully clean run.** If any task failed (paused / escalated), do NOT auto-verify and do NOT offer the next step — surface the failure and the resume command first. Verification of a half-built feature is noise.
 
 ## Governance compliance
 
-| # | Rule | How this skill complies |
-|---|---|---|
-| G2 | Canonical state | All workflow state lives in `lifecycle.json`; runtime state in `pipeline.json` + `wave-summaries/`. |
-| G3 | Summary boundary | Verifier output capped via `summary.verifier_tail(tail_lines=3)`. SubagentOutput.summary_lines capped at 5. |
-| G5 | Executor isolation | Codex tasks via `renmark-execute` subprocess; non-codex via Agent — never inlined. |
-| G6 | Artifact governance | Each task writes its own artifact with metadata; wave-summary aggregates only the SubagentOutput fields. |
-| G7 | Compact semantics | Pipeline state on disk; `/compact` mid-run preserves resumability. |
-| G8 | Compounding verification | Failed tasks append to `bugs.md` via `memory.log_bug`. Routing wins/losses append to `routing.md`. |
-| G9 | Failure transparency | SubagentOutput carries `completion_state` / `confidence` / `retry_count`; honest defaults if subagent omits. |
-| G10 | Workflow recovery | `pipeline.json` updated at wave boundaries; `--resume` reads it and continues from `wave_index`. |
-| G11 | Task isolation | `dispatch_task_isolated` enforced; `parse_subagent_response` refuses transcripts, diffs, generated_code, reasoning. |
-| G12 | Lifecycle persistence | `lifecycle.write_lifecycle(stage='created')` on completion. |
+Upholds G2/G3/G5/G6/G7/G8/G9/G10/G11/G12 — see `CLAUDE.md` governance rules for definitions. The load-bearing caps are enforced in code, not prose: `dispatch.parse_subagent_response` refuses transcripts/diffs/code (G11), `SubagentOutput` caps summaries at 5 lines × 1200 chars (G3), and `summary.verifier_tail(tail_lines=3)` bounds verifier output (G3). State separation (lifecycle.json vs pipeline.json) and codex-subprocess isolation (G5) are described in the Steps above.
 
 ## Reference
 
