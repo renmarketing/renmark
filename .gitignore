@@ -13,4 +13,5 @@ node_modules/
 .renmark/state/
 .renmark/debug/
 .renmark/logs/
+.renmark/baks/
 .env - Copy.example:Zone.Identifier

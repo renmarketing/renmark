@@ -4,6 +4,12 @@
 
 **Fewer commands, more done per command. The day-to-day path is now four steps (brainstorm → plan → orchestrate → finish) because validation and verification auto-run inside the steps they belong to. brainstorm gained research; the project-write boundary is now a hard rule.**
 
+**Distribution packaging (new — `/renmark:finish` § Release):**
+
+- **`renmark.release.build_package()`** — pure-Python (no rsync/zip CLI, no new deps) builder that zips the distributable into the **project's** `.renmark/baks/<name>-v<version>.zip`, version-anchored to match the git tag `v<version>`. Honors the project-write-boundary rule (writes only inside the project) and excludes `.git`, `.venv`, `__pycache__`, `.env`, `.renmark/`, `PLAN.md`, etc. CLI: `python -m renmark.release package`. (+5 tests)
+- **`/renmark:finish` gains an `[r] Release` option:** drift-gate → build the local bak (always, offline) → tag `v<version>` → **if** a git remote + `gh` exist, offer to push the tag and `gh release create` with the zip attached; otherwise report the local bak + tag as a complete offline release. One version string across bak filename, git tag, and GitHub release — never drifting. The local `.renmark/baks/` copy is the offline fallback when you don't want to pull from GitHub.
+- `.renmark/baks/` is gitignored (regenerable; the GitHub release is the shareable canonical copy).
+
 **Pipeline auto-chaining (commands stay standalone-callable):**
 
 - **`/renmark:plan` auto-runs `/renmark:check-plan`.** After writing the plan, validation runs automatically before the dispatch gate. BLOCK loops back to fix; PASS/WARN advances the lifecycle to `plan-validated` and shows the cost-approval gate. The critical cost gate stays in `plan` — auto-validation never silently dispatches. `/renmark:check-plan` remains callable on any plan.

@@ -121,6 +121,86 @@ VERSION_FILES: list[VersionFile] = [
 ]
 
 
+# ── Packaging ─────────────────────────────────────────────────────────────────
+# Builds a versioned distribution zip into the PROJECT's .renmark/baks/ — a
+# local mirror of what would be attached to the matching GitHub release tag
+# v<version>. Pure-Python (no rsync/zip CLI dependency). Honors the
+# project-write-boundary rule: writes only inside the project.
+
+import fnmatch
+import zipfile
+
+BAKS_SUBDIR = ".renmark/baks"
+
+# Anything matching these (by path segment or glob) is left out of the package.
+PACKAGE_EXCLUDES: tuple[str, ...] = (
+    ".git", ".venv", "venv", ".pytest_cache", "__pycache__", "*.pyc",
+    "*.egg-info", ".env", ".env.local", ".env - Copy*", "*Zone.Identifier*",
+    ".claude", ".renmark", "PLAN.md", "node_modules",
+)
+
+
+def _is_excluded(rel_parts: tuple[str, ...]) -> bool:
+    """True if any path segment matches a PACKAGE_EXCLUDES pattern."""
+    for seg in rel_parts:
+        for pat in PACKAGE_EXCLUDES:
+            if fnmatch.fnmatch(seg, pat):
+                return True
+    return False
+
+
+def package_basename(repo: Path | str = ".") -> str:
+    """Archive base name = plugin manifest name, falling back to the repo dir."""
+    repo = Path(repo)
+    manifest = repo / "plugin" / ".claude-plugin" / "plugin.json"
+    if manifest.exists():
+        try:
+            name = json.loads(manifest.read_text(encoding="utf-8")).get("name")
+            if isinstance(name, str) and name:
+                return name
+        except (json.JSONDecodeError, OSError):
+            pass
+    return repo.resolve().name
+
+
+def build_package(repo: Path | str = ".", *, version: str | None = None) -> Path:
+    """Build a versioned distribution zip into <repo>/.renmark/baks/.
+
+    Archive name `<basename>-v<version>.zip`, version-anchored so it matches the
+    git tag `v<version>` and the GitHub release of the same version. The zip's
+    top-level folder is `<basename>-v<version>/` (clean extraction). Returns the
+    zip path.
+
+    Pure-Python, offline, no external CLI. Writes only inside the project
+    (project-write-boundary rule). Overwrites an existing same-version zip.
+    """
+    repo = Path(repo)
+    ver = version or current_version(repo)
+    base = package_basename(repo)
+    stem = f"{base}-v{ver}"
+
+    baks = repo / BAKS_SUBDIR
+    baks.mkdir(parents=True, exist_ok=True)
+    out = baks / f"{stem}.zip"
+    if out.exists():
+        out.unlink()
+
+    files: list[Path] = []
+    for p in sorted(repo.rglob("*")):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(repo)
+        if _is_excluded(rel.parts):
+            continue
+        files.append(p)
+
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in files:
+            rel = p.relative_to(repo)
+            zf.write(p, f"{stem}/{rel.as_posix()}")
+    return out
+
+
 # ── API ──────────────────────────────────────────────────────────────────────
 
 
@@ -171,13 +251,25 @@ def drift_report(repo: Path | str = ".") -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
-        sys.stderr.write("usage: python -m renmark.release {check|current|scan PATH}\n")
+        sys.stderr.write("usage: python -m renmark.release {check|current|scan PATH|package [PATH]}\n")
         return 2
 
     cmd = argv[0]
 
     if cmd == "current":
         sys.stdout.write(current_version() + "\n")
+        return 0
+
+    if cmd == "package":
+        repo = Path(argv[1]) if len(argv) > 1 else Path(".")
+        issues = drift_report(repo)
+        if issues:
+            sys.stderr.write("refusing to package — version drift:\n")
+            for i in issues:
+                sys.stderr.write(f"  - {i}\n")
+            return 1
+        out = build_package(repo)
+        sys.stdout.write(f"OK  built {out}  (v{current_version(repo)})\n")
         return 0
 
     if cmd == "check":
