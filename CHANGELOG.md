@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.2 — 2026-05-27 (context-hygiene + maintainability audit)
+
+**Patch release — seven audit fixes hardening the isolation boundary, spend reporting, and module structure. No breaking changes; the public import surface is preserved.**
+
+**Context-hygiene fixes:**
+
+- **G3 char-cap leak closed** — `SubagentOutput.__post_init__` (`dispatch.py`) now enforces the ≤1200-char-per-line cap and a non-string guard, not just the ≤5-line count. A 5-line × 5000-char payload can no longer slip through `parse_subagent_response`. The cap matches `schemas.py` and `summary.py`. (+3 tests)
+- **Lifecycle dead-pointers fixed** — `NEXT_BY_STAGE` no longer routes to unimplemented skills (`/renmark:document`, `/release`, `/approve`, etc.). `next_recommended()` resolves through a new `IMPLEMENTED_SKILLS` set and falls back to manual hints; aspirational routing preserved in `NEXT_BY_STAGE_PLANNED`. A regression test iterates every canonical stage. (lifecycle.py)
+- **Agent-call spend ledgered** — new `state.log_agent_call()`; the orchestrate skill records every haiku/sonnet/opus Agent return so `/renmark:roadmap` reports real spend. `roadmap.py` now prices opus at ~$0.015/kT (was treated as free) and includes haiku.
+- **Honest cost preview** — `plan/SKILL.md` bakes the ~10k Agent-call overhead into the displayed total instead of footnoting it; the dry-run footer was corrected to match.
+- **Step-0 boilerplate consolidated** — new `lifecycle.skill_preamble(repo, skill)` replaces the duplicated `context_budget_check` + `record_skill_invocation` block across all 14 SKILL.md files. Domain resolves centrally from `DOMAIN_BY_SKILL`, so per-skill drift is impossible.
+- **Artifact-dir rotation** — new `state.rotate_dir()` caps `wave-summaries/` (50), `logs/` (50), and `escalations/` (20), archiving overflow to `.renmark/state/archive/<stamp>/`. Best-effort; never breaks a running orchestrate. (+4 tests)
+
+**Maintainability:**
+
+- **`state.py` (538 lines) → `state/` package** — eight cohesive submodules (`_core`, `usage`, `pause`, `pipeline`, `logs`, `commits`, `skills`) behind a re-exporting `__init__.py`. Rotation caps are read via `_core` at call-time so they stay monkeypatchable.
+- **`cli.py` (982 lines) → `cli/` package** — execution engine (`_engine.py`) split from the self-contained subcommand handlers (`commands.py`); re-exporting `__init__.py` keeps `cli.main` / `cli.cmd_task` / `cli.execute_plan` intact.
+
+**Verification:** 291 unit tests pass (+10 new), 28 integration skipped (codex/network-gated), shadow baselines re-accepted (lifecycle `case-full-walk`), functional smoke green (`--usage`/`--roadmap`/`--logs`/dry-run). Independent codex review was unavailable (account model limitation); reviewed via diff + runtime invariant checks.
+
 ## v0.3.1 — 2026-05-21 (integration testing + guardrails)
 
 **Patch release — the framework now defends itself against regressions.**
