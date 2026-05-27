@@ -75,6 +75,14 @@ a **local copy always** in `.renmark/baks/` and a GitHub release **when availabl
 The local bak is the offline fallback — "if I don't want to pull from GitHub, it's
 in `.renmark/baks/`."
 
+> **Maintainer note (packaging renmark itself, not a managed project):** the
+> default writes inside the project's `.renmark/baks/`. To package a release to a
+> sibling/parent directory with a custom name (e.g. renmark's own repo, whose
+> releases live in `~/projects/ai-system-renmark-vX-DATE.zip`), use the override:
+> `python -m renmark.release package --dest ~/projects --name ai-system-renmark-v<VERSION>-<DATE>`.
+> `--dest` is an explicit opt-out of the project-write-boundary for maintainer
+> release builds only — managed-project releases always default to `.renmark/baks/`.
+
 **4a. Drift gate (free).** `python -m renmark.release check` — refuse to release
 if the 7 version locations disagree. Fix drift first.
 

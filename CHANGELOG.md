@@ -9,6 +9,7 @@
 - **`renmark.release.build_package()`** — pure-Python (no rsync/zip CLI, no new deps) builder that zips the distributable into the **project's** `.renmark/baks/<name>-v<version>.zip`, version-anchored to match the git tag `v<version>`. Honors the project-write-boundary rule (writes only inside the project) and excludes `.git`, `.venv`, `__pycache__`, `.env`, `.renmark/`, `PLAN.md`, etc. CLI: `python -m renmark.release package`. (+5 tests)
 - **`/renmark:finish` gains an `[r] Release` option:** drift-gate → build the local bak (always, offline) → tag `v<version>` → **if** a git remote + `gh` exist, offer to push the tag and `gh release create` with the zip attached; otherwise report the local bak + tag as a complete offline release. One version string across bak filename, git tag, and GitHub release — never drifting. The local `.renmark/baks/` copy is the offline fallback when you don't want to pull from GitHub.
 - `.renmark/baks/` is gitignored (regenerable; the GitHub release is the shareable canonical copy).
+- **`--dest` / `--name` overrides** on `release package` (and `build_package(dest_dir=, archive_stem=)`) — a maintainer escape hatch to package renmark's OWN release to a sibling dir with a custom name (e.g. `~/projects/ai-system-renmark-v<version>-<date>.zip`), rather than into a managed project's `.renmark/baks/`. Managed-project releases still default to `.renmark/baks/`.
 
 **Pipeline auto-chaining (commands stay standalone-callable):**
 

@@ -236,3 +236,19 @@ def test_build_package_overwrites_same_version(tmp_path: Path):
 def test_package_basename_from_manifest(tmp_path: Path):
     repo = _make_repo(tmp_path, version="0.3.3")
     assert release.package_basename(repo) == "renmark"
+
+
+def test_build_package_dest_and_name_overrides(tmp_path: Path):
+    """Maintainer escape hatch: package renmark's OWN release to a sibling dir
+    with a custom name (e.g. the ai-system-renmark-vX-DATE convention)."""
+    repo = _make_repo(tmp_path, version="0.3.3")
+    dest = tmp_path / "releases"
+    out = release.build_package(
+        repo, dest_dir=dest, archive_stem="ai-system-renmark-v0.3.3-20260527"
+    )
+    assert out == dest / "ai-system-renmark-v0.3.3-20260527.zip"
+    assert out.exists()
+    names = zipfile.ZipFile(out).namelist()
+    # top-level folder matches the custom stem, contents still excluded properly
+    assert all(n.startswith("ai-system-renmark-v0.3.3-20260527/") for n in names)
+    assert any(n.endswith("/VERSION") for n in names)

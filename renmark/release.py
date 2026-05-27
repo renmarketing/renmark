@@ -163,25 +163,38 @@ def package_basename(repo: Path | str = ".") -> str:
     return repo.resolve().name
 
 
-def build_package(repo: Path | str = ".", *, version: str | None = None) -> Path:
-    """Build a versioned distribution zip into <repo>/.renmark/baks/.
+def build_package(
+    repo: Path | str = ".",
+    *,
+    version: str | None = None,
+    dest_dir: Path | str | None = None,
+    archive_stem: str | None = None,
+) -> Path:
+    """Build a versioned distribution zip.
 
-    Archive name `<basename>-v<version>.zip`, version-anchored so it matches the
-    git tag `v<version>` and the GitHub release of the same version. The zip's
-    top-level folder is `<basename>-v<version>/` (clean extraction). Returns the
-    zip path.
+    Default (consumer project): writes to `<repo>/.renmark/baks/<basename>-v<version>.zip`,
+    version-anchored so it matches the git tag `v<version>` and the GitHub
+    release of the same version. The zip's top-level folder equals the archive
+    stem (clean extraction). Returns the zip path.
 
-    Pure-Python, offline, no external CLI. Writes only inside the project
-    (project-write-boundary rule). Overwrites an existing same-version zip.
+    Overrides (maintainer escape hatch — e.g. packaging renmark's OWN release
+    to a sibling directory rather than into a managed project):
+    - `dest_dir`   — write the zip here instead of `<repo>/.renmark/baks/`.
+    - `archive_stem` — full archive name without extension (also the zip's
+      top-level folder). Lets callers match an existing naming convention such
+      as `ai-system-renmark-v0.3.3-20260527`.
+
+    Pure-Python, offline, no external CLI. By default writes only inside the
+    project (project-write-boundary rule); `dest_dir` is an explicit opt-out for
+    maintainer release builds. Overwrites an existing same-name zip.
     """
     repo = Path(repo)
     ver = version or current_version(repo)
-    base = package_basename(repo)
-    stem = f"{base}-v{ver}"
+    stem = archive_stem or f"{package_basename(repo)}-v{ver}"
 
-    baks = repo / BAKS_SUBDIR
-    baks.mkdir(parents=True, exist_ok=True)
-    out = baks / f"{stem}.zip"
+    out_dir = Path(dest_dir).expanduser() if dest_dir is not None else repo / BAKS_SUBDIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{stem}.zip"
     if out.exists():
         out.unlink()
 
@@ -261,14 +274,26 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if cmd == "package":
-        repo = Path(argv[1]) if len(argv) > 1 else Path(".")
+        rest = argv[1:]
+        dest = None
+        name = None
+        positional: list[str] = []
+        i = 0
+        while i < len(rest):
+            if rest[i] == "--dest" and i + 1 < len(rest):
+                dest = rest[i + 1]; i += 2
+            elif rest[i] == "--name" and i + 1 < len(rest):
+                name = rest[i + 1]; i += 2
+            else:
+                positional.append(rest[i]); i += 1
+        repo = Path(positional[0]) if positional else Path(".")
         issues = drift_report(repo)
         if issues:
             sys.stderr.write("refusing to package — version drift:\n")
-            for i in issues:
-                sys.stderr.write(f"  - {i}\n")
+            for issue in issues:
+                sys.stderr.write(f"  - {issue}\n")
             return 1
-        out = build_package(repo)
+        out = build_package(repo, dest_dir=dest, archive_stem=name)
         sys.stdout.write(f"OK  built {out}  (v{current_version(repo)})\n")
         return 0
 
