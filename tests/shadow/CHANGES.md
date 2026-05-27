@@ -1,5 +1,9 @@
 # Shadow baseline changes
 
+## 2026-05-26 17:13:08 UTC — lifecycle
+
+fix: dead-pointer lifecycle stages route to manual hint until /renmark:release ships
+
 ## 2026-05-21 — initial baselines
 
 Initial baselines recorded for dispatch, lifecycle, and summary subsystems

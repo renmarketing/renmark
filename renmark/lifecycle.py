@@ -37,7 +37,20 @@ STAGES: list[str] = [
     "restored",             # a /renmark:restore happened
 ]
 
+# Skills that actually have a `plugin/skills/<name>/SKILL.md`. Stages that
+# point at anything outside this set are routed through a manual-hint fallback
+# in `next_recommended()` — vibe coders never get sent to a non-existent skill.
+IMPLEMENTED_SKILLS: frozenset[str] = frozenset({
+    "brainstorm", "check-plan", "codereview", "debug", "feature", "finish",
+    "help", "orchestrate", "plan", "resume", "roadmap", "setup", "start",
+    "verify",
+})
+
 # Stage transitions — the router uses this to compute next_recommended.
+# Stages that previously pointed at unimplemented skills (`document`, `release`,
+# `restore`, `approve`, `secure`, `map`, `research`) now route to the closest
+# real next step. The legacy targets are preserved in `NEXT_BY_STAGE_PLANNED`
+# for documentation; they take effect once the skill ships.
 NEXT_BY_STAGE: dict[str, str] = {
     "init":                  "/renmark:brainstorm",
     "brainstorm-complete":   "/renmark:plan",
@@ -45,11 +58,22 @@ NEXT_BY_STAGE: dict[str, str] = {
     "plan-validated":        "/renmark:orchestrate",
     "created":               "/renmark:verify",
     "verified":              "/renmark:codereview",
-    "reviewed":              "/renmark:document",
+    # `documented` stage is skipped today — go straight to /renmark:finish.
+    "reviewed":              "/renmark:finish",
     "documented":            "/renmark:finish",
-    "ready-to-release":      "/renmark:release",
+    # `release` skill is not implemented yet — finish marks ready-to-release;
+    # actual release is a manual `git tag` + `bash install.sh` zip step.
+    "ready-to-release":      "(manual: tag the release and build the zip; see README § Release)",
     "released":              "(feature complete — start a new one with /renmark:start)",
     "restored":              "(working tree restored — start a new feature or continue manually)",
+}
+
+# Aspirational routing — what NEXT_BY_STAGE will return once the named skill
+# ships. Kept here as documentation so the v0.3.x → v0.4 migration is obvious.
+NEXT_BY_STAGE_PLANNED: dict[str, str] = {
+    "reviewed":         "/renmark:document",
+    "documented":       "/renmark:finish",
+    "ready-to-release": "/renmark:release",
 }
 
 # Domain classification for context-contamination detection (G4).
@@ -218,21 +242,67 @@ def clear_lifecycle(repo: Path | str) -> None:
 
 def next_recommended(repo: Path | str) -> str:
     """Return the recommended next command for the current lifecycle, or a
-    cold-start prompt if no lifecycle exists. Zero LLM calls."""
+    cold-start prompt if no lifecycle exists. Zero LLM calls.
+
+    Guarantees the returned hint never points at an unimplemented skill — if
+    NEXT_BY_STAGE is somehow stale, the resolver routes to a manual fallback
+    instead of sending a vibe coder into a wall.
+    """
     state = read_lifecycle(repo)
     if state is None:
         return "/renmark:start (no feature in flight)"
 
     if state.human_review_required and not state.human_review_completed:
         target = state.human_review_for or "pending action"
-        return f"/renmark:approve (awaiting human approval for: {target})"
+        # `approve` skill is not implemented yet — surface the manual gate.
+        return f"(manual approval required for: {target} — flip lifecycle.human_review_completed)"
 
-    return state.next_recommended or NEXT_BY_STAGE.get(state.stage, "(unknown stage)")
+    candidate = state.next_recommended or NEXT_BY_STAGE.get(state.stage, "")
+    return _resolve_next(candidate, state.stage)
+
+
+def _resolve_next(candidate: str, stage: str) -> str:
+    """Replace any /renmark:<unimplemented> pointer with a manual hint."""
+    if not candidate.startswith("/renmark:"):
+        return candidate or f"(unknown stage: {stage})"
+    skill = candidate.split(":", 1)[1].split()[0]
+    if skill in IMPLEMENTED_SKILLS:
+        return candidate
+    return f"(manual: /renmark:{skill} is not yet implemented — see CHANGELOG / README for next step from stage {stage!r})"
 
 
 def domain_of(skill: str) -> str:
     """Return the domain bucket for a skill name (G4 contamination detection)."""
     return DOMAIN_BY_SKILL.get(skill, "build")
+
+
+def skill_preamble(repo: Path | str, skill: str) -> str | None:
+    """Single-call Step-0 boilerplate for every SKILL.md.
+
+    Performs the two calls every skill used to inline by hand:
+        1. cross-domain context-budget check (G4)
+        2. record this invocation so the next skill can detect transitions
+
+    Returns the hint string the skill should surface to the user
+    (e.g. "context: cross-domain transition — consider /clear before continuing"),
+    or None when no hint is needed. Domain is resolved from `DOMAIN_BY_SKILL` —
+    callers do not need to pass it, so the per-skill prose can't drift.
+    """
+    # Imported lazily to avoid a state ↔ lifecycle circular import at module load.
+    from . import state as _state
+
+    domain = domain_of(skill)
+    verdict = _state.context_budget_check(repo, skill, domain)
+    _state.record_skill_invocation(repo, skill, domain)
+
+    if verdict == "clear":
+        return (
+            f"context: cross-domain transition into `{domain}` — consider `/clear` "
+            "before continuing (`.renmark/memory/` survives clears)"
+        )
+    if verdict == "compact":
+        return "context: approaching budget — consider `/compact` before continuing"
+    return None
 
 
 def is_cross_domain_transition(prev_skill: str | None, new_skill: str) -> bool:

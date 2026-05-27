@@ -21,14 +21,22 @@ from pathlib import Path
 from .state import read_usage, RENMARK_DIR_NAME
 
 
-# Approximate per-token costs (USD) for cost estimates. Update as pricing shifts.
+# Approximate per-token costs (USD per 1k tokens) for cost estimates.
+# Opus Agent calls DO consume Anthropic billing (not "in-context free") — they
+# go through the user's Claude Code quota. Same for haiku/sonnet. Update as
+# pricing shifts.
 COST_PER_KT = {
-    "haiku": 0.0001,                # cheapest Claude tier
-    "codex": 0.05,                  # rough est for OpenAI Codex CLI calls
+    "haiku":  0.0001,
+    "codex":  0.05,
     "sonnet": 0.003,
-    "opus": 0.0,                    # in-context — Anthropic billing, not separately tracked
-    "nim": 0.0,                     # legacy: NIM removed in v0.2.0
+    "opus":   0.015,                # Anthropic output pricing, rough rule-of-thumb
+    "nim":    0.0,                  # legacy: NIM removed in v0.2.0
 }
+
+# Per-Agent-call overhead: every haiku/sonnet/opus task receives ~10k tokens of
+# system prompt + task spec on TOP of its output. Sized to match the plan
+# cost-preview footnote so roadmap and plan agree.
+AGENT_OVERHEAD_TOKENS = 10_000
 
 
 @dataclass
@@ -138,13 +146,19 @@ def _short_model(name: str) -> str:
 
 
 def _estimate_cost(model_str: str, tokens: int) -> float:
-    """Approximate cost based on which executor strings are in the model field."""
-    if "codex" in model_str.lower():
+    """Approximate cost based on which executor strings are in the model field.
+
+    Honest accounting: haiku/sonnet/opus Agent calls cost real Anthropic
+    quota (not "in-context free" as the v0.2.x ledger assumed)."""
+    m = model_str.lower()
+    if "codex" in m:
         return (tokens / 1000.0) * COST_PER_KT["codex"]
-    if "sonnet" in model_str.lower():
+    if "opus" in m:
+        return (tokens / 1000.0) * COST_PER_KT["opus"]
+    if "sonnet" in m:
         return (tokens / 1000.0) * COST_PER_KT["sonnet"]
-    if "opus" in model_str.lower():
-        return 0.0  # in-context
+    if "haiku" in m:
+        return (tokens / 1000.0) * COST_PER_KT["haiku"]
     return 0.0  # NIM and unknown = free
 
 

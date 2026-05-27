@@ -25,7 +25,7 @@ Goal-backward smoke test. Reads the plan's intent paragraph via `parser.parse_pl
 
 ## Steps
 
-**Step 0 — Context check + pipeline gate.** Call `state.context_budget_check(repo, 'verify', 'build')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'verify', 'build')`. Also check `state.read_pipeline_state(repo)` — if a prior orchestrate run is paused or in flight (`pipeline_is_resumable(repo)` is True), refuse:
+**Step 0 — Context check + pipeline gate.** Call `lifecycle.skill_preamble(repo, 'verify')`. If it returns a non-None hint, surface as a one-line note. Also check `state.read_pipeline_state(repo)` — if a prior orchestrate run is paused or in flight (`pipeline_is_resumable(repo)` is True), refuse:
 
 > *"Orchestrate did not finish cleanly. Run `/renmark:debug` first or re-run `/renmark:orchestrate --resume`."*
 

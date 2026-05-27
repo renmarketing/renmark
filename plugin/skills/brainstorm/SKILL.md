@@ -24,7 +24,7 @@ If the current directory has no `CLAUDE.md`, no `AGENTS.md`, and no `.renmark/`,
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'brainstorm', 'build')`. If it returns `'clear'` or `'compact'`, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'brainstorm', 'build')`.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'brainstorm')`. If it returns a non-None hint, surface as a one-line note. (Domain is resolved from `DOMAIN_BY_SKILL` — do not pass it manually.)
 
 **Final step — Lifecycle update.** After the spec is written to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`, call `lifecycle.write_lifecycle(repo, stage='brainstorm-complete', feature=<topic>, artifact_update=('spec', <spec-path>))`. This is what makes `/renmark:resume` work after `/clear`.
 

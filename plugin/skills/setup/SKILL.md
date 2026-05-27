@@ -20,7 +20,7 @@ Prepares an existing project for the renmark workflow. Reads the current project
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'setup', 'meta')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'setup', 'meta')`.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'setup')`. If it returns a non-None hint, surface as a one-line note.
 
 **Lifecycle initialization.** As part of setup, if no `.renmark/state/lifecycle.json` exists, leave it that way — `/renmark:start` or `/renmark:feature` will create it when work actually begins. Setup itself does NOT seed a lifecycle (there's no in-flight feature yet).
 

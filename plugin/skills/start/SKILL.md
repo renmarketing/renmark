@@ -11,7 +11,7 @@ The vibe coder entry point. Ask what you want to build, and renmark handles the 
 
 ## Steps
 
-**Step 0 — Context check.** Before running, call `state.context_budget_check(repo, 'start', 'build')`. If it returns `'clear'` or `'compact'`, surface as a one-line note (do not block — user decides). Then call `state.record_skill_invocation(repo, 'start', 'build')`. Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'start')`. If it returns a non-None hint, surface as a one-line note (do not block — user decides). Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*
 
 ### 1. Open with one question
 

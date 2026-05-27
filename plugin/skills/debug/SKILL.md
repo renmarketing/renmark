@@ -50,7 +50,7 @@ python3 -c "from renmark import debug; s = debug.new_session('.', '<symptom>'); 
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'debug', 'debug')`. If `'clear'` returned, surface as a one-line note — debug is the `debug` domain, so transitioning into it from `build` or `audit` is a common cross-domain trigger. Then call `state.record_skill_invocation(repo, 'debug', 'debug')`.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'debug')`. If it returns a non-None hint, surface as a one-line note — debug is the `debug` domain, so transitioning into it from `build` or `audit` is a common cross-domain trigger.
 
 **Lifecycle note:** Debug is orthogonal to the lifecycle — it does NOT update `lifecycle.json.stage`. The current feature stage is preserved across debug sessions; when debug ends, `/renmark:resume` continues from whatever stage was active before.
 

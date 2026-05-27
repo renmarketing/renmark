@@ -97,23 +97,47 @@ def test_next_recommended_normal_flow(tmp_path: Path) -> None:
 
 
 def test_next_recommended_pending_approval(tmp_path: Path) -> None:
+    """When approval is pending and /renmark:approve is not yet implemented,
+    surface the manual gate — never point a vibe coder at a missing skill."""
     lifecycle.write_lifecycle(
         tmp_path, stage="ready-to-release", feature="x",
         human_review_required=True, human_review_for="release-v0.3.0",
     )
     rec = lifecycle.next_recommended(tmp_path)
-    assert "approve" in rec
     assert "release-v0.3.0" in rec
+    assert "manual" in rec.lower() or "/renmark:approve" in rec
 
 
 def test_next_recommended_approved_proceeds(tmp_path: Path) -> None:
+    """ready-to-release with approval recorded routes to a manual release hint
+    until /renmark:release ships (see lifecycle.NEXT_BY_STAGE_PLANNED)."""
     lifecycle.write_lifecycle(
         tmp_path, stage="ready-to-release", feature="x",
         human_review_required=True, human_review_completed=True,
         human_review_for="release-v0.3.0",
     )
     rec = lifecycle.next_recommended(tmp_path)
-    assert rec == "/renmark:release"
+    assert rec.startswith("(manual")
+    assert "release" in rec.lower()
+
+
+def test_next_recommended_never_points_at_unimplemented_skill(tmp_path: Path) -> None:
+    """Guard the lifecycle dead-pointer regression. Iterate every canonical
+    stage and confirm the recommendation is either a manual-hint string or
+    a skill that actually exists in plugin/skills/."""
+    from renmark.lifecycle import STAGES, IMPLEMENTED_SKILLS
+    for stage in STAGES:
+        if stage == "init":
+            # init isn't writable via write_lifecycle (it's the implicit start state).
+            continue
+        lifecycle.clear_lifecycle(tmp_path)
+        lifecycle.write_lifecycle(tmp_path, stage=stage, feature="x")
+        rec = lifecycle.next_recommended(tmp_path)
+        if rec.startswith("/renmark:"):
+            skill = rec.split(":", 1)[1].split()[0]
+            assert skill in IMPLEMENTED_SKILLS, (
+                f"stage {stage!r} routes to /renmark:{skill} which has no SKILL.md"
+            )
 
 
 def test_byte_budget_enforced(tmp_path: Path) -> None:

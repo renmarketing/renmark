@@ -52,7 +52,7 @@ Codex writes its review to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` directl
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'codereview', 'debug')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'codereview', 'debug')`.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'codereview')`. If it returns a non-None hint, surface as a one-line note.
 
 **Lifecycle note:** Codereview is orthogonal to stage progression but commonly runs as part of the Review stage. Skill should NOT bump `lifecycle.json.stage` directly — the wrapper `/renmark:feature` handles that after both codereview AND any secure audit complete.
 

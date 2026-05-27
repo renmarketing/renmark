@@ -182,6 +182,11 @@ SUBAGENT_OUTPUT_STATUS_VALUES = {"PASS", "FAIL", "SKIP"}
 SUBAGENT_OUTPUT_COMPLETION_STATES = {"complete", "partial", "failed"}
 SUBAGENT_OUTPUT_CONFIDENCE_VALUES = {"low", "medium", "high"}
 
+# G3 caps — kept in sync with renmark.summary.MAX_SUMMARY_LINES /
+# MAX_CHARS_PER_LINE and renmark.schemas.validate_subagent_output.
+SUBAGENT_MAX_SUMMARY_LINES = 5
+SUBAGENT_MAX_CHARS_PER_LINE = 1200
+
 
 @dataclass(frozen=True)
 class SubagentInput:
@@ -222,12 +227,23 @@ class SubagentOutput:
     retry_count: int = 0
 
     def __post_init__(self) -> None:
-        # G3 cap: 5 lines max.
-        if len(self.summary_lines) > 5:
+        # G3 cap: ≤ 5 lines AND ≤ 1200 chars per line. Both checks live here so
+        # parse_subagent_response cannot let a 5-line × 5000-char payload through.
+        if len(self.summary_lines) > SUBAGENT_MAX_SUMMARY_LINES:
             raise IsolationViolation(
                 f"SubagentOutput.summary_lines has {len(self.summary_lines)} entries; "
-                "max 5 (G3)"
+                f"max {SUBAGENT_MAX_SUMMARY_LINES} (G3)"
             )
+        for i, line in enumerate(self.summary_lines):
+            if not isinstance(line, str):
+                raise IsolationViolation(
+                    f"SubagentOutput.summary_lines[{i}] is {type(line).__name__}; expected str"
+                )
+            if len(line) > SUBAGENT_MAX_CHARS_PER_LINE:
+                raise IsolationViolation(
+                    f"SubagentOutput.summary_lines[{i}] is {len(line)} chars; "
+                    f"max {SUBAGENT_MAX_CHARS_PER_LINE} (G3)"
+                )
         if self.status not in SUBAGENT_OUTPUT_STATUS_VALUES:
             raise IsolationViolation(
                 f"SubagentOutput.status={self.status!r} not in {SUBAGENT_OUTPUT_STATUS_VALUES}"

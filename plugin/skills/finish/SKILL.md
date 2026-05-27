@@ -18,7 +18,7 @@ Three steps: verify everything still passes → show what was built → offer ne
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'finish', 'build')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'finish', 'build')`.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'finish')`. If it returns a non-None hint, surface as a one-line note.
 
 **Final step — Lifecycle update.** After all verifiers pass, call `lifecycle.write_lifecycle(repo, stage='ready-to-release')`. The recommended next command becomes `/renmark:release` (per `NEXT_BY_STAGE`). In v0.4.0+, finish becomes a stage-marker only — PR/merge logic moves to `/renmark:release`.
 

@@ -77,6 +77,34 @@ def test_subagent_output_rejects_too_many_summary_lines() -> None:
         )
 
 
+def test_subagent_output_rejects_oversized_summary_line() -> None:
+    """G3 per-line cap: 5 lines × 5000 chars must not slip through."""
+    with pytest.raises(IsolationViolation) as exc_info:
+        SubagentOutput(
+            status="PASS", artifact_path="x",
+            summary_lines=["x" * 1201],  # 1 char over the G3 cap
+        )
+    assert "1200" in str(exc_info.value) or "G3" in str(exc_info.value)
+
+
+def test_parse_response_rejects_oversized_summary_line() -> None:
+    """Same cap, applied via parse_subagent_response (the orchestrator entrypoint)."""
+    payload = {
+        "status": "PASS", "artifact_path": "x",
+        "summary_lines": ["a", "b", "c", "d", "x" * 5000],  # legal count, illegal length
+    }
+    with pytest.raises(IsolationViolation):
+        parse_subagent_response(payload)
+
+
+def test_subagent_output_rejects_non_string_summary_line() -> None:
+    with pytest.raises(IsolationViolation):
+        SubagentOutput(
+            status="PASS", artifact_path="x",
+            summary_lines=["ok", 42],  # type: ignore[list-item]
+        )
+
+
 def test_subagent_output_rejects_bad_status() -> None:
     with pytest.raises(IsolationViolation):
         SubagentOutput(status="MAYBE", artifact_path="x")  # type: ignore[arg-type]

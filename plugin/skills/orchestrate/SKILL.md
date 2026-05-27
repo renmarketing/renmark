@@ -36,7 +36,7 @@ After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (t
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'orchestrate', 'build')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'orchestrate', 'build')`. Also check `state.read_pipeline_state(repo)` — if `current_phase == "orchestrate"` and `pipeline_is_resumable(repo)`, surface: *"Existing orchestrate run paused at wave N — use `--resume` to continue, or clear pipeline state to start fresh."*
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'orchestrate')`. If it returns a non-None hint, surface as a one-line note. Also check `state.read_pipeline_state(repo)` — if `current_phase == "orchestrate"` and `pipeline_is_resumable(repo)`, surface: *"Existing orchestrate run paused at wave N — use `--resume` to continue, or clear pipeline state to start fresh."*
 
 ### 1. Discover plan
 
@@ -125,6 +125,23 @@ Plain `Agent` call — no `model` override. Build the subagent prompt from `disp
 > The generated code goes in the artifact file at `<artifact_path>`, NOT in your response. Do not paste code or diffs back. If you cannot complete with the inputs provided, return `status: FAIL` with a one-line reason."
 
 After the Agent returns, parse its response through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark the task as FAIL with reason "subagent leaked forbidden fields" — do not retry.
+
+**Ledger the call.** Immediately after parsing each successful Agent return, log the spend so `/renmark:roadmap` reports honestly:
+
+```python
+from renmark import state
+from renmark.roadmap import AGENT_OVERHEAD_TOKENS
+state.log_agent_call(
+    repo,
+    task_id=task.index,
+    model=task.executor,                            # 'haiku' | 'sonnet' | 'opus'
+    tokens_in=AGENT_OVERHEAD_TOKENS,                # ~10k system + spec overhead per call
+    tokens_out=out.token_count,                     # SubagentOutput.token_count
+    run_id=<run_id>,
+)
+```
+
+Codex tasks are ledgered by `renmark-execute` directly — do NOT call `log_agent_call` for them or spend will be double-counted.
 
 **3c. Run verifier per task**
 

@@ -31,7 +31,7 @@ Lightweight plan validator. Structural + hygiene + isolation checks before any t
 
 ## Steps
 
-**Step 0 — Context check.** Call `state.context_budget_check(repo, 'check-plan', 'build')`. If `'clear'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'check-plan', 'build')`.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'check-plan')`. If it returns a non-None hint, surface as a one-line note.
 
 **Final step — Lifecycle update.** On PASS verdict (or WARN that the user explicitly accepts), call `lifecycle.write_lifecycle(repo, stage='plan-validated')`. On BLOCK, do NOT update lifecycle — the plan must be fixed and re-validated first.
 

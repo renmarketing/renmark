@@ -32,7 +32,7 @@ The plan is consumed by `/renmark:orchestrate`.
 
 ## Steps
 
-**Step 0a — Context check.** Call `state.context_budget_check(repo, 'plan', 'build')`. If `'clear'` or `'compact'` returned, surface as a one-line note. Then call `state.record_skill_invocation(repo, 'plan', 'build')`.
+**Step 0a — Context check.** Call `lifecycle.skill_preamble(repo, 'plan')`. If it returns a non-None hint, surface as a one-line note.
 
 **Final step — Lifecycle update.** After the plan is written to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`, call `lifecycle.write_lifecycle(repo, stage='plan-drafted', artifact_update=('plan', <plan-path>))`. The user should then run `/renmark:check-plan` (which is `next_recommended` for `plan-drafted`).
 
@@ -112,17 +112,22 @@ Complexity → executor mapping: `hard` → opus, `medium` → codex (file-write
 
 Tasks that touch disjoint files AND don't depend on each other's outputs get the same `parallel_group`. Conservative default: each task in its own group (serial). Set the same group only when you're confident the targets won't collide.
 
-### 6. Estimate cost
+### 6. Estimate cost (honest accounting — no hidden overhead)
 
-For each task:
-- `haiku` → ~$0.0001/kT × estimated output tokens (cheapest Claude tier)
-- `codex` → ~$0.01-$0.05/kT × estimated output tokens
-- `sonnet` → ~$0.003/kT × estimated output tokens
-- `opus` → in-context Agent dispatch (consumes orchestrator's context; estimate ~$0.015/kT)
+For each task, compute **total spend** = `(output_tokens + agent_overhead) × $/kT`:
 
-**Agent call overhead:** Every haiku/sonnet/opus task costs ~10-18k tokens of context overhead on top of output tokens — the agent receives a full system prompt + task spec. The estimates above only cover output. Total real spend ≈ `est_tokens + 10,000` per Claude-model task. Surface this in the cost preview as a footnote: *"Haiku/sonnet/opus tasks: ~10k context overhead per call not included above."*
+| Executor | $/kT | Agent overhead | Notes |
+|---|---|---|---|
+| `haiku`  | $0.0001 | + 10k tokens | cheapest Claude tier |
+| `codex`  | $0.01–$0.05 | none | runs as `renmark-execute` subprocess |
+| `sonnet` | $0.003  | + 10k tokens | |
+| `opus`   | $0.015  | + 10k tokens | Anthropic billing — NOT "in-context free" |
 
-Show a per-task and total cost preview.
+**Agent overhead is real spend.** Every haiku/sonnet/opus task receives ~10k tokens of system prompt + task spec on top of its output, and that overhead bills to the user's Claude Code quota. Earlier renmark versions footnoted this; that broke vibe-coder trust when "$0.02 estimated" became "$0.20 actual." Bake the overhead into the displayed total. No footnotes.
+
+Concretely: for a sonnet task with `est_tokens: 500`, display cost = `(500 + 10000) / 1000 × 0.003 = $0.0315`, not `$0.0015`.
+
+Show per-task cost AND a single bold total at the bottom. The vibe coder should see one honest number.
 
 ### 7. Write the plan
 
@@ -143,7 +148,8 @@ Show a clear summary:
 
 > *"Plan written to `.renmark/plans/<name>.plan.md`*
 > *Tasks: N (M parallel groups)*
-> *Est. tokens: ~T, est. cost: ~$X*
+> *Total tokens (incl. ~10k Agent overhead/task): ~T*
+> *Total cost: ~$X*
 > *Executors: haiku×a, codex×b, sonnet×c, opus×d*
 >
 > *What's next?*

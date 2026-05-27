@@ -27,9 +27,7 @@ Cost: **one file read, zero LLM calls.** Output: a single-line recommendation (�
 
 ### 0. Context check
 
-Call `state.context_budget_check(repo, 'resume', 'meta')`. Resume is a `meta` domain skill — it rarely triggers a cross-domain prompt because it touches no work. If it does suggest `/clear`, ignore: resume is cheap and should always run.
-
-Then call `state.record_skill_invocation(repo, 'resume', 'meta')`.
+Call `lifecycle.skill_preamble(repo, 'resume')`. Resume is a `meta` domain skill — it rarely triggers a cross-domain prompt because it touches no work. If it does return a hint, ignore: resume is cheap and should always run.
 
 ### 1. Read lifecycle state
 

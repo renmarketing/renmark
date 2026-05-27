@@ -6,7 +6,7 @@
   "human_review_completed": false,
   "human_review_for": null,
   "human_review_required": false,
-  "next_recommended": "/renmark:release",
+  "next_recommended": "(manual: tag the release and build the zip; see README \u00a7 Release)",
   "stage": "ready-to-release",
   "stages_completed": [
     "brainstorm-complete",

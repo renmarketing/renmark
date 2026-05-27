@@ -107,6 +107,53 @@ def test_escalation_dir_created(tmp_path: Path) -> None:
     assert d.name == "task-7"
 
 
+def test_wave_summary_rotates_when_over_cap(tmp_path: Path, monkeypatch) -> None:
+    """Wave-summaries dir must not grow unbounded — overflow goes to archive/."""
+    monkeypatch.setattr(state._core, "WAVE_SUMMARIES_KEEP", 3)
+    for i in range(5):
+        state.write_wave_summary(tmp_path, i, [{"task_id": i}])
+    waves_dir = tmp_path / ".renmark" / "state" / "wave-summaries"
+    hot = list(waves_dir.glob("wave-*.json"))
+    assert len(hot) == 3, f"expected 3 hot files, got {len(hot)}: {[p.name for p in hot]}"
+    archive = tmp_path / ".renmark" / "state" / "archive" / "wave-summaries"
+    assert archive.exists()
+    archived = list(archive.rglob("wave-*.json"))
+    assert len(archived) == 2
+
+
+def test_open_log_rotates_when_over_cap(tmp_path: Path, monkeypatch) -> None:
+    """logs/ dir lives at .renmark/logs/ (not under state/) — rotation must
+    still find the repo root via the .renmark/ marker walk."""
+    monkeypatch.setattr(state._core, "LOGS_KEEP", 2)
+    for i in range(4):
+        state.open_log(tmp_path, f"cmd-{i}", run_id=f"r{i}")
+    logs = list((tmp_path / ".renmark" / "logs").glob("*.log"))
+    assert len(logs) == 2
+    archive = tmp_path / ".renmark" / "state" / "archive" / "logs"
+    archived = list(archive.rglob("*.log"))
+    assert len(archived) == 2
+
+
+def test_escalation_dir_rotates(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(state._core, "ESCALATIONS_KEEP", 2)
+    for i in range(4):
+        state.escalation_dir(tmp_path, i)
+    parent = tmp_path / ".renmark" / "state" / "escalations"
+    hot = [p for p in parent.iterdir() if p.name.startswith("task-")]
+    assert len(hot) == 2
+
+
+def test_rotate_dir_skips_outside_renmark(tmp_path: Path) -> None:
+    """If the target isn't inside a .renmark/ tree, rotate silently no-ops."""
+    bogus = tmp_path / "not-a-renmark-tree"
+    bogus.mkdir()
+    for i in range(5):
+        (bogus / f"{i}.txt").write_text(str(i))
+    moved = state.rotate_dir(bogus, keep=2, subdir_in_archive="x")
+    assert moved == 0
+    assert len(list(bogus.iterdir())) == 5  # untouched
+
+
 def test_commit_pattern_variants_all_recognized(tmp_path: Path) -> None:
     """v0.1.5 regression: orchestrator missed legitimate task-completion
     commits when the prefix wasn't bracketed, causing resume to re-run.
