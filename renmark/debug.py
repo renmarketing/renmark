@@ -12,21 +12,21 @@ State lives in `.renmark/debug/<session-id>/session.md` so a debug run survives
 `/clear`. This module exposes the file-format helpers; the skill drives the loop
 conversationally with the user.
 """
+
 from __future__ import annotations
 
-import datetime as dt
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import state as _state
 from . import memory as _memory
+from . import state as _state
 
 
 @dataclass
 class DebugSession:
     session_id: str
-    path: Path                   # session.md inside .renmark/debug/<session_id>/
+    path: Path  # session.md inside .renmark/debug/<session_id>/
 
     @property
     def dir(self) -> Path:
@@ -100,14 +100,15 @@ def log_investigation(
     session: DebugSession,
     *,
     hypothesis: str,
-    inspector: str,             # "haiku" | "codex" | "opus" | other executor string
+    inspector: str,  # "haiku" | "codex" | "opus" | other executor string
     finding: str,
     rules_out: bool = False,
 ) -> None:
     """Append an investigation step to the log."""
     verdict = "RULES OUT" if rules_out else "noted"
     append_section(
-        session, "Investigation log",
+        session,
+        "Investigation log",
         f"- **{hypothesis}** (via {inspector}) → {verdict}: {finding}",
     )
 
@@ -118,7 +119,9 @@ def set_root_cause(session: DebugSession, root_cause: str) -> None:
     new = re.sub(
         r"## Root cause\n\n.*?(?=\n## )",
         f"## Root cause\n\n{root_cause.strip()}\n\n",
-        text, count=1, flags=re.DOTALL,
+        text,
+        count=1,
+        flags=re.DOTALL,
     )
     session.path.write_text(new, encoding="utf-8")
 
@@ -141,8 +144,12 @@ def close_session(
     """
     _memory.log_bug(
         repo,
-        title=title, severity=severity,
-        symptom=symptom, root_cause=root_cause, fix=fix, lesson=lesson,
+        title=title,
+        severity=severity,
+        symptom=symptom,
+        root_cause=root_cause,
+        fix=fix,
+        lesson=lesson,
         section="Fixed",
     )
     # Mark the session as closed.
@@ -150,6 +157,7 @@ def close_session(
 
 
 # Routing suggestions — used by /renmark:debug skill to pick a model per step.
+
 
 def suggest_inspector(intent: str) -> str:
     """Return the cheapest model executor likely to be enough for `intent`.

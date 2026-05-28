@@ -13,13 +13,13 @@ encounters a task with executor=opus or executor=sonnet, it:
 This module's job is to keep the prompt format and bookkeeping in one place
 so the skill stays simple.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..parser import Task
-
 
 CLAUDE_EXECUTORS = ("haiku", "sonnet", "opus")
 
@@ -30,11 +30,11 @@ class AgentDispatch:
 
     task_index: int
     title: str
-    model: str             # "opus" or "sonnet" (the Agent tool's model param)
+    model: str  # "opus" or "sonnet" (the Agent tool's model param)
     target: str
     verifier: str
-    description: str       # short description for the Agent tool's `description` param
-    prompt: str            # the body the subagent receives
+    description: str  # short description for the Agent tool's `description` param
+    prompt: str  # the body the subagent receives
 
 
 def is_claude_executor(executor: str) -> bool:

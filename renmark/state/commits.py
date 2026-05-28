@@ -1,10 +1,10 @@
 """Completed-task detection by scanning git commit subjects."""
+
 from __future__ import annotations
 
 import re
 import subprocess
 from pathlib import Path
-
 
 # Recognizes: "[renmark] task N: ...", "[codex] task N: ...", "[nim] task N: ...",
 # "[manual] task N: ...", and bare (unbracketed) variants of each.
@@ -26,9 +26,7 @@ def completed_task_indices(repo_root: str | Path, since_ref: str | None = None) 
     if since_ref:
         cmd.append(f"{since_ref}..HEAD")
     try:
-        out = subprocess.run(
-            cmd, check=True, capture_output=True, text=True, timeout=10
-        ).stdout
+        out = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=10).stdout
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return set()
     completed: set[int] = set()

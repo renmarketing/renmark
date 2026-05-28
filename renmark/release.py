@@ -15,14 +15,15 @@ CLI:
 Bump / tag / zip operations are deferred to v0.4.0 — this module is
 read-only by design at v0.3.1.
 """
+
 from __future__ import annotations
 
 import json
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 # ── Version-file catalog ─────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ class VersionFile:
     ``extract`` parses the version out of the file's text. ``replace`` is
     reserved for the v0.4.0 release skill — left as None at v0.3.1.
     """
+
     path: str
     extract: Callable[[str], str | None]
     replace: Callable[[str, str], str] | None = None
@@ -111,12 +113,21 @@ VERSION_FILES: list[VersionFile] = [
     VersionFile("VERSION", _extract_plain, description="canonical version (1 line)"),
     VersionFile("pyproject.toml", _extract_pyproject, description="pip package metadata"),
     VersionFile("renmark/__init__.py", _extract_init, description="Python __version__"),
-    VersionFile("plugin/.claude-plugin/plugin.json", _extract_plugin_json,
-                description="Claude Code plugin manifest"),
-    VersionFile(".claude-plugin/marketplace.json", _extract_marketplace,
-                description="marketplace metadata.version"),
-    VersionFile(".claude-plugin/marketplace.json", _extract_marketplace_plugin,
-                description="marketplace plugins[0].version"),
+    VersionFile(
+        "plugin/.claude-plugin/plugin.json",
+        _extract_plugin_json,
+        description="Claude Code plugin manifest",
+    ),
+    VersionFile(
+        ".claude-plugin/marketplace.json",
+        _extract_marketplace,
+        description="marketplace metadata.version",
+    ),
+    VersionFile(
+        ".claude-plugin/marketplace.json",
+        _extract_marketplace_plugin,
+        description="marketplace plugins[0].version",
+    ),
     VersionFile("README.md", _extract_readme_header, description="README h1 header"),
 ]
 
@@ -134,9 +145,21 @@ BAKS_SUBDIR = ".renmark/baks"
 
 # Anything matching these (by path segment or glob) is left out of the package.
 PACKAGE_EXCLUDES: tuple[str, ...] = (
-    ".git", ".venv", "venv", ".pytest_cache", "__pycache__", "*.pyc",
-    "*.egg-info", ".env", ".env.local", ".env - Copy*", "*Zone.Identifier*",
-    ".claude", ".renmark", "PLAN.md", "node_modules",
+    ".git",
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    "__pycache__",
+    "*.pyc",
+    "*.egg-info",
+    ".env",
+    ".env.local",
+    ".env - Copy*",
+    "*Zone.Identifier*",
+    ".claude",
+    ".renmark",
+    "PLAN.md",
+    "node_modules",
 )
 
 
@@ -281,11 +304,14 @@ def main(argv: list[str] | None = None) -> int:
         i = 0
         while i < len(rest):
             if rest[i] == "--dest" and i + 1 < len(rest):
-                dest = rest[i + 1]; i += 2
+                dest = rest[i + 1]
+                i += 2
             elif rest[i] == "--name" and i + 1 < len(rest):
-                name = rest[i + 1]; i += 2
+                name = rest[i + 1]
+                i += 2
             else:
-                positional.append(rest[i]); i += 1
+                positional.append(rest[i])
+                i += 1
         repo = Path(positional[0]) if positional else Path(".")
         issues = drift_report(repo)
         if issues:

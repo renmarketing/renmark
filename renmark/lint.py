@@ -13,12 +13,12 @@ CLI:
 
 Exit code 0 = clean, 1 = issues found, 2 = bad CLI usage.
 """
+
 from __future__ import annotations
 
 import re
 import sys
 from pathlib import Path
-from typing import Iterable
 
 # ── Frontmatter parsing (zero-dep mini-YAML) ─────────────────────────────────
 
@@ -44,9 +44,7 @@ def parse_frontmatter(text: str) -> dict | None:
         if m:
             key, value = m.group(1), m.group(2).strip()
             # Strip wrapping quotes if any.
-            if (value.startswith("'") and value.endswith("'")) or (
-                value.startswith('"') and value.endswith('"')
-            ):
+            if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
                 value = value[1:-1]
             out[key] = value
     return out
@@ -82,8 +80,7 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
             issues.append(f"skills/{skill_path.name}/SKILL.md: frontmatter missing 'name'")
         elif fm["name"] != skill_path.name:
             issues.append(
-                f"skills/{skill_path.name}/SKILL.md: name={fm['name']!r} "
-                f"doesn't match directory {skill_path.name!r}"
+                f"skills/{skill_path.name}/SKILL.md: name={fm['name']!r} doesn't match directory {skill_path.name!r}"
             )
         if "description" not in fm or not fm["description"]:
             issues.append(f"skills/{skill_path.name}/SKILL.md: frontmatter missing 'description'")
@@ -173,6 +170,7 @@ def lint_plugin_json(plugin_dir: Path) -> list[str]:
     if not p.exists():
         return [f"plugin: missing .claude-plugin/plugin.json at {p}"]
     import json as _json
+
     try:
         data = _json.loads(p.read_text(encoding="utf-8"))
     except _json.JSONDecodeError as exc:
@@ -218,9 +216,7 @@ def main(argv: list[str] | None = None) -> int:
             template_path = Path(argv[i + 1])
             i += 2
         elif argv[i] in ("-h", "--help"):
-            sys.stdout.write(
-                "usage: python -m renmark.lint [--plugin-dir DIR] [--template PATH]\n"
-            )
+            sys.stdout.write("usage: python -m renmark.lint [--plugin-dir DIR] [--template PATH]\n")
             return 0
         else:
             sys.stderr.write(f"unknown arg: {argv[i]}\n")

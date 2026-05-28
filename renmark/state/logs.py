@@ -2,6 +2,7 @@
 
 Gitignored — transient runtime data, regenerable. One file per command run.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -64,13 +65,15 @@ def recent_logs(repo_root: str | Path, n: int = 10) -> list[dict]:
     items: list[dict] = []
     for f in d.glob("*.log"):
         st = f.stat()
-        items.append({
-            "name": f.name,
-            "path": str(f),
-            "size": st.st_size,
-            "mtime": dt.datetime.fromtimestamp(st.st_mtime, dt.timezone.utc).isoformat(timespec="seconds"),
-            "_raw_mtime": st.st_mtime,
-        })
+        items.append(
+            {
+                "name": f.name,
+                "path": str(f),
+                "size": st.st_size,
+                "mtime": dt.datetime.fromtimestamp(st.st_mtime, dt.timezone.utc).isoformat(timespec="seconds"),
+                "_raw_mtime": st.st_mtime,
+            }
+        )
     # Sort by raw float so logs created within the same second still order
     # deterministically by actual write time.
     items.sort(key=lambda x: x["_raw_mtime"], reverse=True)

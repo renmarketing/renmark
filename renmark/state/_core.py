@@ -3,12 +3,12 @@
 Everything here is dependency-free within the package — other state submodules
 import from `_core`, never the reverse.
 """
+
 from __future__ import annotations
 
 import datetime as dt
 import secrets
 from pathlib import Path
-
 
 RENMARK_DIR_NAME = ".renmark"
 STATE_SUBDIR = "state"
@@ -25,9 +25,9 @@ LAST_SKILL_FILE = "last-skill.json"
 
 # Rotation caps — entries beyond these move to .renmark/state/archive/<stamp>/.
 # Tuned for "one vibe coder, one project, many features." Bump for power users.
-WAVE_SUMMARIES_KEEP = 50      # keep last N wave summaries hot
-LOGS_KEEP = 50                # keep last N log files hot
-ESCALATIONS_KEEP = 20         # escalations are rarer but bigger
+WAVE_SUMMARIES_KEEP = 50  # keep last N wave summaries hot
+LOGS_KEEP = 50  # keep last N log files hot
+ESCALATIONS_KEEP = 20  # escalations are rarer but bigger
 
 # Back-compat alias for code that still references STATE_DIR_NAME.
 # .renmark/state/ is the canonical runtime state directory in v0.1.0+.

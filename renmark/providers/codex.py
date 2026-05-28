@@ -4,6 +4,7 @@ Codex is an agent: given a prompt, it plans and edits files itself. So
 unlike the NIM executor (which just emits text we apply), the codex
 executor invokes the CLI and verifies what it produced.
 """
+
 from __future__ import annotations
 
 import shutil
@@ -21,8 +22,8 @@ class CodexError(RuntimeError):
 @dataclass
 class CodexResult:
     exit_code: int
-    output_tail: str       # last lines of codex stdout/stderr — for retry feedback
-    changed_files: list[str]   # files in workspace that codex modified
+    output_tail: str  # last lines of codex stdout/stderr — for retry feedback
+    changed_files: list[str]  # files in workspace that codex modified
 
 
 def codex_available() -> bool:
@@ -33,7 +34,8 @@ def _git_status_porcelain(repo: Path) -> list[str]:
     """Return list of paths with any change vs. HEAD (staged or unstaged)."""
     proc = subprocess.run(
         ["git", "-C", str(repo), "status", "--porcelain"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         return []
@@ -75,9 +77,11 @@ def build_codex_prompt(task: Task, repo: Path) -> str:
         f"- Do not install dependencies.\n"
         f"- Your work is considered complete when this command exits 0:\n"
         f"    {task.verifier}\n"
-        f"- Run the verifier yourself if you want to check; the orchestrator will run it after you finish.\n\n"
+        f"- Run the verifier yourself if you want to check; "
+        f"the orchestrator will run it after you finish.\n\n"
         f"{ctx_block}"
-        f"Output: when done, just stop. The orchestrator reads the file from disk, runs the verifier, and decides PASS/FAIL.\n"
+        f"Output: when done, just stop. The orchestrator reads the file from disk, "
+        f"runs the verifier, and decides PASS/FAIL.\n"
     )
 
 
@@ -96,16 +100,17 @@ def run_codex_task(
     """
     if not codex_available():
         raise CodexError(
-            "codex CLI not on PATH. Install it (npm i -g @openai/codex) or "
-            "switch the task back to executor: nim."
+            "codex CLI not on PATH. Install it (npm i -g @openai/codex) or switch the task back to executor: nim."
         )
 
     prompt = build_codex_prompt(task, repo)
 
     cmd = [
-        "codex", "exec",
-        "--sandbox", sandbox,
-        "--skip-git-repo-check",       # we already verified git ourselves
+        "codex",
+        "exec",
+        "--sandbox",
+        sandbox,
+        "--skip-git-repo-check",  # we already verified git ourselves
     ]
     if extra_args:
         cmd.extend(extra_args)
@@ -114,8 +119,12 @@ def run_codex_task(
 
     try:
         proc = subprocess.run(
-            cmd, input=prompt, cwd=str(repo),
-            capture_output=True, text=True, timeout=timeout_s,
+            cmd,
+            input=prompt,
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
         )
     except subprocess.TimeoutExpired as e:
         partial = ""
@@ -138,9 +147,7 @@ def run_codex_task(
     )
 
 
-def check_only_target_modified(
-    changed: list[str], target: str
-) -> tuple[bool, str]:
+def check_only_target_modified(changed: list[str], target: str) -> tuple[bool, str]:
     """Codex sometimes modifies files outside the target. Reject those tasks.
 
     Returns (ok, reason). Both target and target-relative variants are accepted.

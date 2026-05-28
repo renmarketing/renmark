@@ -4,11 +4,10 @@ Used by `/renmark:brainstorm` when invoked in a fresh project (no CLAUDE.md,
 no AGENTS.md, no `.renmark/`). Copies templates from the plugin, substitutes
 project name + date, and creates the directory structure.
 """
+
 from __future__ import annotations
 
 import datetime as dt
-import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,8 +17,8 @@ from . import memory
 
 @dataclass
 class BootstrapResult:
-    created: list[str]              # absolute paths created
-    git_initialized: bool           # True if we ran git init
+    created: list[str]  # absolute paths created
+    git_initialized: bool  # True if we ran git init
 
 
 def is_empty_project(repo: str | Path) -> bool:
@@ -29,16 +28,11 @@ def is_empty_project(repo: str | Path) -> bool:
         return False
     if (p / "AGENTS.md").exists():
         return False
-    if (p / ".renmark").exists():
-        return False
-    return True
+    return not (p / ".renmark").exists()
 
 
 def _substitute(text: str, project_name: str, date: str) -> str:
-    return (
-        text.replace("{{PROJECT_NAME}}", project_name)
-            .replace("{{DATE}}", date)
-    )
+    return text.replace("{{PROJECT_NAME}}", project_name).replace("{{DATE}}", date)
 
 
 def bootstrap(
@@ -59,10 +53,8 @@ def bootstrap(
 
     tdir = memory.template_dir()
     if tdir is None:
-        raise RuntimeError(
-            "renmark templates directory not found; install.sh symlink missing?"
-        )
-    plugin_tdir = tdir.parent   # plugin/templates/
+        raise RuntimeError("renmark templates directory not found; install.sh symlink missing?")
+    plugin_tdir = tdir.parent  # plugin/templates/
 
     created: list[str] = []
 
@@ -93,8 +85,7 @@ def bootstrap(
         text = gi.read_text(encoding="utf-8")
         missing = [ln for ln in needed_lines if ln not in text]
         if missing:
-            gi.write_text(text.rstrip() + "\n\n# renmark\n" + "\n".join(missing) + "\n",
-                          encoding="utf-8")
+            gi.write_text(text.rstrip() + "\n\n# renmark\n" + "\n".join(missing) + "\n", encoding="utf-8")
             created.append(str(gi) + " (appended)")
     else:
         gi.write_text(
@@ -130,34 +121,43 @@ def bootstrap(
     if init_git and not (repo_p / ".git").is_dir():
         try:
             subprocess.run(
-                ["git", "init", "-q", "-b", "main"], cwd=str(repo_p), check=True,
+                ["git", "init", "-q", "-b", "main"],
+                cwd=str(repo_p),
+                check=True,
                 capture_output=True,
             )
             # Identity defaults if not configured.
             res = subprocess.run(
                 ["git", "-C", str(repo_p), "config", "user.email"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             if res.returncode != 0 or not res.stdout.strip():
                 subprocess.run(
                     ["git", "-C", str(repo_p), "config", "user.email", "renmark@local"],
-                    check=True, capture_output=True,
+                    check=True,
+                    capture_output=True,
                 )
             res = subprocess.run(
                 ["git", "-C", str(repo_p), "config", "user.name"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             if res.returncode != 0 or not res.stdout.strip():
                 subprocess.run(
                     ["git", "-C", str(repo_p), "config", "user.name", "renmark"],
-                    check=True, capture_output=True,
+                    check=True,
+                    capture_output=True,
                 )
             subprocess.run(
-                ["git", "-C", str(repo_p), "add", "-A"], check=True, capture_output=True,
+                ["git", "-C", str(repo_p), "add", "-A"],
+                check=True,
+                capture_output=True,
             )
             subprocess.run(
                 ["git", "-C", str(repo_p), "commit", "-q", "-m", "chore: renmark scaffold"],
-                check=True, capture_output=True,
+                check=True,
+                capture_output=True,
             )
             git_initialized = True
         except subprocess.CalledProcessError:

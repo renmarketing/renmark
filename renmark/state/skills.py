@@ -2,6 +2,7 @@
 
 G4: subject-change detection for context-contamination prompts.
 """
+
 from __future__ import annotations
 
 import json

@@ -13,6 +13,7 @@ Submodules:
 - commits   completed-task detection via git log
 - skills    skill-invocation tracking + context-budget check
 """
+
 from __future__ import annotations
 
 from ._core import (
@@ -37,13 +38,12 @@ from ._core import (
     rotate_dir,
     state_dir,
 )
-from .usage import (
-    UsageRecord,
-    append_usage,
-    log_agent_call,
-    read_usage,
-    usage_this_month,
-    usage_today,
+from .commits import completed_task_indices
+from .logs import (
+    append_log,
+    logs_dir,
+    open_log,
+    recent_logs,
 )
 from .pause import (
     PauseState,
@@ -62,39 +62,73 @@ from .pipeline import (
     write_pipeline_state,
     write_wave_summary,
 )
-from .logs import (
-    append_log,
-    logs_dir,
-    open_log,
-    recent_logs,
-)
-from .commits import completed_task_indices
 from .skills import (
     context_budget_check,
     last_skill_invocation,
     record_skill_invocation,
 )
+from .usage import (
+    UsageRecord,
+    append_usage,
+    log_agent_call,
+    read_usage,
+    usage_this_month,
+    usage_today,
+)
 
 __all__ = [
+    "ARCHIVE_SUBDIR",
+    "DEBUG_SUBDIR",
+    "ESCALATIONS_DIR",
+    "ESCALATIONS_KEEP",
+    "LAST_SKILL_FILE",
+    "LOGS_KEEP",
+    "LOGS_SUBDIR",
+    "MEMORY_SUBDIR",
+    "PAUSED_FILE",
+    "PIPELINE_JSON",
     # _core
-    "RENMARK_DIR_NAME", "STATE_SUBDIR", "MEMORY_SUBDIR", "DEBUG_SUBDIR",
-    "LOGS_SUBDIR", "USAGE_LEDGER", "PAUSED_FILE", "ESCALATIONS_DIR",
-    "ARCHIVE_SUBDIR", "PIPELINE_JSON", "WAVE_SUMMARIES_SUBDIR", "LAST_SKILL_FILE",
-    "WAVE_SUMMARIES_KEEP", "LOGS_KEEP", "ESCALATIONS_KEEP", "STATE_DIR_NAME",
-    "new_run_id", "now_iso", "state_dir", "rotate_dir",
-    # usage
-    "UsageRecord", "append_usage", "log_agent_call", "read_usage",
-    "usage_today", "usage_this_month",
+    "RENMARK_DIR_NAME",
+    "STATE_DIR_NAME",
+    "STATE_SUBDIR",
+    "USAGE_LEDGER",
+    "WAVE_SUMMARIES_KEEP",
+    "WAVE_SUMMARIES_SUBDIR",
     # pause
-    "PauseState", "write_pause", "read_pause", "clear_pause", "escalation_dir",
+    "PauseState",
     # pipeline
-    "PipelineState", "read_pipeline_state", "write_pipeline_state",
-    "clear_pipeline_state", "pipeline_is_resumable", "write_wave_summary",
-    "read_wave_summary", "list_wave_summaries",
-    # logs
-    "logs_dir", "open_log", "append_log", "recent_logs",
+    "PipelineState",
+    # usage
+    "UsageRecord",
+    "append_log",
+    "append_usage",
+    "clear_pause",
+    "clear_pipeline_state",
     # commits
     "completed_task_indices",
+    "context_budget_check",
+    "escalation_dir",
+    "last_skill_invocation",
+    "list_wave_summaries",
+    "log_agent_call",
+    # logs
+    "logs_dir",
+    "new_run_id",
+    "now_iso",
+    "open_log",
+    "pipeline_is_resumable",
+    "read_pause",
+    "read_pipeline_state",
+    "read_usage",
+    "read_wave_summary",
+    "recent_logs",
     # skills
-    "record_skill_invocation", "last_skill_invocation", "context_budget_check",
+    "record_skill_invocation",
+    "rotate_dir",
+    "state_dir",
+    "usage_this_month",
+    "usage_today",
+    "write_pause",
+    "write_pipeline_state",
+    "write_wave_summary",
 ]

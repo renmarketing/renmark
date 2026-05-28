@@ -11,9 +11,9 @@ Env vars consumed (caller can override per call):
 - OPENAI_COMPAT_BASE_URL  (e.g. https://api.together.xyz/v1)
 - OPENAI_COMPAT_API_KEY
 """
+
 from __future__ import annotations
 
-import json
 import os
 import time
 from dataclasses import dataclass
@@ -88,7 +88,7 @@ def complete(
             delay = min(delay * 2, 60.0)
             continue
         if resp.status_code == 401:
-            raise ProviderError(f"401 Unauthorized — check API key")
+            raise ProviderError("401 Unauthorized — check API key")
         if resp.status_code >= 400:
             raise ProviderError(f"HTTP {resp.status_code}: {resp.text[:500]}")
 

@@ -9,14 +9,15 @@ metadata + Summary (never the body).
 Default orchestrator-visible output cap: 5 lines OR ~300 tokens per line.
 Violations raise ValueError at write time — they are bugs, not warnings.
 """
+
 from __future__ import annotations
 
 import hashlib
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
 from renmark.verifier import run_verifier
 
@@ -49,9 +50,9 @@ class ArtifactMetadata:
     stale_after: str | None = None
     dependency_refs: list[str] = field(default_factory=list)
     # G9 transparency:
-    completion_state: str = "complete"     # complete | partial | failed
-    confidence: str = "medium"             # low | medium | high
-    validation_status: str = "unvalidated" # validated | unvalidated | failed
+    completion_state: str = "complete"  # complete | partial | failed
+    confidence: str = "medium"  # low | medium | high
+    validation_status: str = "unvalidated"  # validated | unvalidated | failed
     retry_count: int = 0
     parser_success: bool = True
     schema_compliance: bool = True
@@ -131,12 +132,7 @@ def write_artifact(
     )
 
     summary_block = "\n".join(f"- {line}" for line in summary_lines_list)
-    content = (
-        f"{meta.to_yaml()}\n\n"
-        f"{body.rstrip()}\n\n"
-        f"## Summary\n\n"
-        f"{summary_block}\n"
-    )
+    content = f"{meta.to_yaml()}\n\n{body.rstrip()}\n\n## Summary\n\n{summary_block}\n"
 
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -175,10 +171,7 @@ def emit_pointer(path: Path | str, label: str, *, n_lines: int = MAX_SUMMARY_LIN
             break
 
     # Truncate over-long bullets to stay within token cap
-    bullets = [
-        (b[: MAX_CHARS_PER_LINE - 1] + "…") if len(b) > MAX_CHARS_PER_LINE else b
-        for b in bullets
-    ]
+    bullets = [(b[: MAX_CHARS_PER_LINE - 1] + "…") if len(b) > MAX_CHARS_PER_LINE else b for b in bullets]
 
     header = (
         f"{label}: {meta.get('artifact_type', '?')} "
@@ -298,7 +291,10 @@ def git_head_sha(repo: Path | str) -> str | None:
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=False, timeout=5,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
@@ -312,9 +308,7 @@ def git_head_sha(repo: Path | str) -> str | None:
 
 def _validate_summary(summary_lines: list[str]) -> None:
     if len(summary_lines) > MAX_SUMMARY_LINES:
-        raise SummaryBoundaryError(
-            f"summary_lines has {len(summary_lines)} entries; max {MAX_SUMMARY_LINES} (G3)"
-        )
+        raise SummaryBoundaryError(f"summary_lines has {len(summary_lines)} entries; max {MAX_SUMMARY_LINES} (G3)")
     for i, line in enumerate(summary_lines):
         if len(line) > MAX_CHARS_PER_LINE:
             raise SummaryBoundaryError(

@@ -21,11 +21,11 @@ moving parts to surface their slash commands, and the canonical
 other two (and a few related drift modes) before the user discovers
 the failure by typing ``/renmark:*`` and seeing nothing.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
 import json
-import os
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -53,12 +53,13 @@ PLUGIN_KEY = "renmark@renmark-local"  # `<plugin>@<marketplace>` per CC conventi
 @dataclass
 class Check:
     """One diagnostic check result."""
+
     name: str
-    status: str             # "pass", "fail", "warn"
+    status: str  # "pass", "fail", "warn"
     detail: str
-    fix_cmd: str = ""        # shell command the user can run to remediate
+    fix_cmd: str = ""  # shell command the user can run to remediate
     auto_fixable: bool = False  # whether --fix can resolve this
-    fix_fn: object = None    # callable that applies the fix (set by checker)
+    fix_fn: object = None  # callable that applies the fix (set by checker)
 
 
 @dataclass
@@ -109,7 +110,8 @@ def check_cli_on_path() -> Check:
     if cli:
         return Check("CLI on PATH", "pass", f"`renmark-execute` resolves to {cli}")
     return Check(
-        "CLI on PATH", "warn",
+        "CLI on PATH",
+        "warn",
         "`renmark-execute` is not on PATH. The plugin still works, but ad-hoc CLI usage won't.",
         fix_cmd=f"bash {RENMARK_ROOT}/install.sh",
     )
@@ -117,13 +119,15 @@ def check_cli_on_path() -> Check:
 
 def check_python_package() -> Check:
     try:
-        import renmark  # noqa: F401
+        import renmark
+
         loc = Path(renmark.__file__).resolve()
         v = getattr(renmark, "__version__", "<no __version__>")
         return Check("Python package", "pass", f"`renmark` v{v} importable from {loc.parent}")
     except ImportError as exc:
         return Check(
-            "Python package", "fail",
+            "Python package",
+            "fail",
             f"`import renmark` failed: {exc}",
             fix_cmd=f"pip install -e {RENMARK_ROOT}",
             auto_fixable=False,  # involves package install — leave to user
@@ -146,7 +150,8 @@ def check_plugin_manifest() -> Check:
     src_v = _current_version()
     if v and src_v and v != src_v:
         return Check(
-            "Plugin manifest version", "fail",
+            "Plugin manifest version",
+            "fail",
             f"manifest at v{v} but VERSION says v{src_v} — version drift",
             fix_cmd="python -m renmark.release check",
         )
@@ -158,7 +163,8 @@ def check_settings_marketplace() -> Check:
     mkt = settings.get("extraKnownMarketplaces", {}).get(MARKETPLACE_NAME)
     if not mkt:
         return Check(
-            "Marketplace registered (settings.json)", "fail",
+            "Marketplace registered (settings.json)",
+            "fail",
             f"`extraKnownMarketplaces.{MARKETPLACE_NAME}` missing — Claude Code doesn't know where to find renmark.",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -168,7 +174,8 @@ def check_settings_marketplace() -> Check:
     path = src.get("path")
     if path != str(RENMARK_ROOT):
         return Check(
-            "Marketplace registered (settings.json)", "warn",
+            "Marketplace registered (settings.json)",
+            "warn",
             f"marketplace registered but path is {path!r}, not {str(RENMARK_ROOT)!r}",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -182,7 +189,8 @@ def check_settings_enabled() -> Check:
     enabled = settings.get("enabledPlugins", {}).get(PLUGIN_KEY)
     if not enabled:
         return Check(
-            "Plugin enabled (settings.json)", "fail",
+            "Plugin enabled (settings.json)",
+            "fail",
             f"`enabledPlugins[{PLUGIN_KEY!r}]` is not set to true — slash commands won't appear.",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -196,7 +204,8 @@ def check_installed_plugins_registry() -> Check:
     entries = data.get("plugins", {}).get(PLUGIN_KEY)
     if not entries:
         return Check(
-            "Claude Code registry", "fail",
+            "Claude Code registry",
+            "fail",
             f"`installed_plugins.json` has no entry for `{PLUGIN_KEY}`.",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -207,7 +216,8 @@ def check_installed_plugins_registry() -> Check:
     src_v = _current_version()
     if src_v and registered_v != src_v:
         return Check(
-            "Claude Code registry", "fail",
+            "Claude Code registry",
+            "fail",
             f"registry says v{registered_v} but source is v{src_v} — version drift will cause silent skip.",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -216,7 +226,8 @@ def check_installed_plugins_registry() -> Check:
     install_path = Path(entry.get("installPath", ""))
     if not install_path.exists():
         return Check(
-            "Claude Code registry", "fail",
+            "Claude Code registry",
+            "fail",
             f"registry installPath `{install_path}` does not exist on disk.",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -233,7 +244,8 @@ def check_cache_install_path() -> Check:
     cache_path = PLUGINS_DIR / "cache" / MARKETPLACE_NAME / "renmark" / src_v
     if not cache_path.exists():
         return Check(
-            "Cache install path", "fail",
+            "Cache install path",
+            "fail",
             f"`{cache_path}` doesn't exist — Claude Code won't find the plugin source.",
             fix_cmd="python -m renmark.doctor --fix",
             auto_fixable=True,
@@ -243,7 +255,8 @@ def check_cache_install_path() -> Check:
         target = cache_path.resolve()
         if target != PLUGIN_SOURCE.resolve():
             return Check(
-                "Cache install path", "warn",
+                "Cache install path",
+                "warn",
                 f"`{cache_path}` is a symlink to {target}, not the current plugin source {PLUGIN_SOURCE}",
                 fix_cmd="python -m renmark.doctor --fix",
                 auto_fixable=True,
@@ -257,13 +270,15 @@ def check_plugin_symlink() -> Check:
     """The convenience symlink ~/.claude/plugins/renmark → source/plugin/."""
     if not SYMLINK_PATH.exists():
         return Check(
-            "Convenience symlink", "warn",
+            "Convenience symlink",
+            "warn",
             f"`{SYMLINK_PATH}` missing — not required for plugin load, but install.sh creates it.",
             fix_cmd=f"bash {RENMARK_ROOT}/install.sh",
         )
     if SYMLINK_PATH.is_symlink() and SYMLINK_PATH.resolve() != PLUGIN_SOURCE.resolve():
         return Check(
-            "Convenience symlink", "warn",
+            "Convenience symlink",
+            "warn",
             f"`{SYMLINK_PATH}` points to {SYMLINK_PATH.resolve()}, not {PLUGIN_SOURCE}",
             fix_cmd=f"bash {RENMARK_ROOT}/install.sh",
         )
@@ -319,13 +334,15 @@ def _fix_register_plugin() -> str:
     v = _current_version() or "0.0.0"
     cache_path = PLUGINS_DIR / "cache" / MARKETPLACE_NAME / "renmark" / v
     now = _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z")
-    data["plugins"][PLUGIN_KEY] = [{
-        "scope": "user",
-        "installPath": str(cache_path),
-        "version": v,
-        "installedAt": now,
-        "lastUpdated": now,
-    }]
+    data["plugins"][PLUGIN_KEY] = [
+        {
+            "scope": "user",
+            "installPath": str(cache_path),
+            "version": v,
+            "installedAt": now,
+            "lastUpdated": now,
+        }
+    ]
     INSTALLED_PLUGINS_JSON.write_text(json.dumps(data, indent=2))
     # Also ensure the cache symlink exists
     _fix_cache_symlink()
@@ -338,9 +355,8 @@ def _fix_cache_symlink() -> str:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     # Clean up other versions
     for sibling in cache_path.parent.iterdir():
-        if sibling != cache_path and (sibling.is_symlink() or sibling.is_dir()):
-            if sibling.is_symlink():
-                sibling.unlink()
+        if sibling != cache_path and (sibling.is_symlink() or sibling.is_dir()) and sibling.is_symlink():
+            sibling.unlink()
             # Don't delete real dirs — could be user data
     if cache_path.exists() or cache_path.is_symlink():
         cache_path.unlink()
@@ -396,13 +412,15 @@ def render_human(report: DoctorReport) -> str:
 
 
 def render_json(report: DoctorReport) -> str:
-    return json.dumps({
-        "checks": [
-            {"name": c.name, "status": c.status, "detail": c.detail, "fix_cmd": c.fix_cmd}
-            for c in report.checks
-        ],
-        "ok": report.ok(),
-    }, indent=2)
+    return json.dumps(
+        {
+            "checks": [
+                {"name": c.name, "status": c.status, "detail": c.detail, "fix_cmd": c.fix_cmd} for c in report.checks
+            ],
+            "ok": report.ok(),
+        },
+        indent=2,
+    )
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

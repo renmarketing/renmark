@@ -5,10 +5,11 @@ separation from lifecycle.json: pipeline.json carries RUNTIME fields only
 (wave indices, task indices, retry counts, subprocess state). Workflow fields
 (feature identity, stage names, approval state) live in lifecycle.json.
 """
+
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from . import _core
@@ -25,12 +26,12 @@ from ._core import (
 class PipelineState:
     """Runtime state of an in-flight /renmark:orchestrate execution."""
 
-    current_phase: str = "idle"                  # idle | orchestrate | paused
-    current_plan: str = ""                       # path to plan file
+    current_phase: str = "idle"  # idle | orchestrate | paused
+    current_plan: str = ""  # path to plan file
     wave_index: int = 0
     wave_total: int = 0
-    completed_tasks: list[int] = None           # type: ignore[assignment]
-    failed_tasks: list[int] = None              # type: ignore[assignment]
+    completed_tasks: list[int] = None  # type: ignore[assignment]
+    failed_tasks: list[int] = None  # type: ignore[assignment]
     last_updated: str = ""
 
     def __post_init__(self) -> None:
@@ -113,6 +114,7 @@ def pipeline_is_resumable(repo_root: str | Path) -> bool:
 # --- Wave summaries (.renmark/state/wave-summaries/) -----------------------
 # G11: per-wave aggregated subagent outputs. Next wave reads dependency_notes
 # from here, never from prior conversation.
+
 
 def _wave_summaries_dir(repo_root: str | Path) -> Path:
     d = state_dir(repo_root) / WAVE_SUMMARIES_SUBDIR

@@ -5,6 +5,7 @@ Each task in the plan specifies a verifier shell command. We run it via
 stdout+stderr, and return the exit code plus the tail of output (for use in
 NIM retry prompts).
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -15,8 +16,8 @@ from pathlib import Path
 @dataclass
 class VerifierResult:
     exit_code: int
-    output: str            # combined stdout+stderr
-    tail: str              # last 50 lines of output, for retry prompts
+    output: str  # combined stdout+stderr
+    tail: str  # last 50 lines of output, for retry prompts
     timed_out: bool
 
     @property
@@ -25,12 +26,17 @@ class VerifierResult:
 
 
 def run_verifier(
-    command: str, *, cwd: str | Path, timeout_s: int = 60,
+    command: str,
+    *,
+    cwd: str | Path,
+    timeout_s: int = 60,
     tail_lines: int = 50,
 ) -> VerifierResult:
     if not command.strip():
         return VerifierResult(
-            exit_code=2, output="empty verifier command", tail="empty verifier command",
+            exit_code=2,
+            output="empty verifier command",
+            tail="empty verifier command",
             timed_out=False,
         )
     try:
@@ -49,7 +55,10 @@ def run_verifier(
             partial += e.stderr if isinstance(e.stderr, str) else e.stderr.decode(errors="replace")
         msg = f"[verifier timed out after {timeout_s}s]\n{partial}"
         return VerifierResult(
-            exit_code=124, output=msg, tail=_tail(msg, tail_lines), timed_out=True,
+            exit_code=124,
+            output=msg,
+            tail=_tail(msg, tail_lines),
+            timed_out=True,
         )
 
     combined = (proc.stdout or "") + (proc.stderr or "")

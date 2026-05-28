@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "renmark"
-version = "0.5.2"
+version = "0.5.3"
 description = "Multi-LLM orchestration: brainstorm, plan, orchestrate, debug, codereview. Persistent project memory."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11",
 ]
 
 # Note: no [project.scripts] entry — the canonical CLI is the bash wrapper at
@@ -28,3 +30,37 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["renmark*"]
 exclude = ["tests*", "plugin*", "bin*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+    "E402",   # module-level imports after section comments — intentional refactoring pattern
+    "RUF001", # ambiguous unicode in identifiers — renmark uses intentional stylization
+    "RUF003", # ambiguous unicode in comments — same reason (×, ℹ, ⚠, etc. in stylized output)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501", "F841", "B011"]
+"renmark/init.py" = ["E501"]   # contains long template strings for project-map.md rendering
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+# Lenient-strict: catches actual bugs (Any returns, unreachable code, None
+# handling) without flagging every internal helper that lacks a return
+# annotation. v0.5.3 sets this baseline; full `strict = true` is tracked as
+# a follow-up plan once the 53 strict-mode issues are cleaned up.
+python_version = "3.10"
+strict = false
+warn_unused_configs = true
+warn_return_any = true
+warn_unreachable = true
+warn_redundant_casts = true
+check_untyped_defs = true
+show_error_codes = true
+exclude = ["build/", "dist/", "\\.venv/", "tests/"]

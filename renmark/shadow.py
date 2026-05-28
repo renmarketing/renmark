@@ -25,15 +25,17 @@ Subsystems registered at v0.3.1:
     - lifecycle   stage-transition state machine
     - summary     artifact metadata round-tripping
 """
+
 from __future__ import annotations
 
 import json
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 # ── Registry ─────────────────────────────────────────────────────────────────
 
@@ -43,9 +45,11 @@ _REGISTRY: dict[str, ReplayFn] = {}
 
 def register(name: str) -> Callable[[ReplayFn], ReplayFn]:
     """Decorator: register a subsystem's replay function."""
+
     def deco(fn: ReplayFn) -> ReplayFn:
         _REGISTRY[name] = fn
         return fn
+
     return deco
 
 
@@ -60,7 +64,7 @@ def registered_subsystems() -> list[str]:
 def _replay_dispatch(case: dict) -> dict:
     """Input: {"response": <dict-or-string>}
     Output: SubagentOutput.to_dict() OR {"error": "...class.message"}"""
-    from renmark.dispatch import parse_subagent_response, IsolationViolation
+    from renmark.dispatch import IsolationViolation, parse_subagent_response
 
     response = case["response"]
     try:
@@ -77,8 +81,9 @@ def _replay_lifecycle(case: dict) -> dict:
     """Input: {"calls": [{"stage": ..., "feature": ...}, ...]}
     Output: final lifecycle state (asdict) with last_updated stripped (non-deterministic).
     """
-    from renmark import lifecycle as _lc
     from dataclasses import asdict
+
+    from renmark import lifecycle as _lc
 
     with tempfile.TemporaryDirectory() as td:
         repo = Path(td)
@@ -99,8 +104,9 @@ def _replay_summary(case: dict) -> dict:
     """Input: {"metadata": {...}}
     Output: ArtifactMetadata serialized as a dict (deterministic — strip created_at).
     """
-    from renmark.summary import ArtifactMetadata
     from dataclasses import asdict
+
+    from renmark.summary import ArtifactMetadata
 
     md_kwargs = dict(case["metadata"])
     # Inject a fixed created_at so output is deterministic.
@@ -117,6 +123,7 @@ def _replay_summary(case: dict) -> dict:
 class ShadowDiff:
     """One case's drift, if any. result is ``"match"``, ``"drift"``, or
     ``"missing-baseline"``."""
+
     subsystem: str
     case: str
     result: str
@@ -155,34 +162,36 @@ def run_subsystem(subsystem: str) -> list[ShadowDiff]:
         try:
             case_input = json.loads(case_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
-            diffs.append(ShadowDiff(subsystem, case_name, "error",
-                                    error=f"failed to load case: {exc}"))
+            diffs.append(ShadowDiff(subsystem, case_name, "error", error=f"failed to load case: {exc}"))
             continue
 
         try:
             actual = replay(case_input)
         except Exception as exc:
-            diffs.append(ShadowDiff(subsystem, case_name, "error",
-                                    error=f"replay raised {type(exc).__name__}: {exc}"))
+            diffs.append(
+                ShadowDiff(
+                    subsystem,
+                    case_name,
+                    "error",
+                    error=f"replay raised {type(exc).__name__}: {exc}",
+                )
+            )
             continue
 
         if not baseline_path.exists():
-            diffs.append(ShadowDiff(subsystem, case_name, "missing-baseline",
-                                    actual=actual))
+            diffs.append(ShadowDiff(subsystem, case_name, "missing-baseline", actual=actual))
             continue
 
         try:
             expected = json.loads(baseline_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
-            diffs.append(ShadowDiff(subsystem, case_name, "error",
-                                    error=f"failed to load baseline: {exc}"))
+            diffs.append(ShadowDiff(subsystem, case_name, "error", error=f"failed to load baseline: {exc}"))
             continue
 
         if _normalize(expected) == _normalize(actual):
             diffs.append(ShadowDiff(subsystem, case_name, "match"))
         else:
-            diffs.append(ShadowDiff(subsystem, case_name, "drift",
-                                    expected=expected, actual=actual))
+            diffs.append(ShadowDiff(subsystem, case_name, "drift", expected=expected, actual=actual))
     return diffs
 
 
@@ -205,8 +214,7 @@ def accept_subsystem(subsystem: str, message: str) -> int:
         case_input = json.loads(case_path.read_text(encoding="utf-8"))
         actual = replay(case_input)
         baseline_path = baselines_dir / case_path.name
-        baseline_path.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n",
-                                 encoding="utf-8")
+        baseline_path.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         count += 1
 
     # Prepend a CHANGES.md ledger entry below the header.
@@ -217,7 +225,7 @@ def accept_subsystem(subsystem: str, message: str) -> int:
     if changes_log.exists():
         existing = changes_log.read_text(encoding="utf-8")
         if existing.startswith(header):
-            existing = existing[len(header):]
+            existing = existing[len(header) :]
         changes_log.write_text(header + entry + existing, encoding="utf-8")
     else:
         changes_log.write_text(header + entry, encoding="utf-8")
@@ -278,9 +286,7 @@ def _print_diffs(diffs: list[ShadowDiff], verbose: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
-        sys.stderr.write(
-            "usage: python -m renmark.shadow {run|accept|list} [--subsystem X] [-m MSG] [--verbose]\n"
-        )
+        sys.stderr.write("usage: python -m renmark.shadow {run|accept|list} [--subsystem X] [-m MSG] [--verbose]\n")
         return 2
 
     cmd = argv[0]
@@ -323,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
         if total_issues:
             sys.stderr.write(f"\nFAIL ({total_issues} drift/missing/error)\n")
             return 1
-        sys.stdout.write(f"\nOK  all subsystems clean\n")
+        sys.stdout.write("\nOK  all subsystems clean\n")
         return 0
 
     if cmd == "accept":

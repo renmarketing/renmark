@@ -18,6 +18,7 @@ Executor → provider mapping:
   openai_compat/<m>    → providers.openai_compat (needs OPENAI_COMPAT_BASE_URL)
   <other>/<model>      → providers.openai_compat with model as-is
 """
+
 from __future__ import annotations
 
 # Native executor identifiers handled directly.

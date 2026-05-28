@@ -8,19 +8,19 @@ as the OpenRouter `model` field.
 
 Env: OPENROUTER_API_KEY
 """
+
 from __future__ import annotations
 
 import os
 
 from . import openai_compat
 
-
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
 
 
 def complete(
     *,
-    model: str,                 # already stripped of leading "openrouter/" by dispatcher
+    model: str,  # already stripped of leading "openrouter/" by dispatcher
     prompt: str,
     api_key: str | None = None,
     temperature: float = 0.2,
@@ -30,9 +30,7 @@ def complete(
 ) -> openai_compat.ProviderResponse:
     key = api_key or os.environ.get("OPENROUTER_API_KEY")
     if not key:
-        raise openai_compat.ProviderError(
-            "OPENROUTER_API_KEY not set. Get one at https://openrouter.ai/keys"
-        )
+        raise openai_compat.ProviderError("OPENROUTER_API_KEY not set. Get one at https://openrouter.ai/keys")
     return openai_compat.complete(
         model=model,
         prompt=prompt,

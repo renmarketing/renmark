@@ -8,6 +8,7 @@ Each memory file follows a documented format defined by its template under
 `plugin/templates/memory/<name>.md.template`. Helpers below append into the
 right section (most files are organized newest-first per CHANGELOG convention).
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -15,8 +16,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .state import RENMARK_DIR_NAME, MEMORY_SUBDIR
-
+from .state import MEMORY_SUBDIR, RENMARK_DIR_NAME
 
 MEMORY_FILES = (
     "INDEX.md",
@@ -71,8 +71,7 @@ def ensure_memory(repo: str | Path) -> Path:
         for name in MEMORY_FILES:
             f = d / name
             if not f.exists():
-                f.write_text(f"# {name[:-3]}\n\n(Auto-created. Templates not found.)\n",
-                             encoding="utf-8")
+                f.write_text(f"# {name[:-3]}\n\n(Auto-created. Templates not found.)\n", encoding="utf-8")
         return d
     for name in MEMORY_FILES:
         target = d / name
@@ -100,9 +99,7 @@ def _today() -> str:
     return dt.date.today().isoformat()
 
 
-def _insert_after_section(
-    text: str, section_header: str, new_block: str
-) -> str:
+def _insert_after_section(text: str, section_header: str, new_block: str) -> str:
     """Insert `new_block` immediately after the line matching `section_header`.
 
     `section_header` is matched as a markdown header line (e.g., "## Shipped").
@@ -118,7 +115,7 @@ def _insert_after_section(
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
-            return "".join(lines[: j]) + "\n" + new_block.rstrip() + "\n\n" + "".join(lines[j:])
+            return "".join(lines[:j]) + "\n" + new_block.rstrip() + "\n\n" + "".join(lines[j:])
     return text.rstrip("\n") + f"\n\n{section_header}\n\n{new_block.rstrip()}\n"
 
 
@@ -161,7 +158,7 @@ def log_bug(
     repo: str | Path,
     *,
     title: str,
-    severity: str,           # critical | major | minor
+    severity: str,  # critical | major | minor
     symptom: str,
     root_cause: str | None = None,
     fix: str | None = None,
@@ -197,7 +194,7 @@ def log_decision(
     repo: str | Path,
     *,
     title: str,
-    status: str = "Accepted",     # Accepted | Proposed | Deprecated | Superseded
+    status: str = "Accepted",  # Accepted | Proposed | Deprecated | Superseded
     context: str = "",
     decision: str = "",
     alternatives: list[str] | None = None,
@@ -209,13 +206,9 @@ def log_decision(
     path = memory_dir(repo) / "decisions.md"
     text = path.read_text(encoding="utf-8")
     n = len(re.findall(r"^## ADR-(\d+)", text, flags=re.MULTILINE))
-    next_id = n  # 0-indexed; first ADR is ADR-000 in template
-    if "ADR-000" not in text:
-        next_id = n  # template placeholder counted, keep
-    else:
-        # If the template's example ADR is still present and untouched,
-        # don't count it; start real ADRs at 001.
-        next_id = max(n, 1)
+    # If the template's example ADR-000 is still present and untouched,
+    # don't count it; start real ADRs at 001.
+    next_id = max(n, 1) if "ADR-000" in text else n
     block = [
         f"## ADR-{next_id:03d} — {title}",
         "",
@@ -246,9 +239,9 @@ def log_decision(
 def append_routing(
     repo: str | Path,
     *,
-    signature: str,         # e.g. "target=tests/**, complexity=medium"
+    signature: str,  # e.g. "target=tests/**, complexity=medium"
     executor: str,
-    outcome: str,           # "passed" | "failed" | "retried"
+    outcome: str,  # "passed" | "failed" | "retried"
     run_id: str | None = None,
     date: str | None = None,
 ) -> None:
@@ -261,11 +254,9 @@ def append_routing(
         line += f", run={run_id}"
     line += ")"
     if "## Learned overrides" in text:
-        path.write_text(_insert_after_section(text, "## Learned overrides", line),
-                        encoding="utf-8")
+        path.write_text(_insert_after_section(text, "## Learned overrides", line), encoding="utf-8")
     else:
-        path.write_text(text.rstrip() + "\n\n## Learned overrides\n\n" + line + "\n",
-                        encoding="utf-8")
+        path.write_text(text.rstrip() + "\n\n## Learned overrides\n\n" + line + "\n", encoding="utf-8")
 
 
 def append_learning(
@@ -273,7 +264,7 @@ def append_learning(
     *,
     signal: str,
     observation: str,
-    source: str = "run",      # "run" | "bug" | "review"
+    source: str = "run",  # "run" | "bug" | "review"
     model: str | None = None,
     date: str | None = None,
 ) -> None:
@@ -287,8 +278,6 @@ def append_learning(
     parts.append(f"**{signal}** — {observation}")
     line = " ".join(parts)
     if "## Learned this project" in text:
-        path.write_text(_insert_after_section(text, "## Learned this project", line),
-                        encoding="utf-8")
+        path.write_text(_insert_after_section(text, "## Learned this project", line), encoding="utf-8")
     else:
-        path.write_text(text.rstrip() + "\n\n## Learned this project\n\n" + line + "\n",
-                        encoding="utf-8")
+        path.write_text(text.rstrip() + "\n\n## Learned this project\n\n" + line + "\n", encoding="utf-8")

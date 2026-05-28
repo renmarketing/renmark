@@ -1,6 +1,8 @@
 """Apply agent output to the repo: write file (mode A) or patch (mode B), with validation."""
+
 from __future__ import annotations
 
+import contextlib
 import re
 import shutil
 import subprocess
@@ -20,11 +22,9 @@ _SYNTAX_CHECKERS: dict[str, list[str]] = {
     ".mjs": ["node", "--check", "{path}"],
     ".cjs": ["node", "--check", "{path}"],
     ".ts": ["npx", "--no-install", "tsc", "--noEmit", "--allowJs", "{path}"],
-    ".tsx": ["npx", "--no-install", "tsc", "--noEmit", "--jsx", "preserve",
-             "--allowJs", "{path}"],
+    ".tsx": ["npx", "--no-install", "tsc", "--noEmit", "--jsx", "preserve", "--allowJs", "{path}"],
     ".sh": ["bash", "-n", "{path}"],
-    ".json": ["python", "-c",
-              "import json,sys; json.load(open(sys.argv[1]))", "{path}"],
+    ".json": ["python", "-c", "import json,sys; json.load(open(sys.argv[1]))", "{path}"],
 }
 
 _FENCE_RE = re.compile(r"^```[a-zA-Z0-9_+\-]*\s*\n", re.MULTILINE)
@@ -61,9 +61,7 @@ def syntax_check(path: Path) -> tuple[bool, str]:
         return True, f"no syntax checker for {ext}; skipping"
     cmd = [arg.replace("{path}", str(path)) for arg in tmpl]
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=30
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         return True, f"syntax-checker unavailable ({e}); skipping"
     if proc.returncode == 0:
@@ -71,9 +69,7 @@ def syntax_check(path: Path) -> tuple[bool, str]:
     return False, (proc.stderr or proc.stdout or "syntax check failed").strip()
 
 
-def apply_mode_a(
-    repo_root: str | Path, target: str, body: str
-) -> ApplyResult:
+def apply_mode_a(repo_root: str | Path, target: str, body: str) -> ApplyResult:
     """Write a new file. Strip fences, run syntax check, then write atomically."""
     cleaned = strip_markdown_fences(body)
     if not cleaned:
@@ -81,15 +77,12 @@ def apply_mode_a(
 
     target_path = (Path(repo_root) / target).resolve()
     repo_root_resolved = Path(repo_root).resolve()
-    if not str(target_path).startswith(str(repo_root_resolved) + "/") \
-            and target_path != repo_root_resolved:
+    if not str(target_path).startswith(str(repo_root_resolved) + "/") and target_path != repo_root_resolved:
         raise ApplyError(f"target escapes repo root: {target}")
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Syntax-check in a temp file first; don't pollute the target on failure.
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=target_path.suffix, delete=False, encoding="utf-8"
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=target_path.suffix, delete=False, encoding="utf-8") as tmp:
         tmp.write(cleaned)
         tmp_path = Path(tmp.name)
     try:
@@ -97,25 +90,18 @@ def apply_mode_a(
         if not ok:
             raise ApplyError(f"mode A: syntax check failed: {msg}")
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             tmp_path.unlink()
-        except FileNotFoundError:
-            pass
 
     target_path.write_text(cleaned, encoding="utf-8")
     return ApplyResult(written_path=str(target_path), bytes_written=len(cleaned))
 
 
-def apply_mode_b(
-    repo_root: str | Path, target: str, diff_text: str
-) -> ApplyResult:
+def apply_mode_b(repo_root: str | Path, target: str, diff_text: str) -> ApplyResult:
     """Apply a unified diff via `patch -p0`. Dry-run first; abort on failure."""
     cleaned = strip_markdown_fences(diff_text).rstrip() + "\n"
     if not cleaned.lstrip().startswith("--- ") or "@@" not in cleaned:
-        raise ApplyError(
-            "mode B: response is not a unified diff "
-            "(must start with '--- ' and contain '@@')"
-        )
+        raise ApplyError("mode B: response is not a unified diff (must start with '--- ' and contain '@@')")
 
     target_path = (Path(repo_root) / target).resolve()
     if not target_path.is_file():
@@ -126,9 +112,7 @@ def apply_mode_b(
     if not touched:
         raise ApplyError("mode B: diff did not list any files")
     if set(touched) - {target, "./" + target}:
-        raise ApplyError(
-            f"mode B: diff must modify exactly one file ({target}); got {touched}"
-        )
+        raise ApplyError(f"mode B: diff must modify exactly one file ({target}); got {touched}")
 
     if not shutil.which("patch"):
         raise ApplyError("`patch` command not found in PATH")
@@ -136,23 +120,23 @@ def apply_mode_b(
     # Dry run.
     dry = subprocess.run(
         ["patch", "-p0", "--dry-run", "--forward", "--silent"],
-        input=cleaned, capture_output=True, text=True, cwd=repo_root,
+        input=cleaned,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
     )
     if dry.returncode != 0:
-        raise ApplyError(
-            "mode B: patch --dry-run rejected:\n"
-            f"{(dry.stderr or dry.stdout)[-800:]}"
-        )
+        raise ApplyError(f"mode B: patch --dry-run rejected:\n{(dry.stderr or dry.stdout)[-800:]}")
     # Apply for real.
     real = subprocess.run(
         ["patch", "-p0", "--forward", "--silent"],
-        input=cleaned, capture_output=True, text=True, cwd=repo_root,
+        input=cleaned,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
     )
     if real.returncode != 0:
-        raise ApplyError(
-            "mode B: patch failed after dry-run passed (race?):\n"
-            f"{(real.stderr or real.stdout)[-800:]}"
-        )
+        raise ApplyError(f"mode B: patch failed after dry-run passed (race?):\n{(real.stderr or real.stdout)[-800:]}")
     return ApplyResult(written_path=str(target_path), bytes_written=len(cleaned))
 
 

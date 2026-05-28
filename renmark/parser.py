@@ -12,6 +12,7 @@ Parses markdown plan files of the form:
     - **spec:**
       free prose
 """
+
 from __future__ import annotations
 
 import re
@@ -25,20 +26,22 @@ class PlanError(ValueError):
 
 @dataclass
 class Task:
-    index: int                       # 1-based as written in the plan
+    index: int  # 1-based as written in the plan
     title: str
-    mode: str                        # "A" or "B"
+    mode: str  # "A" or "B"
     target: str
     context_files: list[str] = field(default_factory=list)
     model: str | None = None
     verifier: str = ""
     verifier_timeout_s: int = 60
     spec: str = ""
-    executor: str = "codex"          # "haiku" | "codex" | "sonnet" | "opus" | <litellm-string>
+    executor: str = "codex"  # "haiku" | "codex" | "sonnet" | "opus" | <litellm-string>
     # Phase 1 fields (v0.0.3+):
-    complexity: str = "medium"       # "simple" | "medium" | "hard"
-    parallel_group: int | None = None  # tasks sharing a group run concurrently; default None = serial (each in its own group = index)
-    est_tokens: int | None = None    # planner estimate (informational)
+    complexity: str = "medium"  # "simple" | "medium" | "hard"
+    parallel_group: int | None = (
+        None  # tasks sharing a group run concurrently; default None = serial (each in its own group = index)
+    )
+    est_tokens: int | None = None  # planner estimate (informational)
     est_cost_usd: float | None = None  # planner estimate (informational)
 
 
@@ -72,9 +75,7 @@ def parse_plan(path: str | Path) -> list[Task]:
         try:
             tasks.append(_build_task(current))
         except PlanError as e:
-            raise PlanError(
-                f"task {current.get('index', '?')} (ending at line {end_line}): {e}"
-            ) from None
+            raise PlanError(f"task {current.get('index', '?')} (ending at line {end_line}): {e}") from None
         current = None
         spec_lines = None
         reading_spec = False
@@ -101,9 +102,7 @@ def parse_plan(path: str | Path) -> list[Task]:
 
         if reading_spec:
             stripped = raw.strip()
-            if stripped.startswith("### Task ") or (
-                raw.startswith("## ") and not raw.startswith("### ")
-            ):
+            if stripped.startswith("### Task ") or (raw.startswith("## ") and not raw.startswith("### ")):
                 _close_current(line_no - 1)
                 continue
             if spec_lines is None:
@@ -130,30 +129,22 @@ def parse_plan(path: str | Path) -> list[Task]:
             try:
                 current["verifier_timeout_s"] = int(value)
             except ValueError as e:
-                raise PlanError(
-                    f"line {line_no}: verifier_timeout_s must be int, got {value!r}"
-                ) from e
+                raise PlanError(f"line {line_no}: verifier_timeout_s must be int, got {value!r}") from e
         elif key == "parallel_group":
             try:
                 current["parallel_group"] = int(value)
             except ValueError as e:
-                raise PlanError(
-                    f"line {line_no}: parallel_group must be int, got {value!r}"
-                ) from e
+                raise PlanError(f"line {line_no}: parallel_group must be int, got {value!r}") from e
         elif key == "est_tokens":
             try:
                 current["est_tokens"] = int(value)
             except ValueError as e:
-                raise PlanError(
-                    f"line {line_no}: est_tokens must be int, got {value!r}"
-                ) from e
+                raise PlanError(f"line {line_no}: est_tokens must be int, got {value!r}") from e
         elif key == "est_cost_usd":
             try:
                 current["est_cost_usd"] = float(value)
             except ValueError as e:
-                raise PlanError(
-                    f"line {line_no}: est_cost_usd must be float, got {value!r}"
-                ) from e
+                raise PlanError(f"line {line_no}: est_cost_usd must be float, got {value!r}") from e
         elif key in ("mode", "target", "model", "verifier", "executor", "complexity"):
             current[key] = value
         else:
@@ -221,9 +212,7 @@ def _build_task(d: dict) -> Task:
 
     complexity = (d.get("complexity") or "medium").strip().lower()
     if complexity not in ("simple", "medium", "hard"):
-        raise PlanError(
-            f"complexity must be simple, medium, or hard, got {complexity!r}"
-        )
+        raise PlanError(f"complexity must be simple, medium, or hard, got {complexity!r}")
 
     return Task(
         index=d["index"],
@@ -252,6 +241,4 @@ def _validate_indices(tasks: list[Task]) -> None:
     expected = list(range(1, len(tasks) + 1))
     actual = sorted(t.index for t in tasks)
     if actual != expected:
-        raise PlanError(
-            f"task indices must be contiguous starting at 1; got {actual}"
-        )
+        raise PlanError(f"task indices must be contiguous starting at 1; got {actual}")

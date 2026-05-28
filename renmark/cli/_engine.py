@@ -1,4 +1,5 @@
 """renmark-execute CLI: orchestrates plan execution via Codex and Claude agents."""
+
 from __future__ import annotations
 
 import argparse
@@ -12,14 +13,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from ..apply import ApplyError, apply_mode_a, apply_mode_b
+from ..parser import PlanError, Task, parse_plan
+from ..prompts import mode_a_prompt, mode_b_prompt
 from ..providers.codex import (
     CodexError,
     check_only_target_modified,
     codex_available,
     run_codex_task,
 )
-from ..parser import PlanError, Task, parse_plan
-from ..prompts import format_reminder_prompt, mode_a_prompt, mode_b_prompt, retry_prompt
 from ..state import (
     PauseState,
     UsageRecord,
@@ -30,7 +31,6 @@ from ..state import (
     new_run_id,
     now_iso,
     read_pause,
-    read_usage,
     state_dir,
     usage_this_month,
     usage_today,
@@ -53,7 +53,7 @@ class Config:
     max_output_tokens: int
 
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls) -> Config:
         return cls(
             prefer_small_model=os.environ.get("RENMARK_PREFER_SMALL_MODEL", ""),
             big_model=os.environ.get("RENMARK_BIG_MODEL", ""),
@@ -61,9 +61,7 @@ class Config:
             max_minutes_per_run=int(os.environ.get("RENMARK_MAX_MINUTES_PER_RUN", "30")),
             max_tasks_per_run=int(os.environ.get("RENMARK_MAX_TASKS_PER_RUN", "15")),
             max_task_retries=int(os.environ.get("RENMARK_MAX_TASK_RETRIES", "2")),
-            default_verifier_timeout_s=int(
-                os.environ.get("RENMARK_DEFAULT_VERIFIER_TIMEOUT_S", "60")
-            ),
+            default_verifier_timeout_s=int(os.environ.get("RENMARK_DEFAULT_VERIFIER_TIMEOUT_S", "60")),
             temperature=float(os.environ.get("RENMARK_TEMPERATURE", "0.2")),
             max_output_tokens=int(os.environ.get("RENMARK_MAX_OUTPUT_TOKENS", "4096")),
         )
@@ -74,9 +72,7 @@ def _print(msg: str = "") -> None:
 
 
 def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True
-    )
+    return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
 
 
 def _is_git_repo(cwd: Path) -> bool:
@@ -90,9 +86,7 @@ def _ensure_git_repo(cwd: Path) -> None:
     Doing this silently is safer than asking the user to set up git manually.
     """
     _print(f"note: initializing git repo at {cwd} (commits required per task)")
-    subprocess.run(
-        ["git", "init", "-q", "-b", "main"], cwd=str(cwd), check=True
-    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(cwd), check=True)
     name = _git("config", "user.name", cwd=cwd)
     if name.returncode != 0 or not name.stdout.strip():
         _git("config", "user.name", "renmark", cwd=cwd)
@@ -101,7 +95,8 @@ def _ensure_git_repo(cwd: Path) -> None:
         _git("config", "user.email", "renmark@local", cwd=cwd)
     subprocess.run(
         ["git", "commit", "-q", "--allow-empty", "-m", "init (renmark)"],
-        cwd=str(cwd), check=True,
+        cwd=str(cwd),
+        check=True,
     )
 
 
@@ -110,6 +105,7 @@ def _ensure_git_repo(cwd: Path) -> None:
 # parallelize, but the git index is not — index lock contention would
 # manifest as "Another git process seems to be running" errors.
 import threading as _threading
+
 _GIT_LOCK = _threading.Lock()
 
 
@@ -134,7 +130,10 @@ def _git_commit(cwd: Path, target: str, message: str, trailer: str) -> str:
         full = message + "\n\n" + trailer + "\n"
         commit = subprocess.run(
             ["git", "commit", "-q", "-F", "-"],
-            cwd=str(cwd), input=full, capture_output=True, text=True,
+            cwd=str(cwd),
+            input=full,
+            capture_output=True,
+            text=True,
         )
         if commit.returncode != 0:
             return ""
@@ -159,6 +158,7 @@ def _default_tokens_for_complexity(complexity: str) -> int:
 def _task_signature(task) -> str:
     """Compact signature used in routing memory entries."""
     import fnmatch  # noqa: F401
+
     # Reduce target to a coarse glob: filename for short paths, directory prefix otherwise.
     parts = task.target.split("/")
     if len(parts) >= 2 and parts[0] in ("tests", "test"):
@@ -174,14 +174,20 @@ def _memory_log_outcome(repo: Path, task, outcome: str, run_id: str, note: str =
     """Append a routing.md entry after each task completes. Best-effort."""
     try:
         from .. import memory as _mem
+
         _mem.append_routing(
-            repo, signature=_task_signature(task),
-            executor=task.executor, outcome=outcome, run_id=run_id,
+            repo,
+            signature=_task_signature(task),
+            executor=task.executor,
+            outcome=outcome,
+            run_id=run_id,
         )
         if outcome == "failed" and note:
             _mem.append_learning(
-                repo, signal=f"task {task.index} failed on {task.executor}",
-                observation=note[:200], source="run",
+                repo,
+                signal=f"task {task.index} failed on {task.executor}",
+                observation=note[:200],
+                source="run",
             )
     except Exception:
         pass  # memory updates are non-critical
@@ -211,17 +217,23 @@ def _apply(task: Task, repo: Path, response: str) -> None:
 
 
 def _format_status_line(
-    n: int, total: int, title: str, status: str, elapsed_s: float,
-    tokens: int, sha_or_note: str,
+    n: int,
+    total: int,
+    title: str,
+    status: str,
+    elapsed_s: float,
+    tokens: int,
+    sha_or_note: str,
 ) -> str:
-    return (
-        f"[{n}/{total}] {title[:46]:<46} {status:<6} "
-        f"{elapsed_s:>5.1f}s  {tokens:>5} tok  {sha_or_note}"
-    )
+    return f"[{n}/{total}] {title[:46]:<46} {status:<6} {elapsed_s:>5.1f}s  {tokens:>5} tok  {sha_or_note}"
 
 
 def execute_plan(
-    plan_path: str, *, repo: Path, resume: bool = False, dry_run: bool = False,
+    plan_path: str,
+    *,
+    repo: Path,
+    resume: bool = False,
+    dry_run: bool = False,
     no_commit: bool = False,
 ) -> int:
     global _NO_COMMIT_MODE
@@ -241,9 +253,8 @@ def execute_plan(
         )
         return 2
 
-    if not dry_run:
-        if not _is_git_repo(repo):
-            _ensure_git_repo(repo)
+    if not dry_run and not _is_git_repo(repo):
+        _ensure_git_repo(repo)
 
     # Determine which tasks are already done (resume support).
     done: set[int] = set()
@@ -252,8 +263,7 @@ def execute_plan(
         if pause is None:
             _print("note: no PAUSED state found; running from start")
         else:
-            _print(f"resuming run {pause.run_id}; last attempted task: "
-                   f"{pause.last_task_index}")
+            _print(f"resuming run {pause.run_id}; last attempted task: {pause.last_task_index}")
         done = completed_task_indices(repo)
         if done:
             _print(f"skipping already-committed tasks: {sorted(done)}")
@@ -268,6 +278,7 @@ def execute_plan(
 
     if dry_run:
         from .. import dispatch as _d
+
         waves = _d.group_tasks_by_wave(tasks)
         _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
         # Cost estimates per executor — approximate $/kT (output tokens).
@@ -285,7 +296,7 @@ def execute_plan(
                 if cost is None:
                     # Infer from executor.
                     rate = cost_per_kt.get(ex, 0.0)
-                    if "/" in ex:           # provider/model — assume openai-compatible mid-tier
+                    if "/" in ex:  # provider/model — assume openai-compatible mid-tier
                         rate = cost_per_kt.get("sonnet", 0.003)
                     cost = (tok / 1000.0) * rate
                 cost_str = f"${cost:.3f}" if cost > 0 else "free"
@@ -296,7 +307,7 @@ def execute_plan(
                 total_tokens += tok
                 total_cost += cost
         _print(f"\n  TOTAL estimate: ~{total_tokens:,} tokens · ~${total_cost:.3f}")
-        _print(f"  (codex metered separately; haiku/sonnet/opus bill to your Claude Code quota, ~10k overhead/task)")
+        _print("  (codex metered separately; haiku/sonnet/opus bill to your Claude Code quota, ~10k overhead/task)")
         return 0
 
     # Start anchor tag.
@@ -313,6 +324,7 @@ def execute_plan(
     # Group tasks into waves for parallel execution. Tasks sharing a
     # `parallel_group` run concurrently; defaults to one wave per task.
     from .. import dispatch as _dispatch
+
     try:
         waves = _dispatch.group_tasks_by_wave(tasks)
         for w in waves:
@@ -321,28 +333,42 @@ def execute_plan(
         _print(f"ERROR: plan has invalid wave: {e}")
         return 2
 
-    needs_agent: list[int] = []   # tasks executor=opus/sonnet, skill must dispatch
+    needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
 
     def _runner(task: Task, _repo: Path):
         """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
         ok, reason, used, sha = _execute_task(
-            task=task, repo=_repo, run_id=run_id, cfg=cfg,
+            task=task,
+            repo=_repo,
+            run_id=run_id,
+            cfg=cfg,
             remaining_token_budget=max(0, cfg.max_tokens_per_run - tokens_used),
             total=len(tasks),
         )
         return _dispatch.TaskResult(
-            task_index=task.index, executor=task.executor,
+            task_index=task.index,
+            executor=task.executor,
             status="passed" if ok else "failed",
-            sha=sha, tokens_out=used, note=reason,
+            sha=sha,
+            tokens_out=used,
+            note=reason,
         )
 
     for wave in waves:
         # Already-committed tasks (from --resume) just emit DONE lines.
         for t in wave:
             if t.index in done:
-                _print(_format_status_line(
-                    t.index, len(tasks), t.title, "DONE", 0.0, 0, "(prev run)",
-                ))
+                _print(
+                    _format_status_line(
+                        t.index,
+                        len(tasks),
+                        t.title,
+                        "DONE",
+                        0.0,
+                        0,
+                        "(prev run)",
+                    )
+                )
                 if t.index not in passed:
                     passed.append(t.index)
 
@@ -366,18 +392,27 @@ def execute_plan(
         # marked `needs_agent` for the skill to handle via Agent tool.
         try:
             wave_result = _dispatch.dispatch_wave(
-                runnable, repo=repo, run_task=_runner,
+                runnable,
+                repo=repo,
+                run_task=_runner,
             )
         except Exception as exc:  # pragma: no cover — defense in depth
             import traceback as _tb
+
             tb = _tb.format_exc()
             _print(f"ERROR dispatching wave: {type(exc).__name__}: {str(exc)[:100]}")
             for t in runnable:
                 _record_escalation(
-                    repo, t, run_id, _choose_model(t, cfg),
-                    base_prompt="(wave dispatch failed)", response="",
-                    verifier_log=tb, retry_count=0,
-                    prompt_tokens=0, completion_tokens=0,
+                    repo,
+                    t,
+                    run_id,
+                    _choose_model(t, cfg),
+                    base_prompt="(wave dispatch failed)",
+                    response="",
+                    verifier_log=tb,
+                    retry_count=0,
+                    prompt_tokens=0,
+                    completion_tokens=0,
                 )
             failed_task = runnable[0]
             failure_kind = "wave_dispatch_failed"
@@ -392,11 +427,17 @@ def execute_plan(
                 _memory_log_outcome(repo, task_obj, "passed", run_id)
             elif r.status == "needs_agent":
                 needs_agent.append(r.task_index)
-                _print(_format_status_line(
-                    r.task_index, len(tasks), task_obj.title,
-                    "NEEDS-AGENT", 0.0, 0,
-                    f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
-                ))
+                _print(
+                    _format_status_line(
+                        r.task_index,
+                        len(tasks),
+                        task_obj.title,
+                        "NEEDS-AGENT",
+                        0.0,
+                        0,
+                        f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
+                    )
+                )
             else:  # failed
                 failed_task = task_obj
                 failure_kind = r.note or "task_failed"
@@ -439,11 +480,16 @@ def execute_plan(
         return 0
 
     # Failure path: write pause state and exit non-zero.
-    write_pause(repo, PauseState(
-        run_id=run_id, plan_path=str(plan_path),
-        last_task_index=failed_task.index,
-        reason=failure_kind or "unknown", ts=now_iso(),
-    ))
+    write_pause(
+        repo,
+        PauseState(
+            run_id=run_id,
+            plan_path=str(plan_path),
+            last_task_index=failed_task.index,
+            reason=failure_kind or "unknown",
+            ts=now_iso(),
+        ),
+    )
     _print(
         f"PAUSED at task {failed_task.index} ({failure_kind}). "
         f"Artifacts: .renmark/state/escalations/task-{failed_task.index}/\n"
@@ -453,132 +499,26 @@ def execute_plan(
 
 
 def _execute_task(
-    *, task: Task, repo: Path, run_id: str, cfg: Config,
-    remaining_token_budget: int, total: int,
+    *,
+    task: Task,
+    repo: Path,
+    run_id: str,
+    cfg: Config,
+    remaining_token_budget: int,
+    total: int,
 ) -> tuple[bool, str, int, str]:
     """Execute one task. Returns (ok, failure_reason_or_blank, tokens_used, sha_or_blank)."""
     # nim executor removed in v0.2.0; only codex reaches this function now.
     return _execute_task_codex(task=task, repo=repo, run_id=run_id, cfg=cfg, total=total)
-    model = _choose_model(task, cfg)  # noqa: F401 — dead code, preserved for reference
-    start = time.monotonic()
-    try:
-        base_prompt = _build_prompt(task, repo)
-    except ApplyError as e:
-        _record_escalation(repo, task, run_id, model, base_prompt="(prompt build failed)",
-                           response="", verifier_log=str(e), retry_count=0,
-                           prompt_tokens=0, completion_tokens=0)
-        _print(_format_status_line(
-            task.index, total, task.title, "FAIL", 0.0, 0,
-            f"prompt build: {e}",
-        ))
-        return False, "prompt_build", 0, ""
-
-    prompt = base_prompt
-    tokens_total = 0
-    last_response = ""
-    last_verifier_tail = ""
-    retries_left = cfg.max_task_retries
-
-    while True:
-        try:
-            resp = client.complete(
-                model=model, prompt=prompt,
-                temperature=cfg.temperature,
-                max_tokens=min(cfg.max_output_tokens, remaining_token_budget),
-            )
-        except NIMQuotaError as e:
-            _print(_format_status_line(
-                task.index, total, task.title, "PAUSE", time.monotonic() - start,
-                tokens_total, f"quota: {e}",
-            ))
-            return False, "quota_exhausted", tokens_total, ""
-        except NIMRateLimitError as e:
-            _print(_format_status_line(
-                task.index, total, task.title, "PAUSE", time.monotonic() - start,
-                tokens_total, f"rate-limit: {e}",
-            ))
-            return False, "rate_limited", tokens_total, ""
-        except NIMError as e:
-            _print(_format_status_line(
-                task.index, total, task.title, "FAIL", time.monotonic() - start,
-                tokens_total, f"nim error: {e}",
-            ))
-            _record_escalation(repo, task, run_id, model, base_prompt=prompt,
-                               response="", verifier_log=str(e),
-                               retry_count=cfg.max_task_retries - retries_left,
-                               prompt_tokens=0, completion_tokens=0)
-            return False, "nim_error", tokens_total, ""
-
-        last_response = resp.text
-        tokens_total += resp.prompt_tokens + resp.completion_tokens
-        append_usage(repo, UsageRecord(
-            ts=now_iso(), run_id=run_id, task_id=task.index, model=resp.model,
-            prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens,
-        ))
-
-        # Attempt to apply.
-        apply_err: str | None = None
-        try:
-            _apply(task, repo, resp.text)
-        except ApplyError as e:
-            apply_err = str(e)
-
-        if apply_err:
-            if retries_left > 0:
-                retries_left -= 1
-                prompt = format_reminder_prompt(base_prompt, apply_err)
-                continue
-            _print(_format_status_line(
-                task.index, total, task.title, "FAIL", time.monotonic() - start,
-                tokens_total, f"apply: {apply_err[:40]}",
-            ))
-            _record_escalation(
-                repo, task, run_id, model, base_prompt=prompt, response=resp.text,
-                verifier_log=apply_err, retry_count=cfg.max_task_retries - retries_left,
-                prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens,
-            )
-            return False, "apply_failed", tokens_total, ""
-
-        # Run verifier.
-        vres = run_verifier(
-            task.verifier, cwd=repo, timeout_s=task.verifier_timeout_s,
-        )
-        if vres.ok:
-            sha = _git_commit(
-                repo, task.target,
-                message=f"[renmark] task {task.index}: {task.title}",
-                trailer=f"Co-Authored-By: NIM-{model.split('/')[-1]} <noreply@nvidia.com>",
-            )
-            _print(_format_status_line(
-                task.index, total, task.title, "PASS", time.monotonic() - start,
-                tokens_total, f"→ {sha or '(no-commit)'}",
-            ))
-            return True, "", tokens_total, sha
-
-        # Verifier failed.
-        last_verifier_tail = vres.tail
-        # Roll back target so retries start from a clean state.
-        _git_restore_target(repo, task.target)
-        if retries_left > 0:
-            retries_left -= 1
-            prompt = retry_prompt(base_prompt, vres.tail)
-            continue
-
-        _print(_format_status_line(
-            task.index, total, task.title, "FAIL", time.monotonic() - start,
-            tokens_total, f"verifier exit {vres.exit_code} after retries",
-        ))
-        _record_escalation(
-            repo, task, run_id, model, base_prompt=prompt, response=last_response,
-            verifier_log=last_verifier_tail,
-            retry_count=cfg.max_task_retries - retries_left,
-            prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens,
-        )
-        return False, "verifier_failed", tokens_total, ""
 
 
 def _execute_task_codex(
-    *, task: Task, repo: Path, run_id: str, cfg: Config, total: int,
+    *,
+    task: Task,
+    repo: Path,
+    run_id: str,
+    cfg: Config,
+    total: int,
 ) -> tuple[bool, str, int, str]:
     """Run a task via the Codex CLI instead of NIM.
 
@@ -592,15 +532,28 @@ def _execute_task_codex(
     """
     start = time.monotonic()
     if not codex_available():
-        _print(_format_status_line(
-            task.index, total, task.title, "FAIL", 0.0, 0,
-            "codex CLI not on PATH",
-        ))
+        _print(
+            _format_status_line(
+                task.index,
+                total,
+                task.title,
+                "FAIL",
+                0.0,
+                0,
+                "codex CLI not on PATH",
+            )
+        )
         _record_escalation(
-            repo, task, run_id, "codex",
-            base_prompt="(codex not available)", response="",
+            repo,
+            task,
+            run_id,
+            "codex",
+            base_prompt="(codex not available)",
+            response="",
             verifier_log="codex CLI is not installed (npm i -g @openai/codex)",
-            retry_count=0, prompt_tokens=0, completion_tokens=0,
+            retry_count=0,
+            prompt_tokens=0,
+            completion_tokens=0,
         )
         return False, "codex_unavailable", 0, ""
 
@@ -611,22 +564,43 @@ def _execute_task_codex(
         try:
             result = run_codex_task(task, repo, timeout_s=cfg.default_verifier_timeout_s * 10)
         except CodexError as e:
-            _print(_format_status_line(
-                task.index, total, task.title, "FAIL", time.monotonic() - start, 0,
-                f"codex: {e}",
-            ))
-            _record_escalation(repo, task, run_id, "codex",
-                               base_prompt="(codex error)", response="",
-                               verifier_log=str(e),
-                               retry_count=cfg.max_task_retries - retries_left,
-                               prompt_tokens=0, completion_tokens=0)
+            _print(
+                _format_status_line(
+                    task.index,
+                    total,
+                    task.title,
+                    "FAIL",
+                    time.monotonic() - start,
+                    0,
+                    f"codex: {e}",
+                )
+            )
+            _record_escalation(
+                repo,
+                task,
+                run_id,
+                "codex",
+                base_prompt="(codex error)",
+                response="",
+                verifier_log=str(e),
+                retry_count=cfg.max_task_retries - retries_left,
+                prompt_tokens=0,
+                completion_tokens=0,
+            )
             return False, "codex_error", 0, ""
 
         # Log a usage row so --usage shows the call.
-        append_usage(repo, UsageRecord(
-            ts=now_iso(), run_id=run_id, task_id=task.index, model="codex",
-            prompt_tokens=0, completion_tokens=0,
-        ))
+        append_usage(
+            repo,
+            UsageRecord(
+                ts=now_iso(),
+                run_id=run_id,
+                task_id=task.index,
+                model="codex",
+                prompt_tokens=0,
+                completion_tokens=0,
+            ),
+        )
 
         last_output_tail = result.output_tail
 
@@ -634,80 +608,146 @@ def _execute_task_codex(
             if retries_left > 0:
                 retries_left -= 1
                 continue
-            _print(_format_status_line(
-                task.index, total, task.title, "FAIL", time.monotonic() - start, 0,
-                f"codex exit {result.exit_code} after retries",
-            ))
-            _record_escalation(repo, task, run_id, "codex",
-                               base_prompt="(see codex_output.log)", response="",
-                               verifier_log=result.output_tail,
-                               retry_count=cfg.max_task_retries - retries_left,
-                               prompt_tokens=0, completion_tokens=0)
+            _print(
+                _format_status_line(
+                    task.index,
+                    total,
+                    task.title,
+                    "FAIL",
+                    time.monotonic() - start,
+                    0,
+                    f"codex exit {result.exit_code} after retries",
+                )
+            )
+            _record_escalation(
+                repo,
+                task,
+                run_id,
+                "codex",
+                base_prompt="(see codex_output.log)",
+                response="",
+                verifier_log=result.output_tail,
+                retry_count=cfg.max_task_retries - retries_left,
+                prompt_tokens=0,
+                completion_tokens=0,
+            )
             return False, "codex_failed", 0, ""
 
         # Constrain codex: must have modified only the target file.
         ok, reason = check_only_target_modified(result.changed_files, task.target)
         if not ok:
             # Roll back everything codex did and either retry or escalate.
-            subprocess.run(["git", "-C", str(repo), "checkout", "--", "."],
-                           capture_output=True)
-            subprocess.run(["git", "-C", str(repo), "clean", "-fd",
-                            "--", *(p for p in result.changed_files if p != task.target)],
-                           capture_output=True)
+            subprocess.run(["git", "-C", str(repo), "checkout", "--", "."], capture_output=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "clean",
+                    "-fd",
+                    "--",
+                    *(p for p in result.changed_files if p != task.target),
+                ],
+                capture_output=True,
+            )
             if retries_left > 0:
                 retries_left -= 1
                 continue
-            _print(_format_status_line(
-                task.index, total, task.title, "FAIL", time.monotonic() - start, 0,
-                f"codex out of lane: {reason[:40]}",
-            ))
-            _record_escalation(repo, task, run_id, "codex",
-                               base_prompt="(see codex_output.log)", response="",
-                               verifier_log=f"{reason}\n\n{result.output_tail}",
-                               retry_count=cfg.max_task_retries - retries_left,
-                               prompt_tokens=0, completion_tokens=0)
+            _print(
+                _format_status_line(
+                    task.index,
+                    total,
+                    task.title,
+                    "FAIL",
+                    time.monotonic() - start,
+                    0,
+                    f"codex out of lane: {reason[:40]}",
+                )
+            )
+            _record_escalation(
+                repo,
+                task,
+                run_id,
+                "codex",
+                base_prompt="(see codex_output.log)",
+                response="",
+                verifier_log=f"{reason}\n\n{result.output_tail}",
+                retry_count=cfg.max_task_retries - retries_left,
+                prompt_tokens=0,
+                completion_tokens=0,
+            )
             return False, "codex_out_of_lane", 0, ""
 
         # Run verifier.
         vres = run_verifier(task.verifier, cwd=repo, timeout_s=task.verifier_timeout_s)
         if vres.ok:
             sha = _git_commit(
-                repo, task.target,
+                repo,
+                task.target,
                 message=f"[renmark] task {task.index}: {task.title}",
                 trailer="Co-Authored-By: Codex-CLI <noreply@openai.com>",
             )
-            _print(_format_status_line(
-                task.index, total, task.title, "PASS",
-                time.monotonic() - start, 0, f"→ {sha or '(no-commit)'} (codex)",
-            ))
+            _print(
+                _format_status_line(
+                    task.index,
+                    total,
+                    task.title,
+                    "PASS",
+                    time.monotonic() - start,
+                    0,
+                    f"→ {sha or '(no-commit)'} (codex)",
+                )
+            )
             return True, "", 0, sha
 
         # Verifier failed. Roll back target and retry.
         last_verifier_tail = vres.tail
-        subprocess.run(["git", "-C", str(repo), "checkout", "--", task.target],
-                       capture_output=True)
+        subprocess.run(["git", "-C", str(repo), "checkout", "--", task.target], capture_output=True)
         if retries_left > 0:
             retries_left -= 1
             continue
 
-        _print(_format_status_line(
-            task.index, total, task.title, "FAIL", time.monotonic() - start, 0,
-            f"codex verifier exit {vres.exit_code} after retries",
-        ))
-        _record_escalation(repo, task, run_id, "codex",
-                           base_prompt="(see codex_output.log)", response="",
-                           verifier_log=f"verifier:\n{last_verifier_tail}\n\ncodex tail:\n{last_output_tail}",
-                           retry_count=cfg.max_task_retries - retries_left,
-                           prompt_tokens=0, completion_tokens=0)
+        _print(
+            _format_status_line(
+                task.index,
+                total,
+                task.title,
+                "FAIL",
+                time.monotonic() - start,
+                0,
+                f"codex verifier exit {vres.exit_code} after retries",
+            )
+        )
+        _record_escalation(
+            repo,
+            task,
+            run_id,
+            "codex",
+            base_prompt="(see codex_output.log)",
+            response="",
+            verifier_log=f"verifier:\n{last_verifier_tail}\n\ncodex tail:\n{last_output_tail}",
+            retry_count=cfg.max_task_retries - retries_left,
+            prompt_tokens=0,
+            completion_tokens=0,
+        )
         return False, "codex_verifier_failed", 0, ""
 
 
 def _record_escalation(
-    repo: Path, task: Task, run_id: str, model: str, *, base_prompt: str,
-    response: str, verifier_log: str, retry_count: int,
-    prompt_tokens: int, completion_tokens: int,
+    repo: Path,
+    task: Task,
+    run_id: str,
+    model: str,
+    *,
+    base_prompt: str,
+    response: str,
+    verifier_log: str,
+    retry_count: int,
+    prompt_tokens: int,
+    completion_tokens: int,
 ) -> None:
     import json
+
     d = escalation_dir(repo, task.index)
     (d / "prompt.txt").write_text(base_prompt, encoding="utf-8")
     (d / "response.txt").write_text(response, encoding="utf-8")
@@ -715,18 +755,21 @@ def _record_escalation(
     if task.mode == "B" and response.lstrip().startswith("--- "):
         (d / "diff.patch").write_text(response, encoding="utf-8")
     (d / "metadata.json").write_text(
-        json.dumps({
-            "task_index": task.index,
-            "title": task.title,
-            "mode": task.mode,
-            "target": task.target,
-            "model": model,
-            "run_id": run_id,
-            "retry_count": retry_count,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "ts": now_iso(),
-        }, indent=2),
+        json.dumps(
+            {
+                "task_index": task.index,
+                "title": task.title,
+                "mode": task.mode,
+                "target": task.target,
+                "model": model,
+                "run_id": run_id,
+                "retry_count": retry_count,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "ts": now_iso(),
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
@@ -738,20 +781,29 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--resume", action="store_true", help="resume a paused run")
     ap.add_argument("--dry-run", action="store_true", help="parse plan, list tasks, exit")
     ap.add_argument("--usage", action="store_true", help="show usage and exit")
-    ap.add_argument("--roadmap", action="store_true",
-                    help="print task | llm | status | tokens | $ | commit table; also writes .renmark/memory/roadmap.md")
-    ap.add_argument("--logs", action="store_true",
-                    help="list recent .renmark/logs/ files for troubleshooting")
-    ap.add_argument("--logs-n", type=int, default=10,
-                    help="how many logs to list (with --logs; default 10)")
-    ap.add_argument("--no-commit", action="store_true",
-                    help="apply tasks and run verifier but do not git-commit (skill batches commits per wave)")
+    ap.add_argument(
+        "--roadmap",
+        action="store_true",
+        help="print task | llm | status | tokens | $ | commit table; also writes .renmark/memory/roadmap.md",
+    )
+    ap.add_argument("--logs", action="store_true", help="list recent .renmark/logs/ files for troubleshooting")
+    ap.add_argument("--logs-n", type=int, default=10, help="how many logs to list (with --logs; default 10)")
+    ap.add_argument(
+        "--no-commit",
+        action="store_true",
+        help="apply tasks and run verifier but do not git-commit (skill batches commits per wave)",
+    )
     ap.add_argument("--repo", default=".", help="repo root (default: current dir)")
     # v0.3.0: ad-hoc Codex task mode (G5/G11)
-    ap.add_argument("--task", metavar="SPEC_PATH",
-                    help="ad-hoc mode: read a task-spec markdown file, dispatch to Codex, write artifact to --output. Emits SubagentOutput JSON to stdout.")
-    ap.add_argument("--output", metavar="ARTIFACT_PATH",
-                    help="(with --task) where Codex writes its artifact")
+    ap.add_argument(
+        "--task",
+        metavar="SPEC_PATH",
+        help=(
+            "ad-hoc mode: read a task-spec markdown file, dispatch to Codex, "
+            "write artifact to --output. Emits SubagentOutput JSON to stdout."
+        ),
+    )
+    ap.add_argument("--output", metavar="ARTIFACT_PATH", help="(with --task) where Codex writes its artifact")
     args = ap.parse_args(argv)
 
     repo = Path(args.repo).resolve()
@@ -770,7 +822,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.plan:
         ap.error("plan path is required unless --usage / --roadmap / --logs / --task")
     return execute_plan(
-        args.plan, repo=repo, resume=args.resume, dry_run=args.dry_run,
+        args.plan,
+        repo=repo,
+        resume=args.resume,
+        dry_run=args.dry_run,
         no_commit=args.no_commit,
     )
 

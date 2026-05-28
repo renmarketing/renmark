@@ -10,6 +10,7 @@ they need an Agent tool call from the host. The dispatcher returns a
 Permission-economy: by accepting a list of tasks per wave call, the user
 sees one Bash prompt per wave instead of one per task.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -25,7 +26,7 @@ from .providers import claude_agent
 class TaskResult:
     task_index: int
     executor: str
-    status: str             # "passed" | "failed" | "needs_agent" | "skipped"
+    status: str  # "passed" | "failed" | "needs_agent" | "skipped"
     sha: str = ""
     tokens_in: int = 0
     tokens_out: int = 0
@@ -89,7 +90,7 @@ def dispatch_wave(
     wave: list[Task],
     *,
     repo: Path,
-    run_task,                # callable: (task: Task, repo: Path) -> TaskResult
+    run_task,  # callable: (task: Task, repo: Path) -> TaskResult
     max_workers: int | None = None,
 ) -> WaveResult:
     """Run all non-Claude tasks in a wave concurrently.
@@ -110,10 +111,14 @@ def dispatch_wave(
     runnable = [t for t in wave if not claude_agent.is_claude_executor(t.executor)]
 
     for t in claude_tasks:
-        result.tasks.append(TaskResult(
-            task_index=t.index, executor=t.executor, status="needs_agent",
-            note="dispatch this via the Agent tool from the orchestrate skill",
-        ))
+        result.tasks.append(
+            TaskResult(
+                task_index=t.index,
+                executor=t.executor,
+                status="needs_agent",
+                note="dispatch this via the Agent tool from the orchestrate skill",
+            )
+        )
 
     if not runnable:
         return result
@@ -137,8 +142,11 @@ def _run_one(run_task, task: Task, repo: Path) -> TaskResult:
         return r
     except Exception as e:
         return TaskResult(
-            task_index=task.index, executor=task.executor, status="failed",
-            elapsed_s=time.monotonic() - start, note=f"{type(e).__name__}: {e}",
+            task_index=task.index,
+            executor=task.executor,
+            status="failed",
+            elapsed_s=time.monotonic() - start,
+            note=f"{type(e).__name__}: {e}",
         )
 
 
@@ -172,11 +180,20 @@ class IsolationViolation(RuntimeError):
 
 
 # Public schema: these are the ONLY fields the orchestrator considers.
-SUBAGENT_OUTPUT_FIELDS = frozenset({
-    "status", "artifact_path", "touched_files", "sha", "summary_lines",
-    "dependency_notes", "token_count", "completion_state", "confidence",
-    "retry_count",
-})
+SUBAGENT_OUTPUT_FIELDS = frozenset(
+    {
+        "status",
+        "artifact_path",
+        "touched_files",
+        "sha",
+        "summary_lines",
+        "dependency_notes",
+        "token_count",
+        "completion_state",
+        "confidence",
+        "retry_count",
+    }
+)
 
 SUBAGENT_OUTPUT_STATUS_VALUES = {"PASS", "FAIL", "SKIP"}
 SUBAGENT_OUTPUT_COMPLETION_STATES = {"complete", "partial", "failed"}
@@ -236,26 +253,17 @@ class SubagentOutput:
             )
         for i, line in enumerate(self.summary_lines):
             if not isinstance(line, str):
-                raise IsolationViolation(
-                    f"SubagentOutput.summary_lines[{i}] is {type(line).__name__}; expected str"
-                )
+                raise IsolationViolation(f"SubagentOutput.summary_lines[{i}] is {type(line).__name__}; expected str")
             if len(line) > SUBAGENT_MAX_CHARS_PER_LINE:
                 raise IsolationViolation(
-                    f"SubagentOutput.summary_lines[{i}] is {len(line)} chars; "
-                    f"max {SUBAGENT_MAX_CHARS_PER_LINE} (G3)"
+                    f"SubagentOutput.summary_lines[{i}] is {len(line)} chars; max {SUBAGENT_MAX_CHARS_PER_LINE} (G3)"
                 )
         if self.status not in SUBAGENT_OUTPUT_STATUS_VALUES:
-            raise IsolationViolation(
-                f"SubagentOutput.status={self.status!r} not in {SUBAGENT_OUTPUT_STATUS_VALUES}"
-            )
+            raise IsolationViolation(f"SubagentOutput.status={self.status!r} not in {SUBAGENT_OUTPUT_STATUS_VALUES}")
         if self.completion_state not in SUBAGENT_OUTPUT_COMPLETION_STATES:
-            raise IsolationViolation(
-                f"SubagentOutput.completion_state={self.completion_state!r} invalid"
-            )
+            raise IsolationViolation(f"SubagentOutput.completion_state={self.completion_state!r} invalid")
         if self.confidence not in SUBAGENT_OUTPUT_CONFIDENCE_VALUES:
-            raise IsolationViolation(
-                f"SubagentOutput.confidence={self.confidence!r} invalid"
-            )
+            raise IsolationViolation(f"SubagentOutput.confidence={self.confidence!r} invalid")
 
     def to_dict(self) -> dict:
         return {
@@ -283,16 +291,12 @@ def parse_subagent_response(response: dict | str) -> SubagentOutput:
         try:
             payload = _json.loads(response)
         except _json.JSONDecodeError as exc:
-            raise IsolationViolation(
-                f"subagent response is not valid JSON: {exc}"
-            ) from exc
+            raise IsolationViolation(f"subagent response is not valid JSON: {exc}") from exc
     else:
         payload = response
 
     if not isinstance(payload, dict):
-        raise IsolationViolation(
-            f"subagent response must be a JSON object; got {type(payload).__name__}"
-        )
+        raise IsolationViolation(f"subagent response must be a JSON object; got {type(payload).__name__}")
 
     extra_fields = set(payload.keys()) - SUBAGENT_OUTPUT_FIELDS
     if extra_fields:
@@ -303,9 +307,7 @@ def parse_subagent_response(response: dict | str) -> SubagentOutput:
 
     missing = {"status", "artifact_path"} - set(payload.keys())
     if missing:
-        raise IsolationViolation(
-            f"subagent response missing required fields: {sorted(missing)}"
-        )
+        raise IsolationViolation(f"subagent response missing required fields: {sorted(missing)}")
 
     # Only pass through known fields (defensive — extra_fields check should
     # have caught everything, but guard against future refactors).
@@ -325,7 +327,7 @@ def build_subagent_input(
     No other Task fields cross the boundary."""
     return SubagentInput(
         task_spec=task.spec,
-        required_files=[task.target] + list(task.context_files or []),
+        required_files=[task.target, *list(task.context_files or [])],
         upstream_artifact_pointers=list(upstream_artifact_pointers or []),
         dependency_summaries=list(dependency_summaries or []),
         verifier_expectations=task.verifier or "",

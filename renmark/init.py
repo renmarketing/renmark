@@ -27,9 +27,10 @@ Stdout (success):
     OK  stub=<created|refreshed|unchanged> map=<created|refreshed|unchanged>
         modules=<N> commands=<N> langs=<py,ts,...> ref=YYYY-MM-DD@<sha>
 """
+
 from __future__ import annotations
 
-import hashlib
+import contextlib
 import json
 import re
 import subprocess
@@ -41,9 +42,20 @@ from pathlib import Path
 # ── Scan configuration ───────────────────────────────────────────────────────
 
 EXCLUDE_DIRS = {
-    ".git", "node_modules", "dist", "build", ".next", "target", "out",
-    ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
-    ".idea", ".vscode",
+    ".git",
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "target",
+    "out",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".idea",
+    ".vscode",
     # renmark runtime — keep memory/, exclude state/debug/logs/baks
 }
 
@@ -52,8 +64,12 @@ EXCLUDE_RENMARK_RUNTIME = {".renmark/state", ".renmark/debug", ".renmark/logs", 
 
 LANG_BY_EXT = {
     ".py": "python",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-    ".ts": "typescript", ".tsx": "typescript",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
     ".go": "go",
     ".rs": "rust",
     ".rb": "ruby",
@@ -87,16 +103,18 @@ class FileInfo:
 @dataclass
 class Standard:
     """One detected dev standard (test, lint, type-check, etc.)."""
-    name: str            # canonical key: "test", "lint", "format", "typecheck", "ci", ...
+
+    name: str  # canonical key: "test", "lint", "format", "typecheck", "ci", ...
     command: str | None  # invocation, e.g. "pytest -q" — None if not directly runnable
     config_file: str | None  # where it was detected (relative path)
-    detail: str = ""     # extra info for dev-standards.md
+    detail: str = ""  # extra info for dev-standards.md
 
 
 @dataclass
 class Gap:
     """One standards-health gap with a tighten-this recommendation."""
-    severity: str        # "danger", "warn", "info"
+
+    severity: str  # "danger", "warn", "info"
     title: str
     detail: str
     recommendation: str
@@ -105,6 +123,7 @@ class Gap:
 @dataclass
 class StandardsScan:
     """Result of scanning the repo for dev standards + health gaps."""
+
     standards: list[Standard] = field(default_factory=list)
     gaps: list[Gap] = field(default_factory=list)
     deep: bool = False
@@ -140,16 +159,16 @@ def _is_excluded(path: Path, repo: Path) -> bool:
     rel_str = "/".join(parts)
     if any(rel_str == r or rel_str.startswith(r + "/") for r in EXCLUDE_RENMARK_RUNTIME):
         return True
-    if any(p.endswith(".egg-info") for p in parts):
-        return True
-    return False
+    return bool(any(p.endswith(".egg-info") for p in parts))
 
 
 def _git_short_sha(repo: Path) -> str | None:
     try:
         out = subprocess.run(
             ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if out.returncode == 0:
             return out.stdout.strip() or None
@@ -296,8 +315,11 @@ def _detect_top_dirs(repo: Path) -> list[tuple[str, str]]:
                 rfile = entry / readme_name
                 if rfile.exists():
                     first_line = next(
-                        (ln.strip() for ln in rfile.read_text(encoding="utf-8", errors="replace").splitlines()
-                         if ln.strip() and not ln.strip().startswith("#")),
+                        (
+                            ln.strip()
+                            for ln in rfile.read_text(encoding="utf-8", errors="replace").splitlines()
+                            if ln.strip() and not ln.strip().startswith("#")
+                        ),
                         "",
                     )
                     if first_line:
@@ -322,10 +344,8 @@ def _detect_commands(repo: Path) -> list[tuple[str, str]]:
     # Try to read plugin name from manifest
     manifest = repo / "plugin" / ".claude-plugin" / "plugin.json"
     if manifest.exists():
-        try:
+        with contextlib.suppress(json.JSONDecodeError, KeyError):
             plugin_name = json.loads(manifest.read_text(encoding="utf-8"))["name"]
-        except (json.JSONDecodeError, KeyError):
-            pass
     for cmd_file in sorted(cmds_dir.glob("*.md")):
         name = cmd_file.stem
         text = cmd_file.read_text(encoding="utf-8", errors="replace")
@@ -403,7 +423,7 @@ def _file_purpose(text: str, lang: str) -> str:
             continue
         for prefix in ("# ", "// ", "/* ", "* "):
             if s.startswith(prefix):
-                return s[len(prefix):].rstrip(" */").strip()[:80]
+                return s[len(prefix) :].rstrip(" */").strip()[:80]
     return ""
 
 
@@ -465,9 +485,7 @@ def _render_stub_body(scan: RepoScan) -> str:
         if gates_line:
             lines.append("")
             lines.append(gates_line)
-            lines.append(
-                "**Standards detail** → `.renmark/memory/dev-standards.md` (read before non-trivial changes)."
-            )
+            lines.append("**Standards detail** → `.renmark/memory/dev-standards.md` (read before non-trivial changes).")
 
     lines.append("")
     lines.append(
@@ -503,14 +521,14 @@ def _render_tree(scan: RepoScan) -> str:
 def render_full_map(scan: RepoScan) -> str:
     sha = scan.git_sha or "no-git"
     out: list[str] = []
-    out.append(f"<!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->")
+    out.append("<!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->")
     out.append(f"<!-- Last refreshed: {scan.today} @ {sha} -->")
     out.append("")
     out.append(f"# Project map — {scan.project_name}")
     out.append("")
     out.append(f"**Stack:** {scan.stack}")
     if scan.entry_points:
-        out.append(f"**Entry points:** " + ", ".join(f"`{e}`" for e in scan.entry_points))
+        out.append("**Entry points:** " + ", ".join(f"`{e}`" for e in scan.entry_points))
     langs = ", ".join(f"{lang}={n}" for lang, n in sorted(scan.lang_counts.items(), key=lambda kv: -kv[1]))
     out.append(f"**Languages:** {langs or '—'}")
     out.append("")
@@ -558,7 +576,8 @@ def render_full_map(scan: RepoScan) -> str:
         out.append("| Command | Purpose |")
         out.append("|---|---|")
         for name, desc in scan.commands:
-            out.append(f"| `{name}` | {desc.replace('|', '\\|') if desc else '—'} |")
+            cell = desc.replace("|", "\\|") if desc else "—"
+            out.append(f"| `{name}` | {cell} |")
 
     out.append("")
     return "\n".join(out)
@@ -575,7 +594,7 @@ def _existing_stub_body(text: str) -> str | None:
     end_idx = text.find(STUB_END, begin_idx)
     if end_idx < 0:
         return None
-    inner = text[begin_idx + len(STUB_BEGIN):end_idx]
+    inner = text[begin_idx + len(STUB_BEGIN) : end_idx]
     # Strip leading newlines and the first managed-comment line
     lines = inner.lstrip("\n").splitlines()
     # Skip the header comment line (starts with "<!-- Managed by")
@@ -616,7 +635,7 @@ def merge_stub_into(file_path: Path, scan: RepoScan) -> str:
         if end_idx < 0:
             raise RuntimeError(f"{file_path}: BEGIN marker without END — file corrupted.")
         begin_idx = original.find(STUB_BEGIN)
-        new_text = original[:begin_idx] + new_block + original[end_idx + len(STUB_END):]
+        new_text = original[:begin_idx] + new_block + original[end_idx + len(STUB_END) :]
         file_path.write_text(new_text, encoding="utf-8")
         return "refreshed"
 
@@ -703,7 +722,12 @@ def _detect_test(repo: Path) -> Standard | None:
             if fw in deps:
                 return Standard("test", cmd, "package.json", f"{fw} in deps but no test script")
     if _parse_pyproject_table(repo, "tool.pytest.ini_options") or (repo / "pytest.ini").exists():
-        return Standard("test", "pytest -q", "pyproject.toml" if _parse_pyproject_table(repo, "tool.pytest.ini_options") else "pytest.ini", "")
+        return Standard(
+            "test",
+            "pytest -q",
+            "pyproject.toml" if _parse_pyproject_table(repo, "tool.pytest.ini_options") else "pytest.ini",
+            "",
+        )
     pyproj = repo / "pyproject.toml"
     if pyproj.exists():
         text = _read_text_safe(pyproj)
@@ -718,10 +742,23 @@ def _detect_test(repo: Path) -> Standard | None:
 
 def _detect_lint(repo: Path) -> Standard | None:
     if _parse_pyproject_table(repo, "tool.ruff") or (repo / "ruff.toml").exists() or (repo / ".ruff.toml").exists():
-        return Standard("lint", "ruff check", "ruff.toml" if (repo / "ruff.toml").exists() else "pyproject.toml", "")
+        return Standard(
+            "lint",
+            "ruff check",
+            "ruff.toml" if (repo / "ruff.toml").exists() else "pyproject.toml",
+            "",
+        )
     if _parse_pyproject_table(repo, "tool.flake8") or (repo / ".flake8").exists() or (repo / "setup.cfg").exists():
         return Standard("lint", "flake8", ".flake8", "")
-    for f in (".eslintrc", ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.yaml", "eslint.config.js", "eslint.config.mjs"):
+    for f in (
+        ".eslintrc",
+        ".eslintrc.json",
+        ".eslintrc.js",
+        ".eslintrc.cjs",
+        ".eslintrc.yaml",
+        "eslint.config.js",
+        "eslint.config.mjs",
+    ):
         if (repo / f).exists():
             return Standard("lint", "eslint .", f, "")
     if (repo / ".rubocop.yml").exists():
@@ -739,14 +776,25 @@ def _detect_format(repo: Path) -> Standard | None:
     if _parse_pyproject_table(repo, "tool.ruff.format") or _parse_pyproject_table(repo, "tool.ruff"):
         # Ruff's format subcommand
         return Standard("format", "ruff format", "pyproject.toml", "")
-    for f in (".prettierrc", ".prettierrc.json", ".prettierrc.js", "prettier.config.js", ".prettierrc.yaml"):
+    for f in (
+        ".prettierrc",
+        ".prettierrc.json",
+        ".prettierrc.js",
+        "prettier.config.js",
+        ".prettierrc.yaml",
+    ):
         if (repo / f).exists():
             return Standard("format", "prettier --write .", f, "")
     pkg = _package_json(repo)
     if pkg and "prettier" in {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}:
         return Standard("format", "prettier --write .", "package.json", "prettier in deps")
     if (repo / "rustfmt.toml").exists() or (repo / "Cargo.toml").exists():
-        return Standard("format", "cargo fmt", "rustfmt.toml" if (repo / "rustfmt.toml").exists() else "Cargo.toml", "")
+        return Standard(
+            "format",
+            "cargo fmt",
+            "rustfmt.toml" if (repo / "rustfmt.toml").exists() else "Cargo.toml",
+            "",
+        )
     if (repo / "go.mod").exists():
         return Standard("format", "gofmt -w .", "go.mod", "implicit (gofmt)")
     return None
@@ -775,7 +823,7 @@ def _detect_ci(repo: Path) -> Standard | None:
             if f.suffix in (".yml", ".yaml"):
                 text = _read_text_safe(f)
                 m = re.search(r"^name:\s*(.+)$", text, re.MULTILINE)
-                workflows.append(m.group(1).strip().strip('"\'') if m else f.stem)
+                workflows.append(m.group(1).strip().strip("\"'") if m else f.stem)
         if workflows:
             return Standard("ci", None, ".github/workflows/", f"GitHub Actions: {', '.join(workflows)}")
     if (repo / ".gitlab-ci.yml").exists():
@@ -789,8 +837,12 @@ def _detect_precommit(repo: Path) -> Standard | None:
     if (repo / ".pre-commit-config.yaml").exists():
         text = _read_text_safe(repo / ".pre-commit-config.yaml")
         hooks = re.findall(r"^\s*-\s*id:\s*([\w.-]+)", text, re.MULTILINE)
-        return Standard("precommit", "pre-commit run --all-files", ".pre-commit-config.yaml",
-                        f"hooks: {', '.join(hooks[:6])}" if hooks else "")
+        return Standard(
+            "precommit",
+            "pre-commit run --all-files",
+            ".pre-commit-config.yaml",
+            f"hooks: {', '.join(hooks[:6])}" if hooks else "",
+        )
     if (repo / ".husky").exists() and (repo / ".husky").is_dir():
         return Standard("precommit", None, ".husky/", "Husky hooks")
     return None
@@ -865,7 +917,15 @@ def _detect_deps_policy(repo: Path) -> Standard | None:
     if (repo / "renovate.json").exists() or (repo / ".github" / "renovate.json").exists():
         bits.append("renovate")
     lockfiles = []
-    for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "Pipfile.lock", "Cargo.lock", "go.sum"):
+    for lf in (
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "poetry.lock",
+        "Pipfile.lock",
+        "Cargo.lock",
+        "go.sum",
+    ):
         if (repo / lf).exists():
             lockfiles.append(lf)
     if lockfiles:
@@ -908,133 +968,184 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
         gi = repo / ".gitignore"
         gitignored = gi.exists() and ".env" in _read_text_safe(gi).splitlines()
         if not gitignored:
-            gaps.append(Gap(
-                "danger", "Secrets risk: `.env` is committed (not gitignored)",
-                "`.env` exists in the repo and is not in `.gitignore`. Real credentials may be checked in.",
-                "Add `.env` to `.gitignore`, run `git rm --cached .env`, and rotate any leaked credentials.",
-            ))
+            gaps.append(
+                Gap(
+                    "danger",
+                    "Secrets risk: `.env` is committed (not gitignored)",
+                    "`.env` exists in the repo and is not in `.gitignore`. Real credentials may be checked in.",
+                    "Add `.env` to `.gitignore`, run `git rm --cached .env`, and rotate any leaked credentials.",
+                )
+            )
 
     # 🚨 danger: multiple package managers
     lockfiles_present = [lf for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml") if (repo / lf).exists()]
     if len(lockfiles_present) > 1:
-        gaps.append(Gap(
-            "danger", f"Multiple JS package managers: {', '.join(lockfiles_present)}",
-            "Each lockfile implies a different installer. Concurrent use causes ghost dependencies and silent breakage.",
-            f"Pick one — delete the others. Common choice: keep `package-lock.json` (npm).",
-        ))
+        gaps.append(
+            Gap(
+                "danger",
+                f"Multiple JS package managers: {', '.join(lockfiles_present)}",
+                "Each lockfile implies a different installer. Concurrent use causes ghost dependencies and silent breakage.",
+                "Pick one — delete the others. Common choice: keep `package-lock.json` (npm).",
+            )
+        )
 
     # ⚠ warn: no linter at all
     if "lint" not in by_name:
-        gaps.append(Gap(
-            "warn", "No linter configured",
-            "No ruff/flake8/eslint/rubocop/clippy/go-vet detected. Style and obvious bugs go uncaught.",
-            "Add a linter — for Python: `pip install ruff && echo '[tool.ruff]' >> pyproject.toml`; "
-            "for JS/TS: `npm i -D eslint && npx eslint --init`.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                "No linter configured",
+                "No ruff/flake8/eslint/rubocop/clippy/go-vet detected. Style and obvious bugs go uncaught.",
+                "Add a linter — for Python: `pip install ruff && echo '[tool.ruff]' >> pyproject.toml`; "
+                "for JS/TS: `npm i -D eslint && npx eslint --init`.",
+            )
+        )
 
     # ⚠ warn: no type checker
     if "typecheck" not in by_name:
         # Only flag for typed-ish languages
         has_typed_lang = any(f.lang in ("python", "typescript") for f in files)
         if has_typed_lang:
-            gaps.append(Gap(
-                "warn", "No type checker configured",
-                "No mypy/pyright/tsc-strict detected. Type errors only show up at runtime.",
-                "For Python: `pip install mypy && echo '[tool.mypy]\\nstrict = true' >> pyproject.toml`. "
-                "For TS: set `\"strict\": true` in `tsconfig.json`.",
-            ))
+            gaps.append(
+                Gap(
+                    "warn",
+                    "No type checker configured",
+                    "No mypy/pyright/tsc-strict detected. Type errors only show up at runtime.",
+                    "For Python: `pip install mypy && echo '[tool.mypy]\\nstrict = true' >> pyproject.toml`. "
+                    'For TS: set `"strict": true` in `tsconfig.json`.',
+                )
+            )
     else:
         # tsconfig present but not strict
         tc = by_name["typecheck"]
         if tc.config_file == "tsconfig.json" and "strict mode" not in tc.detail:
-            gaps.append(Gap(
-                "warn", "TypeScript not in strict mode",
-                "`tsconfig.json` exists but `\"strict\": true` is not set. Type guarantees are weak.",
-                "Set `\"strict\": true` in `tsconfig.json`. Expect a backlog of fixes the first run.",
-            ))
+            gaps.append(
+                Gap(
+                    "warn",
+                    "TypeScript not in strict mode",
+                    '`tsconfig.json` exists but `"strict": true` is not set. Type guarantees are weak.',
+                    'Set `"strict": true` in `tsconfig.json`. Expect a backlog of fixes the first run.',
+                )
+            )
 
     # ⚠ warn: no tests in a multi-file project
     n_tests = _count_test_files(repo, files)
     if n_source_files >= 10 and n_tests == 0:
-        gaps.append(Gap(
-            "warn", f"No tests detected ({n_source_files} source files, 0 test files)",
-            "Multi-file project with zero test files. Every change is a bet.",
-            "Add the first test before the next feature. Even one smoke test changes the trajectory.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                f"No tests detected ({n_source_files} source files, 0 test files)",
+                "Multi-file project with zero test files. Every change is a bet.",
+                "Add the first test before the next feature. Even one smoke test changes the trajectory.",
+            )
+        )
 
     # ⚠ warn: test framework in deps but zero test files
     if "test" in by_name and n_tests == 0 and n_source_files >= 3:
-        gaps.append(Gap(
-            "warn", "Test framework configured but no test files",
-            f"`{by_name['test'].command}` is set up, but the test directory is empty.",
-            "Either add tests, or remove the unused test framework so the README doesn't lie.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                "Test framework configured but no test files",
+                f"`{by_name['test'].command}` is set up, but the test directory is empty.",
+                "Either add tests, or remove the unused test framework so the README doesn't lie.",
+            )
+        )
 
     # ⚠ warn: linter exists but not wired to pre-commit or CI
     if "lint" in by_name and "precommit" not in by_name and "ci" not in by_name:
-        gaps.append(Gap(
-            "warn", "Linter not wired to pre-commit or CI",
-            f"`{by_name['lint'].command}` is configured, but nothing enforces it before commit or in CI.",
-            "Add a pre-commit hook (`.pre-commit-config.yaml`) or a CI workflow that runs it.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                "Linter not wired to pre-commit or CI",
+                f"`{by_name['lint'].command}` is configured, but nothing enforces it before commit or in CI.",
+                "Add a pre-commit hook (`.pre-commit-config.yaml`) or a CI workflow that runs it.",
+            )
+        )
 
     # ⚠ warn: multi-file project with no CI
     if n_source_files >= 10 and "ci" not in by_name:
-        gaps.append(Gap(
-            "warn", "No CI configured",
-            f"{n_source_files} source files and no `.github/workflows/`, `.gitlab-ci.yml`, or CircleCI config.",
-            "Add a minimal CI workflow that runs tests + lint on every PR.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                "No CI configured",
+                f"{n_source_files} source files and no `.github/workflows/`, `.gitlab-ci.yml`, or CircleCI config.",
+                "Add a minimal CI workflow that runs tests + lint on every PR.",
+            )
+        )
 
     # ⚠ warn: no pre-commit AND no CI
     if "precommit" not in by_name and "ci" not in by_name and n_source_files >= 5:
-        gaps.append(Gap(
-            "warn", "Nothing enforces quality (no pre-commit hooks AND no CI)",
-            "Whatever you configure locally won't run automatically — both pre-commit and CI are missing.",
-            "Pick one — pre-commit for fast local checks, CI for team-wide gates. Both is best.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                "Nothing enforces quality (no pre-commit hooks AND no CI)",
+                "Whatever you configure locally won't run automatically — both pre-commit and CI are missing.",
+                "Pick one — pre-commit for fast local checks, CI for team-wide gates. Both is best.",
+            )
+        )
 
     # ⚠ warn: no lockfile when package.json exists
     if pkg is not None and not any((repo / lf).exists() for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml")):
-        gaps.append(Gap(
-            "warn", "Missing lockfile for `package.json`",
-            "Dependencies are unpinned at the lockfile level — fresh `npm install` may resolve different versions.",
-            "Run `npm install` (or yarn/pnpm) and commit the resulting lockfile.",
-        ))
+        gaps.append(
+            Gap(
+                "warn",
+                "Missing lockfile for `package.json`",
+                "Dependencies are unpinned at the lockfile level — fresh `npm install` may resolve different versions.",
+                "Run `npm install` (or yarn/pnpm) and commit the resulting lockfile.",
+            )
+        )
 
     # ℹ info: no .gitignore
     if not (repo / ".gitignore").exists() and n_source_files >= 3:
-        gaps.append(Gap(
-            "info", "No `.gitignore`",
-            "Without `.gitignore`, build artifacts, caches, and secrets risk being committed.",
-            "Add a stack-appropriate `.gitignore` (renmark's `/renmark:setup` will create one).",
-        ))
+        gaps.append(
+            Gap(
+                "info",
+                "No `.gitignore`",
+                "Without `.gitignore`, build artifacts, caches, and secrets risk being committed.",
+                "Add a stack-appropriate `.gitignore` (renmark's `/renmark:setup` will create one).",
+            )
+        )
 
     # ℹ info: no README
     if not (repo / "README.md").exists() and not (repo / "README").exists() and n_source_files >= 5:
-        gaps.append(Gap(
-            "info", "No README",
-            "Anyone new to the repo has no entry point.",
-            "Add a `README.md` with: what this is, how to run it locally, how to run tests.",
-        ))
+        gaps.append(
+            Gap(
+                "info",
+                "No README",
+                "Anyone new to the repo has no entry point.",
+                "Add a `README.md` with: what this is, how to run it locally, how to run tests.",
+            )
+        )
 
     # Deep-only: commit-message style sample
     if deep:
         try:
             out = subprocess.run(
                 ["git", "-C", str(repo), "log", "-20", "--pretty=%s"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if out.returncode == 0:
                 subjects = [s for s in out.stdout.splitlines() if s]
                 # Conventional commits detection
-                conv = sum(1 for s in subjects if re.match(r"^(feat|fix|chore|docs|refactor|test|build|ci|perf|style|revert)(\(\w+\))?!?:", s))
+                conv = sum(
+                    1
+                    for s in subjects
+                    if re.match(
+                        r"^(feat|fix|chore|docs|refactor|test|build|ci|perf|style|revert)(\(\w+\))?!?:",
+                        s,
+                    )
+                )
                 if subjects and conv / max(len(subjects), 1) < 0.3 and conv > 0:
-                    gaps.append(Gap(
-                        "info", "Inconsistent commit message style",
-                        f"Of the last {len(subjects)} commits, only {conv} follow conventional-commits format.",
-                        "Pick a convention (conventional-commits or freeform) and enforce via commitlint or PR review.",
-                    ))
+                    gaps.append(
+                        Gap(
+                            "info",
+                            "Inconsistent commit message style",
+                            f"Of the last {len(subjects)} commits, only {conv} follow conventional-commits format.",
+                            "Pick a convention (conventional-commits or freeform) and enforce via commitlint or PR review.",
+                        )
+                    )
         except (FileNotFoundError, subprocess.SubprocessError):
             pass
 
@@ -1046,9 +1157,17 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
 
 def scan_standards(repo: Path, files: list[FileInfo], deep: bool = False) -> StandardsScan:
     detectors = (
-        _detect_test, _detect_lint, _detect_format, _detect_typecheck,
-        _detect_ci, _detect_precommit, _detect_env_schema, _detect_db,
-        _detect_local_dev, _detect_style, _detect_deps_policy,
+        _detect_test,
+        _detect_lint,
+        _detect_format,
+        _detect_typecheck,
+        _detect_ci,
+        _detect_precommit,
+        _detect_env_schema,
+        _detect_db,
+        _detect_local_dev,
+        _detect_style,
+        _detect_deps_policy,
     )
     standards = [s for s in (d(repo) for d in detectors) if s is not None]
     gaps = evaluate_health(repo, standards, files, deep)
@@ -1078,7 +1197,7 @@ def render_dev_gates_line(standards: StandardsScan) -> str | None:
         # ci.detail is like "GitHub Actions: build, test, deploy"
         wf_part = ci.detail.split(":", 1)[1].strip() if ":" in ci.detail else ci.detail
         parts.append(f"CI: {wf_part}")
-    return f"**Dev gates:** " + " · ".join(parts) if parts else None
+    return "**Dev gates:** " + " · ".join(parts) if parts else None
 
 
 def render_standards_md(repo_name: str, today: str, git_sha: str | None, standards: StandardsScan) -> str:
@@ -1124,7 +1243,9 @@ def render_standards_md(repo_name: str, today: str, git_sha: str | None, standar
         for g in standards.gaps:
             counts[g.severity] = counts.get(g.severity, 0) + 1
         summary = ", ".join(f"{n} {sev}" for sev, n in counts.items() if n)
-        out.append(f"**{len(standards.gaps)} gap{'s' if len(standards.gaps) != 1 else ''} detected** ({summary}). Tightening recommendations below.")
+        out.append(
+            f"**{len(standards.gaps)} gap{'s' if len(standards.gaps) != 1 else ''} detected** ({summary}). Tightening recommendations below."
+        )
         out.append("")
         for g in standards.gaps:
             prefix = _SEVERITY_PREFIX.get(g.severity, "•")
@@ -1167,10 +1288,7 @@ def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[
     """Returns (exit_code, summary_line)."""
     claude_md = repo / "CLAUDE.md"
     if not claude_md.exists():
-        return 1, (
-            "FAIL  CLAUDE.md not found. Run /renmark:setup first to create it, "
-            "then re-run /renmark:init."
-        )
+        return 1, ("FAIL  CLAUDE.md not found. Run /renmark:setup first to create it, then re-run /renmark:init.")
 
     scan = scan_repo(repo, include_private=include_private)
     # Standards scan runs first so the stub can include the gates line
@@ -1241,7 +1359,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(f"entries:   {scan.entry_points}\n")
         sys.stdout.write(f"top:       {[d for d, _ in scan.top_dirs]}\n")
         sys.stdout.write(f"standards: {[s.name for s in standards.standards]}\n")
-        sys.stdout.write(f"gaps:      {len(standards.gaps)} ({', '.join(g.severity for g in standards.gaps) or 'none'})\n")
+        sys.stdout.write(
+            f"gaps:      {len(standards.gaps)} ({', '.join(g.severity for g in standards.gaps) or 'none'})\n"
+        )
         return 0
 
     if cmd in ("refresh", "."):

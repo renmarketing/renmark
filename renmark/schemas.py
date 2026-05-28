@@ -16,36 +16,37 @@ CLI:
 
 Exit code 0 = valid, 1 = invalid, 2 = bad CLI usage.
 """
+
 from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
-from renmark.lifecycle import STAGES
 from renmark.dispatch import (
-    SUBAGENT_OUTPUT_FIELDS,
-    SUBAGENT_OUTPUT_STATUS_VALUES,
     SUBAGENT_OUTPUT_COMPLETION_STATES,
     SUBAGENT_OUTPUT_CONFIDENCE_VALUES,
+    SUBAGENT_OUTPUT_FIELDS,
+    SUBAGENT_OUTPUT_STATUS_VALUES,
 )
-
+from renmark.lifecycle import STAGES
 
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 
 LIFECYCLE_FIELDS = {
-    "feature":                  (str, True),
-    "branch":                   (str, True),
-    "github_issue":             ((int, type(None)), True),
-    "stage":                    (str, True),
-    "stages_completed":         (list, True),
-    "artifacts":                (dict, True),
-    "human_review_required":    (bool, True),
-    "human_review_completed":   (bool, True),
-    "human_review_for":         ((str, type(None)), True),
-    "next_recommended":         (str, True),
-    "last_updated":             (str, True),
+    "feature": (str, True),
+    "branch": (str, True),
+    "github_issue": ((int, type(None)), True),
+    "stage": (str, True),
+    "stages_completed": (list, True),
+    "artifacts": (dict, True),
+    "human_review_required": (bool, True),
+    "human_review_completed": (bool, True),
+    "human_review_for": ((str, type(None)), True),
+    "next_recommended": (str, True),
+    "last_updated": (str, True),
 }
 
 
@@ -86,13 +87,13 @@ def validate_lifecycle(data: Any) -> list[str]:
 # ── Pipeline ─────────────────────────────────────────────────────────────────
 
 PIPELINE_FIELDS = {
-    "current_phase":   (str, True),
-    "current_plan":    (str, True),
-    "wave_index":      (int, True),
-    "wave_total":      (int, True),
+    "current_phase": (str, True),
+    "current_plan": (str, True),
+    "wave_index": (int, True),
+    "wave_total": (int, True),
     "completed_tasks": (list, True),
-    "failed_tasks":    (list, True),
-    "last_updated":    (str, True),
+    "failed_tasks": (list, True),
+    "last_updated": (str, True),
 }
 
 PIPELINE_PHASES = {"idle", "orchestrate", "paused"}
@@ -122,16 +123,16 @@ def validate_pipeline(data: Any) -> list[str]:
 # ── SubagentOutput ───────────────────────────────────────────────────────────
 
 SUBAGENT_OUTPUT_TYPES = {
-    "status":           str,
-    "artifact_path":    str,
-    "touched_files":    list,
-    "sha":              (str, type(None)),
-    "summary_lines":    list,
+    "status": str,
+    "artifact_path": str,
+    "touched_files": list,
+    "sha": (str, type(None)),
+    "summary_lines": list,
     "dependency_notes": str,
-    "token_count":      int,
+    "token_count": int,
     "completion_state": str,
-    "confidence":       str,
-    "retry_count":      int,
+    "confidence": str,
+    "retry_count": int,
 }
 
 
@@ -148,8 +149,7 @@ def validate_subagent_output(data: Any) -> list[str]:
     extra = set(data.keys()) - SUBAGENT_OUTPUT_FIELDS
     if extra:
         issues.append(
-            f"subagent: G11 isolation violation — extra fields {sorted(extra)} "
-            f"not in {sorted(SUBAGENT_OUTPUT_FIELDS)}"
+            f"subagent: G11 isolation violation — extra fields {sorted(extra)} not in {sorted(SUBAGENT_OUTPUT_FIELDS)}"
         )
 
     for field, expected_type in SUBAGENT_OUTPUT_TYPES.items():
@@ -159,10 +159,7 @@ def validate_subagent_output(data: Any) -> list[str]:
                 issues.append(f"subagent: required field {field!r} missing")
             continue
         if not _isinstance(data[field], expected_type):
-            issues.append(
-                f"subagent.{field} expected {_typename(expected_type)}, "
-                f"got {type(data[field]).__name__}"
-            )
+            issues.append(f"subagent.{field} expected {_typename(expected_type)}, got {type(data[field]).__name__}")
 
     status = data.get("status")
     if isinstance(status, str) and status not in SUBAGENT_OUTPUT_STATUS_VALUES:
@@ -192,20 +189,20 @@ def validate_subagent_output(data: Any) -> list[str]:
 # ── ArtifactMetadata (G6) ────────────────────────────────────────────────────
 
 ARTIFACT_METADATA_FIELDS = {
-    "artifact_type":      (str, True),
-    "schema_version":     ((str, int), True),
-    "created_at":         (str, True),
-    "source_sha":         ((str, type(None)), False),
-    "related_plan":       ((str, type(None)), False),
-    "generator":          (str, True),
-    "stale_after":        ((str, type(None)), False),
-    "dependency_refs":    (list, False),
-    "completion_state":   (str, False),
-    "confidence":         (str, False),
-    "validation_status":  (str, False),
-    "retry_count":        (int, False),
-    "parser_success":     (bool, False),
-    "schema_compliance":  (bool, False),
+    "artifact_type": (str, True),
+    "schema_version": ((str, int), True),
+    "created_at": (str, True),
+    "source_sha": ((str, type(None)), False),
+    "related_plan": ((str, type(None)), False),
+    "generator": (str, True),
+    "stale_after": ((str, type(None)), False),
+    "dependency_refs": (list, False),
+    "completion_state": (str, False),
+    "confidence": (str, False),
+    "validation_status": (str, False),
+    "retry_count": (int, False),
+    "parser_success": (bool, False),
+    "schema_compliance": (bool, False),
 }
 
 ARTIFACT_COMPLETION_STATES = {"complete", "partial", "failed"}
@@ -244,10 +241,7 @@ def _check_fields(data: dict, spec: dict[str, tuple], scope: str) -> list[str]:
                 issues.append(f"{scope}: required field {field!r} missing")
             continue
         if not _isinstance(data[field], expected_type):
-            issues.append(
-                f"{scope}.{field} expected {_typename(expected_type)}, "
-                f"got {type(data[field]).__name__}"
-            )
+            issues.append(f"{scope}.{field} expected {_typename(expected_type)}, got {type(data[field]).__name__}")
     return issues
 
 
@@ -273,18 +267,16 @@ def _typename(expected: Any) -> str:
 
 VALIDATORS: dict[str, Callable[[Any], list[str]]] = {
     "lifecycle": validate_lifecycle,
-    "pipeline":  validate_pipeline,
-    "subagent":  validate_subagent_output,
-    "artifact":  validate_artifact_metadata,
+    "pipeline": validate_pipeline,
+    "subagent": validate_subagent_output,
+    "artifact": validate_artifact_metadata,
 }
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 2 or argv[0] not in VALIDATORS:
-        sys.stderr.write(
-            "usage: python -m renmark.schemas {lifecycle|pipeline|subagent|artifact} <path>\n"
-        )
+        sys.stderr.write("usage: python -m renmark.schemas {lifecycle|pipeline|subagent|artifact} <path>\n")
         return 2
 
     kind, path = argv

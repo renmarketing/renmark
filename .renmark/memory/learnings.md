@@ -1,0 +1,20 @@
+# Learnings
+
+Auto-maintained by `/renmark:orchestrate` and `/renmark:debug`. Records patterns learned from past runs.
+
+## Format
+
+Each entry: signal, observation, model that caught it, date.
+
+## Common patterns (seeded from prior projects)
+
+- `tests/**.py with threading + setUpClass` — NIM small models often produce invalid Python here. Route to `codex` or `opus`.
+- `.js with canvas/DOM API` — NIM small models often write code that crashes at runtime (e.g., `document.canvas.width`). Route to `opus`.
+- Codex with `--sandbox workspace-write` will sometimes modify files outside the target — verify with a post-run lane check.
+
+## Learned this project
+
+
+- (2026-05-28, run) **task 1 failed on codex** — codex_verifier_failed
+
+(Empty — will fill as runs complete.)

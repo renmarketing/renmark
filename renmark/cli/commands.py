@@ -3,6 +3,7 @@
 Self-contained CLI reporting + ad-hoc Codex task mode. These do not touch the
 orchestrator's shared git globals, so they live apart from the execution engine.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,12 +25,9 @@ def cmd_usage(repo: Path) -> int:
     today_rows = [r for r in rows if r.get("ts", "").startswith(today_prefix)]
     month_rows = [r for r in rows if r.get("ts", "").startswith(month_prefix)]
 
-    print(f"Today ({today_prefix}):  {sum(tok(r) for r in today_rows):>7} tokens "
-          f"over {len(today_rows)} calls")
-    print(f"This month:          {sum(tok(r) for r in month_rows):>7} tokens "
-          f"over {len(month_rows)} calls")
-    print(f"All time:            {sum(tok(r) for r in rows):>7} tokens "
-          f"over {len(rows)} calls")
+    print(f"Today ({today_prefix}):  {sum(tok(r) for r in today_rows):>7} tokens over {len(today_rows)} calls")
+    print(f"This month:          {sum(tok(r) for r in month_rows):>7} tokens over {len(month_rows)} calls")
+    print(f"All time:            {sum(tok(r) for r in rows):>7} tokens over {len(rows)} calls")
 
     # Per-model breakdown this month.
     by_model: dict[str, dict[str, int]] = {}
@@ -77,6 +75,7 @@ def cmd_usage(repo: Path) -> int:
 
 def cmd_roadmap(repo: Path) -> int:
     from .. import roadmap as _roadmap
+
     rows = _roadmap.build_rows(repo)
     print(_roadmap.render_table(rows))
     _roadmap.write_roadmap_md(repo)
@@ -86,6 +85,7 @@ def cmd_roadmap(repo: Path) -> int:
 
 def cmd_logs(repo: Path, n: int = 10) -> int:
     from .. import state as _state
+
     items = _state.recent_logs(repo, n=n)
     if not items:
         print(f"No logs yet at {repo}/.renmark/logs/")
@@ -108,19 +108,24 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     Honors G5 (executor isolation) and G11 (task isolation).
     """
     import json as _json
+
     from ..summary import emit_pointer, git_head_sha
 
     spec_path = Path(task_spec_path)
     out_path = Path(output_path)
     if not spec_path.exists():
-        print(_json.dumps({
-            "status": "FAIL",
-            "artifact_path": str(out_path),
-            "summary_lines": [f"task spec not found at {spec_path}"],
-            "completion_state": "failed",
-            "confidence": "high",
-            "retry_count": 0,
-        }))
+        print(
+            _json.dumps(
+                {
+                    "status": "FAIL",
+                    "artifact_path": str(out_path),
+                    "summary_lines": [f"task spec not found at {spec_path}"],
+                    "completion_state": "failed",
+                    "confidence": "high",
+                    "retry_count": 0,
+                }
+            )
+        )
         return 2
 
     task_prompt = spec_path.read_text(encoding="utf-8")
@@ -129,18 +134,23 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     # falls back to Sonnet via Agent calls, but ad-hoc mode is codex-only by design
     # (the whole point is to push bulk work outside the orchestrator's window).
     import shutil
+
     if shutil.which("codex") is None:
-        print(_json.dumps({
-            "status": "FAIL",
-            "artifact_path": str(out_path),
-            "summary_lines": [
-                "codex CLI not found on PATH",
-                "Install codex (https://github.com/openai/codex) or call this task via Agent."
-            ],
-            "completion_state": "failed",
-            "confidence": "high",
-            "retry_count": 0,
-        }))
+        print(
+            _json.dumps(
+                {
+                    "status": "FAIL",
+                    "artifact_path": str(out_path),
+                    "summary_lines": [
+                        "codex CLI not found on PATH",
+                        "Install codex (https://github.com/openai/codex) or call this task via Agent.",
+                    ],
+                    "completion_state": "failed",
+                    "confidence": "high",
+                    "retry_count": 0,
+                }
+            )
+        )
         return 127
 
     # Run codex with the task spec as input. We tell it to write the artifact
@@ -158,6 +168,7 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     )
 
     import subprocess
+
     try:
         proc = subprocess.run(
             ["codex", "exec", "-"],
@@ -168,30 +179,38 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
             cwd=str(repo),
         )
     except subprocess.TimeoutExpired:
-        print(_json.dumps({
-            "status": "FAIL",
-            "artifact_path": str(out_path),
-            "summary_lines": ["codex timed out after 600s"],
-            "completion_state": "failed",
-            "confidence": "high",
-            "retry_count": 0,
-        }))
+        print(
+            _json.dumps(
+                {
+                    "status": "FAIL",
+                    "artifact_path": str(out_path),
+                    "summary_lines": ["codex timed out after 600s"],
+                    "completion_state": "failed",
+                    "confidence": "high",
+                    "retry_count": 0,
+                }
+            )
+        )
         return 124
 
     if proc.returncode != 0 or not out_path.exists():
         # codex either errored or didn't write the artifact. Surface a bounded summary.
         stderr_tail = (proc.stderr or "").splitlines()[-3:]
-        print(_json.dumps({
-            "status": "FAIL",
-            "artifact_path": str(out_path),
-            "summary_lines": [
-                f"codex exit {proc.returncode}",
-                *[line[:200] for line in stderr_tail],
-            ][:5],
-            "completion_state": "failed",
-            "confidence": "high",
-            "retry_count": 0,
-        }))
+        print(
+            _json.dumps(
+                {
+                    "status": "FAIL",
+                    "artifact_path": str(out_path),
+                    "summary_lines": [
+                        f"codex exit {proc.returncode}",
+                        *[line[:200] for line in stderr_tail],
+                    ][:5],
+                    "completion_state": "failed",
+                    "confidence": "high",
+                    "retry_count": 0,
+                }
+            )
+        )
         return proc.returncode or 1
 
     # Artifact exists. Parse its Summary section into our SubagentOutput shape.

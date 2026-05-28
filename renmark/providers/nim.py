@@ -3,6 +3,7 @@
 The orchestrator uses this exclusively. Streaming is always on so big-model
 generations don't timeout the HTTP connection.
 """
+
 from __future__ import annotations
 
 import json
@@ -69,16 +70,12 @@ class NIMClient:
         self.timeout_s = timeout_s
 
     @classmethod
-    def from_env(cls, *, min_interval_s: float | None = None) -> "NIMClient":
+    def from_env(cls, *, min_interval_s: float | None = None) -> NIMClient:
         api_key = os.environ.get("NVIDIA_NIM_API_KEY")
         if not api_key:
             raise NIMAuthError("NVIDIA_NIM_API_KEY not set in environment")
         base = os.environ.get("NVIDIA_NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
-        interval = (
-            min_interval_s
-            if min_interval_s is not None
-            else float(os.environ.get("NIM_MIN_INTERVAL_S", "6.0"))
-        )
+        interval = min_interval_s if min_interval_s is not None else float(os.environ.get("NIM_MIN_INTERVAL_S", "6.0"))
         retries = int(os.environ.get("NIM_MAX_RETRIES_429", "5"))
         timeout = int(os.environ.get("NIM_TIMEOUT_S", "300"))
         return cls(
@@ -104,8 +101,7 @@ class NIMClient:
             )
         except NIMRateLimitError as e:
             raise NIMQuotaError(
-                "Pre-flight probe rate-limited — quota likely exhausted. "
-                "Retry later or upgrade NVIDIA NIM tier."
+                "Pre-flight probe rate-limited — quota likely exhausted. Retry later or upgrade NVIDIA NIM tier."
             ) from e
 
     def complete(
@@ -152,18 +148,13 @@ class NIMClient:
                         raise NIMAuthError(f"401 Unauthorized: {resp.text[:200]}")
                     if resp.status_code in (429, 503):
                         if attempt >= self.max_retries_429:
-                            raise NIMRateLimitError(
-                                f"HTTP {resp.status_code} after "
-                                f"{self.max_retries_429} retries"
-                            )
+                            raise NIMRateLimitError(f"HTTP {resp.status_code} after {self.max_retries_429} retries")
                         attempt += 1
                         time.sleep(delay)
                         delay = min(delay * 2, 60.0)
                         continue
                     if resp.status_code >= 400:
-                        raise NIMError(
-                            f"HTTP {resp.status_code}: {resp.text[:500]}"
-                        )
+                        raise NIMError(f"HTTP {resp.status_code}: {resp.text[:500]}")
 
                     text_chunks: list[str] = []
                     prompt_tokens = 0
@@ -178,7 +169,7 @@ class NIMClient:
                             continue
                         if not line.startswith("data: "):
                             continue
-                        data = line[len("data: "):]
+                        data = line[len("data: ") :]
                         if data == "[DONE]":
                             break
                         try:
@@ -194,9 +185,7 @@ class NIMClient:
                         usage = obj.get("usage") or {}
                         if usage:
                             prompt_tokens = int(usage.get("prompt_tokens", prompt_tokens))
-                            completion_tokens = int(
-                                usage.get("completion_tokens", completion_tokens)
-                            )
+                            completion_tokens = int(usage.get("completion_tokens", completion_tokens))
                     return NIMResponse(
                         text="".join(text_chunks),
                         prompt_tokens=prompt_tokens,
@@ -208,9 +197,7 @@ class NIMClient:
                 # (truncated SSE streams), ContentDecodingError, etc. —
                 # anything inheriting from the `requests` exception base.
                 if attempt >= self.max_retries_429:
-                    raise NIMError(
-                        f"network failure after retries: {type(e).__name__}: {e}"
-                    ) from e
+                    raise NIMError(f"network failure after retries: {type(e).__name__}: {e}") from e
                 attempt += 1
                 time.sleep(delay)
                 delay = min(delay * 2, 60.0)

@@ -1,16 +1,26 @@
 """Prompt templates for mode A (new file) and mode B (unified diff)."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 from .parser import Task
 
-
 _EXT_LANG = {
-    ".py": "Python", ".js": "JavaScript", ".mjs": "JavaScript",
-    ".ts": "TypeScript", ".tsx": "TypeScript", ".sh": "Bash",
-    ".json": "JSON", ".md": "Markdown", ".yaml": "YAML", ".yml": "YAML",
-    ".html": "HTML", ".css": "CSS", ".go": "Go", ".rs": "Rust",
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".mjs": "JavaScript",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".sh": "Bash",
+    ".json": "JSON",
+    ".md": "Markdown",
+    ".yaml": "YAML",
+    ".yml": "YAML",
+    ".html": "HTML",
+    ".css": "CSS",
+    ".go": "Go",
+    ".rs": "Rust",
 }
 
 
@@ -44,22 +54,26 @@ def mode_b_prompt(task: Task, current_contents: str, context: dict[str, str]) ->
         "FILE>>>\n",
     ]
     for ctx_path, body in context.items():
-        parts.extend([
-            f"\nAdditional read-only context (do not modify):\n",
-            f"<<<CONTEXT path={ctx_path}\n",
-            body.rstrip() + "\n",
-            "CONTEXT>>>\n",
-        ])
-    parts.extend([
-        "\nSpecification:\n",
-        task.spec + "\n",
-        "\nOutput ONLY a unified diff in `diff -u` format that:\n",
-        "- Applies cleanly with `patch -p0` from the repo root.\n",
-        f"- Modifies exactly one file: {task.target}.\n",
-        "- Uses 3 lines of context per hunk.\n",
-        "- Begins with two header lines: `--- <path>` and `+++ <path>`.\n",
-        "\nDo not include prose, markdown fences, or commentary.\n",
-    ])
+        parts.extend(
+            [
+                "\nAdditional read-only context (do not modify):\n",
+                f"<<<CONTEXT path={ctx_path}\n",
+                body.rstrip() + "\n",
+                "CONTEXT>>>\n",
+            ]
+        )
+    parts.extend(
+        [
+            "\nSpecification:\n",
+            task.spec + "\n",
+            "\nOutput ONLY a unified diff in `diff -u` format that:\n",
+            "- Applies cleanly with `patch -p0` from the repo root.\n",
+            f"- Modifies exactly one file: {task.target}.\n",
+            "- Uses 3 lines of context per hunk.\n",
+            "- Begins with two header lines: `--- <path>` and `+++ <path>`.\n",
+            "\nDo not include prose, markdown fences, or commentary.\n",
+        ]
+    )
     return "".join(parts)
 
 

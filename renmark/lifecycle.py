@@ -12,39 +12,52 @@ Strict separation from ``pipeline.json``:
 
 If lifecycle.json exceeds ~1KB it's a bug — runtime cruft has leaked in.
 """
+
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
 
 # Canonical stages in order. Skills update lifecycle.json with one of these.
 STAGES: list[str] = [
-    "init",                 # lifecycle created, no work yet
+    "init",  # lifecycle created, no work yet
     "brainstorm-complete",  # spec written
-    "plan-drafted",         # plan written, not yet validated
-    "plan-validated",       # check-plan PASS
-    "created",              # orchestrate complete
-    "verified",             # verify PASS
-    "reviewed",             # codereview + (optional) secure complete
-    "documented",           # document complete
-    "ready-to-release",     # finish flipped the marker
-    "released",             # release tagged + zip built
-    "restored",             # a /renmark:restore happened
+    "plan-drafted",  # plan written, not yet validated
+    "plan-validated",  # check-plan PASS
+    "created",  # orchestrate complete
+    "verified",  # verify PASS
+    "reviewed",  # codereview + (optional) secure complete
+    "documented",  # document complete
+    "ready-to-release",  # finish flipped the marker
+    "released",  # release tagged + zip built
+    "restored",  # a /renmark:restore happened
 ]
 
 # Skills that actually have a `plugin/skills/<name>/SKILL.md`. Stages that
 # point at anything outside this set are routed through a manual-hint fallback
 # in `next_recommended()` — vibe coders never get sent to a non-existent skill.
-IMPLEMENTED_SKILLS: frozenset[str] = frozenset({
-    "brainstorm", "check-plan", "codereview", "debug", "feature", "finish",
-    "help", "orchestrate", "plan", "resume", "roadmap", "setup", "start",
-    "verify",
-})
+IMPLEMENTED_SKILLS: frozenset[str] = frozenset(
+    {
+        "brainstorm",
+        "check-plan",
+        "codereview",
+        "debug",
+        "feature",
+        "finish",
+        "help",
+        "orchestrate",
+        "plan",
+        "resume",
+        "roadmap",
+        "setup",
+        "start",
+        "verify",
+    }
+)
 
 # Stage transitions — the router uses this to compute next_recommended.
 # Stages that previously pointed at unimplemented skills (`document`, `release`,
@@ -52,54 +65,54 @@ IMPLEMENTED_SKILLS: frozenset[str] = frozenset({
 # real next step. The legacy targets are preserved in `NEXT_BY_STAGE_PLANNED`
 # for documentation; they take effect once the skill ships.
 NEXT_BY_STAGE: dict[str, str] = {
-    "init":                  "/renmark:brainstorm",
-    "brainstorm-complete":   "/renmark:plan",
-    "plan-drafted":          "/renmark:check-plan",
-    "plan-validated":        "/renmark:orchestrate",
-    "created":               "/renmark:verify",
-    "verified":              "/renmark:codereview",
+    "init": "/renmark:brainstorm",
+    "brainstorm-complete": "/renmark:plan",
+    "plan-drafted": "/renmark:check-plan",
+    "plan-validated": "/renmark:orchestrate",
+    "created": "/renmark:verify",
+    "verified": "/renmark:codereview",
     # `documented` stage is skipped today — go straight to /renmark:finish.
-    "reviewed":              "/renmark:finish",
-    "documented":            "/renmark:finish",
+    "reviewed": "/renmark:finish",
+    "documented": "/renmark:finish",
     # `release` skill is not implemented yet — finish marks ready-to-release;
     # actual release is a manual `git tag` + `bash install.sh` zip step.
-    "ready-to-release":      "(manual: tag the release and build the zip; see README § Release)",
-    "released":              "(feature complete — start a new one with /renmark:start)",
-    "restored":              "(working tree restored — start a new feature or continue manually)",
+    "ready-to-release": "(manual: tag the release and build the zip; see README § Release)",
+    "released": "(feature complete — start a new one with /renmark:start)",
+    "restored": "(working tree restored — start a new feature or continue manually)",
 }
 
 # Aspirational routing — what NEXT_BY_STAGE will return once the named skill
 # ships. Kept here as documentation so the v0.3.x → v0.4 migration is obvious.
 NEXT_BY_STAGE_PLANNED: dict[str, str] = {
-    "reviewed":         "/renmark:document",
-    "documented":       "/renmark:finish",
+    "reviewed": "/renmark:document",
+    "documented": "/renmark:finish",
     "ready-to-release": "/renmark:release",
 }
 
 # Domain classification for context-contamination detection (G4).
 DOMAIN_BY_SKILL: dict[str, str] = {
-    "debug":       "debug",
-    "codereview":  "debug",
-    "start":       "build",
-    "brainstorm":  "build",
-    "plan":        "build",
-    "check-plan":  "build",
+    "debug": "debug",
+    "codereview": "debug",
+    "start": "build",
+    "brainstorm": "build",
+    "plan": "build",
+    "check-plan": "build",
     "orchestrate": "build",
-    "verify":      "build",
-    "finish":      "build",
-    "feature":     "build",
-    "secure":      "audit",
-    "document":    "audit",
-    "map":         "audit",
-    "research":    "audit",
-    "setup":       "meta",
-    "roadmap":     "meta",
-    "help":        "meta",
-    "resume":      "meta",
-    "release":     "meta",
-    "restore":     "meta",
-    "approve":     "meta",
-    "issue":       "meta",
+    "verify": "build",
+    "finish": "build",
+    "feature": "build",
+    "secure": "audit",
+    "document": "audit",
+    "map": "audit",
+    "research": "audit",
+    "setup": "meta",
+    "roadmap": "meta",
+    "help": "meta",
+    "resume": "meta",
+    "release": "meta",
+    "restore": "meta",
+    "approve": "meta",
+    "issue": "meta",
 }
 
 # ── Size guard ────────────────────────────────────────────────────────────────
@@ -193,10 +206,9 @@ def write_lifecycle(
     if stage is not None:
         if stage not in STAGES:
             raise ValueError(f"unknown stage {stage!r}; must be one of {STAGES}")
-        if current.stage != stage and current.stage not in current.stages_completed:
+        if current.stage != stage and current.stage != "init" and current.stage not in current.stages_completed:
             # Promote previous stage into stages_completed (idempotent).
-            if current.stage != "init" and current.stage not in current.stages_completed:
-                current.stages_completed.append(current.stage)
+            current.stages_completed.append(current.stage)
         current.stage = stage
         current.next_recommended = NEXT_BY_STAGE.get(stage, "")
 
@@ -268,7 +280,9 @@ def _resolve_next(candidate: str, stage: str) -> str:
     skill = candidate.split(":", 1)[1].split()[0]
     if skill in IMPLEMENTED_SKILLS:
         return candidate
-    return f"(manual: /renmark:{skill} is not yet implemented — see CHANGELOG / README for next step from stage {stage!r})"
+    return (
+        f"(manual: /renmark:{skill} is not yet implemented — see CHANGELOG / README for next step from stage {stage!r})"
+    )
 
 
 def domain_of(skill: str) -> str:

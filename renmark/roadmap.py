@@ -10,27 +10,26 @@ Output: a per-task table with columns:
 
 Plus a totals row (per-LLM token aggregate and project total $).
 """
+
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .state import read_usage, RENMARK_DIR_NAME
-
+from .state import RENMARK_DIR_NAME, read_usage
 
 # Approximate per-token costs (USD per 1k tokens) for cost estimates.
 # Opus Agent calls DO consume Anthropic billing (not "in-context free") — they
 # go through the user's Claude Code quota. Same for haiku/sonnet. Update as
 # pricing shifts.
 COST_PER_KT = {
-    "haiku":  0.0001,
-    "codex":  0.05,
+    "haiku": 0.0001,
+    "codex": 0.05,
     "sonnet": 0.003,
-    "opus":   0.015,                # Anthropic output pricing, rough rule-of-thumb
-    "nim":    0.0,                  # legacy: NIM removed in v0.2.0
+    "opus": 0.015,  # Anthropic output pricing, rough rule-of-thumb
+    "nim": 0.0,  # legacy: NIM removed in v0.2.0
 }
 
 # Per-Agent-call overhead: every haiku/sonnet/opus task receives ~10k tokens of
@@ -41,13 +40,13 @@ AGENT_OVERHEAD_TOKENS = 10_000
 
 @dataclass
 class RoadmapRow:
-    task: str                       # task index + title
-    llm: str                        # model name or executor
-    status: str                     # passed | failed | retried | shipped | planned | in-progress
+    task: str  # task index + title
+    llm: str  # model name or executor
+    status: str  # passed | failed | retried | shipped | planned | in-progress
     tokens: int
     cost_usd: float
-    commit: str                     # short sha or empty
-    when: str = ""                  # ISO timestamp or date
+    commit: str  # short sha or empty
+    when: str = ""  # ISO timestamp or date
 
 
 def _git_commits_for_tasks(repo: str | Path) -> dict[int, str]:
@@ -55,7 +54,10 @@ def _git_commits_for_tasks(repo: str | Path) -> dict[int, str]:
     try:
         out = subprocess.run(
             ["git", "-C", str(repo), "log", "--pretty=%h %s"],
-            check=True, capture_output=True, text=True, timeout=10,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
         ).stdout
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return {}
@@ -78,10 +80,16 @@ def _aggregate_usage(repo: str | Path) -> dict[int, dict]:
     by_task: dict[int, dict] = {}
     for r in rows:
         tid = int(r.get("task_id", 0))
-        d = by_task.setdefault(tid, {
-            "tokens_in": 0, "tokens_out": 0,
-            "models": [], "calls": 0, "last_ts": "",
-        })
+        d = by_task.setdefault(
+            tid,
+            {
+                "tokens_in": 0,
+                "tokens_out": 0,
+                "models": [],
+                "calls": 0,
+                "last_ts": "",
+            },
+        )
         d["tokens_in"] += int(r.get("prompt_tokens", 0))
         d["tokens_out"] += int(r.get("completion_tokens", 0))
         d["calls"] += 1
@@ -106,15 +114,17 @@ def build_rows(repo: str | Path) -> list[RoadmapRow]:
         models = ", ".join(u.get("models", [])) or "?"
         tokens = u.get("tokens_in", 0) + u.get("tokens_out", 0)
         cost = _estimate_cost(models, tokens)
-        rows.append(RoadmapRow(
-            task=f"task {tid}",
-            llm=_short_model(models),
-            status="shipped",
-            tokens=tokens,
-            cost_usd=cost,
-            commit=commits[tid],
-            when=u.get("last_ts", ""),
-        ))
+        rows.append(
+            RoadmapRow(
+                task=f"task {tid}",
+                llm=_short_model(models),
+                status="shipped",
+                tokens=tokens,
+                cost_usd=cost,
+                commit=commits[tid],
+                when=u.get("last_ts", ""),
+            )
+        )
 
     # Tasks with usage but no commit = attempted, not landed (in-progress or failed).
     for tid, u in usage.items():
@@ -125,15 +135,17 @@ def build_rows(repo: str | Path) -> list[RoadmapRow]:
         cost = _estimate_cost(models, tokens)
         # If retries > 1 and no commit, likely failed/escalated.
         status = "retried" if u.get("calls", 1) > 1 else "in-progress"
-        rows.append(RoadmapRow(
-            task=f"task {tid}",
-            llm=_short_model(models),
-            status=status,
-            tokens=tokens,
-            cost_usd=cost,
-            commit="",
-            when=u.get("last_ts", ""),
-        ))
+        rows.append(
+            RoadmapRow(
+                task=f"task {tid}",
+                llm=_short_model(models),
+                status=status,
+                tokens=tokens,
+                cost_usd=cost,
+                commit="",
+                when=u.get("last_ts", ""),
+            )
+        )
 
     return rows
 
@@ -167,10 +179,7 @@ def render_table(rows: list[RoadmapRow]) -> str:
     if not rows:
         return "(no roadmap data yet — run /renmark:plan and /renmark:orchestrate to populate)"
 
-    header = (
-        "| task | llm | status | tokens | $ | commit |\n"
-        "|------|-----|--------|-------:|--:|--------|\n"
-    )
+    header = "| task | llm | status | tokens | $ | commit |\n|------|-----|--------|-------:|--:|--------|\n"
     lines = []
     total_tokens = 0
     total_cost = 0.0
@@ -178,9 +187,7 @@ def render_table(rows: list[RoadmapRow]) -> str:
     for r in rows:
         cost_str = f"${r.cost_usd:.3f}" if r.cost_usd > 0 else "free"
         sha = r.commit or "—"
-        lines.append(
-            f"| {r.task} | {r.llm} | {r.status} | {r.tokens:,} | {cost_str} | `{sha}` |"
-        )
+        lines.append(f"| {r.task} | {r.llm} | {r.status} | {r.tokens:,} | {cost_str} | `{sha}` |")
         total_tokens += r.tokens
         total_cost += r.cost_usd
         by_status[r.status] = by_status.get(r.status, 0) + 1
@@ -201,8 +208,7 @@ def write_roadmap_md(repo: str | Path) -> Path:
     out = Path(repo) / RENMARK_DIR_NAME / "memory" / "roadmap.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        f"# Roadmap\n\nAuto-generated by /renmark:roadmap from features.md + usage.jsonl + git log.\n\n"
-        + table + "\n",
+        "# Roadmap\n\nAuto-generated by /renmark:roadmap from features.md + usage.jsonl + git log.\n\n" + table + "\n",
         encoding="utf-8",
     )
     return out
