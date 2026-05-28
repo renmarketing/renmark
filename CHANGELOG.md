@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.4.0 — 2026-05-28 (verify --qa / --deep-qa: live-browser E2E verification)
+
+**Minor release — verification grows a second lens. Smoke proves the happy path *responds*; QA proves it *works in a browser*; Deep QA proves it *fails gracefully at the edges*. All three are reachable from each other in one keystroke via a shared hand-off menu.**
+
+The driving goal: stop the loop of "ask to fix → find it's still broken → surgically fix what QA should have caught." Live-browser E2E that runs automatically-on-request and produces specific, reproducible findings makes the fix loop converge. Spec lived as draft at `.renmark/specs/2026-05-27-verify-qa-browser-e2e.spec.md` since v0.3.3; this release implements it as skill prose with zero new Python deps.
+
+**New shared file:**
+
+- **`plugin/skills/_shared/handoff-menu.md`** (NEW) — single source of truth for the quality-gate hand-off menu, referenced by `verify`, `verify --qa`, `verify --deep-qa`, and `codereview`. Same `_shared/` pattern as `scope-contract.md` (already excluded from the plugin linter as of v0.3.3). Documents the four canonical gate letters (`[s]` Smoke, `[qa]` QA, `[dq]` Deep QA, `[c]` Code review) plus the terminal actions, and the five rendering rules (omit the gate just run; show `[dq]` only after `--qa` passes; show `[d]` only on failure; etc.). Adding a future gate (perf, security) is now a one-file edit.
+
+**`verify --qa` — one live-browser happy-path flow:**
+
+- **Applicability gate.** Web project (per `.renmark/memory/stack.md` / `package.json`) + Chrome DevTools MCP reachable (`list_pages` probe). Non-web project → "N/A, no browser surface." MCP unavailable → degrade to shell smoke with a one-line note. Never crash, never block.
+- **Server lifecycle.** Detect-or-boot the dev server via the run command from `CLAUDE.md § Testing` / `stack.md`; record `qa_started_server` so we tear down only what we booted, never a server the user is using.
+- **Single happy-path flow** derived goal-backward from the spec's #1 user-visible behavior; driven via `navigate_page` / `take_snapshot` / `click` / `fill` / `wait_for` / `take_screenshot` / `list_console_messages` / `list_network_requests`.
+- **Pass criteria (5 hard, 2 soft).** Hard: page loads (not blank/500), no uncaught console errors, no 4xx/5xx on the path, expected result element renders (`wait_for`), no error UI. Soft: persistence + latency. Each failure names *which* criterion broke so the verdict line is specific.
+- **Context-hygiene contract — non-negotiable.** Screenshots go to `.renmark/reviews/qa/<feature>/step-N.png`; console + network dumps go into the artifact body; accessibility snapshots are used transiently to find selectors and then discarded. The orchestrator sees only the ≤5-line verdict block + artifact pointer.
+- **Artifact:** `.renmark/reviews/YYYY-MM-DD-<sha>.qa.md` via `summary.write_artifact(artifact_type="qa", generator="verify-qa", ...)`.
+
+**`verify --deep-qa` — 3 risk-ranked edge-case flows:**
+
+- **Hard gate behind a passing `--qa`.** Refuses unless a `.qa.md` artifact exists for the current sha with `completion_state="complete"` and `generator="verify-qa"`. Edge cases on a broken happy path are noise.
+- **Plan phase — risk-rank, then pick 3 (no browser yet).** Reads the diff (bounded — never pasted into chat), the feature behaviors, and `bugs.md` entries whose `files:` overlap, then ranks failure modes by likelihood using a 6-category checklist (empty/missing, boundary/size, malformed/hostile, error path, state/sequence, authz). Surfaces top 3 + one-line rationale each for user approval before opening a browser.
+- **Runs them serially**, in risk order, in the singleton main-agent browser. Pass condition is **graceful handling**: no uncaught console exception, no crash, no corrupt state, either tolerates the input OR rejects with a clear visible error — not silent no-op, not infinite spinner.
+- **Artifact:** `.renmark/reviews/YYYY-MM-DD-<sha>.deep-qa.md`; per-case evidence under `.renmark/reviews/qa/<feature>/deep/case-N/`.
+- **Why serial-in-main, not subagents:** at 1+3 flows that each dump evidence to disk and return only verdict lines, the main context never holds heavy payloads — subagent fan-out buys nothing against a singleton browser and adds coordination cost.
+
+**Three gates, mutually reachable:**
+
+- `verify` (smoke), `verify --qa`, `verify --deep-qa`, and `codereview` all now render the menu from `_shared/handoff-menu.md`, omitting the gate just run and showing `[dq]` only after `--qa` passes for the current sha and `[d]` only on a failure. Re-testing a feature from a different angle is one keystroke at any point.
+- `codereview`'s hand-off was extended: in addition to its existing `[o] Open` / `[fix] Fix` actions, it now offers Smoke + QA + (conditionally) Deep QA + Debug + Finish + Nothing.
+
+**Convergence loop (the certainty mechanism):**
+
+- Every `--qa` / `--deep-qa` failure calls `memory.log_bug` with a reproducible finding — symptom + console/error + file:line if discoverable + repro steps. A later `verify --qa` re-runs the failing flow plus the `bugs.md` regression set; the fix loop converges. No "still broken" surprises downstream.
+- Every run (pass or fail, any mode) calls `memory.append_learning` (G8 compounding).
+
+**No Python module changes required.** The browser MCP session is the main agent's; `renmark/` Python stays as-is. `summary.write_artifact` accepts `artifact_type="qa"` / `"deep-qa"` via its existing generic field; no signature changes.
+
+**Lifecycle:** `--qa` / `--deep-qa` do NOT add new stages. Both run at stage `verified` (or re-run there). The verification artifact pointer is updated via `lifecycle.write_lifecycle(artifact_update=("qa", ...))` / `("deep-qa", ...)`, but `stage` stays `verified` — codereview / finish remain the next recommended steps.
+
+**Files touched:**
+
+- New: `plugin/skills/_shared/handoff-menu.md`.
+- Modified: `plugin/skills/verify/SKILL.md` (smoke hand-off rewritten to use shared menu; full `--qa` and `--deep-qa` sections added), `plugin/skills/codereview/SKILL.md` (hand-off appends shared menu), `plugin/commands/verify.md` (description + `argument-hint` + mode-selection notes), `.renmark/specs/2026-05-27-verify-qa-browser-e2e.spec.md` (`status: draft` → `implemented` + `related_release: v0.4.0`), all 7 canonical version locations, this changelog.
+
+**Do not change:**
+
+- The hand-off menu text lives in `_shared/handoff-menu.md` and nowhere else. If you find yourself pasting the menu into a SKILL.md, stop and reference the shared file instead — drift across skills was the exact problem this directory was added to solve.
+- The Deep QA gate (`--deep-qa` refuses unless a passing `.qa.md` exists for the current sha) is load-bearing. Removing it means edge cases run against a happy path that doesn't work, producing meaningless noise.
+- The context-hygiene contract for `--qa` / `--deep-qa` (screenshots/console/network → disk; orchestrator sees only the ≤5-line verdict) is non-negotiable. If a future change makes the orchestrator ingest browser payloads, the whole point of running this in the singleton main agent is defeated — split it into a subagent flow first.
+- The browser MCP session is a singleton owned by the main agent. Do not introduce a subagent-driven browser flow; that path (subagent fan-out for many journeys) was explicitly deferred.
+
+**Verification:** 298 unit tests pass (no Python changes, no test changes), plugin lint clean, drift check clean (all 7 version locations at v0.4.0). The new skill prose is text-only and exercised by the existing lint test that checks every SKILL.md has matching frontmatter + paired command shim.
+
 ## v0.3.3 — 2026-05-27 (pipeline streamlining + research + write boundary)
 
 **Fewer commands, more done per command. The day-to-day path is now four steps (brainstorm → plan → orchestrate → finish) because validation and verification auto-run inside the steps they belong to. brainstorm gained research; the project-write boundary is now a hard rule.**

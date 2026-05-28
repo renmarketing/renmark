@@ -70,13 +70,20 @@ Codex output is parsed (or written through verbatim) and saved to `.renmark/revi
 
 ### 4. Hand off
 
-Tell the user — using ONLY the summary, never the diff body:
+Tell the user — using ONLY the summary, never the diff body. Lead with the codereview-specific actions, then render the shared quality-gate menu so re-testing from a different angle stays one keystroke away:
 
 > *"Review at `<path>`. <N critical, M major, K minor> findings.*
 > *What's next?*
 > *  [o] Open — open the review file to read the full findings*
-> *  [f] Fix — kick off a new /renmark:plan built from the critical findings*
-> *  [n] Done — stop here; the review stays on disk"*
+> *  [fix] Fix — kick off a new /renmark:plan built from the critical findings"*
+
+Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`, applying the rendering rules:
+
+- **Omit `[c] Code review`** — we just ran it.
+- **Show `[s] Smoke`** and `[qa] QA` (a finding worth re-verifying live often lives in the just-reviewed diff).
+- **Show `[dq] Deep QA`** only if a passing `.qa.md` exists for the current sha.
+- **Show `[d] Debug`** only if any Critical findings exist (Major+ alone is informational, not a debug trigger).
+- **Show `[f] Finish`** unconditionally and `[n] Nothing` always.
 
 Don't auto-fix. The human reads and decides.
 

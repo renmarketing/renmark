@@ -2,9 +2,11 @@
 artifact_type: spec
 schema_version: 1
 created_at: 2026-05-27
+implemented_at: 2026-05-28
 generator: brainstorm
 related_plan: null
-status: draft
+related_release: v0.4.0
+status: implemented
 ---
 
 # Spec — `verify --qa` / `--deep-qa`: opt-in live browser E2E in the verification stage
