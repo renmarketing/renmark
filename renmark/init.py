@@ -706,9 +706,14 @@ def _package_json(repo: Path) -> dict[str, Any] | None:
     if not p.exists():
         return None
     try:
-        return cast(dict[str, Any], json.loads(_read_text_safe(p)))
+        obj = json.loads(_read_text_safe(p))
     except json.JSONDecodeError:
         return None
+    # A non-object package.json (someone wrote a list or scalar by mistake)
+    # would type-check through cast() but crash at downstream .get() calls.
+    if not isinstance(obj, dict):
+        return None
+    return cast(dict[str, Any], obj)
 
 
 def _detect_test(repo: Path) -> Standard | None:

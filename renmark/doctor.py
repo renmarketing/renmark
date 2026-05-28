@@ -91,9 +91,14 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+        obj = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+    # Guard against valid non-object JSON (lists, scalars, null) — downstream
+    # callers use .get()/.setdefault() and would crash otherwise.
+    if not isinstance(obj, dict):
+        return {}
+    return cast(dict[str, Any], obj)
 
 
 def _backup(path: Path) -> Path | None:

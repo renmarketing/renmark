@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "renmark"
-version = "0.5.4"
+version = "0.5.5"
 description = "Multi-LLM orchestration: brainstorm, plan, orchestrate, debug, codereview. Persistent project memory."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -61,5 +61,5 @@ show_error_codes = true
 exclude = ["build/", "dist/", "\\.venv/", "tests/"]
 
 [[tool.mypy.overrides]]
-module = "requests.*"
+module = "requests"
 ignore_missing_imports = true

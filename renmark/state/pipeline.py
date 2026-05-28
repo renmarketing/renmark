@@ -53,8 +53,15 @@ def read_pipeline_state(repo_root: str | Path) -> PipelineState | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+    if not isinstance(data, dict):
+        return None
     known = {f for f in PipelineState.__dataclass_fields__}
     filtered = {k: v for k, v in data.items() if k in known}
+    # Backward compat: legacy pipeline.json (pre-v0.5.4) may have null for
+    # these list fields; coerce so the constructor receives clean defaults.
+    for list_field in ("completed_tasks", "failed_tasks"):
+        if filtered.get(list_field) is None:
+            filtered.pop(list_field, None)
     return PipelineState(**filtered)
 
 

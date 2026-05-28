@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.5.5 — 2026-05-28 (codereview fixes — 4 findings from v0.5.4 review applied)
+
+**Patch release — fixes 4 findings (2 Major, 2 Minor) raised by `/renmark:codereview` on the v0.5.4 strict-mypy commit. Codex caught real semantic bugs that the type-checker rubber-stamped because the casts were unchecked or the migration broke backward compat invisibly. These are the kind of catches that justify running adversarial review after a mechanical refactor.**
+
+The driving observation: mypy strict says "no errors" but doesn't guarantee runtime safety. v0.5.4's strict-mode pass got the count to zero by adding `cast()` calls and migrating data classes — both legitimate moves, but each created a new class of risk that codex flagged correctly in the post-commit review.
+
+**Fixes for the 2 Major findings:**
+
+- **`renmark/state/pipeline.py`** — v0.5.4 migrated `completed_tasks`/`failed_tasks` from `None + __post_init__ coercion` to `field(default_factory=list)`. Clean Python idiom, but it silently dropped the backward-compat path for legacy `pipeline.json` files (pre-v0.5.4) that stored those fields as `null`. On resume, those legacy files would crash at the first `in self.completed_tasks` or `self.failed_tasks.append(...)` call in `write_pipeline_state()`. v0.5.5 restores the safety net by **normalizing in the loader** instead of the dataclass: `read_pipeline_state()` strips `None`-valued list fields from the deserialized dict so the constructor receives clean defaults. The dataclass stays mypy-clean (no `# type: ignore` lies); the legacy compat lives where it belongs (at the I/O boundary). Also added `isinstance(data, dict)` guard for the deserialized JSON itself — a malformed pipeline.json containing a JSON array would have hit the `data.items()` call.
+
+- **`pyproject.toml [[tool.mypy.overrides]]`** — v0.5.4 added `module = "requests.*"` to ignore missing stubs. But `providers/nim.py` and `providers/openai_compat.py` use bare `import requests`, and mypy's `requests.*` pattern doesn't match the top-level package — only its submodules. So v0.5.4's "0 mypy errors" claim was environment-dependent: on a clean install without `types-requests` cached locally, mypy would have reported import errors. Fixed to `module = "requests"` (bare), which matches the actual import statements. The `requests.*` glob is unused (renmark only does top-level imports) so omitting it removes the corresponding "unused section" mypy note.
+
+**Fixes for the 2 Minor findings:**
+
+- **`renmark/doctor.py:_load_json()`** — v0.5.4 wrapped `return json.loads(path.read_text(...))` in `cast(dict[str, Any], ...)` to satisfy `-> dict[str, Any]`. But `json.loads()` can validly return any JSON type — list, scalar, null. A non-object JSON file would type-check through the cast but crash at the first `.get()` or `.setdefault()` downstream, with the type system saying everything was fine. Now: parse into `obj`, validate `isinstance(obj, dict)`, return `{}` for non-objects, then `cast()` only the verified-dict path.
+
+- **`renmark/init.py:_package_json()`** — same unchecked-cast pattern. A `package.json` that's structurally valid JSON but not an object would type-check through and crash at downstream `pkg.get("scripts", {})` calls. Same fix: `isinstance(obj, dict)` guard before the cast.
+
+**Lesson recorded:**
+
+> `cast()` is a promise to the type checker that you've verified the shape. If you haven't verified it, you're lying. v0.5.4 made 5 of these promises with `cast(dict[str, Any], json.loads(...))` and codex flagged the 2 that didn't validate. The fix isn't to remove cast — it's to do the validation cast claims you already did. Pattern locked in: `json.loads → isinstance(dict) guard → cast → return`.
+
+**All 5 pre-commit gates green:** 298 pytests passing, ruff clean, ruff format clean, mypy strict 0 errors, plugin lint clean. Pre-commit hard-fails on mypy as of v0.5.4 — that gate is enforcing.
+
+**Do not change:**
+
+- The `isinstance(obj, dict)` guards in `doctor.py:_load_json` and `init.py:_package_json`. These exist specifically because `cast()` was lying without them. Removing the guards re-introduces the v0.5.4 silent-failure mode.
+- The legacy-state normalization in `read_pipeline_state()`. Moving it to `__post_init__` reintroduces the mypy `unreachable` warnings v0.5.4 was trying to avoid AND lies to the type checker. Loader-level normalization keeps both invariants honest.
+- The `module = "requests"` override (bare, not `requests.*`). Renmark's code only does top-level `import requests`. Adding `requests.*` back generates an "unused section" note on every mypy run.
+
 ## v0.5.4 — 2026-05-28 (full strict mypy — 59 → 0, pre-commit gate flipped to hard-fail)
 
 **Patch release — closes the mypy backlog from v0.5.3. `tool.mypy` flipped from lenient to `strict = true`; all 59 strict-mode errors resolved; `tools/precommit.sh` step 5 promoted from informational soft-warn to hard-fail. Renmark's source tree now enforces full strict mypy on every commit.**
