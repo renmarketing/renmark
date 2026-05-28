@@ -69,15 +69,13 @@ else
     say "ruff not installed — skipping (install with \`pip install -e .[dev]\`)"
 fi
 
-hdr "5/5  mypy (type check)"
-# v0.5.3 baseline: mypy is informational (does NOT block commits) until the
-# 20 known errors are cleaned up. Once that backlog is fixed, flip this from
-# soft-warn to hard-fail by setting fail=1 in the else branch below.
+hdr "5/5  mypy (strict type check)"
 if command -v mypy >/dev/null 2>&1; then
     if mypy renmark/ 2>&1 | tail -5; then
         say "OK"
     else
-        say "WARN — type errors detected (informational; see tracking issue for cleanup)"
+        say "FAIL — fix type errors above"
+        fail=1
     fi
 else
     say "mypy not installed — skipping (install with \`pip install -e .[dev]\`)"

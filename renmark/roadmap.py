@@ -17,6 +17,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .state import RENMARK_DIR_NAME, read_usage
 
@@ -74,10 +75,10 @@ def _git_commits_for_tasks(repo: str | Path) -> dict[int, str]:
     return out_map
 
 
-def _aggregate_usage(repo: str | Path) -> dict[int, dict]:
+def _aggregate_usage(repo: str | Path) -> dict[int, dict[str, Any]]:
     """Per-task aggregate from usage.jsonl: total tokens, primary model, call count."""
     rows = read_usage(repo)
-    by_task: dict[int, dict] = {}
+    by_task: dict[int, dict[str, Any]] = {}
     for r in rows:
         tid = int(r.get("task_id", 0))
         d = by_task.setdefault(

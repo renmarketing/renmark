@@ -10,6 +10,7 @@ import datetime as dt
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 from ._core import USAGE_LEDGER, new_run_id, now_iso, state_dir
 
@@ -64,11 +65,11 @@ def log_agent_call(
     return rec
 
 
-def read_usage(repo_root: str | Path) -> list[dict]:
+def read_usage(repo_root: str | Path) -> list[dict[str, Any]]:
     path = state_dir(repo_root) / USAGE_LEDGER
     if not path.exists():
         return []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         raw = raw.strip()
         if not raw:

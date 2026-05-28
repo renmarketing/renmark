@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from ._core import LAST_SKILL_FILE, now_iso, state_dir
 
@@ -31,12 +32,12 @@ def record_skill_invocation(repo_root: str | Path, skill_name: str, domain: str)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def last_skill_invocation(repo_root: str | Path) -> dict | None:
+def last_skill_invocation(repo_root: str | Path) -> dict[str, Any] | None:
     path = _last_skill_path(repo_root)
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
     except (json.JSONDecodeError, OSError):
         return None
 

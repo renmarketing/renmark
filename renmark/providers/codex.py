@@ -129,9 +129,9 @@ def run_codex_task(
     except subprocess.TimeoutExpired as e:
         partial = ""
         if e.stdout:
-            partial += e.stdout if isinstance(e.stdout, str) else e.stdout.decode(errors="replace")
+            partial += e.stdout if isinstance(e.stdout, str) else e.stdout.decode(errors="replace")  # type: ignore[unreachable]
         if e.stderr:
-            partial += e.stderr if isinstance(e.stderr, str) else e.stderr.decode(errors="replace")
+            partial += e.stderr if isinstance(e.stderr, str) else e.stderr.decode(errors="replace")  # type: ignore[unreachable]
         return CodexResult(
             exit_code=124,
             output_tail=f"[codex timed out after {timeout_s}s]\n{partial[-2000:]}",

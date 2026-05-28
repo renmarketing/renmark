@@ -71,7 +71,7 @@ def _print(msg: str = "") -> None:
     print(msg, flush=True)
 
 
-def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
+def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
 
 
@@ -155,7 +155,7 @@ def _default_tokens_for_complexity(complexity: str) -> int:
     return {"simple": 200, "medium": 1000, "hard": 4000}.get(complexity, 1000)
 
 
-def _task_signature(task) -> str:
+def _task_signature(task: Task) -> str:
     """Compact signature used in routing memory entries."""
     import fnmatch  # noqa: F401
 
@@ -170,7 +170,7 @@ def _task_signature(task) -> str:
     return f"target={glob}, complexity={task.complexity}, mode={task.mode}"
 
 
-def _memory_log_outcome(repo: Path, task, outcome: str, run_id: str, note: str = "") -> None:
+def _memory_log_outcome(repo: Path, task: Task, outcome: str, run_id: str, note: str = "") -> None:
     """Append a routing.md entry after each task completes. Best-effort."""
     try:
         from .. import memory as _mem
@@ -335,7 +335,7 @@ def execute_plan(
 
     needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
 
-    def _runner(task: Task, _repo: Path):
+    def _runner(task: Task, _repo: Path) -> _dispatch.TaskResult:
         """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
         ok, reason, used, sha = _execute_task(
             task=task,
@@ -480,6 +480,8 @@ def execute_plan(
         return 0
 
     # Failure path: write pause state and exit non-zero.
+    # Both early-return branches above guarantee failed_task is non-None here.
+    assert failed_task is not None
     write_pause(
         repo,
         PauseState(

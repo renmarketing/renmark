@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 from pathlib import Path
+from typing import Any
 
 from . import _core
 from ._core import (
@@ -56,13 +57,13 @@ def append_log(log_path: Path, *messages: str) -> None:
             fh.write(f"[{ts}] {m}\n")
 
 
-def recent_logs(repo_root: str | Path, n: int = 10) -> list[dict]:
+def recent_logs(repo_root: str | Path, n: int = 10) -> list[dict[str, Any]]:
     """Return the n most-recent log entries with name, size, modified-time.
 
     Sorted newest first.
     """
     d = logs_dir(repo_root)
-    items: list[dict] = []
+    items: list[dict[str, Any]] = []
     for f in d.glob("*.log"):
         st = f.stat()
         items.append(

@@ -7,6 +7,7 @@ orchestrator's shared git globals, so they live apart from the execution engine.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from ..state import now_iso, read_usage
 
@@ -17,7 +18,7 @@ def cmd_usage(repo: Path) -> int:
         print(f"No usage recorded yet at {repo}/.renmark/state/usage.jsonl")
         return 0
 
-    def tok(r: dict) -> int:
+    def tok(r: dict[str, Any]) -> int:
         return int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
 
     today_prefix = now_iso()[:10]
@@ -45,7 +46,7 @@ def cmd_usage(repo: Path) -> int:
             print(f"  {m:<40} {d['calls']:>6} {d['prompt']:>8} {d['completion']:>8} {total:>8}")
 
     # Per-run breakdown (today only, to keep it readable).
-    by_run: dict[str, dict] = {}
+    by_run: dict[str, dict[str, Any]] = {}
     for r in today_rows:
         rid = r.get("run_id", "?")
         d = by_run.setdefault(rid, {"calls": 0, "tokens": 0, "first": r.get("ts", "")})
@@ -58,7 +59,7 @@ def cmd_usage(repo: Path) -> int:
             print(f"  {rid:<28} {d['calls']:>6} {d['tokens']:>8}  {d['first']}")
 
     # Top tasks this month (catch tasks that ate tokens via retries).
-    by_task: dict[tuple, dict] = {}
+    by_task: dict[tuple[Any, ...], dict[str, Any]] = {}
     for r in month_rows:
         key = (r.get("task_id"), r.get("model", "?").split("/")[-1])
         d = by_task.setdefault(key, {"calls": 0, "tokens": 0})
@@ -104,7 +105,7 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
 
     Reads a task-spec markdown file (prompt + context paths, no inline code),
     dispatches to Codex, writes the artifact to <output_path>. Emits a
-    SubagentOutput-shaped JSON dict to stdout for the orchestrator to consume.
+    SubagentOutput-shaped JSON dict[str, Any] to stdout for the orchestrator to consume.
     Honors G5 (executor isolation) and G11 (task isolation).
     """
     import json as _json

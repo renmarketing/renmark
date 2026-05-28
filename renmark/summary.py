@@ -18,6 +18,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from renmark.verifier import run_verifier
 
@@ -181,10 +182,10 @@ def emit_pointer(path: Path | str, label: str, *, n_lines: int = MAX_SUMMARY_LIN
     return "\n".join([header, *bullets])
 
 
-def read_metadata(path: Path | str) -> dict:
+def read_metadata(path: Path | str) -> dict[str, Any]:
     """Parse the YAML frontmatter block at the top of an artifact.
 
-    Returns an empty dict if the file lacks frontmatter. Does NOT pull in
+    Returns an empty dict[str, Any] if the file lacks frontmatter. Does NOT pull in
     a YAML library — we control the writer's format, so a tiny line parser
     is sufficient and dependency-free.
     """
@@ -201,7 +202,7 @@ def read_metadata(path: Path | str) -> dict:
         return {}
 
     block = text[3:end].strip("\n")
-    result: dict = {}
+    result: dict[str, Any] = {}
     current_list_key: str | None = None
     for raw in block.splitlines():
         line = raw.rstrip()

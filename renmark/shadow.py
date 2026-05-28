@@ -4,7 +4,7 @@ subsystems.
 How it works:
 
     1. Each subsystem registers a deterministic ``replay(case)`` function
-       that maps an input dict to an output dict. Pure, no side effects.
+       that maps an input dict[str, Any] to an output dict. Pure, no side effects.
     2. Cases live in ``tests/shadow/cases/<subsystem>/case-*.json``.
     3. Baselines (last-known-good outputs) live in
        ``tests/shadow/baselines/<subsystem>/case-*.json``.
@@ -39,7 +39,7 @@ from typing import Any
 
 # ── Registry ─────────────────────────────────────────────────────────────────
 
-ReplayFn = Callable[[dict], dict]
+ReplayFn = Callable[[dict[str, Any]], dict[str, Any]]
 _REGISTRY: dict[str, ReplayFn] = {}
 
 
@@ -61,7 +61,7 @@ def registered_subsystems() -> list[str]:
 
 
 @register("dispatch")
-def _replay_dispatch(case: dict) -> dict:
+def _replay_dispatch(case: dict[str, Any]) -> dict[str, Any]:
     """Input: {"response": <dict-or-string>}
     Output: SubagentOutput.to_dict() OR {"error": "...class.message"}"""
     from renmark.dispatch import IsolationViolation, parse_subagent_response
@@ -77,7 +77,7 @@ def _replay_dispatch(case: dict) -> dict:
 
 
 @register("lifecycle")
-def _replay_lifecycle(case: dict) -> dict:
+def _replay_lifecycle(case: dict[str, Any]) -> dict[str, Any]:
     """Input: {"calls": [{"stage": ..., "feature": ...}, ...]}
     Output: final lifecycle state (asdict) with last_updated stripped (non-deterministic).
     """
@@ -100,9 +100,9 @@ def _replay_lifecycle(case: dict) -> dict:
 
 
 @register("summary")
-def _replay_summary(case: dict) -> dict:
+def _replay_summary(case: dict[str, Any]) -> dict[str, Any]:
     """Input: {"metadata": {...}}
-    Output: ArtifactMetadata serialized as a dict (deterministic — strip created_at).
+    Output: ArtifactMetadata serialized as a dict[str, Any] (deterministic — strip created_at).
     """
     from dataclasses import asdict
 
@@ -127,8 +127,8 @@ class ShadowDiff:
     subsystem: str
     case: str
     result: str
-    expected: dict | None = None
-    actual: dict | None = None
+    expected: dict[str, Any] | None = None
+    actual: dict[str, Any] | None = None
     error: str | None = None
 
 
@@ -236,7 +236,7 @@ def accept_subsystem(subsystem: str, message: str) -> int:
 
 
 def _normalize(value: Any) -> Any:
-    """Sort dict keys recursively so ordering doesn't cause false drift."""
+    """Sort dict[str, Any] keys recursively so ordering doesn't cause false drift."""
     if isinstance(value, dict):
         return {k: _normalize(value[k]) for k in sorted(value.keys())}
     if isinstance(value, list):
@@ -244,7 +244,7 @@ def _normalize(value: Any) -> Any:
     return value
 
 
-def _format_dict_diff(expected: dict, actual: dict, indent: str = "    ") -> str:
+def _format_dict_diff(expected: dict[str, Any], actual: dict[str, Any], indent: str = "    ") -> str:
     """Tiny per-key diff for human-readable run output."""
     lines: list[str] = []
     all_keys = sorted(set(expected.keys()) | set(actual.keys()))

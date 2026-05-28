@@ -48,11 +48,12 @@ def run_verifier(
             timeout=timeout_s,
         )
     except subprocess.TimeoutExpired as e:
+        # text=True above, so stdout/stderr are str when TimeoutExpired fires.
         partial = ""
         if e.stdout:
-            partial += e.stdout if isinstance(e.stdout, str) else e.stdout.decode(errors="replace")
+            partial += e.stdout if isinstance(e.stdout, str) else e.stdout.decode(errors="replace")  # type: ignore[unreachable]
         if e.stderr:
-            partial += e.stderr if isinstance(e.stderr, str) else e.stderr.decode(errors="replace")
+            partial += e.stderr if isinstance(e.stderr, str) else e.stderr.decode(errors="replace")  # type: ignore[unreachable]
         msg = f"[verifier timed out after {timeout_s}s]\n{partial}"
         return VerifierResult(
             exit_code=124,

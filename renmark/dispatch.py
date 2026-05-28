@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -72,7 +73,12 @@ def validate_wave(wave: list[Task]) -> None:
     if len(targets) != len(wave):
         dup = [t.target for t in wave]
         seen: set[str] = set()
-        repeated = [x for x in dup if x in seen or seen.add(x)]
+        repeated: list[str] = []
+        for x in dup:
+            if x in seen:
+                repeated.append(x)
+            else:
+                seen.add(x)
         raise ValueError(
             f"parallel wave has overlapping targets: {sorted(set(repeated))}. "
             f"Tasks in the same parallel_group must touch disjoint files."
@@ -90,7 +96,7 @@ def dispatch_wave(
     wave: list[Task],
     *,
     repo: Path,
-    run_task,  # callable: (task: Task, repo: Path) -> TaskResult
+    run_task: Callable[[Task, Path], TaskResult],
     max_workers: int | None = None,
 ) -> WaveResult:
     """Run all non-Claude tasks in a wave concurrently.
@@ -134,7 +140,7 @@ def dispatch_wave(
     return result
 
 
-def _run_one(run_task, task: Task, repo: Path) -> TaskResult:
+def _run_one(run_task: Callable[[Task, Path], TaskResult], task: Task, repo: Path) -> TaskResult:
     start = time.monotonic()
     try:
         r = run_task(task, repo)
@@ -169,7 +175,7 @@ def estimate_wave_cost(wave: list[Task]) -> tuple[int, float]:
 # dispatch_task_isolated enforces the contract: violations raise IsolationViolation.
 
 import json as _json
-from typing import Literal
+from typing import Any, Literal
 
 
 class IsolationViolation(RuntimeError):
@@ -215,7 +221,7 @@ class SubagentInput:
     dependency_summaries: list[str] = field(default_factory=list)
     verifier_expectations: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_spec": self.task_spec,
             "required_files": list(self.required_files),
@@ -265,7 +271,7 @@ class SubagentOutput:
         if self.confidence not in SUBAGENT_OUTPUT_CONFIDENCE_VALUES:
             raise IsolationViolation(f"SubagentOutput.confidence={self.confidence!r} invalid")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "artifact_path": self.artifact_path,
@@ -280,7 +286,7 @@ class SubagentOutput:
         }
 
 
-def parse_subagent_response(response: dict | str) -> SubagentOutput:
+def parse_subagent_response(response: dict[str, Any] | str) -> SubagentOutput:
     """Parse a subagent's response into a SubagentOutput, refusing any
     payload that includes fields outside SUBAGENT_OUTPUT_FIELDS.
 
@@ -339,12 +345,12 @@ def dispatch_task_isolated(
     *,
     dependency_summaries: list[str] | None = None,
     upstream_artifact_pointers: list[str] | None = None,
-    subagent_runner,
+    subagent_runner: Callable[[SubagentInput], dict[str, Any] | str],
 ) -> SubagentOutput:
     """Run one task in an isolated subagent context with strict I/O bounds.
 
     ``subagent_runner`` is a callable that takes a SubagentInput and returns
-    a dict or JSON string representing the subagent's response. This is the
+    a dict[str, Any] or JSON string representing the subagent's response. This is the
     injection point for the actual executor (codex subprocess, Agent tool
     call, or a test mock). Whatever it returns is then validated through
     parse_subagent_response — extra fields raise IsolationViolation.

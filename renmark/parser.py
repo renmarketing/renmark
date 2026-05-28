@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 
 class PlanError(ValueError):
@@ -61,7 +62,7 @@ def parse_plan(path: str | Path) -> list[Task]:
     lines = p.read_text(encoding="utf-8").splitlines()
 
     tasks: list[Task] = []
-    current: dict | None = None
+    current: dict[str, Any] | None = None
     spec_lines: list[str] | None = None
     reading_spec = False
     line_no = 0
@@ -173,7 +174,7 @@ def _parse_list(raw: str) -> list[str]:
     return [i for i in items if i]
 
 
-def _build_task(d: dict) -> Task:
+def _build_task(d: dict[str, Any]) -> Task:
     required = ("mode", "target", "verifier")
     for k in required:
         v = d.get(k)

@@ -329,8 +329,8 @@ def main(argv: list[str] | None = None) -> int:
         issues = drift_report(repo)
         if issues:
             sys.stderr.write(f"Canonical version (VERSION): {canonical}\n")
-            for i in issues:
-                sys.stderr.write(f"  - {i}\n")
+            for issue in issues:
+                sys.stderr.write(f"  - {issue}\n")
             sys.stderr.write(f"FAIL ({len(issues)} drift{'s' if len(issues) != 1 else ''})\n")
             return 1
         sys.stdout.write(f"OK  all {len(VERSION_FILES)} version locations at v{canonical}\n")

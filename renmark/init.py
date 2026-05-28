@@ -38,6 +38,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import Any, cast
 
 # ── Scan configuration ───────────────────────────────────────────────────────
 
@@ -700,12 +701,12 @@ def _parse_pyproject_table(repo: Path, table: str) -> str | None:
     return text if re.search(rf"^\[{re.escape(table)}\]", text, re.MULTILINE) else None
 
 
-def _package_json(repo: Path) -> dict | None:
+def _package_json(repo: Path) -> dict[str, Any] | None:
     p = repo / "package.json"
     if not p.exists():
         return None
     try:
-        return json.loads(_read_text_safe(p))
+        return cast(dict[str, Any], json.loads(_read_text_safe(p)))
     except json.JSONDecodeError:
         return None
 

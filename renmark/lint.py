@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 # ── Frontmatter parsing (zero-dep mini-YAML) ─────────────────────────────────
 
@@ -26,7 +27,7 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?\n)---\s*\n", re.DOTALL)
 _KV_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*):\s*(.*)$")
 
 
-def parse_frontmatter(text: str) -> dict | None:
+def parse_frontmatter(text: str) -> dict[str, Any] | None:
     """Extract a top-level YAML frontmatter block as a dict. Returns None if
     no frontmatter is present. Only handles the flat key:value form — that
     is the entire Claude Code SKILL.md / command convention.

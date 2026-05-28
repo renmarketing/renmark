@@ -9,8 +9,9 @@ separation from lifecycle.json: pipeline.json carries RUNTIME fields only
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any, cast
 
 from . import _core
 from ._core import (
@@ -30,15 +31,11 @@ class PipelineState:
     current_plan: str = ""  # path to plan file
     wave_index: int = 0
     wave_total: int = 0
-    completed_tasks: list[int] = None  # type: ignore[assignment]
-    failed_tasks: list[int] = None  # type: ignore[assignment]
+    completed_tasks: list[int] = field(default_factory=list)
+    failed_tasks: list[int] = field(default_factory=list)
     last_updated: str = ""
 
     def __post_init__(self) -> None:
-        if self.completed_tasks is None:
-            self.completed_tasks = []
-        if self.failed_tasks is None:
-            self.failed_tasks = []
         if not self.last_updated:
             self.last_updated = now_iso()
 
@@ -122,7 +119,7 @@ def _wave_summaries_dir(repo_root: str | Path) -> Path:
     return d
 
 
-def write_wave_summary(repo_root: str | Path, wave_index: int, task_outputs: list[dict]) -> Path:
+def write_wave_summary(repo_root: str | Path, wave_index: int, task_outputs: list[dict[str, Any]]) -> Path:
     """Write the aggregated per-task summaries for one wave.
 
     task_outputs is a list of dicts conforming to SubagentOutput (status,
@@ -144,12 +141,12 @@ def write_wave_summary(repo_root: str | Path, wave_index: int, task_outputs: lis
     return path
 
 
-def read_wave_summary(repo_root: str | Path, wave_index: int) -> dict | None:
+def read_wave_summary(repo_root: str | Path, wave_index: int) -> dict[str, Any] | None:
     path = _wave_summaries_dir(repo_root) / f"wave-{wave_index}.json"
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
     except (json.JSONDecodeError, OSError):
         return None
 

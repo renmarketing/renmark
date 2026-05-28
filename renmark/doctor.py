@@ -28,8 +28,10 @@ import datetime as _dt
 import json
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, cast
 
 # ── Where renmark expects to live ─────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ class Check:
     detail: str
     fix_cmd: str = ""  # shell command the user can run to remediate
     auto_fixable: bool = False  # whether --fix can resolve this
-    fix_fn: object = None  # callable that applies the fix (set by checker)
+    fix_fn: Callable[[], str] | None = None  # callable that applies the fix (set by checker)
 
 
 @dataclass
@@ -85,11 +87,11 @@ def _current_version() -> str | None:
     return VERSION_FILE.read_text(encoding="utf-8").strip() or None
 
 
-def _load_json(path: Path) -> dict:
+def _load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
     except json.JSONDecodeError:
         return {}
 

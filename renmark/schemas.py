@@ -233,7 +233,7 @@ def validate_artifact_metadata(data: Any) -> list[str]:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _check_fields(data: dict, spec: dict[str, tuple], scope: str) -> list[str]:
+def _check_fields(data: dict[str, Any], spec: dict[str, tuple[Any, ...]], scope: str) -> list[str]:
     issues: list[str] = []
     for field, (expected_type, required) in spec.items():
         if field not in data:

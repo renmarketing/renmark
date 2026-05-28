@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.5.4 — 2026-05-28 (full strict mypy — 59 → 0, pre-commit gate flipped to hard-fail)
+
+**Patch release — closes the mypy backlog from v0.5.3. `tool.mypy` flipped from lenient to `strict = true`; all 59 strict-mode errors resolved; `tools/precommit.sh` step 5 promoted from informational soft-warn to hard-fail. Renmark's source tree now enforces full strict mypy on every commit.**
+
+The driving idea: v0.5.3 shipped the infrastructure with mypy in soft-warn mode and 20 known errors. v0.5.4 closes that gap so the gates are real, not aspirational. Every commit from this point forward MUST pass strict type-checking — the discipline that catches real bugs at edit time instead of at runtime.
+
+**Real bugs caught by strict mypy (now fixed in source):**
+
+- **`renmark/release.py:332`** — `for i in issues` shadowed an outer `i = 0` int counter from an earlier loop, then was used as a string in the inner loop body. `[assignment]` error caught a genuine variable shadowing bug. Renamed to `for issue in issues`.
+- **`renmark/dispatch.py:75`** — clever list-comp using `set.add()` as a side-effect was relying on `set.add` returning None (falsy). `[func-returns-value]` flagged it as a likely mistake; refactored to an explicit for-loop with clear intent.
+- **`renmark/cli/_engine.py:488-495`** — three `Task | None` accesses past early-return guards. mypy couldn't narrow across multiple if-return branches. Added an `assert failed_task is not None` at the join point so the type narrowing is explicit. (Also documents the invariant for future readers.)
+- **`renmark/doctor.py:373`** — `c.fix_fn()` called on `Optional[object]` field; mypy's `[operator]` error correctly flagged "object not callable". Field typed as `Callable[[], str] | None` instead.
+- **`renmark/state/pipeline.py:33-41`** — `__post_init__` None-check on dataclass fields that were typed as `list[int]` (with `# type: ignore[assignment]` lying about the default value). mypy correctly reported the post-init branches as `[unreachable]`. Refactored to `field(default_factory=list)` — the idiomatic Python pattern for mutable defaults. The `# type: ignore` lies are gone.
+- **`renmark/init.py:579`** — Python 3.10 syntax error fixed in v0.5.3 (backslash in f-string subexpression). Confirmed clean.
+
+**Bulk mechanical fixes (no runtime behavior change):**
+
+- **33 `[type-arg]` resolved** — bare `dict` and `tuple` in type position parameterized as `dict[str, Any]` and `tuple[Any, ...]`. Applied across 15 files via a regex pass with careful isolation (the script avoided `isinstance(x, dict)` calls, which would have been an illegal `isinstance(x, dict[str, Any])` and broke runtime). 4 files needed manual repair after the regex pass (`__future__` imports got bumped, fixed). Tests stayed green throughout.
+- **6 `[no-untyped-def]` resolved** — added explicit `Task`, `Callable[[Task, Path], TaskResult]`, and `"_dispatch.TaskResult"` annotations to `_task_signature`, `_memory_log_outcome`, `_runner`, `dispatch_wave.run_task`, `_run_one.run_task`, `dispatch_task_isolated.subagent_runner`.
+- **5 `[no-any-return]` resolved** — `return json.loads(...)` patterns wrapped in `cast(dict[str, Any], ...)` to preserve runtime behavior while satisfying the declared return type. Added `from typing import cast` where needed.
+- **4 `[unreachable]` from subprocess.TimeoutExpired** — bytes/str disjoint-base checks in `verifier.py` and `providers/codex.py`. Added `# type: ignore[unreachable]` on those specific lines (the code IS unreachable when `text=True`, but the defensive branch handles a hypothetical caller that disables `text=True` later).
+- **2 `[import-untyped]`** — added `[[tool.mypy.overrides]]` for `requests.*` with `ignore_missing_imports = true` (avoids a `types-requests` dev dependency for a transitive-only import in providers).
+
+**`tools/precommit.sh` flipped to hard-fail:**
+
+- Step 5 header renamed `5/5 mypy (type check)` → `5/5 mypy (strict type check)` to reflect the new posture.
+- Old soft-warn branch (`say "WARN — type errors detected (informational)"`) removed.
+- Replaced with hard-fail: `fail=1` on any mypy error, just like the other 4 steps. No way to commit through a broken type-check without `--no-verify`.
+
+**Updated `pyproject.toml [tool.mypy]`:**
+
+- `strict = false` → `strict = true`.
+- Removed the `check_untyped_defs = true` line (subsumed by `strict`).
+- Added `[[tool.mypy.overrides]] module = "requests.*"` with `ignore_missing_imports = true` (replaces the dropped tests.* override which was generating an "unused section" warning since `tests/` is in `exclude`).
+
+**Acceptance criteria:**
+
+> Step 5/5 of `tools/precommit.sh` says `OK`, not `WARN`, when run from a clean tree.
+
+Status after v0.5.4:
+- ✅ 298 pytests passing
+- ✅ ruff check: 0 errors (after final `--unsafe-fixes` clean-up + `ruff format`)
+- ✅ ruff format: 0 reformat needs
+- ✅ **mypy strict: 0 errors** (was 59)
+- ✅ plugin lint clean
+- ✅ drift check clean
+- ✅ pre-commit: 5/5 OK in ~3s
+
+**Do not change:**
+
+- The `cast(dict[str, Any], json.loads(...))` pattern at the json.loads return sites. `json.loads()` is typed as returning `Any`, which is fine in most callers but defeats the purpose of typed function returns. cast() preserves the typed surface without runtime overhead. Don't refactor to `# type: ignore` — that hides the seam.
+- The `assert failed_task is not None` in `cli/_engine.py:482`. Looks redundant because the preceding if-return branches GUARANTEE non-None, but mypy can't narrow across multi-branch returns. The assert serves both as type narrowing AND as a runtime invariant (cheap; only fires if we ever break the narrowing).
+- The hard-fail in `tools/precommit.sh` step 5. Backing off to soft-warn would let regressions slip in. If a strict mypy error blocks an urgent commit, fix the type — don't relax the gate.
+- The `# type: ignore[unreachable]` markers in `verifier.py` and `providers/codex.py`. The bytes branch of the TimeoutExpired stdout/stderr handling is technically dead when `text=True`, but exists as defense in depth if `text=True` is ever removed. Deleting the bytes branch would silently lose the protection.
+
 ## v0.5.3 — 2026-05-28 (self-host — dev standards tightened: ruff strict, mypy lenient, GitHub Actions CI, 5-step pre-commit)
 
 **Patch release — renmark adopts its own dev-standards prescriptions. Closes the 4 warn-level gaps surfaced when `/renmark:init` first ran against the renmark source repo at v0.5.2. The infrastructure now matches what renmark recommends to managed projects: linter + formatter + type-checker + CI + pre-commit, all wired into a single `tools/precommit.sh` script.**
