@@ -26,6 +26,29 @@ Three steps: verify everything still passes → show what was built → offer ne
 
 Run each task's verifier from the plan, or `npm test` / `pytest -q` if a test suite exists. If any fail: **stop**, report which ones, route to `/renmark:debug`.
 
+### 1.5 Refresh the project map
+
+Now that verifiers pass and the branch is in its final shape, refresh the codebase map:
+
+```bash
+python -m renmark.init
+```
+
+The script byte-equality-skips: if shape didn't change (e.g. this feature only fixed bugs), no files are written — zero cache bust, zero churn. The stdout line tells you exactly what happened: `stub=unchanged map=unchanged` vs `stub=refreshed map=refreshed`.
+
+**If the script wrote anything** (stdout shows `refreshed` or `created` for any of stub/agents/map), commit it as part of this branch:
+
+```bash
+# Stage only files the script actually touches
+git add CLAUDE.md AGENTS.md .renmark/memory/project-map.md 2>/dev/null
+# Only commit if there's something to commit
+git diff --cached --quiet || git commit -m "docs: refresh project map"
+```
+
+This puts the map refresh on the feature branch — the PR's diff includes the doc updates, and merging the feature merges the refreshed map.
+
+Add the script's stdout line to the eventual report (step 3 / [p] PR body / etc.) as `Project map: <stdout>`.
+
 ### 2. Show branch summary
 
 ```bash

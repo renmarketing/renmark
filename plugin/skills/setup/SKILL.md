@@ -107,6 +107,22 @@ Create any missing memory seed files from templates:
 - If `.gitignore` exists, check for those entries and add if missing
 - If not a git repo, ask: *"Initialize git repo? [Y/n]"* — on Y run `git init -b main && git add -A`
 
+### 5.5 Seed the project map (first-time only)
+
+If `.renmark/memory/project-map.md` does not yet exist, seed it now:
+
+```bash
+python -m renmark.init
+```
+
+This populates the `<!-- BEGIN:project-stub -->` block in CLAUDE.md (and AGENTS.md if it exists) and writes `.renmark/memory/project-map.md`. The script is deterministic Python — no LLM tokens spent.
+
+**Skip silently if `project-map.md` already exists** — setup is bootstrap-only. Subsequent refreshes happen automatically at the end of `/renmark:finish`, or manually via `/renmark:init`.
+
+If the script exits 1 (CLAUDE.md missing — shouldn't happen since step 2 just created it), note in the report and continue. If it exits 2 (corrupted markers), surface the message and stop; the user has to resolve manually.
+
+Capture the script's stdout line and roll it into step 6's report as `project-map — <stdout>`.
+
 ### 6. Report and hand off
 
 ```
@@ -117,6 +133,7 @@ AGENTS.md   — [created | synced with CLAUDE.md changes]
 CHANGELOG.md — [created | already exists — left as-is]
 .renmark/   — [created | already exists]
 stack.md    — Node.js + Express + SQLite (detected — verify in .renmark/memory/stack.md)
+project-map — [seeded (.renmark/memory/project-map.md) | already existed — skipped]
 ```
 
 Then prompt:

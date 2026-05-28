@@ -1,5 +1,57 @@
 # Changelog
 
+## v0.5.0 — 2026-05-28 (/renmark:init — codebase map + dev-standards/health scanner)
+
+**Minor release — renmark gains its own analog to Claude Code's native `/init`, but designed around context-window hygiene from day one. Walk into any project (greenfield or production) and get a verdict: what the code looks like, what standards the project enforces, and where the standards are loose enough to break things.**
+
+The driving observation: CLAUDE.md is loaded into the system prompt on every turn of every conversation, forever. Embedding a 2-3k-token project map in CLAUDE.md would be paid permanently as context tax — worse than re-running `find` + `grep` on demand. So the design splits content by access pattern: tiny stub in always-loaded context (~200-300 tokens), full payload in on-demand files (`.renmark/memory/project-map.md`, `.renmark/memory/dev-standards.md`).
+
+**New command — `/renmark:init`:**
+
+- **`plugin/commands/init.md`**, **`plugin/skills/init/SKILL.md`** (NEW) — thin command stub + skill dispatcher. The skill's only job is to invoke `python -m renmark.init` and relay the one-line summary; agents do no scanning, no regex, no rendering. Token cost per invocation: near-zero (just script stdout).
+- **`/renmark:init --deep`** — opt-in flag for slower checks: samples last 20 git commits for conventional-commits style. Reserved for future expensive checks (GitHub branch-protection lookups, test-naming inference). Baseline scan runs without the flag.
+- **`/renmark:init scan`** — diagnostic mode; prints what would be detected, writes nothing.
+
+**New Python module — `renmark/init.py`:**
+
+- **Project map scanner.** Walks the repo respecting `.gitignore` (excludes `.git`, `node_modules`, `.venv`, `dist`, `build`, `.next`, `target`, `.renmark/state`, `.renmark/debug`, etc.). Detects stack from `pyproject.toml` / `package.json` / `go.mod` / `Cargo.toml` / Claude Code plugin manifest. Extracts public symbols from the top-20 largest source files for Python, JS/TS, Go, Rust, Ruby. Caps modules table at 40 rows, symbols-per-file at 6, top-level layout at 7 dirs. No file bodies, no docstring transcripts.
+- **11 dev-standard detectors.** Test (pytest/jest/vitest/cargo/go), lint (ruff/flake8/eslint/rubocop/clippy), formatter (black/ruff format/prettier/rustfmt/gofmt), type-checker (mypy/pyright/tsc-strict), CI (GitHub Actions/GitLab/CircleCI — extracts workflow names), pre-commit (`.pre-commit-config.yaml` hooks + Husky), env schema (`.env.example` key names only, never values), database/migrations (alembic/prisma/drizzle/knex), local-dev startup (npm scripts/Makefile/docker-compose), code style (`.editorconfig`), dep policy (dependabot/renovate/lockfiles).
+- **11 standards-health gap checks** with severity ranking. 🚨 danger: `.env` committed without `.gitignore` entry; multiple JS package-manager lockfiles concurrently. ⚠ warn: no linter; no type checker (or tsconfig without `"strict": true`); no tests in a >10-file project; test framework configured but zero test files; linter not wired to pre-commit OR CI; no CI on a multi-file project; pre-commit AND CI both missing; missing lockfile when `package.json` exists. ℹ info: no `.gitignore`; no README. Each gap carries a *tighten-this* recommendation pointing to the exact remediation.
+- **Byte-equality skip on every artifact.** If the rendered stub body matches the existing `<!-- BEGIN:project-stub -->` block in CLAUDE.md, the file is not rewritten — no prompt-cache bust. Same check for `project-map.md` and `dev-standards.md` (stripping the timestamp header line so the freshness stamp doesn't trigger spurious rewrites).
+
+**Three artifacts, three access patterns:**
+
+- **CLAUDE.md / AGENTS.md stub** (always-loaded, ~250 tokens) — stack one-liner, top-level layout, `Dev gates:` line listing test/lint/typecheck/CI commands when detected, and pointers to the on-demand files. The gates line is conditional: greenfield projects with no detected standards produce a stub with no gates line at all.
+- **`.renmark/memory/project-map.md`** (on-demand, opt-in payload) — full directory tree, modules table with symbols, user-facing commands catalog. Read by agents that need to navigate the codebase.
+- **`.renmark/memory/dev-standards.md`** (on-demand, opt-in payload) — detected-standards table + standards-health section with severity-ranked gaps and recommendations. Read by agents about to make non-trivial changes.
+
+**Auto-refresh hooks wired into the pipeline:**
+
+- **`/renmark:setup`** — step 5.5 seeds the project map and dev-standards on first run (skipped if `project-map.md` already exists). One-time bootstrap.
+- **`/renmark:finish`** — step 1.5 refreshes both artifacts after verifiers pass but before the branch summary. If the byte-equality skip says nothing changed (e.g. feature only fixed bugs, no shape change), no files are written, no commit is made, no cache is busted. If anything changed, files are staged and committed as `docs: refresh project map` so the refresh ships with the feature.
+- **`/renmark:init`** — manual escape hatch for hand-edited or out-of-pipeline changes.
+- **Explicitly NOT hooked into `/renmark:orchestrate` or `/renmark:debug`** — those run too frequently for the cost-to-value ratio. Per-task or per-fix refreshes would bust the CLAUDE.md cache 5-15 times per feature for the same information value finish would refresh once.
+
+**stdout contract — what the agent sees:**
+
+```
+OK  stub=<created|refreshed|unchanged> agents=<…|skipped> map=<…> standards=<…> modules=N commands=N langs=py,ts,… ref=YYYY-MM-DD@<git-sha>
+HEALTH: N gaps (X danger, Y warn, Z info) — see `.renmark/memory/dev-standards.md`
+```
+
+The HEALTH line only appears when at least one gap exists. A clean project produces just the OK line.
+
+**Other changes:**
+
+- **`plugin/skills/help/SKILL.md`** — `/renmark:init` added to the command catalog.
+- **`.claude-plugin/marketplace.json`** — skills list updated to include `init`.
+
+**Do not change:**
+
+- Changelog format — renmark reads and appends to this file automatically; the `## [date] — [title]` heading shape is parsed by the version-drift gate and the release-notes generator.
+- The byte-equality skip logic in `renmark.init` — without it, every `/renmark:finish` would rewrite CLAUDE.md and bust the prompt cache for every conversation in the project. The skip is what makes the auto-refresh strategy affordable.
+- The "stub vs payload" split — moving full module/symbol detail back into CLAUDE.md would re-introduce the context-tax problem this release was designed to solve.
+
 ## v0.4.0 — 2026-05-28 (verify --qa / --deep-qa: live-browser E2E verification)
 
 **Minor release — verification grows a second lens. Smoke proves the happy path *responds*; QA proves it *works in a browser*; Deep QA proves it *fails gracefully at the edges*. All three are reachable from each other in one keystroke via a shared hand-off menu.**

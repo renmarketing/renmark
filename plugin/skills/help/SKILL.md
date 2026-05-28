@@ -45,6 +45,11 @@ Commands:
       Multi-pass diff review: codex (adversarial bug-finding), sonnet
       (quality), opus (architecture/security on hot files).
 
+  /renmark:init
+      Scan the repo and write a project map (file tree, modules, public
+      functions, commands) into a managed block in CLAUDE.md and AGENTS.md.
+      Renmark's analog to Claude Code's native /init. Idempotent.
+
   /renmark:help
       This message.
 
