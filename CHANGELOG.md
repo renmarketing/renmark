@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.5.2 — 2026-05-28 (distribution readiness — LICENSE, install.ps1, Codex prompt, vibe-coder README)
+
+**Patch release — makes the zip safely distributable to vibe coders on any of the three OS paths (Mac/Linux/WSL, native Windows). Closes the four real distribution blockers identified during the v0.5.1 audit: missing LICENSE file, no Windows installer, stale README, no Codex handling.**
+
+**Reason for shipping now:** the audience is non-technical vibe coders sharing the zip hand-to-hand. They won't manually copy folders into `%USERPROFILE%\.claude\plugins\` and they won't hand-edit `settings.json`. Without `install.ps1`, Windows users would hit the same silent failure WSL did before v0.5.1 — installer "succeeds" but `/renmark:*` commands never appear. v0.5.2 closes that gap so every supported OS has a single command that produces a working install.
+
+**New: LICENSE file (legal blocker for redistribution):**
+
+- **`LICENSE`** (NEW) — MIT License text at repo root. `pyproject.toml` already declared MIT but the actual license text was missing from both the repo and the release zip. MIT redistribution requires the text shipped alongside the code; without it, anyone who pulls the zip can't legally redistribute. v0.5.2 ships the LICENSE file in the zip.
+
+**New: `install.ps1` (Windows PowerShell installer):**
+
+- **`install.ps1`** (NEW) — Mirrors `install.sh` for native Windows. Uses NTFS **junctions** (directory aliases that don't require admin/elevation) instead of symlinks, with a copy-fallback if junctions fail (uncommon — usually a corporate AppLocker policy). Performs the same 4 steps as the bash version: plugin install → `pip install -e .` → Codex prompt → `python -m renmark.doctor --fix` for registry/settings.json registration.
+- **`-Uninstall` flag** — removes everything bash uninstall does: junction/copy, cache directory, settings.json entries, installed_plugins.json entries.
+- **`-NoCodex` flag** — for scripted/non-interactive installs that should skip the Codex prompt.
+
+**New: Codex CLI detection + offer-to-install (both installers):**
+
+- **`install.sh`** — after the pip install step, detects whether `codex` is on PATH. If missing AND stdin is a terminal AND npm is available, prompts: *"Install Codex CLI now via npm? [Y/n]"*. On Y, runs `npm install -g @openai/codex` and prints the `codex login` reminder. On N or non-interactive, prints the manual install steps. If npm itself is missing, prints the Node.js install URL + manual steps. Codex is OPTIONAL — without it, `executor: codex` tasks fall back to Sonnet automatically, so the prompt is a recommendation not a hard requirement.
+- **`install.ps1`** — same logic in PowerShell. Same prompt, same fallbacks, same package name (`@openai/codex` — Codex CLI bundles per-platform binaries, so the npm command is identical on all three OSes).
+
+**README rewrite for vibe-coder audience:**
+
+- **`README.md`** — replaced the stale `unzip ai-system-renmark-v0.3.0-*.zip` example with a version-agnostic `v*` glob. Rewrote the Windows section from "manually copy folders into `%USERPROFILE%\.claude\plugins\renmark\` (which won't work — the silent-failure bug)" to `.\install.ps1`. Added a dedicated **Codex CLI** section explaining when to install it and the one-line install command. Added **Troubleshooting** section explaining what to do if `/renmark:*` commands don't appear (`python -m renmark.doctor --fix`).
+- **WSL-vs-Windows-native note** — explicit callout: if Claude Code is running inside WSL Ubuntu, use `install.sh` not `install.ps1`. PowerShell installer only registers with `%USERPROFILE%\.claude\` which Claude Code under WSL doesn't read.
+
+**Do not change:**
+
+- **The `@openai/codex` npm package name.** Codex CLI uses an optional-platform-dependencies pattern that bundles per-OS binaries (`@openai/codex-linux-x64`, `@openai/codex-darwin-arm64`, `@openai/codex-win32-x64`) — the parent `@openai/codex` package resolves the right binary at install time. One install command works on every supported OS.
+- **The junction-then-copy fallback in install.ps1.** Junctions don't need admin, copies don't either, but copies break the "edit source → see changes" workflow. We prefer junction so dogfooding stays live; the copy is only a last resort when corporate policy blocks junctions entirely.
+- **`-NoCodex` as opt-out (not opt-in).** Defaulting to "ask about Codex" is the vibe-coder-friendly behavior; CI/scripted callers can pass `-NoCodex` to suppress the prompt. Flipping the default would silently skip a recommended dependency for most users.
+
 ## v0.5.1 — 2026-05-28 (/renmark:doctor + install.sh self-registers with Claude Code)
 
 **Patch release — fixes the silent-install failure mode discovered during v0.5.0 dogfooding. The canonical `install.sh` only created symlinks; Claude Code requires THREE additional entries in `~/.claude/settings.json` and `~/.claude/plugins/installed_plugins.json` before slash commands appear. Without them, `/renmark:*` silently doesn't show up — the worst-possible UX for a vibe-coder-targeted tool whose first impression depends on a clean install.**

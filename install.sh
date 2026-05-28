@@ -96,6 +96,49 @@ if command -v pip3 >/dev/null 2>&1; then
         || echo "Package: pip install skipped (no setup.py/pyproject.toml or already installed)"
 fi
 
+# ── Codex CLI (optional) ──────────────────────────────────────────────────────
+# Codex is the third-party CLI from OpenAI that renmark dispatches `executor: codex`
+# tasks to. Without it, those tasks fall back to Sonnet automatically — renmark
+# still works, just at higher token cost on bulk-emit tasks. We detect it and
+# (interactively) offer to install. Non-interactive callers (CI, scripted
+# installs) skip the prompt and just print guidance.
+if command -v codex >/dev/null 2>&1; then
+    echo "Codex:   $(codex --version 2>/dev/null | head -1) (already installed)"
+else
+    echo ""
+    echo "Codex CLI is not installed."
+    echo "  renmark uses Codex (OpenAI) as the cheap bulk-emission executor."
+    echo "  Without it, codex-tagged tasks fall back to Sonnet (more expensive,"
+    echo "  but works fine). Codex is OPTIONAL but recommended."
+    echo ""
+    if command -v npm >/dev/null 2>&1; then
+        # Interactive only — if stdin isn't a terminal, skip the prompt
+        if [[ -t 0 ]]; then
+            read -r -p "Install Codex CLI now via npm? [Y/n] " codex_ans
+            codex_ans="${codex_ans:-Y}"
+            if [[ "$codex_ans" =~ ^[Yy] ]]; then
+                echo "  Installing @openai/codex globally…"
+                if npm install -g @openai/codex 2>&1 | tail -3; then
+                    echo "Codex:   installed via npm"
+                    echo "         (you'll need to authenticate with \`codex login\` once)"
+                else
+                    echo "Codex:   npm install failed — see https://github.com/openai/codex"
+                fi
+            else
+                echo "Codex:   skipped (install later: npm install -g @openai/codex)"
+            fi
+        else
+            echo "  Non-interactive install — skipping prompt."
+            echo "  To enable Codex later:  npm install -g @openai/codex && codex login"
+        fi
+    else
+        echo "  npm is not installed. To enable Codex:"
+        echo "    1. Install Node.js (https://nodejs.org)"
+        echo "    2. npm install -g @openai/codex"
+        echo "    3. codex login"
+    fi
+fi
+
 # ── Claude Code registry + settings.json (CRITICAL) ──────────────────────────
 # A directory-marketplace plugin needs THREE registrations to surface its
 # slash commands:
