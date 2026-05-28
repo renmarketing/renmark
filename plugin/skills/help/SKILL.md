@@ -50,6 +50,11 @@ Commands:
       functions, commands) into a managed block in CLAUDE.md and AGENTS.md.
       Renmark's analog to Claude Code's native /init. Idempotent.
 
+  /renmark:doctor
+      Diagnose Claude Code plugin install health. Run when /renmark:*
+      commands aren't appearing or after a version bump. Pass --fix to
+      auto-repair settings.json + registry entries.
+
   /renmark:help
       This message.
 

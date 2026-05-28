@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.5.1 — 2026-05-28 (/renmark:doctor + install.sh self-registers with Claude Code)
+
+**Patch release — fixes the silent-install failure mode discovered during v0.5.0 dogfooding. The canonical `install.sh` only created symlinks; Claude Code requires THREE additional entries in `~/.claude/settings.json` and `~/.claude/plugins/installed_plugins.json` before slash commands appear. Without them, `/renmark:*` silently doesn't show up — the worst-possible UX for a vibe-coder-targeted tool whose first impression depends on a clean install.**
+
+**New command — `/renmark:doctor`:**
+
+- **`plugin/commands/doctor.md`**, **`plugin/skills/doctor/SKILL.md`** (NEW) — thin command stub + skill dispatcher. The skill invokes `python -m renmark.doctor` and relays its checklist output; agents do no diagnosis work themselves.
+- **`/renmark:doctor`** — runs 9 health checks: CLI on PATH, Python package importable, VERSION file present, plugin manifest version parity, Claude Code registry registration, settings.json marketplace registration, settings.json plugin-enabled flag, cache install path resolves to source, convenience symlink. Each check prints a ✓ / ✗ / ! glyph, a one-line detail, and (for failures) a `fix:` line.
+- **`/renmark:doctor --fix`** — applies safe auto-fixes for the four known-remediable failures (add to `extraKnownMarketplaces`, set `enabledPlugins[…] = true`, register in `installed_plugins.json`, create the cache version symlink). Every modified file gets a timestamped `.doctor.bak.<unix-time>` backup first.
+- **`/renmark:doctor --json`** — machine-readable output for scripting (CI, integration with editor extensions, etc.).
+
+**New Python module — `renmark/doctor.py`:**
+
+- 9 deterministic checks. Read-only by default; `--fix` writes only to `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, and `~/.claude/plugins/cache/renmark-local/<version>/`.
+- Each `Check` carries: name, status (`pass` / `fail` / `warn`), one-line detail, optional `fix_cmd` for users to run manually, and (when auto-fixable) a callable that applies the fix idempotently.
+- Detects 4 specific drift modes that cause silent load failure: (1) version mismatch between VERSION file and installed_plugins.json registry, (2) missing `extraKnownMarketplaces.renmark-local` (cache file `known_marketplaces.json` is regenerated from this — editing only the cache doesn't stick), (3) missing `enabledPlugins["renmark@renmark-local"] = true`, (4) cache symlink pointing to a non-existent or wrong-version directory.
+
+**`install.sh` now self-registers:**
+
+- After the symlink and pip-install steps, calls `python -m renmark.doctor --fix` to write the three required registry entries automatically. Same Python logic that `/renmark:doctor` uses to repair broken installs — DRY, with backups always taken before writes.
+- `install.sh --uninstall` now also removes the renmark entries from `settings.json` and `installed_plugins.json`, and wipes `~/.claude/plugins/cache/renmark-local/`. Pre-v0.5.1 uninstalls left dangling registry entries that surfaced as "Plugin not found in marketplace" warnings in the `/plugin` UI.
+- Post-install banner adds `/renmark:doctor` to the skill list.
+
+**Background — why this matters:**
+
+A directory-marketplace Claude Code plugin needs THREE moving parts to surface its slash commands:
+
+1. `~/.claude/plugins/installed_plugins.json` — registry entry under `<plugin>@<marketplace>`, with `version` matching the marketplace's current version (drift causes silent skip), and `installPath` pointing to an existing directory.
+2. `~/.claude/settings.json` → `extraKnownMarketplaces.<marketplace-name>` — tells Claude Code where the marketplace lives. The cache file `~/.claude/plugins/known_marketplaces.json` is *derived* from this; editing only the cache doesn't survive a reload.
+3. `~/.claude/settings.json` → `enabledPlugins["<plugin>@<marketplace>"] = true` — Claude Code requires explicit enable for directory marketplaces. Without this, the plugin loads (no error) but commands don't appear in the slash menu.
+
+A plain `install.sh` that only writes symlinks misses #2 and #3 entirely, and the resulting failure is silent — `/reload-plugins` reports "1 error during load" without naming the plugin. v0.5.1 closes that gap.
+
+**Other changes:**
+
+- **`plugin/skills/help/SKILL.md`** — `/renmark:doctor` added to the command catalog with a hint about when to use it.
+
+**Do not change:**
+
+- The doctor module's "read-only by default" stance. Making it edit settings.json without `--fix` would surprise users who run it for diagnosis.
+- The `.doctor.bak.<timestamp>` naming convention for backups. The integration tests and rollback procedures assume that pattern.
+- The decision to delegate install-time registry writes to `python -m renmark.doctor --fix`. Pulling the JSON-edit logic into raw bash inside install.sh would duplicate it and re-create the maintenance burden v0.5.1 was designed to eliminate.
+
 ## v0.5.0 — 2026-05-28 (/renmark:init — codebase map + dev-standards/health scanner)
 
 **Minor release — renmark gains its own analog to Claude Code's native `/init`, but designed around context-window hygiene from day one. Walk into any project (greenfield or production) and get a verdict: what the code looks like, what standards the project enforces, and where the standards are loose enough to break things.**

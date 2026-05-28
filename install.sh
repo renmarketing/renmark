@@ -23,11 +23,45 @@ done
 if [[ "${1:-}" == "--uninstall" ]]; then
     rm -f "$CLAUDE_PLUGINS_DIR/renmark"
     rm -f "$LOCAL_BIN_DIR/renmark-execute"
+    # Remove from settings.json + installed_plugins.json + cache symlink
+    python3 - <<'PY' || echo "Settings cleanup: skipped (python3 not available or settings.json missing)"
+import json, pathlib, shutil, sys
+
+claude = pathlib.Path.home() / ".claude"
+settings = claude / "settings.json"
+installed = claude / "plugins" / "installed_plugins.json"
+cache_root = claude / "plugins" / "cache" / "renmark-local"
+
+if settings.exists():
+    s = json.loads(settings.read_text())
+    changed = False
+    if "extraKnownMarketplaces" in s and "renmark-local" in s["extraKnownMarketplaces"]:
+        del s["extraKnownMarketplaces"]["renmark-local"]
+        changed = True
+    if "enabledPlugins" in s and "renmark@renmark-local" in s["enabledPlugins"]:
+        del s["enabledPlugins"]["renmark@renmark-local"]
+        changed = True
+    if changed:
+        settings.write_text(json.dumps(s, indent=4))
+        print("Settings: removed renmark entries from settings.json")
+
+if installed.exists():
+    d = json.loads(installed.read_text())
+    if "renmark@renmark-local" in d.get("plugins", {}):
+        del d["plugins"]["renmark@renmark-local"]
+        installed.write_text(json.dumps(d, indent=2))
+        print("Registry: removed renmark@renmark-local from installed_plugins.json")
+
+if cache_root.exists():
+    shutil.rmtree(cache_root)
+    print(f"Cache:    removed {cache_root}")
+PY
     if [[ -L "$DEV_HOOK_PATH" ]]; then
         rm -f "$DEV_HOOK_PATH"
         echo "Dev hook removed: $DEV_HOOK_PATH"
     fi
     echo "renmark uninstalled."
+    echo "Run \`/reload-plugins\` in Claude Code to drop the slash commands from the menu."
     exit 0
 fi
 
@@ -62,6 +96,26 @@ if command -v pip3 >/dev/null 2>&1; then
         || echo "Package: pip install skipped (no setup.py/pyproject.toml or already installed)"
 fi
 
+# ── Claude Code registry + settings.json (CRITICAL) ──────────────────────────
+# A directory-marketplace plugin needs THREE registrations to surface its
+# slash commands:
+#   1. ~/.claude/plugins/installed_plugins.json  → entry under "renmark@renmark-local"
+#   2. ~/.claude/settings.json → extraKnownMarketplaces.renmark-local
+#   3. ~/.claude/settings.json → enabledPlugins["renmark@renmark-local"] = true
+# The symlinks above are necessary but not sufficient. We delegate the
+# registration to `python -m renmark.doctor --fix` since that's the same
+# logic /renmark:doctor uses to repair installs — DRY, and the script
+# writes backups of every config it touches.
+if command -v python3 >/dev/null 2>&1; then
+    if python3 -c "import renmark.doctor" 2>/dev/null; then
+        echo ""
+        echo "Registering with Claude Code (settings.json + installed_plugins.json):"
+        python3 -m renmark.doctor --fix 2>&1 | grep -E "^(Applying|  •|\[)" | head -20 || true
+    else
+        echo "Registry: skipped (renmark.doctor not importable yet — re-run install.sh after pip succeeds)"
+    fi
+fi
+
 # ── Dev hook (--dev) ──────────────────────────────────────────────────────────
 # Symlinks .git/hooks/pre-commit → tools/precommit.sh so every commit runs
 # pytest + drift check + lint before allowing the commit to land.
@@ -89,6 +143,7 @@ renmark v${VERSION} installed.
 Skills:
   /renmark:start       — vibe coder entry: describe what you want, renmark builds the rest
   /renmark:setup       — prepare any project for renmark workflow
+  /renmark:init        — scan repo: project map + dev-standards/health report
   /renmark:brainstorm  — design a feature into a spec
   /renmark:plan        — decompose spec into executor-tagged tasks
   /renmark:check-plan  — validate plan before spending tokens
@@ -99,6 +154,7 @@ Skills:
   /renmark:debug       — systematic root-cause loop
   /renmark:codereview  — single-pass Codex diff review
   /renmark:roadmap     — project status and token usage report
+  /renmark:doctor      — diagnose install health (run if /renmark:* not surfacing)
   /renmark:help        — list all skills
 
 CLI:
