@@ -224,8 +224,8 @@ def log_decision(
             # Look for **Date:** within this ADR block (up to next ADR header).
             block_start = m.end()
             block_end = adr_iter[i + 1].start() if i + 1 < len(adr_iter) else len(text)
-            block = text[block_start:block_end]
-            date_m = re.search(r"^\*\*Date:\*\*\s*(\S+)", block, flags=re.MULTILINE)
+            adr_body = text[block_start:block_end]
+            date_m = re.search(r"^\*\*Date:\*\*\s*(\S+)", adr_body, flags=re.MULTILINE)
             if date_m and date_m.group(1).strip() == target_date:
                 return  # Duplicate ADR — no-op.
     except Exception:
