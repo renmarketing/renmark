@@ -345,6 +345,11 @@ def validate_artifact_refs(
     Returns a list of issue dicts with keys: severity, kind, artifact, path,
     detail. BLOCK issues come first (in artifacts insertion order), then WARN
     issues sorted by artifact key alphabetically.
+
+    Issue ``kind`` values: ``missing_path`` (BLOCK for plan/spec, else WARN),
+    ``out_of_tree`` (WARN — path is absolute or escapes the project subtree;
+    further checks are skipped), ``unreachable_sha`` (WARN), ``stale_artifact``
+    (WARN).
     """
     if state is None:
         state = read_lifecycle(repo)
@@ -356,7 +361,26 @@ def validate_artifact_refs(
     warn_issues: list[dict[str, str]] = []
 
     for key, path_str in state.artifacts.items():
-        resolved = (repo_path / path_str) if not Path(path_str).is_absolute() else Path(path_str)
+        raw = Path(path_str)
+        try:
+            resolved = raw.resolve() if raw.is_absolute() else (repo_path / raw).resolve()
+            resolved.relative_to(repo_path.resolve())  # raises ValueError if outside
+            inside_repo = True
+        except (ValueError, OSError):
+            inside_repo = False
+
+        if not inside_repo:
+            warn_issues.append(
+                {
+                    "severity": "WARN",
+                    "kind": "out_of_tree",
+                    "artifact": key,
+                    "path": path_str,
+                    "detail": f"artifact {key!r} resolves outside project subtree"[:120],
+                }
+            )
+            continue
+
         if not resolved.exists():
             severity = "BLOCK" if key in {"plan", "spec"} else "WARN"
             issue: dict[str, str] = {
