@@ -53,6 +53,25 @@ else:
 "
 ```
 
+### 1.5 Validate artifact freshness
+
+Cross-check that every artifact referenced in lifecycle state still exists and is current. Still **zero LLM calls** — one extra file read per artifact (frontmatter only).
+
+```bash
+python3 -c "
+from pathlib import Path
+from renmark.lifecycle import validate_artifact_refs
+issues = validate_artifact_refs(Path('.'))
+for i in issues:
+    icon = '❌ BLOCK' if i['severity'] == 'BLOCK' else '⚠ WARN'
+    print(f\"{icon} {i['kind']}: {i['artifact']} @ {i['path']} — {i['detail']}\")
+if any(i['severity'] == 'BLOCK' for i in issues):
+    raise SystemExit(2)
+"
+```
+
+Each WARN prints as `⚠ <kind>: <artifact> @ <path>`; each BLOCK prints as `❌ BLOCK <kind>: <artifact> @ <path>`. On any BLOCK the skill exits non-zero (code 2) so the user investigates before continuing.
+
 ### 2. Surface pending approval gates
 
 If `human_review_required` is true and `human_review_completed` is false, the user MUST be told about the pending gate before any other recommendation. The next action is always `/renmark:approve` until the gate is cleared.
@@ -97,3 +116,5 @@ Resume is a reporting skill — there is no automatic handoff. The user reads th
 ## Governance compliance
 
 Resume IS the G7/G10/G12 recovery surface — it reads `lifecycle.json` (+ `pipeline.json` for `--resume` hints) and recommends the next step in ≤5 lines (G3), zero LLM calls, writing no workflow state. Other G-rules are N/A (it dispatches nothing and emits no artifact). See `CLAUDE.md` governance rules for definitions.
+
+- Step 1.5 reads frontmatter from each referenced artifact (`spec`, `plan`, …) to cross-check `source_sha` + `stale_after`. Still zero LLM calls; bounded output (one line per issue, at most a few issues per healthy lifecycle).
