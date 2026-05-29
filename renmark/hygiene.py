@@ -74,9 +74,7 @@ def _ensure_archive_under_renmark(repo: Path, archive_root: Path) -> Path:
     try:
         resolved.relative_to(renmark_root)
     except ValueError as e:
-        raise ValueError(
-            f"archive_root must live under {renmark_root}, got {resolved}"
-        ) from e
+        raise ValueError(f"archive_root must live under {renmark_root}, got {resolved}") from e
     return resolved
 
 
@@ -236,9 +234,7 @@ def prune_memory(
     for name in _MEMORY_LOGS:
         try:
             report.deduped += memory.dedupe_memory_log(repo, name, dry_run=dry_run)
-            report.aged_out += memory.age_out_memory_log(
-                repo, name, days, archive_root, dry_run=dry_run
-            )
+            report.aged_out += memory.age_out_memory_log(repo, name, days, archive_root, dry_run=dry_run)
             report.files_touched.append(name)
         except OSError as e:
             report.errors.append(f"{name}: {e}")
@@ -317,11 +313,7 @@ def main(argv: list[str] | None = None) -> int:
         prune_report = prune_memory(repo, days=args.memory_days, dry_run=dry_run)
 
     if scan_report is not None:
-        archived_n = (
-            scan_report.archived
-            if args.apply
-            else len(scan_report.archived_paths)
-        )
+        archived_n = scan_report.archived if args.apply else len(scan_report.archived_paths)
         print(
             f"HYGIENE  mode={mode_label}  scanned={scan_report.scanned}  "
             f"archived={archived_n}  kept={scan_report.kept}  "
@@ -333,10 +325,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if prune_report is not None:
         files_csv = ",".join(n.removesuffix(".md") for n in prune_report.files_touched)
-        print(
-            f"MEMORY   deduped={prune_report.deduped}  "
-            f"aged_out={prune_report.aged_out}  files={files_csv}"
-        )
+        print(f"MEMORY   deduped={prune_report.deduped}  aged_out={prune_report.aged_out}  files={files_csv}")
 
     # Error handling — only persist when --apply was used.
     all_errors: list[str] = []

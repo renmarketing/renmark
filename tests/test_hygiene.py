@@ -180,11 +180,7 @@ def test_prune_ages_out_old_bugs(tmp_path: Path) -> None:
     bugs = tmp_path / ".renmark" / "memory" / "bugs.md"
     _write_memory_file(
         bugs,
-        (
-            "# Bugs\n\n"
-            f"## {_iso_days_ago(200)[:10]}\n\nOld bug\n\n"
-            f"## {_iso_days_ago(0)[:10]}\n\nNew bug\n"
-        ),
+        (f"# Bugs\n\n## {_iso_days_ago(200)[:10]}\n\nOld bug\n\n## {_iso_days_ago(0)[:10]}\n\nNew bug\n"),
     )
 
     report = prune_memory(tmp_path, days=180, dry_run=False)

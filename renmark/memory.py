@@ -384,9 +384,7 @@ def dedupe_memory_log(repo: str | Path, name: str, *, dry_run: bool = False) -> 
             f"allowed: {list(_DEDUPE_ALLOWED)}; curated: {list(_CURATED_FILES)}"
         )
     if name not in _DEDUPE_ALLOWED:
-        raise ValueError(
-            f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}"
-        )
+        raise ValueError(f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}")
     ensure_memory(repo)
     path = memory_dir(repo) / name
     text = path.read_text(encoding="utf-8")
@@ -456,9 +454,7 @@ def age_out_memory_log(
             f"allowed: {list(_DEDUPE_ALLOWED)}; curated: {list(_CURATED_FILES)}"
         )
     if name not in _DEDUPE_ALLOWED:
-        raise ValueError(
-            f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}"
-        )
+        raise ValueError(f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}")
     ensure_memory(repo)
     path = memory_dir(repo) / name
     text = path.read_text(encoding="utf-8")
