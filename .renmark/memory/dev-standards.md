@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-05-28 @ 95f0d9d -->
+<!-- Last refreshed: 2026-05-29 @ 560b746 -->
 
 # Dev standards — ai-system
 

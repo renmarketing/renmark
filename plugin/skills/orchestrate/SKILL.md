@@ -147,6 +147,10 @@ Codex tasks are ledgered by `renmark-execute` directly — do NOT call `log_agen
 
 For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, tail_lines=3)`. Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
 
+**3d. Escalation decision log**
+
+When a task is escalated to a higher-tier executor, an ADR is appended to `.renmark/memory/decisions.md` via `memory.log_escalation_decision()`. This is automatic — handled inside `renmark/cli/_engine.py`'s `_record_escalation` when `escalated_to=` is passed. Idempotent on (title, date): re-running the same escalation on the same day does not duplicate the ADR. Best-effort: decision-logging failures do NOT break orchestrate. Pointer-only — the orchestrator never reads `decisions.md` into conversation.
+
 ### 4. Aggregate wave summary
 
 After all tasks in the wave finish:

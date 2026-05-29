@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.5.6 — 2026-05-29 (lifecycle hygiene — decision log enforcement, artifact GC, memory prune, resume validation)
+
+**Patch release — closes the gap between renmark's artifact-first doctrine and its actual enforcement. The `stale_after` / `created_at` / `source_sha` metadata schema in `renmark/summary.py` and `memory.log_decision()` in `renmark/memory.py` were both designed in earlier releases but had no consumer wired in. v0.5.6 builds the sweepers and enforcers that close the loop — turning aspirational metadata into operational hygiene.**
+
+The driving idea: artifacts decay. Decisions get forgotten across `/clear`. Escalations happen silently inside `_engine.py` and leave no trail. The schema fields were already there — what was missing was the code that READS them and acts. v0.5.6 ships that code: a hygiene CLI, a resume-time validator, an idempotent decision logger, and a finish-time ADR write.
+
+**What shipped:**
+
+- **`memory.log_decision()` is now idempotent on `(title, date)`.** New helpers in `renmark/memory.py`: `dedupe_memory_log` (collapses duplicate ADR sections in curated files), `age_out_memory_log` (archives entries older than N days from append-only logs), and `log_escalation_decision` (writes a structured ADR when an executor escalates). Same `(title, date)` short-circuits — so rerunning the same plan on the same day no longer duplicates every ADR.
+- **`lifecycle.validate_artifact_refs(repo, state=None)`** cross-checks paths + `source_sha` + `stale_after` for every artifact tracked in `lifecycle.json`. Returns a list of BLOCK / WARN findings with explicit reasons. `hygiene` added to `DOMAIN_BY_SKILL` as `meta` — diagnostic, not a pipeline stage.
+- **New `renmark/hygiene.py` module + `python -m renmark.hygiene` CLI** with `scan | prune | all` subcommands and `--apply / --ttl-days / --memory-days / --include-memory` flags. Archives stale artifacts to `.renmark/archive/YYYY-MM/` preserving repo-relative paths under the archive root. Default dry-run; writes are opt-in via `--apply`. Refuses any `archive_root` outside the project tree (raises `ValueError`).
+- **`_record_escalation` in `renmark/cli/_engine.py`** now accepts `escalated_to: str | None = None`. When non-None, it calls `memory.log_escalation_decision()` best-effort (try/except: pass — never breaks orchestrate). Every meaningful executor escalation now leaves an ADR in `decisions.md` — the WHY survives `/clear`.
+- **New `/renmark:hygiene` skill + `plugin/commands/hygiene.md` dispatcher.** Thin command stub; the skill invokes `python -m renmark.hygiene` and relays its output. **`/renmark:resume` now runs `validate_artifact_refs` as Step 1.5** and emits BLOCK/WARN lines; exits `SystemExit(2)` when any BLOCK is present. Ghost references are caught before re-entry, not after.
+- **`/renmark:finish` documents (and runs) a single `log_decision()` write at branch close** — captures feature name, branch, stage transition, and completed stages. Idempotent on `(title, date)`, so re-running finish on the same day is safe.
+
+**Why this matters for vibe coders:** `decisions.md` becomes the persistent WHY across `/clear` — re-entering a project two weeks later, the ADRs are still there and the reasoning isn't lost. `.renmark/` no longer grows unbounded — `python -m renmark.hygiene prune --apply` archives stale plan/spec/review/verification artifacts into `.renmark/archive/YYYY-MM/`. `/renmark:resume` catches dangling artifact pointers (deleted plans, renamed specs, stale-after-deadline reviews) before they cause downstream confusion. And executor escalations — previously a silent fact about a run — now leave an audit trail. Together they make renmark's promise of "artifacts over conversation" enforced, not aspirational.
+
+**Acceptance gates:**
+
+- ✅ pytest: 64 new tests + all existing tests passing (total 335 + 28 skipped)
+- ✅ ruff check + ruff format: clean
+- ✅ mypy strict: 0 errors (38 source files)
+- ✅ plugin lint: OK
+- ✅ 5/5 pre-commit gates OK
+
+**Codex codereview pass applied before merge (4 Major fixes):**
+
+A `/renmark:codereview` over the feature branch surfaced 4 Major findings. All were fixed on the same branch before merge; v0.5.6 ships with the helpers actually working on real renmark memory files (not just the synthetic shapes the original tests covered).
+
+- **`renmark/memory.py`** — `dedupe_memory_log` and `age_out_memory_log` rewired to parse the REAL on-disk schemas: `### YYYY-MM-DD — Title` entries under H2 section headers for `features.md` / `bugs.md`, and `- ` bullets under H2 sections for `learnings.md`. The original H2-only parser worked on synthetic tests but was a no-op on production files. Tests now produce entries via the writer functions (`log_feature`, `log_bug`, `append_learning`) so readers round-trip with writers. Bullet parser also tightened to stop at paragraph breaks (`(Empty — will fill…)` placeholders no longer get absorbed into the last bullet's signature). Migrated `dt.utcnow()` → `dt.now(timezone.utc)` along the way (kept on `datetime.timezone.utc` rather than `dt.UTC` for Python 3.10 compatibility).
+- **`renmark/hygiene.py`** — lifecycle artifact refs normalized via `Path.resolve()` before comparison. Absolute paths and repo-relative paths now match consistently; a verify run that stored `str(absolute_path)` is no longer mis-detected as unreferenced and prematurely archived. Ghost-ref counting uses the same normalization.
+- **`renmark/lifecycle.py`** — `validate_artifact_refs` now emits `WARN` with `kind="out_of_tree"` for any artifact path that resolves outside the project subtree (absolute paths, `..`-escapes). `/renmark:resume` can no longer be tricked into trusting files outside `.renmark/` via a crafted `lifecycle.json` ref. Existing `BLOCK`/`WARN` semantics for missing/stale/unreachable artifacts and the BLOCK-first stable ordering are preserved.
+- **Tests** — updated/added across `test_memory.py`, `test_hygiene.py`, `test_lifecycle.py`: real-schema dedupe + age-out cases via writer functions, absolute-path lifecycle ref regression, out-of-tree boundary cases. 6 new tests on top of the original 58, plus 3 existing prune tests rewritten against real schemas.
+
+The Minor finding (#5 — escalation hook dead code in `_record_escalation`) is by design: the `escalated_to: str | None = None` kwarg is opt-in to avoid breaking existing call sites; real callers land as escalation contexts get fleshed out in a follow-up.
+
+**Do not change:**
+
+- **The idempotency check in `log_decision`.** Same `(title, date)` short-circuits and returns without writing. Removing it floods `decisions.md` on re-runs — the same plan rerun on the same day would duplicate every ADR, defeating the purpose of the decision log.
+- **`hygiene` is `meta` domain.** It MUST NOT advance `lifecycle.json` stage — hygiene is diagnostic, not a workflow stage. Moving it into the `build` domain breaks the workflow router (it would be treated as a pipeline stage and confuse `/renmark:resume`).
+- **The `try/except: pass` inside `memory.log_escalation_decision`** (and the optional-kwarg pattern in `_record_escalation`). Decision logging is best-effort. A failure to write `decisions.md` must NEVER break orchestrate's escalation path — escalation is the load-bearing behavior, ADR write is the audit trail.
+- **Hygiene's `dry_run=True` default.** Writes are opt-in via `--apply`. Flipping the default would silently rewrite project state on the first `python -m renmark.hygiene scan` — exactly the kind of surprise the artifact-first doctrine exists to prevent.
+- **Hygiene's refusal to write outside `.renmark/`.** The `ValueError` guard against a caller-supplied `archive_root` outside the project tree is what keeps the "writes stay in the project" memory honest. Loosening it would let one project's hygiene run leak into `$HOME` or the global plugin install.
+- **The curated memory-file set in `dedupe_memory_log` / `age_out_memory_log`.** `decisions.md`, `project.md`, `stack.md`, `architecture.md`, `conventions.md`, `routing.md`, `dev-standards.md`, `MEMORY.md`, `project-map.md`, `INDEX.md` are curated and MUST NOT be auto-pruned. Only `learnings.md`, `bugs.md`, `features.md` are treated as append-only logs subject to age-out.
+- **BLOCK-only severity for missing `plan` / `spec` artifacts in `validate_artifact_refs`.** Other missing artifacts (review, verification, research) WARN. Promoting all missing artifacts to BLOCK would make `/renmark:resume` too noisy to use; demoting plan/spec to WARN would let users continue with structurally broken pipelines.
+
 ## v0.5.5 — 2026-05-28 (codereview fixes — 4 findings from v0.5.4 review applied)
 
 **Patch release — fixes 4 findings (2 Major, 2 Minor) raised by `/renmark:codereview` on the v0.5.4 strict-mypy commit. Codex caught real semantic bugs that the type-checker rubber-stamped because the casts were unchecked or the migration broke backward compat invisibly. These are the kind of catches that justify running adversarial review after a mechanical refactor.**

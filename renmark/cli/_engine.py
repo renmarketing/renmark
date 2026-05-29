@@ -12,6 +12,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .. import memory as _memory
 from ..apply import ApplyError, apply_mode_a, apply_mode_b
 from ..parser import PlanError, Task, parse_plan
 from ..prompts import mode_a_prompt, mode_b_prompt
@@ -747,6 +748,7 @@ def _record_escalation(
     retry_count: int,
     prompt_tokens: int,
     completion_tokens: int,
+    escalated_to: str | None = None,
 ) -> None:
     import json
 
@@ -774,6 +776,14 @@ def _record_escalation(
         ),
         encoding="utf-8",
     )
+    if escalated_to is not None:
+        _memory.log_escalation_decision(
+            repo,
+            task_index=task.index,
+            from_exec=task.executor,
+            to_exec=escalated_to,
+            reason=verifier_log,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

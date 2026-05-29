@@ -12,8 +12,10 @@ right section (most files are organized newest-first per CHANGELOG convention).
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import re
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 from .state import MEMORY_SUBDIR, RENMARK_DIR_NAME
@@ -201,10 +203,35 @@ def log_decision(
     consequences: list[str] | None = None,
     date: str | None = None,
 ) -> None:
-    """Append an ADR to `decisions.md`. Auto-numbers based on existing ADRs."""
+    """Append an ADR to `decisions.md`. Auto-numbers based on existing ADRs.
+
+    Idempotent: if an ADR with the same `(title, date)` already exists, this
+    is a no-op. Parsing errors are treated conservatively — if any block can't
+    be parsed cleanly, the short-circuit is skipped and the write proceeds.
+    """
     ensure_memory(repo)
     path = memory_dir(repo) / "decisions.md"
     text = path.read_text(encoding="utf-8")
+    # Idempotency short-circuit: check for an existing ADR with same title+date.
+    try:
+        target_title = title.strip()
+        target_date = (date or _today()).strip()
+        # Find all ADR headers and their position in the text.
+        adr_iter = list(re.finditer(r"^## ADR-\d+\s+—\s+(.+?)\s*$", text, flags=re.MULTILINE))
+        for i, m in enumerate(adr_iter):
+            existing_title = m.group(1).strip()
+            if existing_title != target_title:
+                continue
+            # Look for **Date:** within this ADR block (up to next ADR header).
+            block_start = m.end()
+            block_end = adr_iter[i + 1].start() if i + 1 < len(adr_iter) else len(text)
+            adr_body = text[block_start:block_end]
+            date_m = re.search(r"^\*\*Date:\*\*\s*(\S+)", adr_body, flags=re.MULTILINE)
+            if date_m and date_m.group(1).strip() == target_date:
+                return  # Duplicate ADR — no-op.
+    except Exception:
+        # Conservative: parsing failed, let the write proceed.
+        pass
     n = len(re.findall(r"^## ADR-(\d+)", text, flags=re.MULTILINE))
     # If the template's example ADR-000 is still present and untouched,
     # don't count it; start real ADRs at 001.
@@ -281,3 +308,397 @@ def append_learning(
         path.write_text(_insert_after_section(text, "## Learned this project", line), encoding="utf-8")
     else:
         path.write_text(text.rstrip() + "\n\n## Learned this project\n\n" + line + "\n", encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Memory log maintenance: dedupe + age-out
+# ---------------------------------------------------------------------------
+
+_DEDUPE_ALLOWED = ("learnings.md", "bugs.md", "features.md")
+_CURATED_FILES = (
+    "decisions.md",
+    "INDEX.md",
+    "project.md",
+    "stack.md",
+    "architecture.md",
+    "conventions.md",
+    "routing.md",
+    "dev-standards.md",
+    "MEMORY.md",
+    "project-map.md",
+)
+
+
+@dataclass(frozen=True)
+class _MemoryEntry:
+    schema: str
+    title: str
+    date: str | None
+    raw: str
+    start: int
+    end: int
+    section_header: str
+
+
+_SCHEMA_BY_NAME: dict[str, str] = {
+    "features.md": "features",
+    "bugs.md": "bugs",
+    "learnings.md": "learnings",
+}
+
+_H3_HEADER_RE = re.compile(r"^###\s+(\d{4}-\d{2}-\d{2})\s+—\s+(.+?)\s*$")
+_H2_SECTION_RE = re.compile(r"^##\s+(.+?)\s*$")
+_LEARNING_BULLET_DATE_RE = re.compile(r"\((\d{4}-\d{2}-\d{2})")
+_DATE_FIELD_RE = re.compile(r"^\*\*Date:\*\*\s*(\d{4}-\d{2}-\d{2})", flags=re.MULTILINE)
+
+
+def _parse_h3_entries(text: str, schema: str) -> list[_MemoryEntry]:
+    """Parse features.md / bugs.md — `### YYYY-MM-DD — Title` under `## Section`.
+
+    Each entry's `raw` runs from the `###` line up to (but not including) the
+    next `###` or `## Section` line, or EOF. A trailing `---` separator is
+    included in `raw` if present.
+    """
+    lines = text.splitlines(keepends=True)
+    # Pre-compute byte offsets for each line so we can return (start, end)
+    # ranges in character positions over the original text.
+    offsets: list[int] = []
+    cur = 0
+    for line in lines:
+        offsets.append(cur)
+        cur += len(line)
+    offsets.append(cur)  # one past EOF
+
+    entries: list[_MemoryEntry] = []
+    current_section = ""
+    n = len(lines)
+    i = 0
+    while i < n:
+        line = lines[i]
+        sec_m = _H2_SECTION_RE.match(line.rstrip("\n"))
+        if sec_m:
+            current_section = f"## {sec_m.group(1).strip()}"
+            i += 1
+            continue
+        h3_m = _H3_HEADER_RE.match(line.rstrip("\n"))
+        if h3_m and current_section:
+            date = h3_m.group(1)
+            title = h3_m.group(2).strip()
+            start_line = i
+            j = i + 1
+            while j < n:
+                ln = lines[j]
+                if _H3_HEADER_RE.match(ln.rstrip("\n")):
+                    break
+                if _H2_SECTION_RE.match(ln.rstrip("\n")):
+                    break
+                j += 1
+            end_line = j
+            raw = "".join(lines[start_line:end_line])
+            entries.append(
+                _MemoryEntry(
+                    schema=schema,
+                    title=title,
+                    date=date,
+                    raw=raw,
+                    start=offsets[start_line],
+                    end=offsets[end_line],
+                    section_header=current_section,
+                ),
+            )
+            i = end_line
+            continue
+        i += 1
+    return entries
+
+
+def _parse_learning_entries(text: str) -> list[_MemoryEntry]:
+    """Parse learnings.md — top-level `- ` bullets under `## Section`.
+
+    A bullet runs from its `-` line to (but not including) the next top-level
+    bullet, the next `## Section`, or EOF. Indented continuation lines belong
+    to the preceding bullet.
+    """
+    allowed_sections = {"## Common patterns", "## Learned this project"}
+    lines = text.splitlines(keepends=True)
+    offsets: list[int] = []
+    cur = 0
+    for line in lines:
+        offsets.append(cur)
+        cur += len(line)
+    offsets.append(cur)
+
+    entries: list[_MemoryEntry] = []
+    current_section = ""
+    n = len(lines)
+    i = 0
+    while i < n:
+        raw_line = lines[i]
+        stripped_nl = raw_line.rstrip("\n")
+        sec_m = _H2_SECTION_RE.match(stripped_nl)
+        if sec_m:
+            current_section = f"## {sec_m.group(1).strip()}"
+            i += 1
+            continue
+        if current_section in allowed_sections and stripped_nl.startswith("- "):
+            start_line = i
+            j = i + 1
+            saw_blank = False
+            while j < n:
+                ln = lines[j]
+                ln_no_nl = ln.rstrip("\n")
+                if ln_no_nl.startswith("- "):
+                    break
+                if _H2_SECTION_RE.match(ln_no_nl):
+                    break
+                # Blank line is provisional — extend through it; but if we
+                # then see a non-indented, non-bullet, non-section line,
+                # that's a paragraph break (e.g. template placeholders),
+                # so end the bullet at the blank line.
+                if ln_no_nl.strip() == "":
+                    saw_blank = True
+                    j += 1
+                    continue
+                if saw_blank and not (ln_no_nl.startswith(" ") or ln_no_nl.startswith("\t")):
+                    # Non-indented paragraph after a blank — bullet ended at the blank.
+                    break
+                saw_blank = False
+                j += 1
+            # Trim trailing blank-only lines so the bullet's raw doesn't
+            # absorb separator whitespace into its signature.
+            while j > start_line + 1 and lines[j - 1].strip() == "":
+                j -= 1
+            end_line = j
+            raw = "".join(lines[start_line:end_line])
+            bullet_text = stripped_nl[2:].strip()
+            title = bullet_text[:80] if bullet_text else ""
+            date_m = _LEARNING_BULLET_DATE_RE.search(raw)
+            date = date_m.group(1) if date_m else None
+            entries.append(
+                _MemoryEntry(
+                    schema="learnings",
+                    title=title,
+                    date=date,
+                    raw=raw,
+                    start=offsets[start_line],
+                    end=offsets[end_line],
+                    section_header=current_section,
+                ),
+            )
+            i = end_line
+            continue
+        i += 1
+    return entries
+
+
+def _parse_memory_entries(text: str, schema: str) -> list[_MemoryEntry]:
+    """Dispatch parsing based on `schema` — one of features|bugs|learnings."""
+    if schema in ("features", "bugs"):
+        return _parse_h3_entries(text, schema)
+    if schema == "learnings":
+        return _parse_learning_entries(text)
+    raise ValueError(f"unknown memory schema: {schema!r}")
+
+
+def _remove_entries(text: str, entries: list[_MemoryEntry]) -> str:
+    """Rebuild `text` with the given entries' `raw` spans excised.
+
+    Spans are expected to be non-overlapping. They are sorted by `start` and
+    removed in one pass — surrounding content (section headers, blank lines,
+    preamble) is preserved unchanged.
+    """
+    if not entries:
+        return text
+    ordered = sorted(entries, key=lambda e: e.start)
+    out_parts: list[str] = []
+    cursor = 0
+    for e in ordered:
+        if e.start < cursor:
+            # Overlap — defensive: skip to end of this entry.
+            cursor = max(cursor, e.end)
+            continue
+        out_parts.append(text[cursor : e.start])
+        cursor = e.end
+    out_parts.append(text[cursor:])
+    return "".join(out_parts)
+
+
+def dedupe_memory_log(repo: str | Path, name: str, *, dry_run: bool = False) -> int:
+    """Remove duplicate entries from a memory log, keeping the first occurrence.
+
+    Only operates on the append-style logs: `learnings.md`, `bugs.md`,
+    `features.md`. Curated files (decisions.md, project.md, etc.) raise
+    ValueError.
+
+    Schema-aware: features/bugs use `###` entries under `##` sections;
+    learnings use top-level `-` bullets under `##` sections.
+
+    Duplicate signature: `(title.strip(), sha256(raw.strip())[:12])`. Files
+    are newest-first; keeping the first occurrence preserves the most recent
+    copy of each repeated entry. Returns the number of duplicate entries
+    removed; with `dry_run=True`, no write.
+    """
+    if name in _CURATED_FILES:
+        raise ValueError(
+            f"refusing to dedupe curated memory file '{name}'; "
+            f"allowed: {list(_DEDUPE_ALLOWED)}; curated: {list(_CURATED_FILES)}"
+        )
+    if name not in _DEDUPE_ALLOWED:
+        raise ValueError(f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}")
+    schema = _SCHEMA_BY_NAME[name]
+    ensure_memory(repo)
+    path = memory_dir(repo) / name
+    text = path.read_text(encoding="utf-8")
+    entries = _parse_memory_entries(text, schema)
+    seen: set[tuple[str, str]] = set()
+    duplicates: list[_MemoryEntry] = []
+    for entry in entries:
+        digest = hashlib.sha256(entry.raw.strip().encode("utf-8")).hexdigest()[:12]
+        sig = (entry.title.strip(), digest)
+        if sig in seen:
+            duplicates.append(entry)
+            continue
+        seen.add(sig)
+    removed = len(duplicates)
+    if removed == 0 or dry_run:
+        return removed
+    rebuilt = _remove_entries(text, duplicates)
+    path.write_text(rebuilt, encoding="utf-8")
+    return removed
+
+
+def _entry_date_obj(entry: _MemoryEntry) -> dt.date | None:
+    """Resolve an entry's date (H3 date, bullet date, or `**Date:**` field)."""
+    if entry.date:
+        try:
+            return dt.date.fromisoformat(entry.date)
+        except ValueError:
+            pass
+    dm = _DATE_FIELD_RE.search(entry.raw)
+    if dm:
+        try:
+            return dt.date.fromisoformat(dm.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def age_out_memory_log(
+    repo: str | Path,
+    name: str,
+    days: int,
+    archive_root: Path,
+    *,
+    dry_run: bool = False,
+) -> int:
+    """Move entries older than `days` from a memory log into an archive file.
+
+    Schema-aware (features/bugs `###` under `##`, learnings bullets under
+    `##`). Entries without a parseable date are KEPT (safe default).
+
+    Aged-out entries are appended to `archive_root/memory/<name>` grouped
+    under their original `## Section` header so context is preserved. The
+    archive write is idempotent across same-day re-runs: each section header
+    is written at most once per call, but is reused if it already exists in
+    the archive (the same set of moved entries can't be moved twice — they
+    are excised from the source on the first call).
+
+    Returns the count of entries moved. With `dry_run=True`, no files are
+    written and no directories are created.
+    """
+    if name in _CURATED_FILES:
+        raise ValueError(
+            f"refusing to age out curated memory file '{name}'; "
+            f"allowed: {list(_DEDUPE_ALLOWED)}; curated: {list(_CURATED_FILES)}"
+        )
+    if name not in _DEDUPE_ALLOWED:
+        raise ValueError(f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}")
+    schema = _SCHEMA_BY_NAME[name]
+    ensure_memory(repo)
+    path = memory_dir(repo) / name
+    text = path.read_text(encoding="utf-8")
+    entries = _parse_memory_entries(text, schema)
+    today = dt.datetime.now(dt.timezone.utc).date()
+    cutoff_delta = dt.timedelta(days=days)
+    aged: list[_MemoryEntry] = []
+    for entry in entries:
+        entry_date = _entry_date_obj(entry)
+        if entry_date is None:
+            continue
+        if (today - entry_date) > cutoff_delta:
+            aged.append(entry)
+    if not aged:
+        return 0
+    if dry_run:
+        return len(aged)
+
+    # Group aged entries by section header (preserve original order within
+    # each section).
+    grouped: dict[str, list[_MemoryEntry]] = {}
+    section_order: list[str] = []
+    for entry in aged:
+        header = entry.section_header
+        if header not in grouped:
+            grouped[header] = []
+            section_order.append(header)
+        grouped[header].append(entry)
+
+    archive_dir = Path(archive_root) / "memory"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_file = archive_dir / name
+    archive_existing = archive_file.read_text(encoding="utf-8") if archive_file.exists() else ""
+
+    parts: list[str] = []
+    if archive_existing:
+        parts.append(archive_existing)
+        if not archive_existing.endswith("\n"):
+            parts.append("\n")
+    for header in section_order:
+        # Only emit the header if it isn't already present in the existing
+        # archive content (idempotent append for repeat sections).
+        if header not in archive_existing:
+            parts.append(f"{header}\n\n")
+        for entry in grouped[header]:
+            parts.append(entry.raw)
+            if not entry.raw.endswith("\n"):
+                parts.append("\n")
+    archive_file.write_text("".join(parts), encoding="utf-8")
+
+    rebuilt = _remove_entries(text, aged)
+    path.write_text(rebuilt, encoding="utf-8")
+    return len(aged)
+
+
+def log_escalation_decision(
+    repo: str | Path,
+    *,
+    task_index: int,
+    from_exec: str,
+    to_exec: str,
+    reason: str,
+    plan_path: str | None = None,
+) -> None:
+    """Record an executor escalation as an ADR (best-effort, swallows errors).
+
+    Title: `Escalated task {task_index} from {from_exec} to {to_exec}`.
+    Passes today's date so the idempotency short-circuit in `log_decision`
+    catches re-runs within the same day.
+    """
+    try:
+        title = f"Escalated task {task_index} from {from_exec} to {to_exec}"
+        context = (reason or "")[:200]
+        if plan_path:
+            context = f"{context} (plan: {plan_path})" if context else f"plan: {plan_path}"
+        log_decision(
+            repo,
+            title=title,
+            status="Accepted",
+            context=context,
+            decision=f"Re-route to {to_exec}",
+            alternatives=[f"Retry {from_exec}", "Fail the task"],
+            consequences=["Higher cost", "Higher capability"],
+            date=_today(),
+        )
+    except Exception:
+        # Best-effort: never raise.
+        pass

@@ -1,0 +1,57 @@
+---
+name: hygiene
+description: Use to garbage-collect stale renmark artifacts and prune append-only memory logs. Scans .renmark/specs|plans|reviews|research|state/wave-summaries for artifacts past their stale_after or TTL, archives them to .renmark/archive/YYYY-MM/ while preserving paths. Optionally dedupes and ages out entries in learnings.md/bugs.md/features.md. Default dry-run; opt-in to writes via --apply. Meta domain — never advances lifecycle.json.
+---
+
+# hygiene
+
+## Overview
+
+Hygiene closes the loop on renmark's existing `stale_after` / `created_at` / `source_sha` artifact metadata. The schema was designed in earlier releases (see `renmark/summary.py`); this module is the sweeper that finally consumes it. Built on top of `summary.is_stale()` plus the memory helpers — stdlib only, no LLM calls.
+
+Two operations, one CLI:
+
+- **scan** — walk `.renmark/specs|plans|reviews|research|state/wave-summaries`, identify artifacts past their `stale_after` (or older than `--ttl-days` when metadata is missing), archive them to `.renmark/archive/YYYY-MM/` preserving the original repo-relative path. Artifacts referenced by `lifecycle.json` are never archived.
+- **prune** — age out and dedupe entries in `learnings.md`, `bugs.md`, `features.md`. Curated memory files are never touched.
+
+## When to Use
+
+- Monthly cleanup of a bloated `.renmark/` directory.
+- After a long-running feature branch leaves stale plans/reviews behind.
+- Before archiving a finished project — compact the artifact tree first.
+- When memory logs (`learnings.md`, `bugs.md`, `features.md`) accumulate duplicates from repeated debug sessions.
+
+## Steps
+
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'hygiene')`. Hygiene is `meta` domain; cross-domain prompts only fire on transitions FROM `build` / `debug` / `audit`. Surface the returned hint if non-None.
+
+### 1. Run the scanner
+
+```bash
+python -m renmark.hygiene scan                   # dry-run, default 90d TTL
+python -m renmark.hygiene scan --apply           # actually archive
+python -m renmark.hygiene all --apply --ttl-days 60 --memory-days 120
+```
+
+Subcommands: `scan` (artifacts), `prune` (memory logs), `all` (both).
+
+### 2. Relay the result
+
+Pass the bounded ≤5-line stdout through to the user unchanged. The script emits two status lines (`HYGIENE …`, `MEMORY …`) plus an optional `ERRORS …` line. Do not paraphrase or expand — the format is the contract.
+
+## Flags
+
+- `--apply` — make changes on disk. Default is dry-run (report only).
+- `--ttl-days N` — artifact TTL fallback when `stale_after` is missing (default `90`).
+- `--memory-days N` — age-out threshold for memory log entries (default `180`).
+- `--include-memory` — when subcommand is `scan`, also runs `prune` after.
+- `--repo PATH` — project root (default `.`).
+
+## Boundaries
+
+- **NEVER advances `lifecycle.json` stage.** Hygiene is diagnostic, not a workflow transition.
+- **All writes inside `.renmark/`.** Refuses with `ValueError` if `archive_root` resolves outside that subtree.
+- **Archive layout preserved.** `.renmark/plans/foo.plan.md` → `.renmark/archive/YYYY-MM/plans/foo.plan.md`.
+- **Lifecycle-referenced artifacts never archived** — even if past their TTL.
+- **Curated memory files are off-limits.** Only `learnings.md`, `bugs.md`, `features.md` are pruned. Never touches `decisions.md`, `INDEX.md`, `project.md`, `stack.md`, `architecture.md`, `conventions.md`, `routing.md`, `dev-standards.md`, `MEMORY.md`, `project-map.md`.
+- **No LLM calls.** Deterministic Python only.

@@ -15,6 +15,12 @@ Each entry: signal, observation, model that caught it, date.
 ## Learned this project
 
 
+
+
+- (2026-05-29, run) **task 5 failed on codex** — codex_verifier_failed
+
+- (2026-05-29, .renmark/reviews/2026-05-29-729e0ca.verification.md) model `verify`: **verify-lifecycle-hygiene** — 6/6 behaviors verified; failed: none; regressions: 0
+
 - (2026-05-28, run) **task 1 failed on codex** — codex_verifier_failed
 
 (Empty — will fill as runs complete.)
