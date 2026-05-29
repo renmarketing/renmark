@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-05-28 @ 95f0d9d -->
+<!-- Last refreshed: 2026-05-29 @ 715ef63 -->
 
 # Dev standards — ai-system
 
@@ -18,6 +18,10 @@ What this project enforces about itself, detected from configuration files. Read
 
 ## Standards health
 
-✅ **No gaps detected.** Linter, type checker, tests, and CI are all wired up.
+**1 gap detected** (1 info). Tightening recommendations below.
 
-_Run `python -m renmark.init --deep` for deeper checks (commit-message style, etc.)._
+### ℹ Inconsistent commit message style
+
+Of the last 20 commits, only 5 follow conventional-commits format.
+
+**Recommendation:** Pick a convention (conventional-commits or freeform) and enforce via commitlint or PR review.
