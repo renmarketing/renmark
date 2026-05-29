@@ -12,6 +12,7 @@ right section (most files are organized newest-first per CHANGELOG convention).
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import re
 import shutil
 from pathlib import Path
@@ -201,10 +202,35 @@ def log_decision(
     consequences: list[str] | None = None,
     date: str | None = None,
 ) -> None:
-    """Append an ADR to `decisions.md`. Auto-numbers based on existing ADRs."""
+    """Append an ADR to `decisions.md`. Auto-numbers based on existing ADRs.
+
+    Idempotent: if an ADR with the same `(title, date)` already exists, this
+    is a no-op. Parsing errors are treated conservatively — if any block can't
+    be parsed cleanly, the short-circuit is skipped and the write proceeds.
+    """
     ensure_memory(repo)
     path = memory_dir(repo) / "decisions.md"
     text = path.read_text(encoding="utf-8")
+    # Idempotency short-circuit: check for an existing ADR with same title+date.
+    try:
+        target_title = title.strip()
+        target_date = (date or _today()).strip()
+        # Find all ADR headers and their position in the text.
+        adr_iter = list(re.finditer(r"^## ADR-\d+\s+—\s+(.+?)\s*$", text, flags=re.MULTILINE))
+        for i, m in enumerate(adr_iter):
+            existing_title = m.group(1).strip()
+            if existing_title != target_title:
+                continue
+            # Look for **Date:** within this ADR block (up to next ADR header).
+            block_start = m.end()
+            block_end = adr_iter[i + 1].start() if i + 1 < len(adr_iter) else len(text)
+            block = text[block_start:block_end]
+            date_m = re.search(r"^\*\*Date:\*\*\s*(\S+)", block, flags=re.MULTILINE)
+            if date_m and date_m.group(1).strip() == target_date:
+                return  # Duplicate ADR — no-op.
+    except Exception:
+        # Conservative: parsing failed, let the write proceed.
+        pass
     n = len(re.findall(r"^## ADR-(\d+)", text, flags=re.MULTILINE))
     # If the template's example ADR-000 is still present and untouched,
     # don't count it; start real ADRs at 001.
@@ -281,3 +307,224 @@ def append_learning(
         path.write_text(_insert_after_section(text, "## Learned this project", line), encoding="utf-8")
     else:
         path.write_text(text.rstrip() + "\n\n## Learned this project\n\n" + line + "\n", encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Memory log maintenance: dedupe + age-out
+# ---------------------------------------------------------------------------
+
+_DEDUPE_ALLOWED = ("learnings.md", "bugs.md", "features.md")
+_CURATED_FILES = (
+    "decisions.md",
+    "INDEX.md",
+    "project.md",
+    "stack.md",
+    "architecture.md",
+    "conventions.md",
+    "routing.md",
+    "dev-standards.md",
+    "MEMORY.md",
+    "project-map.md",
+)
+
+
+def _split_h2_entries(text: str) -> tuple[str, list[tuple[str, str]]]:
+    """Split a markdown file into (preamble, [(h2_line, body), ...]).
+
+    H2 boundary = a line starting with `## ` at column 0. Body includes
+    everything from after the H2 line up to (but not including) the next H2
+    or EOF. Preamble is everything before the first H2.
+    """
+    lines = text.splitlines(keepends=True)
+    h2_re = re.compile(r"^## ")
+    # Find H2 indices.
+    h2_indices = [i for i, line in enumerate(lines) if h2_re.match(line)]
+    if not h2_indices:
+        return text, []
+    preamble = "".join(lines[: h2_indices[0]])
+    entries: list[tuple[str, str]] = []
+    for idx, start in enumerate(h2_indices):
+        end = h2_indices[idx + 1] if idx + 1 < len(h2_indices) else len(lines)
+        h2_line = lines[start]
+        body = "".join(lines[start + 1 : end])
+        entries.append((h2_line, body))
+    return preamble, entries
+
+
+def _first_nonblank_line(body: str) -> str:
+    for line in body.splitlines():
+        s = line.strip()
+        if s:
+            return s
+    return ""
+
+
+def _h2_title(h2_line: str) -> str:
+    # Strip leading "## " and trailing newline/whitespace.
+    return h2_line.lstrip("#").strip()
+
+
+def dedupe_memory_log(repo: str | Path, name: str, *, dry_run: bool = False) -> int:
+    """Remove duplicate entries from a memory log, keeping the first occurrence.
+
+    Only operates on the append-style logs: `learnings.md`, `bugs.md`,
+    `features.md`. Curated files (decisions.md, project.md, etc.) raise
+    ValueError.
+
+    Duplicate signature: `(h2_title, sha256(first_nonblank_line_in_body)[:12])`.
+    Files are newest-first, so keeping the first occurrence preserves the
+    most recent copy of each repeated entry.
+
+    Returns the number of duplicate entries removed. With `dry_run=True`,
+    counts duplicates without writing.
+    """
+    if name in _CURATED_FILES:
+        raise ValueError(
+            f"refusing to dedupe curated memory file '{name}'; "
+            f"allowed: {list(_DEDUPE_ALLOWED)}; curated: {list(_CURATED_FILES)}"
+        )
+    if name not in _DEDUPE_ALLOWED:
+        raise ValueError(
+            f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}"
+        )
+    ensure_memory(repo)
+    path = memory_dir(repo) / name
+    text = path.read_text(encoding="utf-8")
+    preamble, entries = _split_h2_entries(text)
+    seen: set[tuple[str, str]] = set()
+    kept: list[tuple[str, str]] = []
+    removed = 0
+    for h2_line, body in entries:
+        title = _h2_title(h2_line)
+        first = _first_nonblank_line(body)
+        digest = hashlib.sha256(first.encode("utf-8")).hexdigest()[:12]
+        sig = (title, digest)
+        if sig in seen:
+            removed += 1
+            continue
+        seen.add(sig)
+        kept.append((h2_line, body))
+    if removed == 0 or dry_run:
+        return removed
+    rebuilt = preamble + "".join(h2 + body for h2, body in kept)
+    path.write_text(rebuilt, encoding="utf-8")
+    return removed
+
+
+_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+_DATE_FIELD_RE = re.compile(r"^\*\*Date:\*\*\s*(\d{4}-\d{2}-\d{2})", flags=re.MULTILINE)
+
+
+def _entry_date(h2_line: str, body: str) -> dt.date | None:
+    """Extract the first YYYY-MM-DD found in the H2 line or in a **Date:** body line."""
+    m = _DATE_RE.search(h2_line)
+    if not m:
+        dm = _DATE_FIELD_RE.search(body)
+        if dm:
+            m = dm
+    if not m:
+        return None
+    try:
+        return dt.date.fromisoformat(m.group(1))
+    except ValueError:
+        return None
+
+
+def age_out_memory_log(
+    repo: str | Path,
+    name: str,
+    days: int,
+    archive_root: Path,
+    *,
+    dry_run: bool = False,
+) -> int:
+    """Move entries older than `days` from a memory log into an archive file.
+
+    Entries are parsed by H2 boundary. The first `YYYY-MM-DD` token found in
+    the H2 line (or in a `**Date:**` line within the entry body) is the
+    entry's age. Entries with no parseable date are KEPT (safe default).
+
+    Aged-out entries are appended to `archive_root/memory/<name>` in their
+    original (newest-first) order. The source file is rewritten without them.
+
+    Returns the count of entries moved. With `dry_run=True`, no files are
+    written and no directories are created.
+    """
+    if name in _CURATED_FILES:
+        raise ValueError(
+            f"refusing to age out curated memory file '{name}'; "
+            f"allowed: {list(_DEDUPE_ALLOWED)}; curated: {list(_CURATED_FILES)}"
+        )
+    if name not in _DEDUPE_ALLOWED:
+        raise ValueError(
+            f"unknown memory log '{name}'; allowed: {list(_DEDUPE_ALLOWED)}"
+        )
+    ensure_memory(repo)
+    path = memory_dir(repo) / name
+    text = path.read_text(encoding="utf-8")
+    preamble, entries = _split_h2_entries(text)
+    today = dt.datetime.utcnow().date()
+    cutoff_delta = dt.timedelta(days=days)
+    kept: list[tuple[str, str]] = []
+    aged: list[tuple[str, str]] = []
+    for h2_line, body in entries:
+        entry_date = _entry_date(h2_line, body)
+        if entry_date is None:
+            kept.append((h2_line, body))
+            continue
+        if (today - entry_date) > cutoff_delta:
+            aged.append((h2_line, body))
+        else:
+            kept.append((h2_line, body))
+    if not aged:
+        return 0
+    if dry_run:
+        return len(aged)
+    # Write archive: append aged entries to archive_root/memory/<name>.
+    archive_dir = Path(archive_root) / "memory"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_file = archive_dir / name
+    archive_existing = archive_file.read_text(encoding="utf-8") if archive_file.exists() else ""
+    archive_block = "".join(h2 + body for h2, body in aged)
+    if archive_existing and not archive_existing.endswith("\n"):
+        archive_existing += "\n"
+    archive_file.write_text(archive_existing + archive_block, encoding="utf-8")
+    # Rewrite source file without aged entries.
+    rebuilt = preamble + "".join(h2 + body for h2, body in kept)
+    path.write_text(rebuilt, encoding="utf-8")
+    return len(aged)
+
+
+def log_escalation_decision(
+    repo: str | Path,
+    *,
+    task_index: int,
+    from_exec: str,
+    to_exec: str,
+    reason: str,
+    plan_path: str | None = None,
+) -> None:
+    """Record an executor escalation as an ADR (best-effort, swallows errors).
+
+    Title: `Escalated task {task_index} from {from_exec} to {to_exec}`.
+    Passes today's date so the idempotency short-circuit in `log_decision`
+    catches re-runs within the same day.
+    """
+    try:
+        title = f"Escalated task {task_index} from {from_exec} to {to_exec}"
+        context = (reason or "")[:200]
+        if plan_path:
+            context = f"{context} (plan: {plan_path})" if context else f"plan: {plan_path}"
+        log_decision(
+            repo,
+            title=title,
+            status="Accepted",
+            context=context,
+            decision=f"Re-route to {to_exec}",
+            alternatives=[f"Retry {from_exec}", "Fail the task"],
+            consequences=["Higher cost", "Higher capability"],
+            date=_today(),
+        )
+    except Exception:
+        # Best-effort: never raise.
+        pass
