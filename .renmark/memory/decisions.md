@@ -1,6 +1,18 @@
 # Decisions (ADRs)
 
 
+
+## ADR-002 — Finished feature codereview-focus
+
+**Date:** 2026-05-29
+**Status:** Accepted
+
+**Context.** Small 3-task feature; per CLAUDE.md 'small changes stay on main'; folded into v0.5.6 release alongside lifecycle-hygiene
+
+**Decision.** Landed --focus optimize/standards directly on main
+
+---
+
 ## ADR-001 — Finished feature lifecycle-hygiene
 
 **Date:** 2026-05-29
