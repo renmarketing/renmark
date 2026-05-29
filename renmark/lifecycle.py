@@ -16,9 +16,12 @@ If lifecycle.json exceeds ~1KB it's a bug — runtime cruft has leaked in.
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
 
@@ -113,6 +116,7 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "restore": "meta",
     "approve": "meta",
     "issue": "meta",
+    "hygiene": "meta",
 }
 
 # ── Size guard ────────────────────────────────────────────────────────────────
@@ -326,6 +330,93 @@ def is_cross_domain_transition(prev_skill: str | None, new_skill: str) -> bool:
     if prev_skill is None:
         return False
     return domain_of(prev_skill) != domain_of(new_skill)
+
+
+# ── Artifact reference validation ─────────────────────────────────────────────
+
+
+def validate_artifact_refs(
+    repo: Path | str,
+    state: LifecycleState | None = None,
+) -> list[dict[str, str]]:
+    """Validate that artifacts referenced in lifecycle state actually exist and
+    are reachable. Pure read — does not mutate lifecycle state.
+
+    Returns a list of issue dicts with keys: severity, kind, artifact, path,
+    detail. BLOCK issues come first (in artifacts insertion order), then WARN
+    issues sorted by artifact key alphabetically.
+    """
+    if state is None:
+        state = read_lifecycle(repo)
+    if state is None:
+        return []
+
+    repo_path = Path(repo)
+    block_issues: list[dict[str, str]] = []
+    warn_issues: list[dict[str, str]] = []
+
+    for key, path_str in state.artifacts.items():
+        resolved = (repo_path / path_str) if not Path(path_str).is_absolute() else Path(path_str)
+        if not resolved.exists():
+            severity = "BLOCK" if key in {"plan", "spec"} else "WARN"
+            issue: dict[str, str] = {
+                "severity": severity,
+                "kind": "missing_path",
+                "artifact": key,
+                "path": path_str,
+                "detail": f"artifact {key!r} missing at {path_str}"[:120],
+            }
+            if severity == "BLOCK":
+                block_issues.append(issue)
+            else:
+                warn_issues.append(issue)
+            continue
+
+        # File exists — check provenance and freshness.
+        try:
+            meta = read_metadata(resolved)
+        except Exception:
+            meta = {}
+
+        source_sha = meta.get("source_sha")
+        if isinstance(source_sha, str) and source_sha and source_sha != "null":
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(repo_path), "cat-file", "-e", source_sha],
+                    capture_output=True,
+                    timeout=5,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    warn_issues.append(
+                        {
+                            "severity": "WARN",
+                            "kind": "unreachable_sha",
+                            "artifact": key,
+                            "path": path_str,
+                            "detail": f"source_sha {source_sha[:12]} for {key!r} not reachable in git"[:120],
+                        }
+                    )
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+
+        try:
+            stale = is_stale(resolved)
+        except Exception:
+            stale = False
+        if stale:
+            warn_issues.append(
+                {
+                    "severity": "WARN",
+                    "kind": "stale_artifact",
+                    "artifact": key,
+                    "path": path_str,
+                    "detail": f"artifact {key!r} past its stale_after timestamp"[:120],
+                }
+            )
+
+    warn_issues.sort(key=lambda i: i["artifact"])
+    return block_issues + warn_issues
 
 
 # ── Internal ──────────────────────────────────────────────────────────────────
