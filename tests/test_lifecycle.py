@@ -13,6 +13,10 @@ from renmark.lifecycle import LifecycleBloatError, LifecycleState, NEXT_BY_STAGE
 from renmark.summary import write_artifact
 
 
+def _init_git_repo(path: Path) -> None:
+    subprocess.run(["git", "init", str(path)], check=True, capture_output=True)
+
+
 def test_read_lifecycle_none_when_missing(tmp_path: Path) -> None:
     assert lifecycle.read_lifecycle(tmp_path) is None
 
@@ -273,6 +277,7 @@ def test_validate_artifact_refs_missing_aux_warns(tmp_path: Path) -> None:
 
 
 def test_validate_artifact_refs_unreachable_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _init_git_repo(tmp_path)
     state = lifecycle.write_lifecycle(
         tmp_path,
         stage="brainstorm-complete",
@@ -324,12 +329,49 @@ def test_validate_artifact_refs_stale_artifact(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "stale_artifact"
 
 
+def test_validate_artifact_refs_absolute_outside_repo_warns(tmp_path: Path) -> None:
+    _init_git_repo(tmp_path)
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("plan", "/tmp/escape.plan.md"),
+    )
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "WARN"
+    assert issues[0]["kind"] == "out_of_tree"
+
+
+def test_validate_artifact_refs_dotdot_escape_warns(tmp_path: Path) -> None:
+    _init_git_repo(tmp_path)
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("plan", "../../../etc/passwd"),
+    )
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "WARN"
+    assert issues[0]["kind"] == "out_of_tree"
+
+
 def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
+    _init_git_repo(tmp_path)
     state = lifecycle.write_lifecycle(
         tmp_path,
         stage="brainstorm-complete",
         feature="x",
         artifact_update=("plan", "missing.md"),
+    )
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        artifact_update=("alpha", "../../../etc/passwd"),
     )
     state = lifecycle.write_lifecycle(
         tmp_path,
@@ -347,5 +389,9 @@ def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
 
     issues = lifecycle.validate_artifact_refs(tmp_path, state)
 
-    assert [issue["severity"] for issue in issues] == ["BLOCK", "WARN"]
-    assert [issue["kind"] for issue in issues] == ["missing_path", "stale_artifact"]
+    assert [issue["severity"] for issue in issues] == ["BLOCK", "WARN", "WARN"]
+    assert [issue["kind"] for issue in issues] == [
+        "missing_path",
+        "out_of_tree",
+        "stale_artifact",
+    ]
