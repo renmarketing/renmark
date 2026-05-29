@@ -19,11 +19,22 @@ The driving idea: artifacts decay. Decisions get forgotten across `/clear`. Esca
 
 **Acceptance gates:**
 
-- ✅ pytest: 58 new tests + all existing tests passing (total ≈ 356 tests)
+- ✅ pytest: 64 new tests + all existing tests passing (total 335 + 28 skipped)
 - ✅ ruff check + ruff format: clean
-- ✅ mypy strict: 0 errors (39 source files)
+- ✅ mypy strict: 0 errors (38 source files)
 - ✅ plugin lint: OK
 - ✅ 5/5 pre-commit gates OK
+
+**Codex codereview pass applied before merge (4 Major fixes):**
+
+A `/renmark:codereview` over the feature branch surfaced 4 Major findings. All were fixed on the same branch before merge; v0.5.6 ships with the helpers actually working on real renmark memory files (not just the synthetic shapes the original tests covered).
+
+- **`renmark/memory.py`** — `dedupe_memory_log` and `age_out_memory_log` rewired to parse the REAL on-disk schemas: `### YYYY-MM-DD — Title` entries under H2 section headers for `features.md` / `bugs.md`, and `- ` bullets under H2 sections for `learnings.md`. The original H2-only parser worked on synthetic tests but was a no-op on production files. Tests now produce entries via the writer functions (`log_feature`, `log_bug`, `append_learning`) so readers round-trip with writers. Bullet parser also tightened to stop at paragraph breaks (`(Empty — will fill…)` placeholders no longer get absorbed into the last bullet's signature). Migrated `dt.utcnow()` → `dt.now(timezone.utc)` along the way (kept on `datetime.timezone.utc` rather than `dt.UTC` for Python 3.10 compatibility).
+- **`renmark/hygiene.py`** — lifecycle artifact refs normalized via `Path.resolve()` before comparison. Absolute paths and repo-relative paths now match consistently; a verify run that stored `str(absolute_path)` is no longer mis-detected as unreferenced and prematurely archived. Ghost-ref counting uses the same normalization.
+- **`renmark/lifecycle.py`** — `validate_artifact_refs` now emits `WARN` with `kind="out_of_tree"` for any artifact path that resolves outside the project subtree (absolute paths, `..`-escapes). `/renmark:resume` can no longer be tricked into trusting files outside `.renmark/` via a crafted `lifecycle.json` ref. Existing `BLOCK`/`WARN` semantics for missing/stale/unreachable artifacts and the BLOCK-first stable ordering are preserved.
+- **Tests** — updated/added across `test_memory.py`, `test_hygiene.py`, `test_lifecycle.py`: real-schema dedupe + age-out cases via writer functions, absolute-path lifecycle ref regression, out-of-tree boundary cases. 6 new tests on top of the original 58, plus 3 existing prune tests rewritten against real schemas.
+
+The Minor finding (#5 — escalation hook dead code in `_record_escalation`) is by design: the `escalated_to: str | None = None` kwarg is opt-in to avoid breaking existing call sites; real callers land as escalation contexts get fleshed out in a follow-up.
 
 **Do not change:**
 
