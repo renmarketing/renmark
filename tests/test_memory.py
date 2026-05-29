@@ -1,7 +1,10 @@
 """Unit tests for renmark.memory."""
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
+
+import pytest
 
 from renmark import memory
 
@@ -117,3 +120,144 @@ def test_template_dir_resolves(tmp_path: Path) -> None:
     assert td.is_dir()
     # At minimum, INDEX template should exist.
     assert (td / "INDEX.md.template").is_file()
+
+
+def test_log_decision_idempotent_same_day(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(memory, "_today", lambda: "2026-05-29")
+
+    memory.log_decision(tmp_path, title="X", decision="Y")
+    memory.log_decision(tmp_path, title="X", decision="Y")
+
+    text = (tmp_path / ".renmark" / "memory" / "decisions.md").read_text()
+    assert text.count("## ADR-001 — X") == 1
+
+
+def test_log_decision_distinct_titles_both_appear(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(memory, "_today", lambda: "2026-05-29")
+
+    memory.log_decision(tmp_path, title="First", decision="A")
+    memory.log_decision(tmp_path, title="Second", decision="B")
+
+    text = (tmp_path / ".renmark" / "memory" / "decisions.md").read_text()
+    assert "## ADR-001 — First" in text
+    assert "## ADR-002 — Second" in text
+
+
+def test_log_decision_same_title_different_date(tmp_path: Path) -> None:
+    memory.log_decision(tmp_path, title="Same", decision="A", date="2026-05-28")
+    memory.log_decision(tmp_path, title="Same", decision="B", date="2026-05-29")
+
+    text = (tmp_path / ".renmark" / "memory" / "decisions.md").read_text()
+    assert text.count("— Same") == 2
+    assert "**Date:** 2026-05-28" in text
+    assert "**Date:** 2026-05-29" in text
+
+
+def test_log_escalation_decision_writes_adr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(memory, "_today", lambda: "2026-05-29")
+
+    memory.log_escalation_decision(
+        tmp_path,
+        task_index=7,
+        from_exec="codex",
+        to_exec="opus",
+        reason="Need deeper reasoning",
+    )
+
+    text = (tmp_path / ".renmark" / "memory" / "decisions.md").read_text()
+    assert "Escalated task 7 from codex to opus" in text
+    assert "from codex to opus" in text
+    assert "Re-route to opus" in text
+
+
+def test_dedupe_memory_log_removes_dupes(tmp_path: Path) -> None:
+    path = memory.ensure_memory(tmp_path) / "learnings.md"
+    path.write_text(
+        "# Learnings\n\n"
+        "## Repeated entry\n\n"
+        "same-first-line\n"
+        "keep this copy\n\n"
+        "## Repeated entry\n\n"
+        "same-first-line\n"
+        "remove this copy\n"
+    )
+
+    removed = memory.dedupe_memory_log(tmp_path, "learnings.md")
+    text = path.read_text()
+
+    assert removed == 1
+    assert "keep this copy" in text
+    assert "remove this copy" not in text
+
+
+def test_dedupe_memory_log_keeps_distinct(tmp_path: Path) -> None:
+    path = memory.ensure_memory(tmp_path) / "learnings.md"
+    original = (
+        "# Learnings\n\n"
+        "## Entry one\n\n"
+        "first-line-a\n"
+        "body a\n\n"
+        "## Entry one\n\n"
+        "first-line-b\n"
+        "body b\n"
+    )
+    path.write_text(original)
+
+    removed = memory.dedupe_memory_log(tmp_path, "learnings.md")
+
+    assert removed == 0
+    assert path.read_text() == original
+
+
+def test_dedupe_memory_log_rejects_curated_files(tmp_path: Path) -> None:
+    memory.ensure_memory(tmp_path)
+
+    with pytest.raises(ValueError):
+        memory.dedupe_memory_log(tmp_path, "decisions.md")
+
+    with pytest.raises(ValueError):
+        memory.dedupe_memory_log(tmp_path, "project.md")
+
+
+def test_age_out_memory_log_moves_old(tmp_path: Path) -> None:
+    today = dt.datetime.utcnow().date()
+    old = (today - dt.timedelta(days=200)).isoformat()
+    recent = today.isoformat()
+    path = memory.ensure_memory(tmp_path) / "features.md"
+    path.write_text(
+        "# Features\n\n"
+        f"## {recent} — Recent\n\n"
+        "recent body\n\n"
+        f"## {old} — Old\n\n"
+        "old body\n"
+    )
+
+    archive_root = tmp_path / "archive"
+    moved = memory.age_out_memory_log(tmp_path, "features.md", 180, archive_root)
+
+    text = path.read_text()
+    archived = (archive_root / "memory" / "features.md").read_text()
+    assert moved == 1
+    assert "Recent" in text
+    assert "Old" not in text
+    assert "Old" in archived
+    assert "Recent" not in archived
+
+
+def test_age_out_memory_log_keeps_undated(tmp_path: Path) -> None:
+    path = memory.ensure_memory(tmp_path) / "bugs.md"
+    original = (
+        "# Bugs\n\n"
+        "## Undated entry\n\n"
+        "No parseable date here.\n"
+    )
+    path.write_text(original)
+
+    moved = memory.age_out_memory_log(tmp_path, "bugs.md", 180, tmp_path / "archive")
+
+    assert moved == 0
+    assert path.read_text() == original
