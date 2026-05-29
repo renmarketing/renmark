@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from renmark import lifecycle
 from renmark.lifecycle import LifecycleBloatError, LifecycleState, NEXT_BY_STAGE
+from renmark.summary import write_artifact
 
 
 def test_read_lifecycle_none_when_missing(tmp_path: Path) -> None:
@@ -156,6 +158,10 @@ def test_domain_classification() -> None:
     assert lifecycle.domain_of("unknown-skill") == "build"  # default
 
 
+def test_hygiene_is_meta_domain() -> None:
+    assert lifecycle.DOMAIN_BY_SKILL["hygiene"] == "meta"
+
+
 def test_cross_domain_transition() -> None:
     assert lifecycle.is_cross_domain_transition(None, "plan") is False
     assert lifecycle.is_cross_domain_transition("plan", "orchestrate") is False  # both build
@@ -193,3 +199,135 @@ def test_stage_named_in_next_by_stage_for_every_canonical_stage() -> None:
     from renmark.lifecycle import STAGES
     for stage in STAGES:
         assert stage in NEXT_BY_STAGE, f"stage {stage!r} missing from NEXT_BY_STAGE"
+
+
+def test_validate_artifact_refs_no_lifecycle(tmp_path: Path) -> None:
+    assert lifecycle.validate_artifact_refs(tmp_path) == []
+
+
+def test_validate_artifact_refs_all_ok(tmp_path: Path) -> None:
+    lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("plan", "p.md"),
+    )
+    write_artifact(
+        tmp_path / "p.md",
+        artifact_type="plan",
+        body="plan body",
+        summary_lines=["ok"],
+        source_sha="null",
+        generator="test",
+    )
+
+    assert lifecycle.validate_artifact_refs(tmp_path) == []
+
+
+def test_validate_artifact_refs_missing_plan_blocks(tmp_path: Path) -> None:
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("plan", "missing.md"),
+    )
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "BLOCK"
+    assert issues[0]["kind"] == "missing_path"
+
+
+def test_validate_artifact_refs_missing_aux_warns(tmp_path: Path) -> None:
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("notes", "missing.md"),
+    )
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "WARN"
+    assert issues[0]["kind"] == "missing_path"
+
+
+def test_validate_artifact_refs_unreachable_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("notes", "p.md"),
+    )
+    write_artifact(
+        tmp_path / "p.md",
+        artifact_type="notes",
+        body="notes body",
+        summary_lines=["ok"],
+        source_sha="deadbeefdeadbeef",
+        generator="test",
+    )
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(args=args[0], returncode=1, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(lifecycle.subprocess, "run", fake_run)
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "WARN"
+    assert issues[0]["kind"] == "unreachable_sha"
+
+
+def test_validate_artifact_refs_stale_artifact(tmp_path: Path) -> None:
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("notes", "p.md"),
+    )
+    write_artifact(
+        tmp_path / "p.md",
+        artifact_type="notes",
+        body="notes body",
+        summary_lines=["ok"],
+        source_sha="null",
+        generator="test",
+        stale_after="2020-01-01T00:00:00Z",
+    )
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert len(issues) == 1
+    assert issues[0]["severity"] == "WARN"
+    assert issues[0]["kind"] == "stale_artifact"
+
+
+def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        stage="brainstorm-complete",
+        feature="x",
+        artifact_update=("plan", "missing.md"),
+    )
+    state = lifecycle.write_lifecycle(
+        tmp_path,
+        artifact_update=("notes", "notes.md"),
+    )
+    write_artifact(
+        tmp_path / "notes.md",
+        artifact_type="notes",
+        body="notes body",
+        summary_lines=["ok"],
+        source_sha="null",
+        generator="test",
+        stale_after="2020-01-01T00:00:00Z",
+    )
+
+    issues = lifecycle.validate_artifact_refs(tmp_path, state)
+
+    assert [issue["severity"] for issue in issues] == ["BLOCK", "WARN"]
+    assert [issue["kind"] for issue in issues] == ["missing_path", "stale_artifact"]
