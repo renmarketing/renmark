@@ -443,6 +443,7 @@ def _parse_learning_entries(text: str) -> list[_MemoryEntry]:
         if current_section in allowed_sections and stripped_nl.startswith("- "):
             start_line = i
             j = i + 1
+            saw_blank = False
             while j < n:
                 ln = lines[j]
                 ln_no_nl = ln.rstrip("\n")
@@ -450,7 +451,23 @@ def _parse_learning_entries(text: str) -> list[_MemoryEntry]:
                     break
                 if _H2_SECTION_RE.match(ln_no_nl):
                     break
+                # Blank line is provisional — extend through it; but if we
+                # then see a non-indented, non-bullet, non-section line,
+                # that's a paragraph break (e.g. template placeholders),
+                # so end the bullet at the blank line.
+                if ln_no_nl.strip() == "":
+                    saw_blank = True
+                    j += 1
+                    continue
+                if saw_blank and not (ln_no_nl.startswith(" ") or ln_no_nl.startswith("\t")):
+                    # Non-indented paragraph after a blank — bullet ended at the blank.
+                    break
+                saw_blank = False
                 j += 1
+            # Trim trailing blank-only lines so the bullet's raw doesn't
+            # absorb separator whitespace into its signature.
+            while j > start_line + 1 and lines[j - 1].strip() == "":
+                j -= 1
             end_line = j
             raw = "".join(lines[start_line:end_line])
             bullet_text = stripped_nl[2:].strip()

@@ -164,41 +164,49 @@ def test_scan_refuses_archive_outside_renmark(tmp_path: Path) -> None:
 
 
 def test_prune_dedupes_learnings(tmp_path: Path) -> None:
-    learnings = tmp_path / ".renmark" / "memory" / "learnings.md"
-    _write_memory_file(
-        learnings,
-        "# Learnings\n\n## 2026-05-01\n\nSame item\n\n## 2026-05-01\n\nSame item\n",
-    )
+    from renmark import memory
+
+    memory.append_learning(tmp_path, signal="same-signal", observation="same observation", date="2026-05-01")
+    memory.append_learning(tmp_path, signal="same-signal", observation="same observation", date="2026-05-01")
 
     report = prune_memory(tmp_path, dry_run=False)
 
+    learnings = tmp_path / ".renmark" / "memory" / "learnings.md"
     assert report.deduped == 1
-    assert learnings.read_text() == "# Learnings\n\n## 2026-05-01\n\nSame item\n\n"
+    # Only one of the two identical bullets should remain.
+    assert learnings.read_text().count("**same-signal** — same observation") == 1
 
 
 def test_prune_ages_out_old_bugs(tmp_path: Path) -> None:
-    bugs = tmp_path / ".renmark" / "memory" / "bugs.md"
-    _write_memory_file(
-        bugs,
-        (f"# Bugs\n\n## {_iso_days_ago(200)[:10]}\n\nOld bug\n\n## {_iso_days_ago(0)[:10]}\n\nNew bug\n"),
-    )
+    from renmark import memory
+
+    old_date = _iso_days_ago(200)[:10]
+    new_date = _iso_days_ago(0)[:10]
+    memory.log_bug(tmp_path, title="Old bug", severity="major", symptom="x", date=old_date)
+    memory.log_bug(tmp_path, title="New bug", severity="major", symptom="y", date=new_date)
 
     report = prune_memory(tmp_path, days=180, dry_run=False)
 
+    bugs = tmp_path / ".renmark" / "memory" / "bugs.md"
     assert report.aged_out == 1
-    assert "Old bug" not in bugs.read_text()
-    assert "New bug" in bugs.read_text()
+    text = bugs.read_text()
+    assert "Old bug" not in text
+    assert "New bug" in text
 
 
 def test_prune_dry_run_no_writes(tmp_path: Path) -> None:
+    from renmark import memory
+
+    memory.append_learning(tmp_path, signal="dup", observation="dup observation", date="2026-05-01")
+    memory.append_learning(tmp_path, signal="dup", observation="dup observation", date="2026-05-01")
+
     learnings = tmp_path / ".renmark" / "memory" / "learnings.md"
-    original = "# Learnings\n\n## 2026-05-01\n\nSame item\n\n## 2026-05-01\n\nSame item\n"
-    _write_memory_file(learnings, original)
+    before = learnings.read_text()
 
     report = prune_memory(tmp_path, dry_run=True)
 
     assert report.deduped == 1
-    assert learnings.read_text() == original
+    assert learnings.read_text() == before
 
 
 def test_prune_refuses_curated_files(tmp_path: Path) -> None:
