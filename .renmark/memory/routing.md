@@ -18,6 +18,12 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 ## Learned overrides
 
 
+
+
+- (2026-05-29) `target=tests/**, complexity=medium, mode=B` → **codex** (failed, run=20260529-155804-f7e2)
+
+- (2026-05-29) `target=tests/**, complexity=hard, mode=B` → **codex** (passed, run=20260529-155804-f7e2)
+
 - (2026-05-28) `target=*.toml, complexity=medium, mode=B` → **codex** (failed, run=20260528-210652-36fc)
 
 (Empty — will fill as runs complete.)
