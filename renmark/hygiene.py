@@ -96,14 +96,27 @@ def _file_mtime_utc(path: Path) -> datetime:
     return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
 
 
-def _referenced_paths(repo: Path) -> set[str]:
+def _normalize_ref(repo: Path, ref: str) -> Path | None:
+    """Return a canonical absolute resolved Path for a lifecycle artifact ref,
+    or None if the ref is malformed (empty/whitespace/unreadable)."""
+    if not ref or not ref.strip():
+        return None
+    try:
+        p = Path(ref)
+        return p.resolve() if p.is_absolute() else (repo / p).resolve()
+    except (OSError, RuntimeError):
+        return None
+
+
+def _referenced_paths(repo: Path) -> set[Path]:
     state = lifecycle.read_lifecycle(repo)
     if state is None:
         return set()
-    refs: set[str] = set()
+    refs: set[Path] = set()
     for value in state.artifacts.values():
-        if isinstance(value, str) and value:
-            refs.add(value.replace("\\", "/"))
+        norm = _normalize_ref(repo, value)
+        if norm is not None:
+            refs.add(norm)
     return refs
 
 
@@ -113,9 +126,9 @@ def _ghost_count(repo: Path) -> int:
         return 0
     n = 0
     for value in state.artifacts.values():
-        if not isinstance(value, str) or not value:
+        candidate = _normalize_ref(repo, value)
+        if candidate is None:
             continue
-        candidate = (repo / value).resolve() if not Path(value).is_absolute() else Path(value)
         if not candidate.exists():
             n += 1
     return n
@@ -193,8 +206,8 @@ def scan_artifacts(
                     continue
                 report.scanned += 1
 
-                rel_posix = path.resolve().relative_to(repo.resolve()).as_posix()
-                is_referenced = rel_posix in referenced
+                resolved = path.resolve()
+                is_referenced = resolved in referenced
                 stale = _is_stale_for_gc(path, ttl_days)
 
                 if stale and not is_referenced:
