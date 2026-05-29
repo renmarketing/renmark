@@ -22,6 +22,19 @@ Three steps: verify everything still passes → show what was built → offer ne
 
 **Final step — Lifecycle update.** After all verifiers pass, call `lifecycle.write_lifecycle(repo, stage='ready-to-release')`. The recommended next command becomes `/renmark:release` (per `NEXT_BY_STAGE`). In v0.4.0+, finish becomes a stage-marker only — PR/merge logic moves to `/renmark:release`.
 
+**Decision log entry.** Immediately after the lifecycle write, finish appends a single ADR to `.renmark/memory/decisions.md` via `memory.log_decision()` — capturing the feature name (`state.feature`), branch, stage transition (e.g. `documented → ready-to-release`), and the list of completed stages. The call is idempotent on `(title.strip(), date)`, so re-running finish on the same day short-circuits and never duplicates ADRs. Canonical snippet finish runs:
+
+```python
+from renmark import memory, lifecycle
+from pathlib import Path
+s = lifecycle.read_lifecycle(Path('.'))
+if s:
+    memory.log_decision(Path('.'),
+        title=f"Finished feature {s.feature}",
+        decision=f"Branch {s.branch} reached stage {s.stage}",
+        context=f"Completed stages: {', '.join(s.stages_completed)}")
+```
+
 ### 1. Re-run verifiers
 
 Run each task's verifier from the plan, or `npm test` / `pytest -q` if a test suite exists. If any fail: **stop**, report which ones, route to `/renmark:debug`.
