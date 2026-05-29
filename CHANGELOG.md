@@ -36,6 +36,16 @@ A `/renmark:codereview` over the feature branch surfaced 4 Major findings. All w
 
 The Minor finding (#5 — escalation hook dead code in `_record_escalation`) is by design: the `escalated_to: str | None = None` kwarg is opt-in to avoid breaking existing call sites; real callers land as escalation contexts get fleshed out in a follow-up.
 
+**Codereview lens — `--focus optimize` / `--focus standards` (same skill, different prompt):**
+
+The driving idea: codereview's default lens is correctness — does this diff do what it claims, safely. Sometimes the question is different. Sometimes it's "is this fast?" or "does this look like the rest of the package?" Both deserve a review pass, neither deserves a second skill, a second module, or a second artifact path. `--focus` swaps the prompt template only. Same dispatcher, same sandbox, same `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` output path. Zero new context cost, zero new modules, one new flag.
+
+- **`--focus optimize`** — performance / idiom lens. Allocations, complexity, hot-loop work, blocking calls inside async paths, resource lifecycle (file handles, subprocesses, network sessions). Out-of-scope correctness bugs spotted in passing are listed as ASIDEs at the bottom of the report rather than mixed into the main findings — keeps the lens honest.
+- **`--focus standards`** — UNWRITTEN-standards lens. Compares the diff against sibling files in the same package for conventions that aren't enforced by `tools/precommit.sh` (ruff/mypy/format already gate the written standards). Looks at pathlib vs os.path mixing, helper duplication, naming drift, error-handling shape, type-annotation density. The point is to catch the conventions a linter cannot see.
+- **Default (no flag)** — unchanged. Same prompt body, same output, same artifact path. The summary line now reads `Review at <path> (focus: <mode>)` only for non-default modes — default invocations stay terse and exactly as they were.
+
+**What did NOT ship and why.** `--focus prior-art` was considered and explicitly dropped. Prior-art lookup — "is there a stdlib module or well-known library that does this better than the hand-rolled version in the diff?" — is research, not review. It would require codex to reach beyond the diff and consult external knowledge or the web, which violates the read-only-sandbox shape of codereview and conflates two different jobs. That work belongs on `/renmark:brainstorm` (as a prior-art mode) or on a dedicated `/renmark:prior-art` skill if real usage justifies the slot. Future contributors should not re-add it to codereview without revisiting this trade-off.
+
 **Do not change:**
 
 - **The idempotency check in `log_decision`.** Same `(title, date)` short-circuits and returns without writing. Removing it floods `decisions.md` on re-runs — the same plan rerun on the same day would duplicate every ADR, defeating the purpose of the decision log.

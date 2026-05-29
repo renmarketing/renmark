@@ -1,6 +1,6 @@
 ---
 name: codereview
-description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Runs a single codex-based review pass in a read-only sandbox; codex emits a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean.
+description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Runs a single codex-based review pass in a read-only sandbox; codex emits a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean. Supports `--focus optimize` and `--focus standards` to swap the prompt template; default is correctness + quality.
 ---
 
 # codereview
@@ -15,6 +15,13 @@ Output: structured markdown at `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` wit
 
 Recommended cadence: **after a full plan completes**, not after every task. `/renmark:orchestrate` offers a hand-off prompt at the end of a successful run.
 
+## Argument parsing
+
+- `$ARGUMENTS` may contain a git ref range AND/OR `--focus <mode>`.
+- Recognized modes: `optimize`, `standards`. Anything else (or absent) = default.
+- Parse rule: strip the `--focus <mode>` pair from `$ARGUMENTS`; remaining text is the ref range (passed unchanged to Step 1).
+- Unknown mode → print a one-line note (`unknown --focus <mode> — falling back to default`) and use the default prompt. Do not abort.
+
 ## When to Use
 
 - "Review my changes" / "review this PR"
@@ -27,9 +34,13 @@ Recommended cadence: **after a full plan completes**, not after every task. `/re
 
 ## How it runs (one pass, codex)
 
+The agent selects one of three prompt blocks below based on the parsed focus, then pipes it to `codex exec --sandbox read-only -`.
+
 ```bash
 codex exec --sandbox read-only -
 ```
+
+### Prompt: default (correctness + quality)
 
 The skill pipes a prompt like:
 
@@ -45,6 +56,76 @@ For each finding:
   - one-sentence fix suggestion
 
 Top of report: summary counts per severity.
+Do not modify any files. Do not exit until the review is complete.
+```
+
+### Prompt: optimize
+
+```
+Review the diff <range> for PERFORMANCE and IDIOM issues. Focus on:
+  - unnecessary allocations, copies, or work inside hot loops
+  - asymptotic complexity surprises (accidental O(n²) over reasonable inputs)
+  - repeated computation that could be cached or hoisted
+  - blocking calls where async / batching would scale better
+  - non-idiomatic constructs that have a clearer, faster language-native form
+  - resource lifecycle issues (locks held too long, file handles, sockets)
+
+Out of scope for this pass: correctness bugs, security, edge cases.
+  If you spot a correctness bug while looking at perf, list it as ASIDE
+  (severity: Major), but DO NOT exhaustively hunt for them — that's the
+  default focus's job.
+
+For each finding:
+  - file:line
+  - severity: Critical | Major | Minor | Nit
+  - one-sentence description (what's slow / non-idiomatic, and roughly why)
+  - one-sentence fix suggestion
+
+Top of report: summary counts per severity, plus a single bold line
+"Focus: optimize" so the reader knows which lens this pass used.
+Do not modify any files. Do not exit until the review is complete.
+```
+
+### Prompt: standards
+
+```
+Review the diff <range> for adherence to the project's UNWRITTEN code
+standards. Skip what tools/precommit.sh already checks (ruff lint, ruff
+format, mypy strict, plugin lint, pytest) — those are the WRITTEN
+standards and the gate already enforces them. Look only at the
+conventions that exist in the codebase but are not enforced by tooling.
+
+Sources of truth:
+  - Spot-check 3–5 other files in the same module/package for
+    conventions: imports (relative vs absolute), error-handling shape
+    (raise vs return None vs Result), logging style, naming, type
+    annotation density, docstring presence and shape, where helpers go.
+  - If .renmark/memory/conventions.md exists, treat it as a hard rubric.
+  - If .renmark/memory/dev-standards.md flags any "gap" the diff touches,
+    call those out.
+
+Specifically look for:
+  - pathlib.Path vs os.path mixing
+  - dict[str, Any] in new code where a TypedDict / dataclass would fit
+    the existing pattern
+  - new public function without a type annotation when siblings have them
+  - error suppression (bare except, except Exception: pass) inconsistent
+    with sibling files
+  - reinventing a helper that already exists elsewhere in the package
+  - naming drift (camelCase function in a snake_case file, etc.)
+  - missing or stale CHANGELOG entry when sibling features have them
+
+For each finding:
+  - file:line
+  - severity: Critical | Major | Minor | Nit  (most standards findings
+    will be Minor or Nit; Major only if it would block merge in a
+    maintainer review)
+  - one-sentence description (what convention is broken, and what the
+    majority pattern looks like)
+  - one-sentence fix suggestion
+
+Top of report: summary counts per severity, plus a single bold line
+"Focus: standards" so the reader knows which lens this pass used.
 Do not modify any files. Do not exit until the review is complete.
 ```
 
@@ -72,10 +153,12 @@ Codex output is parsed (or written through verbatim) and saved to `.renmark/revi
 
 Tell the user — using ONLY the summary, never the diff body. Lead with the codereview-specific actions, then render the shared quality-gate menu so re-testing from a different angle stays one keystroke away:
 
-> *"Review at `<path>`. <N critical, M major, K minor> findings.*
+> *"Review at `<path>` (focus: <mode>). <N critical, M major, K minor> findings.*
 > *What's next?*
 > *  [o] Open — open the review file to read the full findings*
 > *  [fix] Fix — kick off a new /renmark:plan built from the critical findings"*
+
+Omit the `(focus: <mode>)` parenthetical entirely when mode is default — preserves the existing terse output for the common case.
 
 Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`, applying the rendering rules:
 
@@ -101,3 +184,4 @@ Avoid: running codereview after every single task. That creates one review per f
 
 - Codex review syntax: `codex review --help`
 - Existing `review` slash command for inspiration
+- Focus modes: see Argument parsing above. Adding a new focus = adding a new `### Prompt: <name>` block; nothing else to change.
