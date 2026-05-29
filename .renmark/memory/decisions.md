@@ -1,5 +1,17 @@
 # Decisions (ADRs)
 
+
+## ADR-001 — Finished feature lifecycle-hygiene
+
+**Date:** 2026-05-29
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/lifecycle-hygiene reached stage ready-to-release
+
+---
+
 Architecture Decision Records. Newest at top. Each ADR captures: context (why we needed to decide), the decision, alternatives considered, and consequences. Updated by `/renmark:brainstorm` and `/renmark:plan` when they make non-trivial calls; hand-editable.
 
 ## ADR-000 — (example) Choose JSON over MessagePack for /api responses
