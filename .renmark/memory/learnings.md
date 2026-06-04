@@ -18,6 +18,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-04, .renmark/reviews/2026-06-04-0959d69ca675a6c468246c853153734baec7bb45.verification.md) model `verify`: **verify-verify-browser-qa** — 7/7 smoke behaviors verified for the SKILL.md refinement; pytest 335 passed; no regressions. Anchor-based smoke fits prompt-only features.
+
 - (2026-06-04, .renmark/plans/2026-06-04-verify-browser-qa.plan.md) model `opus`: **orchestrate-verify-browser-qa** — Single-file SKILL.md prompt refinement, opus executor. Verifier anchor 'overlap' was too weak (pre-existed in unrelated 'files overlap' text) — tightened to 'overlapping interactive elements' pre-dispatch so the verifier actually gates new work.
 
 - (2026-05-29, run) **task 5 failed on codex** — codex_verifier_failed
