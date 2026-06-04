@@ -3,6 +3,18 @@
 
 
 
+
+## ADR-004 — Finished feature qa-flow-memory
+
+**Date:** 2026-06-04
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/qa-flow-memory reached stage ready-to-release
+
+---
+
 ## ADR-003 — Finished feature verify-browser-qa
 
 **Date:** 2026-06-04
