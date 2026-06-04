@@ -43,6 +43,15 @@ git checkout -b feature/$SLUG
 
 Confirm branch name with user before continuing.
 
+**Write the feature identity to `lifecycle.json` (required — do NOT skip).** Immediately after the branch exists (whether newly created or switched to), persist this feature's identity so every downstream stage writes against the correct `feature`/`branch` instead of inheriting the previous feature's:
+
+```python
+from renmark import lifecycle
+lifecycle.begin_feature(repo, feature="<slug>", branch="feature/<slug>")
+```
+
+`begin_feature` resets lifecycle to a clean `init` state for the new feature (empty `stages_completed`, empty `artifacts`). Skipping this is the identity bug that left `/renmark:finish`'s ADR and lifecycle pointing at the *prior* feature — the router owns identity; stage skills only advance `stage`.
+
 ### 2. Plan
 
 Invoke `/renmark:plan <description or spec-path>`. The plan skill runs the Scope Contract discovery (Q1–Q3), writes CHANGELOG + stack.md, then decomposes into tasks.

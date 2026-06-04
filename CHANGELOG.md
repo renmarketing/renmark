@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-06-04] — fix: /renmark:feature now persists feature identity to lifecycle.json
+
+**Request:** Fix the lifecycle-identity bug found during the browser-QA finish: a feature started via `/renmark:feature` never wrote its identity, so `lifecycle.json` kept the prior feature's `feature`/`branch` and finish's ADR was wrong. Keep it tightly scoped; add a verifier; don't touch the browser-QA work.
+
+**Built:** New `lifecycle.begin_feature(repo, *, feature, branch)` establishes a clean lifecycle for a new feature — resets to stage `init` with empty `stages_completed`/`artifacts` and the correct identity. `/renmark:feature` Step 1 now calls it immediately after creating/switching to the branch. Two focused tests prove `lifecycle.json` reflects the current feature/branch after entry and that a new feature does not inherit prior stage history or artifact pointers.
+
+**Files changed:**
+- `renmark/lifecycle.py` — added `begin_feature` (DRY: `clear_lifecycle` + `write_lifecycle(stage="init", …)`, so the 1KB byte-budget guard still applies).
+- `plugin/skills/feature/SKILL.md` — Step 1 now writes feature identity via `begin_feature` right after branch creation, with rationale.
+- `tests/test_lifecycle.py` — `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`.
+- `.renmark/memory/bugs.md` — moved the identity bug Open → Fixed.
+
+**Do not change:**
+- **The router owns identity; stage skills only advance `stage`.** `begin_feature` must run at feature entry (after the branch exists) — before plan/orchestrate/verify/finish, which only write `stage`/artifacts and would otherwise inherit stale identity.
+- `begin_feature` intentionally **resets** `stages_completed` and `artifacts` — a new feature starts clean. Don't change it to a partial overwrite, or cross-feature artifact pointers leak back in.
+
 ## [2026-06-04] — verify browser QA refinement (`--qa` / `--deep-qa`)
 
 **Request:** Make `/renmark:verify --qa`/`--deep-qa` do real browser-based QA (load pages, drive controls, exercise workflows, report visible + console/runtime bugs) — opt-in, not the default — and document when to use it; prefer `--deep-qa` for deeper runtime/visual checks that track UI changes, catch overlapping/broken interface layout, and stop/flag when a flow breaks or can't finish.

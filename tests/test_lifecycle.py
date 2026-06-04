@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from renmark import lifecycle
-from renmark.lifecycle import LifecycleBloatError, LifecycleState, NEXT_BY_STAGE
+from renmark.lifecycle import NEXT_BY_STAGE, LifecycleBloatError, LifecycleState
 from renmark.summary import write_artifact
 
 
@@ -46,6 +46,47 @@ def test_stage_transitions_track_completed(tmp_path: Path) -> None:
     assert state.stage == "plan-validated"
     assert "brainstorm-complete" in state.stages_completed
     assert "plan-drafted" in state.stages_completed
+
+
+def test_begin_feature_writes_identity(tmp_path: Path) -> None:
+    """After /renmark:feature enters a branch, lifecycle.json must reflect THIS
+    feature's identity at a clean init stage."""
+    state = lifecycle.begin_feature(tmp_path, feature="verify-browser-qa", branch="feature/verify-browser-qa")
+    assert state.feature == "verify-browser-qa"
+    assert state.branch == "feature/verify-browser-qa"
+    assert state.stage == "init"
+    assert state.stages_completed == []
+    assert state.artifacts == {}
+
+    loaded = lifecycle.read_lifecycle(tmp_path)
+    assert loaded is not None
+    assert loaded.feature == "verify-browser-qa"
+    assert loaded.branch == "feature/verify-browser-qa"
+    assert loaded.stage == "init"
+
+
+def test_begin_feature_resets_prior_feature_state(tmp_path: Path) -> None:
+    """The identity bug: a new feature must NOT inherit the prior feature's
+    identity, stage history, or artifact pointers."""
+    # Simulate a previous feature that ran to ready-to-release.
+    lifecycle.write_lifecycle(
+        tmp_path,
+        stage="plan-drafted",
+        feature="old-feature",
+        branch="feature/old-feature",
+        artifact_update=("plan", ".renmark/plans/old.plan.md"),
+    )
+    lifecycle.write_lifecycle(tmp_path, stage="ready-to-release")
+
+    # Entering a new feature wipes the slate.
+    lifecycle.begin_feature(tmp_path, feature="new-feature", branch="feature/new-feature")
+    state = lifecycle.read_lifecycle(tmp_path)
+    assert state is not None
+    assert state.feature == "new-feature"
+    assert state.branch == "feature/new-feature"
+    assert state.stage == "init"
+    assert state.stages_completed == []  # no stale "plan-drafted"/"ready-to-release"
+    assert state.artifacts == {}  # no stale plan pointer
 
 
 def test_unknown_stage_rejected(tmp_path: Path) -> None:
@@ -143,7 +184,7 @@ def test_next_recommended_never_points_at_unimplemented_skill(tmp_path: Path) ->
     """Guard the lifecycle dead-pointer regression. Iterate every canonical
     stage and confirm the recommendation is either a manual-hint string or
     a skill that actually exists in plugin/skills/."""
-    from renmark.lifecycle import STAGES, IMPLEMENTED_SKILLS
+    from renmark.lifecycle import IMPLEMENTED_SKILLS, STAGES
 
     for stage in STAGES:
         if stage == "init":

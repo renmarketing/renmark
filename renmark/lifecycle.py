@@ -256,6 +256,21 @@ def clear_lifecycle(repo: Path | str) -> None:
         path.unlink()
 
 
+def begin_feature(repo: Path | str, *, feature: str, branch: str) -> LifecycleState:
+    """Establish a clean lifecycle for a newly started feature.
+
+    Called by ``/renmark:feature`` immediately after creating or switching to
+    the feature branch. Resets to a fresh state — stage ``init``, empty
+    ``stages_completed``, empty ``artifacts`` — so a new feature never inherits
+    the previous feature's identity, stage history, or artifact pointers. This
+    is the canonical feature-entry write; downstream stage skills then advance
+    ``stage`` on top of the correct identity. Without it, stage writes silently
+    keep whatever ``feature``/``branch`` the prior feature left behind.
+    """
+    clear_lifecycle(repo)
+    return write_lifecycle(repo, stage="init", feature=feature, branch=branch)
+
+
 def next_recommended(repo: Path | str) -> str:
     """Return the recommended next command for the current lifecycle, or a
     cold-start prompt if no lifecycle exists. Zero LLM calls.
