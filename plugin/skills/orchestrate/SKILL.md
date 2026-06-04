@@ -219,7 +219,7 @@ Report the orchestrate completion line first, then let verify take over:
 > *  3. [d] Debug — investigate the failure verify surfaced via /renmark:debug*
 > *  4. [n] Nothing — stop here; work stays committed*
 
-(Verify renders the live numbered menu per `_shared/handoff-menu.md`; the user must pick a number to continue.)
+(Verify renders the live menu per `_shared/handoff-menu.md` — an interactive `AskUserQuestion` choice when available, numbered text only as fallback; the user must pick a choice to continue.)
 
 **Only auto-verify on a fully clean run.** If any task failed (paused / escalated), do NOT auto-verify and do NOT offer the next step — surface the failure and the resume command first. Verification of a half-built feature is noise.
 

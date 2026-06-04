@@ -80,7 +80,7 @@ Present: N commits, M files changed, brief note on each commit.
 > *  3. [r] Release — package this version to .renmark/baks/ + tag it (+ GitHub release if available)*
 > *  4. [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
 
-A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
+**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Pull request [p]`, `Merge [m]`, `Release [r]`, `Nothing [n]` (all 4 fit the option cap). **Fallback** (non-interactive / headless / tool unavailable or errors): print the numbered list above and accept a number or bracket letter. A choice is required either way — never auto-proceed. (Merge / release are outward, irreversible actions — only run on the user's explicit selection.)
 
 **[p] PR:**
 Pull the `**Built:**` lines from CHANGELOG.md entries written during this run and use them as bullet points in the PR body.

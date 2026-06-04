@@ -163,7 +163,7 @@ Show a clear summary:
 > *  3. [e] Edit — tell me what to change; I'll rewrite the plan and re-validate it*
 > *  4. [n] No — stop here; the validated plan stays on disk to dispatch later"*
 
-A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed on an empty answer.
+**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): one arrow-selectable choice per option — `label` = the action with its code (`Review [r]`, `Dispatch [d]`, `Edit [e]`, `No [n]`), `description` = the gloss above. All 4 fit the picker's option cap. **Fallback** (non-interactive / headless / tool unavailable or errors): print the numbered list above and accept a number or bracket letter. A choice is required either way — `AskUserQuestion` blocks by construction; never auto-proceed on an empty answer.
 
 On **1 / r** → cat/open the plan file in the conversation, then re-ask the same prompt.
 On **2 / d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.

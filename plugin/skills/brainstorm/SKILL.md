@@ -126,7 +126,7 @@ Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestr
 > *  2. [w] Wait — stop here; the spec stays on disk to plan later*
 > *  3. [n] No — stop, and log why planning was deferred"*
 
-A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
+**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Plan [p]`, `Wait [w]`, `No [n]`. **Fallback** (non-interactive / headless / tool unavailable or errors): print the numbered list above and accept a number or bracket letter. A choice is required either way — never auto-proceed.
 
 - **1 / p** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
 - **2 / w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.

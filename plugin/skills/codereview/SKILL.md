@@ -168,9 +168,17 @@ Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff
 - **Show `[d] Debug`** only if any Critical findings exist (Major+ alone is informational, not a debug trigger).
 - **Show `[f] Finish`** unconditionally and `[n] Nothing` always.
 
-Continue the numbering from the `[o]`/`[fix]` actions above so the user sees one
-single numbered list (e.g. `1. [o]`, `2. [fix]`, then `3. [s]`, `4. [qa]`, …) —
-and require an explicit choice before doing anything.
+Treat the `[o]`/`[fix]` actions plus the filtered gate options as ONE combined
+menu. **Present it as an interactive `AskUserQuestion` choice when available**
+(PRIMARY) — one selectable choice per option (`label` = action + code, e.g.
+`Fix [fix]`, `Open [o]`, `Code review`… ). This combined menu usually exceeds
+the picker's 4-option cap, so apply handoff-menu.md rule 6's overflow path:
+surface the **4 highest-priority** as selectable choices (priority: `[fix]` on
+critical findings → `[qa]` → `[f]` → `[o]`/`[s]`, always keep `[n] Nothing`) AND
+print the **full combined numbered list** beneath as reference, so the overflow
+options stay reachable by typed number/letter. **Fall back** to the numbered list
+entirely when `AskUserQuestion` is unavailable / non-interactive / errors. Require
+an explicit choice before doing anything.
 
 Don't auto-fix. The human reads and decides.
 

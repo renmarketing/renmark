@@ -122,6 +122,6 @@ Renmark is a wizard pipeline. After reporting results:
 > *  1. [d] Dispatch — spin up AI subagents to implement the validated plan, then auto-verify on completion*
 > *  2. [n] No — stop here; the plan stays validated on disk to run later"*
 
-A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
+**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Dispatch [d]` and `No [n]`. **Fallback** (non-interactive / headless / tool unavailable or errors): print the numbered list above and accept a number or bracket letter. A choice is required either way — never auto-proceed.
 
 On **1 / d** → immediately invoke `/renmark:orchestrate`. On **2 / n** → stop.

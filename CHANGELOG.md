@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-06-04] — interactive (arrow-selectable) hand-off menus via AskUserQuestion
+
+**Interaction-layer change, not menu formatting.** The earlier "numbered, forced-choice markdown menu" change only made menus *print* as `1. [x] Option` text — readable, but still a static list with no arrow-key selection. This change makes hand-off gates present an actual arrow-key-navigable picker via Claude Code's **`AskUserQuestion`** tool when available, with the printed numbered list demoted to a graceful fallback. It **supersedes** the numbered-markdown-as-primary rule.
+
+**Request:** Render hand-off menus through the interactive question/choice component (arrow keys + Enter) when available; fall back to the printed numbered list (number or bracket-letter input) in non-interactive contexts. Don't invent an API — use the supported mechanism.
+
+**Built:** Verified the mechanism first (via Claude Code docs): `AskUserQuestion` is the supported interactive picker — 1–4 questions/call, **2–4 options per question (hard cap of 4)**, label + description + ≤12-char header, blocking (no default, which enforces the required-choice gate), free-text always accepted; **unavailable in subagents and in headless / `-p` / piped / CI** sessions. SKILL.md can't call tools — it instructs the agent to call `AskUserQuestion`.
+- `_shared/handoff-menu.md`: rules 6–7 rewritten. **Rule 6 (PRIMARY): present survivors via `AskUserQuestion`** — one choice per option (`label` = action + `[x]` code, `description` = gloss). **4-option-cap handling:** ≤4 survivors → all selectable; >4 → surface the 4 highest-priority (defined order, `[n]` always kept) AND print the full numbered list so overflow stays reachable by typed number/letter (free-text). **Rule 7 (FALLBACK): printed numbered list** for non-interactive / unavailable / error, and as the reference beneath an overflow picker. Rule 8: explicit choice always required.
+- Static gates updated to interactive-primary + numbered-fallback: `plan`, `check-plan`, `finish`, `brainstorm`, `setup`, `orchestrate` (preview note), `codereview` (combined `[o]/[fix]`+gate menu, overflow path), `verify` (dispatch wording + citation).
+- Discovery questions updated likewise: `start` (Q1/Q2), `_shared/scope-contract.md` (Q1–Q3; 5-option questions use top-4 + free-text). `brainstorm` already used `AskUserQuestion` for discovery.
+
+**Files changed:**
+- `plugin/skills/_shared/handoff-menu.md` — interactive-primary rules 6–8, citation snippet, canonical-menu intro.
+- `plugin/skills/{plan,check-plan,finish,brainstorm,setup,orchestrate,codereview,verify,start}/SKILL.md` — gate/dispatch wording.
+- `plugin/skills/_shared/scope-contract.md` — Presentation directive + sub-question wording.
+
+**Do not change (supersedes the prior numbered-menu guard):**
+- **Interactive `AskUserQuestion` is the PRIMARY presentation; the numbered markdown list is ONLY the fallback.** Do not revert to "numbered list is the solution" — that earlier rule is intentionally superseded.
+- **The 4-option cap is a real API constraint, not a style choice.** Menus with >4 filtered options must surface the top 4 as choices and keep the rest reachable via the printed fallback + free-text. Don't try to cram >4 options into one `AskUserQuestion`.
+- **Never auto-proceed.** The required-choice gate holds in both modes; `AskUserQuestion` enforces it by blocking, the text fallback by re-asking on no match.
+- Option **filtering rules (1–5) are unchanged** — interactivity is purely the presentation layer on top of the same filtered survivor set.
+
 ## [2026-06-04] — fix: /renmark:feature now persists feature identity to lifecycle.json
 
 **Request:** Fix the lifecycle-identity bug found during the browser-QA finish: a feature started via `/renmark:feature` never wrote its identity, so `lifecycle.json` kept the prior feature's `feature`/`branch` and finish's ADR was wrong. Keep it tightly scoped; add a verifier; don't touch the browser-QA work.
@@ -48,9 +70,9 @@ Follow-up (same branch): the QA applicability gate now selects between **two bro
 - `plugin/skills/codereview/SKILL.md` — numbered the `[o]`/`[fix]` actions; appended hand-off menu continues the numbering into one list.
 - `plugin/skills/_shared/scope-contract.md` — Q1/Q2/Q3 discovery questions numbered.
 
-**Do not change:**
+**Do not change:** — ⚠️ **SUPERSEDED** by the interactive-menu entry above (2026-06-04). Numbered markdown is now only the *fallback*; the primary presentation is the `AskUserQuestion` picker. The notes below apply only to the fallback list:
 - The handoff menu numbering is a **render-time** rule, not hardcoded in the canonical list — items are filtered first (rules 1–5), then numbered. Don't bake fixed numbers into the canonical `[x]` block in `handoff-menu.md`; omitted gates would leave gaps.
-- Keep both the number AND the `[x]` bracket code on every menu line — letters are still valid selectors and several dispatch instructions reference them.
+- Keep the `[x]` bracket code on every fallback menu line — letters are still valid selectors and several dispatch instructions reference them.
 
 ## v0.5.6 — 2026-05-29 (lifecycle hygiene — decision log enforcement, artifact GC, memory prune, resume validation)
 
