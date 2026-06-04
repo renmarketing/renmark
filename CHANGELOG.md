@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.8 — 2026-06-04 (QA flow memory + QA bootstrap)
+
+**Release of the qa-flow-memory feature** (detailed per-change entry below). Bumped from 0.5.7 across all 7 version locations.
+
+- **QA flow memory:** new committed `.renmark/memory/qa-flows.md` playbook store. `/renmark:verify --qa` / `--deep-qa` read it before choosing a browser flow and promote a passing one-off flow into it; degrades to today's synthesize-from-plan behavior when the file is missing or empty.
+- **QA bootstrap:** `/renmark:verify --qa --bootstrap` seeds the playbook with the project's top critical flows (no third browser flag — rides the existing `--qa` parser).
+- **Recommendation triggers:** `/renmark:verify` and `/renmark:orchestrate` now recommend (never auto-run) browser QA for user-visible/browser-facing changes; shell smoke stays the default.
+
+Gates: plugin lint clean, `pytest` 343 passed / 0 failed. Codex review: 0 findings on the feature diff. Local release only (no remote configured).
+
 ## v0.5.7 — 2026-06-04 (browser QA, dual channel, interactive menus, lifecycle identity)
 
 **Release bundling the four changes shipped on 2026-06-04** (detailed per-change entries below). Bumped from 0.5.6 across all 7 version locations.
