@@ -195,13 +195,29 @@ Dispatch on the chosen number or letter: invoke the matching `/renmark:` skill (
 
 ## QA mode (`verify --qa`)
 
-Opt-in live-browser end-to-end check via the Chrome DevTools MCP. Proves the feature works from rendered state, not exit codes. Runs **exactly one** happy-path flow, one at a time in the main agent (the browser MCP session is a singleton — no subagent fan-out, no parallel pages). All heavy evidence goes to disk; chat sees only the ≤5-line verdict.
+Opt-in live-browser end-to-end check. Proves the feature works from rendered state, not exit codes. renmark can drive the browser through **either of two channels** — the Chrome DevTools MCP or the native Claude-in-Chrome extension — chosen by environment (see *Browser channel selection* below). Runs **exactly one** happy-path flow, one at a time in the main agent (the browser session is a singleton — no subagent fan-out, no parallel pages). All heavy evidence goes to disk; chat sees only the ≤5-line verdict.
 
 ### Applicability gate (before opening a browser)
 
 1. **Web project?** Read `.renmark/memory/stack.md` and/or `package.json`. If there's no frontend or web server (CLI tool, pure data script, ML notebook), QA is N/A — print *"no browser surface to test — verify --qa is N/A for this project"* and stop. Do not open a page that doesn't exist.
 
-2. **Browser MCP available?** Probe `list_pages` (Chrome DevTools MCP). If the tool isn't reachable, **degrade to shell smoke** with a one-line note: *"browser not connected — ran shell smoke only; connect the extension for live E2E."* Then proceed with the Smoke mode steps above. Never crash; never block.
+2. **Browser channel selection (renmark supports two).** renmark runs on both WSL and the native Windows/desktop app, so QA can drive a browser through either of two channels. Pick by environment, with the CLI / MCP path as the default:
+
+   | Channel | How it connects | When renmark uses it |
+   |---|---|---|
+   | **Chrome DevTools MCP** (default) | MCP server (`chrome-devtools`) over the Chrome DevTools Protocol | Any CLI session — and the **only** option under WSL, where it can target Chrome running on the Windows host. |
+   | **Native Claude-in-Chrome** (`claude --chrome`) | Native messaging to the "Claude in Chrome" extension (no MCP) | When running from the **Windows / desktop app** with the extension connected. Native messaging does **not** cross the WSL boundary. |
+
+   **Detection + precedence (first match wins):**
+   1. **WSL?** — `grep -qi microsoft /proc/version`, or `$WSL_DISTRO_NAME` / `$WSL_INTEROP` is set → use **Chrome DevTools MCP** (probe `list_pages`). The native extension is unsupported on WSL; do not attempt it.
+   2. **Windows / desktop app with the native channel connected?** — the native `claude --chrome` integration is active/reachable → use the **native Claude-in-Chrome** channel.
+   3. **Otherwise (default CLI)** → use **Chrome DevTools MCP** (probe `list_pages`).
+
+   **If the selected channel isn't available, guide then degrade — never block.** Print the one install hint that matches the environment, then fall back to shell smoke and run the Smoke-mode steps above:
+   - WSL / CLI → *"browser not connected — ran shell smoke only. For live E2E, add the Chrome DevTools MCP: `claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`"*
+   - Windows / desktop app → *"browser not connected — ran shell smoke only. For live E2E, install the 'Claude in Chrome' extension, then launch with `claude --chrome` (or run `/chrome` to reconnect)."*
+
+   Record the chosen channel in local state and name it once in the verdict header (e.g. `verify --qa: <feature> (1 E2E flow, live browser — Chrome DevTools MCP)`). Everything below — flow derivation, pass criteria, evidence handling, and the context-hygiene contract — is **identical regardless of channel**; only the connection differs.
 
 ### Server lifecycle
 
@@ -217,7 +233,7 @@ E2E needs the app running:
 
 Derive **one** highest-value journey from the spec's stated user-visible behaviors — same goal-backward engine as smoke, just the #1 flow (the action named first in the goal paragraph, or the primary user action). State which flow you chose in one line before driving: *"QA flow: <chosen> — redirect with [edit] before I open the browser? [y/edit]"* (default to running if no response).
 
-Drive it with the Chrome DevTools MCP tools:
+Drive it with the selected channel's tools (the tool names below are the Chrome DevTools MCP set; the native Claude-in-Chrome channel exposes equivalent navigate / snapshot / click / fill / wait / screenshot / console / network actions — use whichever the active channel provides):
 
 - `navigate_page` to the app URL
 - `take_snapshot` (accessibility tree) to locate elements — transient, not pasted into chat
@@ -351,7 +367,7 @@ Do not open a browser. Stop.
 
 ### Reuse the QA setup
 
-The app is typically still running from the prior `--qa`. Same applicability gate (web project + browser MCP). Same server lifecycle: detect-or-boot, record-what-we-booted, tear-down-only-our-own-on-exit.
+The app is typically still running from the prior `--qa`. Same applicability gate (web project + browser channel selection — Chrome DevTools MCP or native Claude-in-Chrome, picked by environment). Same server lifecycle: detect-or-boot, record-what-we-booted, tear-down-only-our-own-on-exit.
 
 ### Plan phase — risk-rank, then pick 3 (no browser yet)
 

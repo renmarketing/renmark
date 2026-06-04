@@ -6,6 +6,8 @@
 
 **Built:** Audit found browser QA already existed (Chrome DevTools MCP: navigate/click/fill/wait_for/screenshot, console + network criteria, opt-in flags, degrade-to-shell). This refinement closes four gaps in `plugin/skills/verify/SKILL.md`: (1) a `### When to use which mode` decision guide (shell smoke vs `--qa` vs `--deep-qa`); (2) a new HARD visual/layout integrity criterion catching overlapping interactive elements / clipped / off-screen content, detected via snapshot + screenshot + `getBoundingClientRect`; (3) before/after screenshot capture with an agent-observed diff note (evidence to disk only); (4) explicit stop-and-report-on-break semantics (hang, uncaught exception, broken layout, can't-finish) wired into the existing `log_bug` / artifact / learnings flow.
 
+Follow-up (same branch): the QA applicability gate now selects between **two browser channels** so renmark works on both WSL and the Windows/desktop app — **Chrome DevTools MCP** (default; the only option under WSL, can target Windows-host Chrome) and the **native Claude-in-Chrome** extension (`claude --chrome`, used when on the Windows/desktop app with the extension connected). Detection precedence: WSL → MCP; Windows/desktop app with native channel connected → native; otherwise default CLI → MCP. If the chosen channel is unavailable it prints the environment-matched install hint (MCP `claude mcp add` command, or extension + `claude --chrome`) and degrades to shell smoke — never blocks. Pass criteria, evidence handling, and the hygiene contract are identical across channels.
+
 **Files changed:**
 - `plugin/skills/verify/SKILL.md` — added when-to-use guide, visual/layout hard criterion (`--qa` + strengthened `--deep-qa`), before/after UI-change tracking, stop-on-break semantics; frontmatter description lightly extended. (+33/−7)
 
@@ -13,6 +15,7 @@
 - **Shell smoke (default mode) stays untouched and stays the default** — browser QA must remain opt-in via `--qa`/`--deep-qa`; the applicability gate (web project? browser MCP available?) and degrade-to-shell fallback are load-bearing.
 - **Context-hygiene contract (G3/G5) is non-negotiable** — screenshots, DOM trees, console/network dumps, and before/after diff data go to disk + artifact body only; chat sees only the ≤5-line verdict. Do not inline images or paste diffs.
 - **No third browser flag** — the refinement lives inside the existing two flags by design.
+- **Browser-channel precedence is load-bearing:** WSL must always resolve to Chrome DevTools MCP (native messaging cannot cross the WSL boundary); the native `claude --chrome` channel is only for the Windows/desktop app. Do not reorder so that WSL attempts the native extension. Both channels share identical pass criteria / evidence / hygiene — keep them in lockstep.
 - The hand-off menu blocks and dispatch-on-number-or-letter wording were deliberately NOT touched (see prior numbered-menu guard).
 
 ## [2026-06-04] — numbered, forced-choice hand-off menus
