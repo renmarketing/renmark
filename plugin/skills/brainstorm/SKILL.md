@@ -122,13 +122,15 @@ Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestr
 
 > *"Spec written to `<path>`.*
 > *What's next?*
-> *  [p] Plan — decompose the spec into executor-tagged tasks via /renmark:plan (auto-validates)*
-> *  [w] Wait — stop here; the spec stays on disk to plan later*
-> *  [n] No — stop, and log why planning was deferred"*
+> *  1. [p] Plan — decompose the spec into executor-tagged tasks via /renmark:plan (auto-validates)*
+> *  2. [w] Wait — stop here; the spec stays on disk to plan later*
+> *  3. [n] No — stop, and log why planning was deferred"*
 
-- **p** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
-- **w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
-- **n** → stop, and log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
+A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
+
+- **1 / p** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
+- **2 / w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
+- **3 / n** → stop, and log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
 
 ## Common Mistakes
 

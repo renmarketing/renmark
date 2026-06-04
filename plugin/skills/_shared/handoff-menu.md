@@ -22,6 +22,10 @@ Plus the terminal actions `Finish`, `Debug`, and `Nothing`.
 
 ## Canonical menu text
 
+This is the master list of every gate, keyed by its `[x]` bracket code. It is
+**not** shown verbatim — the calling skill filters it (rules 1–5) and then
+numbers the survivors (rule 6) before rendering.
+
 ```
 [s]  Smoke test  — re-run the goal-backward shell smoke via /renmark:verify
 [qa] QA          — run one happy-path flow live in the browser via /renmark:verify --qa
@@ -59,6 +63,24 @@ contextual:
 5. **`[n] Nothing` is always offered** — the user can stop at any gate. Work
    stays committed; the artifact stays on disk.
 
+6. **Number the surviving options.** After applying filters 1–5, render the
+   options that remain as a numbered list — `1.`, `2.`, `3.`, … in display
+   order — keeping the `[x]` bracket code on each line. The number is the
+   primary selector; the letter still works. Example after filtering out the
+   just-run gate and an all-clean (no Debug) run:
+
+   ```
+   1. [qa] QA          — run one happy-path flow live in the browser via /renmark:verify --qa
+   2. [c]  Code review — run an adversarial Codex pass over the diff via /renmark:codereview
+   3. [f]  Finish      — close the branch (PR or merge) via /renmark:finish
+   4. [n]  Nothing     — stop here; work stays committed
+   ```
+
+7. **A choice is required to continue.** End on `What's next?` and wait. Never
+   auto-proceed, assume a default, or act on an empty answer — every hand-off
+   is an explicit decision the user must make. Accept either the number or the
+   bracket code; if the answer matches neither, re-show the menu and ask again.
+
 ---
 
 ## Why a shared file
@@ -78,6 +100,7 @@ When citing this menu in a SKILL.md, write:
 
 > *Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`,
 > applying the rendering rules (omit the gate just run; show `[dq]` only after
-> `--qa` passes; show `[d]` only on failure).*
+> `--qa` passes; show `[d]` only on failure; number the survivors; require an
+> explicit choice).*
 
 Do not paste the menu text into the calling SKILL.md.

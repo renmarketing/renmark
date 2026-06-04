@@ -75,10 +75,12 @@ Present: N commits, M files changed, brief note on each commit.
 
 > *"All verifiers pass. N commits, M files changed.*
 > *What's next?*
-> *  [p] Pull request — open a PR with gh, using the CHANGELOG summary as the body*
-> *  [m] Merge — merge the branch into main locally and push*
-> *  [r] Release — package this version to .renmark/baks/ + tag it (+ GitHub release if available)*
-> *  [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
+> *  1. [p] Pull request — open a PR with gh, using the CHANGELOG summary as the body*
+> *  2. [m] Merge — merge the branch into main locally and push*
+> *  3. [r] Release — package this version to .renmark/baks/ + tag it (+ GitHub release if available)*
+> *  4. [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
+
+A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
 
 **[p] PR:**
 Pull the `**Built:**` lines from CHANGELOG.md entries written during this run and use them as bullet points in the PR body.

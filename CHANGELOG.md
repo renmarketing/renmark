@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-06-04] — numbered, forced-choice hand-off menus
+
+**Request:** Make the bracketed option menus (`[qa]`, `[d]`, etc.) numbered `1. 2. 3. 4.` so the user can answer by number, and require an explicit choice to continue on every prompt.
+
+**Built:** Every renmark interactive menu now renders as a numbered list while keeping its `[x]` bracket code (e.g. `1. [d] Dispatch …`). The number is the primary selector; the bracket letter still works. Each prompt now states a choice is required and must never auto-proceed on an empty answer.
+
+**Files changed:**
+- `plugin/skills/_shared/handoff-menu.md` — added rendering rule 6 (number survivors after filtering) and rule 7 (a choice is required; accept number or letter; re-ask on no match); updated the citation snippet.
+- `plugin/skills/verify/SKILL.md` — dispatch now keys on "number or letter" and requires an explicit choice.
+- `plugin/skills/plan/SKILL.md`, `check-plan/SKILL.md`, `finish/SKILL.md`, `brainstorm/SKILL.md`, `setup/SKILL.md` — static gates numbered; dispatch keyed on `N / letter`; added "choice required" line.
+- `plugin/skills/orchestrate/SKILL.md` — numbered the verify-menu preview.
+- `plugin/skills/codereview/SKILL.md` — numbered the `[o]`/`[fix]` actions; appended hand-off menu continues the numbering into one list.
+- `plugin/skills/_shared/scope-contract.md` — Q1/Q2/Q3 discovery questions numbered.
+
+**Do not change:**
+- The handoff menu numbering is a **render-time** rule, not hardcoded in the canonical list — items are filtered first (rules 1–5), then numbered. Don't bake fixed numbers into the canonical `[x]` block in `handoff-menu.md`; omitted gates would leave gaps.
+- Keep both the number AND the `[x]` bracket code on every menu line — letters are still valid selectors and several dispatch instructions reference them.
+
 ## v0.5.6 — 2026-05-29 (lifecycle hygiene — decision log enforcement, artifact GC, memory prune, resume validation)
 
 **Patch release — closes the gap between renmark's artifact-first doctrine and its actual enforcement. The `stale_after` / `created_at` / `source_sha` metadata schema in `renmark/summary.py` and `memory.log_decision()` in `renmark/memory.py` were both designed in earlier releases but had no consumer wired in. v0.5.6 builds the sweepers and enforcers that close the loop — turning aspirational metadata into operational hygiene.**

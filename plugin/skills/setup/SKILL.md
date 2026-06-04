@@ -139,8 +139,10 @@ project-map — [seeded (.renmark/memory/project-map.md) | already existed — s
 Then prompt:
 
 > *"Project is ready for renmark.*
-> *  [b] Brainstorm — design a new feature into a spec via /renmark:brainstorm*
-> *  [p] Plan — I already have a description; go straight to /renmark:plan*
-> *  [n] Nothing — setup only, stop here"*
+> *  1. [b] Brainstorm — design a new feature into a spec via /renmark:brainstorm*
+> *  2. [p] Plan — I already have a description; go straight to /renmark:plan*
+> *  3. [n] Nothing — setup only, stop here"*
 
-On **b** → invoke `/renmark:brainstorm`. On **p** → invoke `/renmark:plan`. On **n** → stop.
+A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
+
+On **1 / b** → invoke `/renmark:brainstorm`. On **2 / p** → invoke `/renmark:plan`. On **3 / n** → stop.

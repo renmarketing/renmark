@@ -119,7 +119,9 @@ Renmark is a wizard pipeline. After reporting results:
 - **PASS or WARN** → prompt:
 
 > *"Plan validated. Ready to dispatch?*
-> *  [d] Dispatch — spin up AI subagents to implement the validated plan, then auto-verify on completion*
-> *  [n] No — stop here; the plan stays validated on disk to run later"*
+> *  1. [d] Dispatch — spin up AI subagents to implement the validated plan, then auto-verify on completion*
+> *  2. [n] No — stop here; the plan stays validated on disk to run later"*
 
-On **d** → immediately invoke `/renmark:orchestrate`. On **n** → stop.
+A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed.
+
+On **1 / d** → immediately invoke `/renmark:orchestrate`. On **2 / n** → stop.

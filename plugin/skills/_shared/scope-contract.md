@@ -18,11 +18,11 @@ those records and skips re-asking.
 Always ask for new projects unless the stack is already documented. Infer a suggested stack and present as a confirmable choice:
 
 > For this [feature type], I'd suggest: [recommended stack]. Does that work?
-> - [a] Yes, use that
-> - [b] Different backend — I'll specify
-> - [c] Different frontend/UI approach — I'll specify
-> - [d] Show me 2–3 reasonable options
-> - [e] Skip — I'll add stack notes to the plan manually
+> 1. [a] Yes, use that
+> 2. [b] Different backend — I'll specify
+> 3. [c] Different frontend/UI approach — I'll specify
+> 4. [d] Show me 2–3 reasonable options
+> 5. [e] Skip — I'll add stack notes to the plan manually
 
 **Stack inference rules:**
 
@@ -40,11 +40,11 @@ Always ask for new projects unless the stack is already documented. Infer a sugg
 If multiple stacks are plausible, offer options rather than choosing silently:
 
 > This could reasonably be built two ways:
-> - [a] Python + FastAPI + SQLite — backend-first
-> - [b] Node.js + Express + SQLite — JavaScript full-stack
-> - [c] Next.js — frontend and backend routes together
+> 1. [a] Python + FastAPI + SQLite — backend-first
+> 2. [b] Node.js + Express + SQLite — JavaScript full-stack
+> 3. [c] Next.js — frontend and backend routes together
 >
-> Which direction should I use?
+> Which direction should I use? (pick a number to continue)
 
 ---
 
@@ -53,11 +53,11 @@ If multiple stacks are plausible, offer options rather than choosing silently:
 Ask when the feature includes: server, accounts, auth, database, multiplayer, realtime, API, payments, or public access. Skip for clearly local, static, or frontend-only work.
 
 > Where will this run?
-> - [a] Local only — localhost, no public server
-> - [b] Self-hosted server / VPS
-> - [c] Cloud platform (Vercel, Railway, Fly.io, AWS, etc.)
-> - [d] Internal/private network
-> - [e] Doesn't matter yet
+> 1. [a] Local only — localhost, no public server
+> 2. [b] Self-hosted server / VPS
+> 3. [c] Cloud platform (Vercel, Railway, Fly.io, AWS, etc.)
+> 4. [d] Internal/private network
+> 5. [e] Doesn't matter yet
 
 If user chooses "doesn't matter yet," record: *Deployment target: undecided; plan should avoid provider-specific assumptions.*
 
@@ -68,10 +68,10 @@ If user chooses "doesn't matter yet," record: *Deployment target: undecided; pla
 Always ask for new projects and major features.
 
 > What should be out of scope for this version?
-> - [a] Nothing obvious — plan everything I described
-> - [b] MVP only — keep it to the simplest usable version
-> - [c] Skip advanced features for now
-> - [d] I'll specify exactly what to exclude
+> 1. [a] Nothing obvious — plan everything I described
+> 2. [b] MVP only — keep it to the simplest usable version
+> 3. [c] Skip advanced features for now
+> 4. [d] I'll specify exactly what to exclude
 
 If user chooses MVP only, infer sensible exclusions and record them explicitly.
 

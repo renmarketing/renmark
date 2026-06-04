@@ -158,15 +158,17 @@ Show a clear summary:
 > *Executors: haiku×a, codex×b, sonnet×c, opus×d*
 >
 > *What's next?*
-> *  [r] Review — open the plan file so you can read every task before approving*
-> *  [d] Dispatch — spin up AI subagents to implement the plan, then auto-verify on completion*
-> *  [e] Edit — tell me what to change; I'll rewrite the plan and re-validate it*
-> *  [n] No — stop here; the validated plan stays on disk to dispatch later"*
+> *  1. [r] Review — open the plan file so you can read every task before approving*
+> *  2. [d] Dispatch — spin up AI subagents to implement the plan, then auto-verify on completion*
+> *  3. [e] Edit — tell me what to change; I'll rewrite the plan and re-validate it*
+> *  4. [n] No — stop here; the validated plan stays on disk to dispatch later"*
 
-On **r** → cat/open the plan file in the conversation, then re-ask the same prompt.
-On **d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.
-On **e** → ask what to change, rewrite the plan, re-run 8a (re-validate), then re-show the summary.
-On **n** → stop. Plan stays on disk for later (already validated at `plan-validated`).
+A choice is required to continue — wait for the user to pick a number (or its bracket letter); never auto-proceed on an empty answer.
+
+On **1 / r** → cat/open the plan file in the conversation, then re-ask the same prompt.
+On **2 / d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.
+On **3 / e** → ask what to change, rewrite the plan, re-run 8a (re-validate), then re-show the summary.
+On **4 / n** → stop. Plan stays on disk for later (already validated at `plan-validated`).
 
 ## Plan file format example
 

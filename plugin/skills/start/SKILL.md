@@ -50,15 +50,15 @@ Ask only when the answer would meaningfully change what gets built AND cannot be
 
 **Q1 — Reach** (ask if deployment signal is ambiguous):
 > "Is this just for you, or will other people use it?"
-> - [a] Just me — local machine is fine
-> - [b] Others / my team — needs to be accessible to more people
-> - [c] Not sure yet
+> 1. [a] Just me — local machine is fine
+> 2. [b] Others / my team — needs to be accessible to more people
+> 3. [c] Not sure yet
 
 **Q2 — Lifespan** (ask if complexity is ambiguous):
 > "Is this a one-time run or something you'll use regularly?"
-> - [a] One-time / occasional — keep it simple, I'll run it manually
-> - [b] Regular use — worth making it maintainable and easy to update
-> - [c] Not sure yet
+> 1. [a] One-time / occasional — keep it simple, I'll run it manually
+> 2. [b] Regular use — worth making it maintainable and easy to update
+> 3. [c] Not sure yet
 
 Skip both questions for clearly scoped requests. Never ask about tech stack, architecture, or framework preferences — infer them.
 

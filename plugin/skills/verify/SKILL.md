@@ -179,7 +179,7 @@ Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu
 
 Prefix the menu with `N/M requirements verified. Artifact: PATH.` and end with `What's next?`.
 
-Dispatch on the chosen letter: invoke the matching `/renmark:` skill (passing the failed-symptom into `/renmark:debug` if `[d]`), or stop on `[n]`.
+Dispatch on the chosen number or letter: invoke the matching `/renmark:` skill (passing the failed-symptom into `/renmark:debug` if `[d]`), or stop on `[n]`. Require an explicit choice — don't proceed without one.
 
 ---
 

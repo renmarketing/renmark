@@ -155,8 +155,8 @@ Tell the user — using ONLY the summary, never the diff body. Lead with the cod
 
 > *"Review at `<path>` (focus: <mode>). <N critical, M major, K minor> findings.*
 > *What's next?*
-> *  [o] Open — open the review file to read the full findings*
-> *  [fix] Fix — kick off a new /renmark:plan built from the critical findings"*
+> *  1. [o] Open — open the review file to read the full findings*
+> *  2. [fix] Fix — kick off a new /renmark:plan built from the critical findings"*
 
 Omit the `(focus: <mode>)` parenthetical entirely when mode is default — preserves the existing terse output for the common case.
 
@@ -167,6 +167,10 @@ Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff
 - **Show `[dq] Deep QA`** only if a passing `.qa.md` exists for the current sha.
 - **Show `[d] Debug`** only if any Critical findings exist (Major+ alone is informational, not a debug trigger).
 - **Show `[f] Finish`** unconditionally and `[n] Nothing` always.
+
+Continue the numbering from the `[o]`/`[fix]` actions above so the user sees one
+single numbered list (e.g. `1. [o]`, `2. [fix]`, then `3. [s]`, `4. [qa]`, …) —
+and require an explicit choice before doing anything.
 
 Don't auto-fix. The human reads and decides.
 

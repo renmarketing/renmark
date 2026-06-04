@@ -214,10 +214,12 @@ Report the orchestrate completion line first, then let verify take over:
 > *"All N tasks committed (M commits, ~$X spent). Running verification…"*
 
 → invoke `/renmark:verify`. From here the user follows verify's hand-off:
-> *  [c] Code review — run an adversarial Codex pass over the diff via /renmark:codereview*
-> *  [f] Finish — close the branch (PR or merge) via /renmark:finish*
-> *  [d] Debug — investigate the failure verify surfaced via /renmark:debug*
-> *  [n] Nothing — stop here; work stays committed*
+> *  1. [c] Code review — run an adversarial Codex pass over the diff via /renmark:codereview*
+> *  2. [f] Finish — close the branch (PR or merge) via /renmark:finish*
+> *  3. [d] Debug — investigate the failure verify surfaced via /renmark:debug*
+> *  4. [n] Nothing — stop here; work stays committed*
+
+(Verify renders the live numbered menu per `_shared/handoff-menu.md`; the user must pick a number to continue.)
 
 **Only auto-verify on a fully clean run.** If any task failed (paused / escalated), do NOT auto-verify and do NOT offer the next step — surface the failure and the resume command first. Verification of a half-built feature is noise.
 
