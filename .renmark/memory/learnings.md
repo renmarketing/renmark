@@ -22,6 +22,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-04, .renmark/reviews/2026-06-04-eb5ce2d.verification.md) model `verify`: **verify-qa-flow-memory** — 7/7 behaviors verified; failed: none; full suite 343 passed/0 failed (+6 new tests).
+
 - (2026-06-04, orchestrate run 20260604-qa-flow-memory) **mixed-executor plan, lone codex task in wave 2** — Dispatch a single codex task via a one-task plan + `renmark-execute --no-commit`. The ad-hoc `--task` mode forces YAML-frontmatter artifact format, which corrupts .py source targets; the normal plan path (run_codex_task) edits the source file directly.
 
 - (2026-06-04, bug) **/renmark:feature does not write feature identity to lifecycle.json** — Any pipeline-entry skill that establishes a new work unit must persist that unit's IDENTITY (not just its stage) to canonical state at entry, or downstream stage writes silently inherit stale identity.
