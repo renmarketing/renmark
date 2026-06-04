@@ -1,6 +1,6 @@
 # Changelog
 
-## [2026-06-04] — fix(finish): delete merged branch + correct stale release routing
+## v0.5.9 — 2026-06-04 (fix: finish deletes merged branch + correct release routing)
 
 **Request:** "Once a release is created, the branch should get merged and deleted — but I keep seeing the feature branch left behind." Check the finish/release skill.
 
