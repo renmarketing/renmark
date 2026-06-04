@@ -2,6 +2,18 @@
 
 
 
+
+## ADR-003 — Finished feature verify-browser-qa
+
+**Date:** 2026-06-04
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, ready-to-release
+
+**Decision.** Branch feature/verify-browser-qa reached stage ready-to-release
+
+---
+
 ## ADR-002 — Finished feature codereview-focus
 
 **Date:** 2026-05-29
