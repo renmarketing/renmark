@@ -205,13 +205,13 @@ Opt-in live-browser end-to-end check. Proves the feature works from rendered sta
 
    | Channel | How it connects | When renmark uses it |
    |---|---|---|
-   | **Chrome DevTools MCP** (default) | MCP server (`chrome-devtools`) over the Chrome DevTools Protocol | Any CLI session — and the **only** option under WSL, where it can target Chrome running on the Windows host. |
-   | **Native Claude-in-Chrome** (`claude --chrome`) | Native messaging to the "Claude in Chrome" extension (no MCP) | When running from the **Windows / desktop app** with the extension connected. Native messaging does **not** cross the WSL boundary. |
+   | **Chrome DevTools MCP** (default) | MCP server (`chrome-devtools`) over the Chrome DevTools Protocol | **The universal default for every CLI session** — Windows PowerShell, cmd, macOS/Linux terminals — and the **only** option under WSL, where it can target Chrome running on the Windows host. |
+   | **Native Claude-in-Chrome** (`claude --chrome`) | Native messaging to the "Claude in Chrome" extension (no MCP) | Used **only when the native channel is actually connected** — typically the Windows / desktop app (or any session that explicitly ran `claude --chrome`). Native messaging does **not** cross the WSL boundary. |
 
    **Detection + precedence (first match wins):**
    1. **WSL?** — `grep -qi microsoft /proc/version`, or `$WSL_DISTRO_NAME` / `$WSL_INTEROP` is set → use **Chrome DevTools MCP** (probe `list_pages`). The native extension is unsupported on WSL; do not attempt it.
-   2. **Windows / desktop app with the native channel connected?** — the native `claude --chrome` integration is active/reachable → use the **native Claude-in-Chrome** channel.
-   3. **Otherwise (default CLI)** → use **Chrome DevTools MCP** (probe `list_pages`).
+   2. **Native channel connected?** — the native `claude --chrome` integration is active/reachable (normally the Windows / desktop app, but also any session that opted in via `claude --chrome`) → use the **native Claude-in-Chrome** channel.
+   3. **Otherwise (default — any CLI: PowerShell, cmd, terminal)** → use **Chrome DevTools MCP** (probe `list_pages`). MCP is the default everywhere; the native channel is never assumed, only used when explicitly connected.
 
    **If the selected channel isn't available, guide then degrade — never block.** Print the one install hint that matches the environment, then fall back to shell smoke and run the Smoke-mode steps above:
    - WSL / CLI → *"browser not connected — ran shell smoke only. For live E2E, add the Chrome DevTools MCP: `claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`"*
