@@ -201,7 +201,7 @@ Opt-in live-browser end-to-end check. Proves the feature works from rendered sta
 
 1. **Web project?** Read `.renmark/memory/stack.md` and/or `package.json`. If there's no frontend or web server (CLI tool, pure data script, ML notebook), QA is N/A — print *"no browser surface to test — verify --qa is N/A for this project"* and stop. Do not open a page that doesn't exist.
 
-2. **Browser channel selection (renmark supports two).** renmark runs on both WSL and the native Windows/desktop app, so QA can drive a browser through either of two channels. Pick by environment, with the CLI / MCP path as the default:
+2. **Browser channel selection (renmark supports two).** renmark runs on both WSL and the native Windows/desktop app, so QA can drive a browser through either of two channels. **Plain CLI sessions — including Windows PowerShell/cmd — default to Chrome DevTools MCP unless `claude --chrome` is explicitly connected.** Pick by environment, with the CLI / MCP path as the default:
 
    | Channel | How it connects | When renmark uses it |
    |---|---|---|
