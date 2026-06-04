@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-06-04] — verify browser QA refinement (`--qa` / `--deep-qa`)
+
+**Request:** Make `/renmark:verify --qa`/`--deep-qa` do real browser-based QA (load pages, drive controls, exercise workflows, report visible + console/runtime bugs) — opt-in, not the default — and document when to use it; prefer `--deep-qa` for deeper runtime/visual checks that track UI changes, catch overlapping/broken interface layout, and stop/flag when a flow breaks or can't finish.
+
+**Built:** Audit found browser QA already existed (Chrome DevTools MCP: navigate/click/fill/wait_for/screenshot, console + network criteria, opt-in flags, degrade-to-shell). This refinement closes four gaps in `plugin/skills/verify/SKILL.md`: (1) a `### When to use which mode` decision guide (shell smoke vs `--qa` vs `--deep-qa`); (2) a new HARD visual/layout integrity criterion catching overlapping interactive elements / clipped / off-screen content, detected via snapshot + screenshot + `getBoundingClientRect`; (3) before/after screenshot capture with an agent-observed diff note (evidence to disk only); (4) explicit stop-and-report-on-break semantics (hang, uncaught exception, broken layout, can't-finish) wired into the existing `log_bug` / artifact / learnings flow.
+
+**Files changed:**
+- `plugin/skills/verify/SKILL.md` — added when-to-use guide, visual/layout hard criterion (`--qa` + strengthened `--deep-qa`), before/after UI-change tracking, stop-on-break semantics; frontmatter description lightly extended. (+33/−7)
+
+**Do not change:**
+- **Shell smoke (default mode) stays untouched and stays the default** — browser QA must remain opt-in via `--qa`/`--deep-qa`; the applicability gate (web project? browser MCP available?) and degrade-to-shell fallback are load-bearing.
+- **Context-hygiene contract (G3/G5) is non-negotiable** — screenshots, DOM trees, console/network dumps, and before/after diff data go to disk + artifact body only; chat sees only the ≤5-line verdict. Do not inline images or paste diffs.
+- **No third browser flag** — the refinement lives inside the existing two flags by design.
+- The hand-off menu blocks and dispatch-on-number-or-letter wording were deliberately NOT touched (see prior numbered-menu guard).
+
 ## [2026-06-04] — numbered, forced-choice hand-off menus
 
 **Request:** Make the bracketed option menus (`[qa]`, `[d]`, etc.) numbered `1. 2. 3. 4.` so the user can answer by number, and require an explicit choice to continue on every prompt.
