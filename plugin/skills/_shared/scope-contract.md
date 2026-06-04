@@ -13,6 +13,12 @@ those records and skips re-asking.
 
 ---
 
+## Presentation
+
+**Ask each question below via the `AskUserQuestion` tool (arrow-selectable choices) when available** — `AskUserQuestion` is the canonical fit for these stack/deployment/scope decisions. Map each option to a choice (`label` = the option, e.g. `Yes, use that [a]`; `description` = its gloss). The tool caps at **4 options per question**: for the questions below with 5 options (Q1, Q2), surface the 4 highest-value choices and rely on the always-accepted free-text answer for the rest (the "I'll specify" / "Skip" options are naturally free-text anyway), and print the full numbered list as the fallback. In a non-interactive session (or if the tool is unavailable/errors), print the numbered list and accept a number or bracket letter. A choice is always required — never auto-proceed.
+
+---
+
 ## Q1 — Tech stack
 
 Always ask for new projects unless the stack is already documented. Infer a suggested stack and present as a confirmable choice:
@@ -44,7 +50,7 @@ If multiple stacks are plausible, offer options rather than choosing silently:
 > 2. [b] Node.js + Express + SQLite — JavaScript full-stack
 > 3. [c] Next.js — frontend and backend routes together
 >
-> Which direction should I use? (pick a number to continue)
+> Which direction should I use? (arrow-select via `AskUserQuestion` when available; else type the number/letter — a choice is required)
 
 ---
 

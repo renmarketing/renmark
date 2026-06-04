@@ -46,7 +46,7 @@ From the description, determine silently:
 
 ### 3. Adaptive follow-up (at most 2 questions, only when needed)
 
-Ask only when the answer would meaningfully change what gets built AND cannot be reasonably inferred. Ask one at a time.
+Ask only when the answer would meaningfully change what gets built AND cannot be reasonably inferred. Ask one at a time. **Ask each via the `AskUserQuestion` tool (arrow-selectable choices) when available**; the numbered lists below are the text fallback for non-interactive sessions (accept a number or bracket letter).
 
 **Q1 — Reach** (ask if deployment signal is ambiguous):
 > "Is this just for you, or will other people use it?"
