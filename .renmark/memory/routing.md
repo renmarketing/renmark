@@ -20,6 +20,9 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 
 
 
+
+- (2026-06-04) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260604-183746-05fd)
+
 - (2026-05-29) `target=tests/**, complexity=medium, mode=B` → **codex** (failed, run=20260529-155804-f7e2)
 
 - (2026-05-29) `target=tests/**, complexity=hard, mode=B` → **codex** (passed, run=20260529-155804-f7e2)

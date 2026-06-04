@@ -11,6 +11,25 @@
 
 Gates: `ruff`/`mypy`/plugin lint clean, `pytest` 337 passed. Local release only (no remote configured).
 
+## [2026-06-04] — QA flow memory + QA bootstrap
+
+**Request:** Add a lightweight, markdown-based QA flow memory layer so `/renmark:verify --qa` / `--deep-qa` reuse known-good browser flows instead of re-inventing tests each run, centered on a new `.renmark/memory/qa-flows.md` playbook.
+
+**Built:** New committed QA playbook store (`qa-flows.md`) with a seeded EXAMPLE/TEMPLATE flow (Flow name, URL, Preconditions, Actions, Expected — incl. no overlapping/clipped controls + no console errors, selectors, Evidence, Known risks, related bugs). `/renmark:verify` now reads it BEFORE choosing a QA flow (degrades to today's synthesize-from-plan behavior when the file is "missing or empty"), promotes a passing one-off flow into it on PASS, and gains a `--qa --bootstrap` path (no third flag) plus `--qa`/`--deep-qa` recommendation triggers. `/renmark:orchestrate` Step 8 now recommends (does NOT auto-run) browser QA after a clean run touching browser-facing surfaces. INDEX.md registers the new file. 6 content-presence tests added.
+
+**Files changed:**
+- `.renmark/memory/qa-flows.md` — new QA playbook store (seeded template).
+- `plugin/skills/verify/SKILL.md` — flow selection from memory, `--qa --bootstrap`, promote-on-pass, recommendation triggers, Deep-QA reuse pointer.
+- `.renmark/memory/INDEX.md` — registered `qa-flows.md` in the memory table.
+- `plugin/skills/orchestrate/SKILL.md` — Step 8 browser-QA recommendation note (not automatic).
+- `tests/test_qa_flows.py` — 6 tests covering the store, verify wiring, and the INDEX row.
+
+**Do not change:**
+- **Shell smoke stays the default; browser QA stays opt-in** via `--qa`/`--deep-qa` — never automatic. No third browser flag (bootstrap rides `--qa`).
+- **Existing QA must work when `qa-flows.md` is missing or empty** — that literal phrase is the load-bearing fallback guarantee; don't remove it.
+- **Context-hygiene (G3/G5):** screenshots/DOM/console/network stay on disk + artifact body; chat sees only the ≤5-line verdict.
+- Preserve the dual browser-channel selection (WSL→MCP precedence) and the interactive `AskUserQuestion` hand-off menus.
+
 ## [2026-06-04] — interactive (arrow-selectable) hand-off menus via AskUserQuestion
 
 **Interaction-layer change, not menu formatting.** The earlier "numbered, forced-choice markdown menu" change only made menus *print* as `1. [x] Option` text — readable, but still a static list with no arrow-key selection. This change makes hand-off gates present an actual arrow-key-navigable picker via Claude Code's **`AskUserQuestion`** tool when available, with the printed numbered list demoted to a graceful fallback. It **supersedes** the numbered-markdown-as-primary rule.
