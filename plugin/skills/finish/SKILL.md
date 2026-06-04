@@ -80,7 +80,7 @@ Present: N commits, M files changed, brief note on each commit.
 > *  3. [r] Release — package this version to .renmark/baks/ + tag it (+ GitHub release if available)*
 > *  4. [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
 
-**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Pull request [p]`, `Merge [m]`, `Release [r]`, `Nothing [n]` (all 4 fit the option cap). **Fallback** (non-interactive / headless / tool unavailable or errors): print the numbered list above and accept a number or bracket letter. A choice is required either way — never auto-proceed. (Merge / release are outward, irreversible actions — only run on the user's explicit selection.)
+**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Pull request [p]`, `Merge [m]`, `Release [r]`, `Nothing [n]` (all 4 fit the option cap). **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed. (Merge / release are outward, irreversible actions — only run on the user's explicit selection.)
 
 **[p] PR:**
 Pull the `**Built:**` lines from CHANGELOG.md entries written during this run and use them as bullet points in the PR body.

@@ -11,6 +11,8 @@
 - Static gates updated to interactive-primary + numbered-fallback: `plan`, `check-plan`, `finish`, `brainstorm`, `setup`, `orchestrate` (preview note), `codereview` (combined `[o]/[fix]`+gate menu, overflow path), `verify` (dispatch wording + citation).
 - Discovery questions updated likewise: `start` (Q1/Q2), `_shared/scope-contract.md` (Q1–Q3; 5-option questions use top-4 + free-text). `brainstorm` already used `AskUserQuestion` for discovery.
 
+**Follow-up (same branch) — choiceless-prompt hardening.** Closed a failure mode where `AskUserQuestion` rendered only the header (`What's next?`) with no visible options, or was declined/errored, leaving the user stuck. New rule 9 (hard guarantee): a hand-off MUST end in exactly one of two visible states — the picker showing selectable choices, OR the printed numbered list — **never the bare question with no choices**. Rule 6 now mandates options be passed as real `options[]` entries (never embedded in the `question` text — that's what renders header-only), and broadens the fallback trigger to fire immediately on *any* non-rendering reason: unavailable, errored, **declined/rejected/interrupted**, no valid selection, or header-only. The static gates' fallback clause was broadened to match. "When in doubt, print the fallback."
+
 **Files changed:**
 - `plugin/skills/_shared/handoff-menu.md` — interactive-primary rules 6–8, citation snippet, canonical-menu intro.
 - `plugin/skills/{plan,check-plan,finish,brainstorm,setup,orchestrate,codereview,verify,start}/SKILL.md` — gate/dispatch wording.

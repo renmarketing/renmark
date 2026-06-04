@@ -68,17 +68,27 @@ contextual:
    applying filters 1–5, render the menu by **calling the `AskUserQuestion`
    tool** — an arrow-key-selectable picker — not by printing markdown. This is
    the default behavior; the printed list (rule 7) is only a fallback.
-   - One question, header `What's next?`, `multiSelect: false`.
-   - One selectable choice per surviving option: `label` = the action name with
-     its code (e.g. `Code review [c]`), `description` = the one-line gloss from
-     the canonical list. Keeping `[x]` in the label preserves continuity with
-     the fallback and with dispatch-by-letter.
+   - One question. The `question` field holds ONLY the prompt (`What's next?`)
+     — a short interrogative sentence. `multiSelect: false`.
+   - **Every option MUST be a real entry in the `options` array — never list the
+     choices inside the `question` text.** Each surviving option is its own
+     `options[]` entry: `label` = the action name with its code (e.g.
+     `Code review [c]`), `description` = the one-line gloss from the canonical
+     list. A call whose `question` embeds the option list (and whose `options`
+     array is empty/degenerate) renders as a header with no selectable choices —
+     that is the failure this rule forbids. If you cannot populate a real
+     `options` array (≥2 entries), do NOT call the tool — print the rule 7
+     fallback instead.
    - `AskUserQuestion` is blocking and offers no default — that is what enforces
      rule 8 (no auto-proceed).
-   - **When the picker is NOT usable, fall back to rule 7:** the tool is
-     unavailable in subagents and in headless / `-p` / piped / CI runs, and may
-     error with no TTY. If it is unavailable or the call fails, print the
-     numbered list instead. Never block on a missing picker.
+   - **Fall back to rule 7 the moment the picker does not present visible,
+     selectable choices — for ANY reason.** Concretely, immediately print the
+     numbered list (rule 7) if the call: is unavailable (subagents, headless /
+     `-p` / piped / CI, no TTY); errors or throws; is declined / rejected /
+     interrupted by the user; returns no selection or no valid option; or would
+     render only the question header with no visible options. Never block on,
+     retry indefinitely, or wait after a picker that showed nothing. **A
+     declined or empty picker is a signal to print the fallback, not to stop.**
    - **4-option cap.** `AskUserQuestion` allows **at most 4 options** per
      question. If **≤4 options survive, every one is a selectable choice.** If
      **>4 survive, surface the 4 highest-priority as choices AND also print the
@@ -112,6 +122,15 @@ contextual:
    assume a default or act on an empty answer — every hand-off is a decision the
    user must make. (`AskUserQuestion` enforces this by construction; in the text
    fallback, if the answer matches no option, re-show the list and ask again.)
+
+9. **Hard guarantee — visible choices XOR printed fallback, never neither.**
+   Every hand-off MUST end in one of exactly two visible states: (a) an
+   `AskUserQuestion` picker showing the selectable choices, OR (b) the printed
+   numbered list (rule 7). It must **never** end on the bare question
+   (`What's next?`) with no visible options. If the picker did not render visible
+   choices — declined, errored, header-only, or no valid selection — print the
+   numbered list in the **same turn** before yielding. When in doubt, print the
+   fallback: a redundant numbered list is harmless; a choiceless prompt is a bug.
 
 ---
 
