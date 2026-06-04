@@ -12,7 +12,7 @@ Three modes, one skill — chosen by flag:
 | Mode | Flag | What it does | Where evidence lives |
 |---|---|---|---|
 | **Smoke** (default) | _none_ | one shell command per stated behavior + open regression | `.verification.md` |
-| **QA** | `--qa` | one live-browser happy-path flow via Chrome DevTools MCP | `.qa.md` + `.renmark/reviews/qa/<feature>/` |
+| **QA** | `--qa` | one live-browser happy-path flow via the selected browser channel (Chrome DevTools MCP or native `claude --chrome`) | `.qa.md` + `.renmark/reviews/qa/<feature>/` |
 | **Deep QA** | `--deep-qa` | 3 live-browser edge-case flows, risk-ranked from diff + behaviors + bugs.md | `.deep-qa.md` + `.renmark/reviews/qa/<feature>/deep/` |
 
 Smoke is goal-backward shell verification. QA is goal-backward *rendered* verification — proves the user-visible result actually appears in a real browser, not just that curl gets a 200. Deep QA finds where the feature breaks under unusual but valid conditions. All three share: bounded ≤5-line verdict to chat, evidence to disk, `bugs.md` convergence loop, `learnings.md` appending.
@@ -210,12 +210,12 @@ Opt-in live-browser end-to-end check. Proves the feature works from rendered sta
 
    **Detection + precedence (first match wins):**
    1. **WSL?** — `grep -qi microsoft /proc/version`, or `$WSL_DISTRO_NAME` / `$WSL_INTEROP` is set → use **Chrome DevTools MCP** (probe `list_pages`). The native extension is unsupported on WSL; do not attempt it.
-   2. **Native channel connected?** — the native `claude --chrome` integration is active/reachable (normally the Windows / desktop app, but also any session that opted in via `claude --chrome`) → use the **native Claude-in-Chrome** channel.
+   2. **Native channel connected?** — concretely: this Claude Code session was launched with `claude --chrome` (or reconnected via the `/chrome` built-in) AND that integration reports the extension connected. There is no shell probe for this — it is a session capability the agent can observe directly, unlike MCP's `list_pages`. If the session was not started with `--chrome`, treat native as NOT connected and fall through to rule 3. When it IS connected → use the **native Claude-in-Chrome** channel.
    3. **Otherwise (default — any CLI: PowerShell, cmd, terminal)** → use **Chrome DevTools MCP** (probe `list_pages`). MCP is the default everywhere; the native channel is never assumed, only used when explicitly connected.
 
-   **If the selected channel isn't available, guide then degrade — never block.** Print the one install hint that matches the environment, then fall back to shell smoke and run the Smoke-mode steps above:
-   - WSL / CLI → *"browser not connected — ran shell smoke only. For live E2E, add the Chrome DevTools MCP: `claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`"*
-   - Windows / desktop app → *"browser not connected — ran shell smoke only. For live E2E, install the 'Claude in Chrome' extension, then launch with `claude --chrome` (or run `/chrome` to reconnect)."*
+   **If the selected channel isn't available, guide then degrade — never block.** Branch the install hint on the **channel that was selected** (not on the OS bucket), then fall back to shell smoke and run the Smoke-mode steps above:
+   - **Selected channel = Chrome DevTools MCP** (the default, and all WSL/CLI sessions) → *"browser not connected — ran shell smoke only. For live E2E, add the Chrome DevTools MCP: `claude mcp add chrome-devtools --scope user -- npx chrome-devtools-mcp@latest`"* (the `--` separates claude's flags from the stdio launch command — omitting it misparses the `npx` args).
+   - **Selected channel = native Claude-in-Chrome** → *"native browser channel not connected — ran shell smoke only. For live E2E, install the 'Claude in Chrome' extension, then relaunch with `claude --chrome` (or run the Claude Code built-in `/chrome` to reconnect — it is a core command, not a renmark one)."*
 
    Record the chosen channel in local state and name it once in the verdict header (e.g. `verify --qa: <feature> (1 E2E flow, live browser — Chrome DevTools MCP)`). Everything below — flow derivation, pass criteria, evidence handling, and the context-hygiene contract — is **identical regardless of channel**; only the connection differs.
 
