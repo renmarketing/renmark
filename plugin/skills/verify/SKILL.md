@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Use after `/renmark:orchestrate` completes — runs goal-backward smoke tests derived from the plan's stated feature goal, cross-references open bugs for regressions, reports how many requirements were confirmed, writes a `.verification.md` artifact, and appends a learning entry. Three modes — default shell smoke, `--qa` for one live-browser happy path, `--deep-qa` for 3 live-browser edge cases. Never reads source code into conversation.
+description: Use after `/renmark:orchestrate` completes — runs goal-backward smoke tests derived from the plan's stated feature goal, cross-references open bugs for regressions, reports how many requirements were confirmed, writes a `.verification.md` artifact, and appends a learning entry. Three modes — default shell smoke, `--qa` for one live-browser happy path, `--deep-qa` for 3 live-browser edge cases; browser modes add visual/layout integrity checks and before/after UI-change tracking. Never reads source code into conversation.
 ---
 
 # verify
@@ -12,12 +12,22 @@ Three modes, one skill — chosen by flag:
 | Mode | Flag | What it does | Where evidence lives |
 |---|---|---|---|
 | **Smoke** (default) | _none_ | one shell command per stated behavior + open regression | `.verification.md` |
-| **QA** | `--qa` | one live-browser happy-path flow via Chrome DevTools MCP | `.qa.md` + `.renmark/reviews/qa/<feature>/` |
+| **QA** | `--qa` | one live-browser happy-path flow via the selected browser channel (Chrome DevTools MCP or native `claude --chrome`) | `.qa.md` + `.renmark/reviews/qa/<feature>/` |
 | **Deep QA** | `--deep-qa` | 3 live-browser edge-case flows, risk-ranked from diff + behaviors + bugs.md | `.deep-qa.md` + `.renmark/reviews/qa/<feature>/deep/` |
 
 Smoke is goal-backward shell verification. QA is goal-backward *rendered* verification — proves the user-visible result actually appears in a real browser, not just that curl gets a 200. Deep QA finds where the feature breaks under unusual but valid conditions. All three share: bounded ≤5-line verdict to chat, evidence to disk, `bugs.md` convergence loop, `learnings.md` appending.
 
 **Mode selection.** Parse `$ARGUMENTS` for `--qa` / `--deep-qa`. Default to shell smoke when no flag is given. `--deep-qa` implies and gates on a prior passing `--qa` for the current sha (see Deep QA Gate below).
+
+### When to use which mode
+
+Core principle: **shell/code tests prove a command exits 0, not that the user-visible result is correct.** Browser QA is what tells the whole story — use it whenever there is a real UI surface and the cost is justified. Browser QA is never automatic.
+
+| Mode | Use it when |
+|---|---|
+| **Default shell smoke** | The standing default after every orchestrate. For non-UI work (CLI, data scripts, libraries, APIs) and as the fast first-pass gate on any feature. Always runs first; browser QA is opt-in on top. |
+| **`--qa`** | The feature has a user-visible browser surface and you want to confirm it actually *renders* and the primary flow works live — not just that a shell command exited 0. Opt-in, one happy-path flow. |
+| **`--deep-qa`** | Deeper runtime/visual edge-case validation: after `--qa` is green, when the change touches layout/UI, error paths, or risky inputs — to learn where it breaks under unusual-but-valid conditions. Gated on a passing `--qa` for the current sha. |
 
 ## Smoke mode (default)
 
@@ -185,13 +195,29 @@ Dispatch on the chosen number or letter: invoke the matching `/renmark:` skill (
 
 ## QA mode (`verify --qa`)
 
-Opt-in live-browser end-to-end check via the Chrome DevTools MCP. Proves the feature works from rendered state, not exit codes. Runs **exactly one** happy-path flow, one at a time in the main agent (the browser MCP session is a singleton — no subagent fan-out, no parallel pages). All heavy evidence goes to disk; chat sees only the ≤5-line verdict.
+Opt-in live-browser end-to-end check. Proves the feature works from rendered state, not exit codes. renmark can drive the browser through **either of two channels** — the Chrome DevTools MCP or the native Claude-in-Chrome extension — chosen by environment (see *Browser channel selection* below). Runs **exactly one** happy-path flow, one at a time in the main agent (the browser session is a singleton — no subagent fan-out, no parallel pages). All heavy evidence goes to disk; chat sees only the ≤5-line verdict.
 
 ### Applicability gate (before opening a browser)
 
 1. **Web project?** Read `.renmark/memory/stack.md` and/or `package.json`. If there's no frontend or web server (CLI tool, pure data script, ML notebook), QA is N/A — print *"no browser surface to test — verify --qa is N/A for this project"* and stop. Do not open a page that doesn't exist.
 
-2. **Browser MCP available?** Probe `list_pages` (Chrome DevTools MCP). If the tool isn't reachable, **degrade to shell smoke** with a one-line note: *"browser not connected — ran shell smoke only; connect the extension for live E2E."* Then proceed with the Smoke mode steps above. Never crash; never block.
+2. **Browser channel selection (renmark supports two).** renmark runs on both WSL and the native Windows/desktop app, so QA can drive a browser through either of two channels. **Plain CLI sessions — including Windows PowerShell/cmd — default to Chrome DevTools MCP unless `claude --chrome` is explicitly connected.** Pick by environment, with the CLI / MCP path as the default:
+
+   | Channel | How it connects | When renmark uses it |
+   |---|---|---|
+   | **Chrome DevTools MCP** (default) | MCP server (`chrome-devtools`) over the Chrome DevTools Protocol | **The universal default for every CLI session** — Windows PowerShell, cmd, macOS/Linux terminals — and the **only** option under WSL, where it can target Chrome running on the Windows host. |
+   | **Native Claude-in-Chrome** (`claude --chrome`) | Native messaging to the "Claude in Chrome" extension (no MCP) | Used **only when the native channel is actually connected** — typically the Windows / desktop app (or any session that explicitly ran `claude --chrome`). Native messaging does **not** cross the WSL boundary. |
+
+   **Detection + precedence (first match wins):**
+   1. **WSL?** — `grep -qi microsoft /proc/version`, or `$WSL_DISTRO_NAME` / `$WSL_INTEROP` is set → use **Chrome DevTools MCP** (probe `list_pages`). The native extension is unsupported on WSL; do not attempt it.
+   2. **Native channel connected?** — concretely: this Claude Code session was launched with `claude --chrome` (or reconnected via the `/chrome` built-in) AND that integration reports the extension connected. There is no shell probe for this — it is a session capability the agent can observe directly, unlike MCP's `list_pages`. If the session was not started with `--chrome`, treat native as NOT connected and fall through to rule 3. When it IS connected → use the **native Claude-in-Chrome** channel.
+   3. **Otherwise (default — any CLI: PowerShell, cmd, terminal)** → use **Chrome DevTools MCP** (probe `list_pages`). MCP is the default everywhere; the native channel is never assumed, only used when explicitly connected.
+
+   **If the selected channel isn't available, guide then degrade — never block.** Branch the install hint on the **channel that was selected** (not on the OS bucket), then fall back to shell smoke and run the Smoke-mode steps above:
+   - **Selected channel = Chrome DevTools MCP** (the default, and all WSL/CLI sessions) → *"browser not connected — ran shell smoke only. For live E2E, add the Chrome DevTools MCP: `claude mcp add chrome-devtools --scope user -- npx chrome-devtools-mcp@latest`"* (the `--` separates claude's flags from the stdio launch command — omitting it misparses the `npx` args).
+   - **Selected channel = native Claude-in-Chrome** → *"native browser channel not connected — ran shell smoke only. For live E2E, install the 'Claude in Chrome' extension, then relaunch with `claude --chrome` (or run the Claude Code built-in `/chrome` to reconnect — it is a core command, not a renmark one)."*
+
+   Record the chosen channel in local state and name it once in the verdict header (e.g. `verify --qa: <feature> (1 E2E flow, live browser — Chrome DevTools MCP)`). Everything below — flow derivation, pass criteria, evidence handling, and the context-hygiene contract — is **identical regardless of channel**; only the connection differs.
 
 ### Server lifecycle
 
@@ -207,13 +233,14 @@ E2E needs the app running:
 
 Derive **one** highest-value journey from the spec's stated user-visible behaviors — same goal-backward engine as smoke, just the #1 flow (the action named first in the goal paragraph, or the primary user action). State which flow you chose in one line before driving: *"QA flow: <chosen> — redirect with [edit] before I open the browser? [y/edit]"* (default to running if no response).
 
-Drive it with the Chrome DevTools MCP tools:
+Drive it with the selected channel's tools (the tool names below are the Chrome DevTools MCP set; the native Claude-in-Chrome channel exposes equivalent navigate / snapshot / click / fill / wait / screenshot / console / network actions — use whichever the active channel provides):
 
 - `navigate_page` to the app URL
 - `take_snapshot` (accessibility tree) to locate elements — transient, not pasted into chat
 - `click` / `fill` / `fill_form` to perform the main action
 - `wait_for` the expected result text/element
 - `take_screenshot` at each step → `.renmark/reviews/qa/<feature>/step-N.png` (NEVER inline the image)
+- **`before/after` visual capture around the main action** — `take_screenshot` immediately *before* the main action → `.renmark/reviews/qa/<feature>/before.png`, and immediately *after* → `.../after.png`. Then compare the two shots yourself (agent-observed visual comparison — look at both images; this is NOT a new pixel-diff dependency) to surface any visible UI change or regression, and write a one-line diff note of observed differences into the artifact body. NEVER inline a screenshot or paste raw diff data into chat — images and the diff note live on disk and in the artifact body only.
 - `list_console_messages`, `list_network_requests` for failure-mode signals — captured to artifact body, not chat
 
 ### Happy-path pass criteria
@@ -227,11 +254,12 @@ The flow PASSES only if **all hard criteria** hold. Soft criteria are recorded a
 3. **No failed network requests on the path** — `list_network_requests` shows no 4xx/5xx for calls the flow triggers. The happy path must not hit an error response.
 4. **The action completes and the expected result is visible.** After the main action, the UI reaches the success state the spec promised — the expected text/element renders (asserted via `wait_for` / snapshot). No infinite spinner, no hang, no silent no-op. *This is the goal-backward assertion: the user-visible behavior the spec described actually happened, observed live.*
 5. **No error UI.** No error toast/banner, no stack-trace page, no empty state where content was expected.
+6. **Visual/layout integrity.** The rendered UI has no broken layout: no **overlapping interactive elements**, no content clipped/cut off or pushed off-screen, no controls rendered on top of each other or outside their container, no critical element hidden behind another. Detect with tools already in use — `take_snapshot` (accessibility tree + roles to confirm expected controls are reachable), `take_screenshot` (visual confirmation), and optionally `evaluate_script` reading `getBoundingClientRect` on key controls to flag overlapping bounding boxes or off-viewport positions. The verdict line names this criterion on failure (e.g. *"criterion 6: submit button overlaps the input — layout broken at <viewport>"*).
 
 **Soft (recorded, don't fail):**
 
-6. **Persistence** — if the action creates/saves something, an optional follow-up check (reload or list view) confirms it stuck. Flagged as a warning if it can't be confirmed.
-7. **Latency sanity** — the action resolved within a generous bound. A slow-but-correct result warns, doesn't fail.
+7. **Persistence** — if the action creates/saves something, an optional follow-up check (reload or list view) confirms it stuck. Flagged as a warning if it can't be confirmed.
+8. **Latency sanity** — the action resolved within a generous bound. A slow-but-correct result warns, doesn't fail.
 
 Each criterion maps to a specific signal so the verdict line can name *which* one failed (e.g. *"❌ checkout — criterion 4: success text never rendered; spinner still visible after 10s"*).
 
@@ -277,9 +305,21 @@ summary.write_artifact(
 summary.emit_pointer(qa_artifact_path, "verify --qa")
 ```
 
+### Stop and report on break (could-not-finish)
+
+If the flow cannot finish, the run **STOPS at that step**, marks the flow FAILED, names the failing step + criterion in the verdict, and does **NOT** silently continue or report success. Trigger conditions:
+
+- the page fails to load,
+- an action hangs (infinite spinner / never reaches the expected state within the bounded `wait_for`),
+- the browser becomes unresponsive,
+- an uncaught exception fires,
+- the layout is visibly broken (overlap / clipping — criterion 6).
+
+Such visual/layout and "could-not-finish" failures are logged to `bugs.md` via the existing `memory.log_bug` convergence loop below, exactly like functional failures — a reproducible finding (symptom + offending criterion + screenshot path + repro steps). The early exit ties into the same bounded-verdict + artifact + learnings flow; do not invent a parallel reporting path.
+
 ### QA convergence loop
 
-- On **fail**: `memory.log_bug` with a **reproducible** finding — symptom + console/error + file:line if discoverable + repro steps. Severity `medium` (or promote to `high` if it's a regression of a closed bug).
+- On **fail** (including a stop-on-break early exit): `memory.log_bug` with a **reproducible** finding — symptom + offending criterion + console/error + file:line if discoverable + screenshot path + repro steps. Severity `medium` (or promote to `high` if it's a regression of a closed bug).
 - On **every** run: `memory.append_learning(signal="verify-qa-<feature>", observation=...)`.
 - A later `verify --qa` re-runs this flow AND the bugs.md regression set; after a fix the exact flow confirms green.
 
@@ -327,7 +367,7 @@ Do not open a browser. Stop.
 
 ### Reuse the QA setup
 
-The app is typically still running from the prior `--qa`. Same applicability gate (web project + browser MCP). Same server lifecycle: detect-or-boot, record-what-we-booted, tear-down-only-our-own-on-exit.
+The app is typically still running from the prior `--qa`. Same applicability gate (web project + browser channel selection — Chrome DevTools MCP or native Claude-in-Chrome, picked by environment). Same server lifecycle: detect-or-boot, record-what-we-booted, tear-down-only-our-own-on-exit.
 
 ### Plan phase — risk-rank, then pick 3 (no browser yet)
 
@@ -366,15 +406,17 @@ On `edit`, accept replacements (also from the ranked list, or freeform). On `n`,
 One at a time (singleton browser), in risk order — most-likely-to-break first, so any fail surfaces fast. Each edge case follows the same shape as the `--qa` happy-path flow:
 
 1. Announce: *"running 1/3: empty title…"* (progress visible without dumping detail)
-2. Navigate → perform the edge action
+2. Navigate → take a `before/after` pair around the edge action: `take_screenshot` immediately *before* → `.renmark/reviews/qa/<feature>/deep/case-N/before.png`, perform the edge action, then `take_screenshot` immediately *after* → `.../after.png`. Compare the two shots yourself (agent-observed visual comparison — look at both images, NOT a pixel-diff dependency) and write a one-line diff note of observed differences into the artifact body.
 3. Assert **graceful handling**, not success:
    - **Hard criteria for edge cases (any fail = FAIL):**
      - No uncaught console exception
      - No browser crash / page unresponsive
-     - No corrupt state visible after the action (e.g. half-saved record, broken layout that persists)
+     - No corrupt state or broken layout visible after the action (e.g. half-saved record; **overlapping interactive elements**, content clipped/cut off or pushed off-screen, controls rendered on top of each other or outside their container, a critical element hidden behind another — detect via `take_snapshot` + `take_screenshot`, optionally `evaluate_script` reading `getBoundingClientRect` to flag overlap or off-viewport positions)
      - Either the action completed safely (the app tolerated the edge) OR the app rejected it with a clear, visible error message — *not* a silent no-op, *not* an infinite spinner
 4. Screenshot + console/network slice → `.renmark/reviews/qa/<feature>/deep/case-N/`
 5. Emit one verdict line
+
+**Stop and report on break:** if a case cannot finish — the page fails to load, the action hangs (infinite spinner / never reaches expected state within the bounded `wait_for`), the browser becomes unresponsive, an uncaught exception fires, or the layout is visibly broken (overlap/clipping) — STOP at that step, mark the case FAILED, name the failing step + criterion in the verdict, and do NOT silently continue or report success. Log it to `bugs.md` via the `memory.log_bug` convergence loop below (symptom + offending criterion + screenshot path + repro steps), exactly like functional failures, and tie the early exit into the same bounded-verdict + artifact + learnings flow.
 
 After all 3 (or after an early-exit on hard crash), assemble the bounded report.
 
@@ -414,7 +456,7 @@ summary.write_artifact(
 
 ### Deep QA convergence
 
-Same as `--qa`: every fail logs a reproducible `bugs.md` entry; every run appends a learning. The next `verify --qa` picks up the new bug entry in its regression set, so a Deep QA finding becomes a recurring smoke check too.
+Same as `--qa`: every fail (including a stop-on-break early exit) logs a reproducible `bugs.md` entry via `memory.log_bug` (symptom + offending criterion + screenshot path + repro steps); every run appends a learning. The next `verify --qa` picks up the new bug entry in its regression set, so a Deep QA finding becomes a recurring smoke check too.
 
 ### Why serial-in-main, not subagents
 

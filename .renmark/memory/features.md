@@ -4,6 +4,17 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+
+### 2026-06-04 — verify browser QA refinement
+
+**Files:** `plugin/skills/verify/SKILL.md`
+**Plan:** `.renmark/plans/2026-06-04-verify-browser-qa.plan.md`
+**Commits:** `a142ada`
+
+--qa/--deep-qa: when-to-use guide, visual/layout integrity (overlap/clip/off-screen), before/after UI-change tracking, stop-on-break logging. Default shell smoke + opt-in preserved.
+
+---
+
 (Each entry is one feature, with date and files touched. Auto-appended.)
 
 ### YYYY-MM-DD — (example) Add /healthz endpoint
