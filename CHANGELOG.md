@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-06-04] — fix(finish): delete merged branch + correct stale release routing
+
+**Request:** "Once a release is created, the branch should get merged and deleted — but I keep seeing the feature branch left behind." Check the finish/release skill.
+
+**Built:** Fixed two real gaps in `plugin/skills/finish/SKILL.md`:
+1. **Branch cleanup** — the `[m] Merge` step merged into main but never deleted the branch `/renmark:feature` created, so every finish left the feature branch behind. It now runs `git branch -d <branch>` (the *safe* form — refuses to delete unmerged work) after a clean merge, plus `git push origin --delete` when a remote exists. Release packaging is cut from `main` after the merge, so the branch is already gone by release time.
+2. **Stale release routing** — line 23 claimed PR/merge logic "moves to `/renmark:release`", a command that does not exist (`lifecycle.NEXT_BY_STAGE` routes `ready-to-release` to a manual fallback; `/renmark:release` lives only in `NEXT_BY_STAGE_PLANNED`). Corrected to state merge/release logic lives in finish itself, and added a guard so a re-run never downgrades a `released` feature back to `ready-to-release`.
+
+**Files changed:**
+- `plugin/skills/finish/SKILL.md` — `[m] Merge` deletes the merged branch; final-step lifecycle guard + accurate "no /renmark:release skill" note.
+
+**Do not change:**
+- **Use `git branch -d` (lowercase), never `-D`,** in the merge step — the safe form can never discard unmerged work. `-D` only on explicit user request.
+- **Finish must not downgrade `released → ready-to-release`** on a re-run — guard the final-step lifecycle write on the current stage.
+- There is no `/renmark:release` skill; don't re-introduce references to it as if it were implemented.
+
 ## v0.5.8 — 2026-06-04 (QA flow memory + QA bootstrap)
 
 **Release of the qa-flow-memory feature** (detailed per-change entry below). Bumped from 0.5.7 across all 7 version locations.
