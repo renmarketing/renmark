@@ -5,6 +5,17 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 ## Shipped
 
 
+
+### 2026-06-04 — QA flow memory + QA bootstrap
+
+**Files:** `.renmark/memory/qa-flows.md`, `plugin/skills/verify/SKILL.md`, `.renmark/memory/INDEX.md`, `plugin/skills/orchestrate/SKILL.md`, `tests/test_qa_flows.py`
+**Plan:** `.renmark/plans/2026-06-04-qa-flow-memory.plan.md`
+**Commits:** `851bb7a..1202fba`
+
+Markdown QA playbook store (qa-flows.md); verify reads/promotes flows + --qa --bootstrap; orchestrate recommends browser QA (not auto). 5 tasks / 5 commits / shell-smoke default preserved.
+
+---
+
 ### 2026-06-04 — verify browser QA refinement
 
 **Files:** `plugin/skills/verify/SKILL.md`

@@ -19,6 +19,8 @@ Smoke is goal-backward shell verification. QA is goal-backward *rendered* verifi
 
 **Mode selection.** Parse `$ARGUMENTS` for `--qa` / `--deep-qa`. Default to shell smoke when no flag is given. `--deep-qa` implies and gates on a prior passing `--qa` for the current sha (see Deep QA Gate below).
 
+**Bootstrap modifier.** `--bootstrap` is a **modifier of `--qa`**, not a new flag or command. The only bootstrap invocation is `/renmark:verify --qa --bootstrap`, parsed through the **existing arg parser** (no third browser flag). When both `--qa` and `--bootstrap` are present, run the *Bootstrap path* subsection below instead of the single happy-path flow — it seeds `.renmark/memory/qa-flows.md` (the reusable QA-flow memory) rather than verifying one feature. `--bootstrap` is ignored unless `--qa` is also present.
+
 ### When to use which mode
 
 Core principle: **shell/code tests prove a command exits 0, not that the user-visible result is correct.** Browser QA is what tells the whole story — use it whenever there is a real UI surface and the cost is justified. Browser QA is never automatic.
@@ -28,6 +30,13 @@ Core principle: **shell/code tests prove a command exits 0, not that the user-vi
 | **Default shell smoke** | The standing default after every orchestrate. For non-UI work (CLI, data scripts, libraries, APIs) and as the fast first-pass gate on any feature. Always runs first; browser QA is opt-in on top. |
 | **`--qa`** | The feature has a user-visible browser surface and you want to confirm it actually *renders* and the primary flow works live — not just that a shell command exited 0. Opt-in, one happy-path flow. |
 | **`--deep-qa`** | Deeper runtime/visual edge-case validation: after `--qa` is green, when the change touches layout/UI, error paths, or risky inputs — to learn where it breaks under unusual-but-valid conditions. Gated on a passing `--qa` for the current sha. |
+
+**Recommendation triggers (advisory — browser QA is recommended, NOT automatic).** Every implementation still gets shell smoke as the default; browser QA is opt-in on top. Surface these as a one-line recommendation; never auto-run a browser.
+
+- **Recommend `--qa`** when the changed files / feature scope touch any user-visible surface: templates / views, frontend JS/CSS, routes or controllers that serve browser pages, forms or buttons, settings screens, preview / render UI, checkout / pricing, or anything else a user can see in a browser.
+- **Recommend `--deep-qa`** only for **risky UI/runtime changes**: layout refactors, state persistence, auth / session, render pipelines, multi-step workflows, visual or runtime bug fixes, previously-failed flows, or risky inputs — or after a normal `--qa` passes and the change warrants edge coverage.
+
+State it plainly to the user: browser QA is **recommended, not automatic**; every implementation still gets shell smoke.
 
 ## Smoke mode (default)
 
@@ -229,6 +238,17 @@ E2E needs the app running:
 4. Record `qa_started_server: bool` in local state — we tear down only what we booted, never a server the user is using.
 5. On completion (pass or fail), if `qa_started_server` is True, kill the background shell.
 
+### BEFORE QA — flow selection from memory
+
+Before deriving the happy-path flow, consult the QA-flow memory to reuse a known-good journey when one exists:
+
+1. Read `.renmark/memory/stack.md`, `.renmark/memory/project-map.md`, `.renmark/memory/qa-flows.md` **if it exists**, and `.renmark/memory/bugs.md`.
+2. **Pick the best matching known flow** for the current feature — match on the changed files / routes / surfaces against the flows recorded in `qa-flows.md`.
+3. **If no known flow matches**, synthesize a one-off flow from the plan / spec goal (same goal-backward derivation as "The single happy-path flow" below).
+4. **If `qa-flows.md` is missing or empty, behave exactly as today** — synthesize the flow from the plan goal. Existing QA must not break in the absence of QA-flow memory; the file is a reuse cache, never a hard dependency.
+
+The selected flow (matched or synthesized) is what the next subsection drives. Carry whether it was *matched* or *synthesized-one-off* into the AFTER-QA convergence step (a synthesized one-off that passes is a promotion candidate).
+
 ### The single happy-path flow
 
 Derive **one** highest-value journey from the spec's stated user-visible behaviors — same goal-backward engine as smoke, just the #1 flow (the action named first in the goal paragraph, or the primary user action). State which flow you chose in one line before driving: *"QA flow: <chosen> — redirect with [edit] before I open the browser? [y/edit]"* (default to running if no response).
@@ -262,6 +282,19 @@ The flow PASSES only if **all hard criteria** hold. Soft criteria are recorded a
 8. **Latency sanity** — the action resolved within a generous bound. A slow-but-correct result warns, doesn't fail.
 
 Each criterion maps to a specific signal so the verdict line can name *which* one failed (e.g. *"❌ checkout — criterion 4: success text never rendered; spinner still visible after 10s"*).
+
+### Bootstrap path (`verify --qa --bootstrap`)
+
+When `--bootstrap` modifies `--qa`, the goal is **not** to verify one feature — it is to seed `.renmark/memory/qa-flows.md` with the project's critical user flows so later `--qa` / `--deep-qa` runs can reuse them. Run this instead of *The single happy-path flow* (the applicability gate, browser-channel selection, and server lifecycle above still apply):
+
+1. **Read project memory + history:** `.renmark/memory/stack.md`, `.renmark/memory/project-map.md`, the plans under `.renmark/plans/`, `.renmark/memory/bugs.md`, and `CHANGELOG.md`.
+2. **Detect the main browser surfaces/routes** — the entry routes, primary pages, forms, and controllers serving browser pages — from stack/project-map + the running app.
+3. **Ask or infer the top 3–5 critical user flows.** Prefer the interactive `AskUserQuestion` hand-off to confirm the candidate flows; infer from the surfaces above if the user defers.
+4. **Create `.renmark/memory/qa-flows.md`** (the QA-flow memory file) seeded with those flows.
+5. **When browser QA actually runs**, drive each candidate flow with the active channel (same steps/criteria as a normal `--qa` flow) and save **baseline notes + screenshot/artifact paths** into each flow entry (paths only — evidence stays on disk).
+6. **If browser QA cannot run** (no channel connected / degrade-to-shell), still create the documented candidate flows in `qa-flows.md`, each marked **UNVERIFIED** (no baseline screenshots yet) so a later `--qa` can verify and upgrade them.
+
+Bootstrap honors the same context-hygiene contract: chat sees only a bounded summary (flows created + verified/UNVERIFIED counts + the `qa-flows.md` path); screenshots and dumps stay on disk.
 
 ### Context-hygiene contract (non-negotiable)
 
@@ -317,9 +350,24 @@ If the flow cannot finish, the run **STOPS at that step**, marks the flow FAILED
 
 Such visual/layout and "could-not-finish" failures are logged to `bugs.md` via the existing `memory.log_bug` convergence loop below, exactly like functional failures — a reproducible finding (symptom + offending criterion + screenshot path + repro steps). The early exit ties into the same bounded-verdict + artifact + learnings flow; do not invent a parallel reporting path.
 
+### DURING QA — run the selected flow
+
+Run the **selected flow** (from *BEFORE QA — flow selection from memory*) using the existing browser-channel behavior already documented above — do not duplicate or weaken those steps:
+
+- Drive it through the active channel's tools per *The single happy-path flow* (navigate / snapshot / click / fill / wait / screenshot / console / network).
+- Capture the **before/after screenshots** around the main action and the agent-observed visual comparison exactly as documented there.
+- Capture `list_console_messages` / `list_network_requests` to the artifact body.
+- Enforce the **visual/layout integrity** check (criterion 6 — overlapping / clipped controls, off-viewport elements) per *Happy-path pass criteria*.
+- Honor **Stop and report on break**: STOP + FAIL on hang / crash / broken layout; do not silently continue.
+
 ### QA convergence loop
 
-- On **fail** (including a stop-on-break early exit): `memory.log_bug` with a **reproducible** finding — symptom + offending criterion + console/error + file:line if discoverable + screenshot path + repro steps. Severity `medium` (or promote to `high` if it's a regression of a closed bug).
+- On **fail** (including a stop-on-break early exit): `memory.log_bug` to `.renmark/memory/bugs.md` with a **reproducible** finding — symptom + offending criterion + console/error + file:line if discoverable + screenshot path + repro steps, **linking the review artifact** (the `.qa.md` path). Severity `medium` (or promote to `high` if it's a regression of a closed bug). *(Unchanged.)*
+- On **pass**: update the QA-flow memory at `.renmark/memory/qa-flows.md`:
+  - If the flow was **matched** from `qa-flows.md`, update its entry (refresh the linked passing review artifact path + baseline screenshot paths).
+  - If the flow has no entry yet, **append** it.
+  - If the flow was a **synthesized one-off** that just passed, **promote** it into `qa-flows.md` as a reusable flow — link it to the passing review artifact (`.qa.md`) and the baseline screenshot paths (`before.png` / `after.png` / `step-N.png`).
+  - Keep all heavy evidence on disk + artifact body; chat stays a bounded verdict. The flow entry stores **paths**, not embedded screenshots or dumps.
 - On **every** run: `memory.append_learning(signal="verify-qa-<feature>", observation=...)`.
 - A later `verify --qa` re-runs this flow AND the bugs.md regression set; after a fix the exact flow confirms green.
 
@@ -368,6 +416,8 @@ Do not open a browser. Stop.
 ### Reuse the QA setup
 
 The app is typically still running from the prior `--qa`. Same applicability gate (web project + browser channel selection — Chrome DevTools MCP or native Claude-in-Chrome, picked by environment). Same server lifecycle: detect-or-boot, record-what-we-booted, tear-down-only-our-own-on-exit.
+
+Deep QA also reuses the **QA-flow memory**: select the base flow via *BEFORE QA — flow selection from memory* (read `qa-flows.md` if it exists; behave as today when it is missing or empty), and on a passing run **promote** any synthesized one-off into `qa-flows.md` exactly as the QA convergence loop does.
 
 ### Plan phase — risk-rank, then pick 3 (no browser yet)
 

@@ -15,6 +15,7 @@ Renmark's persistent project memory. Each file follows a documented format and i
 | `conventions.md` | Code, test, commit conventions | hand-edited (skills read but don't write) |
 | `routing.md` | Which executor for which task signature | `/renmark:orchestrate` (auto) |
 | `learnings.md` | Cross-run patterns (failure modes, cost surprises) | `/renmark:debug`, `/renmark:orchestrate` (auto) |
+| `qa-flows.md` | Reusable browser QA flows / baselines (the QA playbook) | `/renmark:verify --qa`, `/renmark:verify --qa --bootstrap` |
 
 ## Counts
 

@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-05-29 @ 560b746 -->
+<!-- Last refreshed: 2026-06-04 @ 3618c38 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=68
+**Languages:** python=69
 
 ## Directory tree
 
@@ -26,8 +26,8 @@ ai-system/
 | `renmark/memory.py` | Files act as living documentation — features shipped, bugs fixed, decisions | `memory_dir`, `template_dir`, `ensure_memory`, `read_index`, `read_file`, `log_feature` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `renmark/doctor.py` | Checks that renmark is properly registered with Claude Code and surfaces | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
-| `renmark/lifecycle.py` | and the seven-stage workflow: Brainstorm → Plan → Create → Test → Review → | `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle`, `next_recommended` |
-| `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_unknown_stage_rejected`, `test_artifact_update`, `test_human_review_fields` |
+| `renmark/lifecycle.py` | and the seven-stage workflow: Brainstorm → Plan → Create → Test → Review → | `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle`, `begin_feature` |
+| `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/dispatch.py` | Groups tasks by parallel_group, validates that tasks sharing a group write | `TaskResult`, `WaveResult`, `group_tasks_by_wave`, `validate_wave`, `dispatch_wave`, `estimate_wave_cost` |
 | `renmark/shadow.py` | subsystems. | `register`, `registered_subsystems`, `ShadowDiff`, `list_cases`, `run_subsystem`, `run_all` |
