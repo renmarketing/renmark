@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.5.7 — 2026-06-04 (browser QA, dual channel, interactive menus, lifecycle identity)
+
+**Release bundling the four changes shipped on 2026-06-04** (detailed per-change entries below). Bumped from 0.5.6 across all 7 version locations.
+
+- **Browser QA refinement** (`/renmark:verify --qa` / `--deep-qa`): visual/layout integrity checks (overlapping/clipped/off-screen controls), before/after UI-change tracking, explicit stop-and-report-on-break, and a "when to use which mode" guide. Default shell smoke preserved; browser QA stays opt-in.
+- **Dual browser channel:** Chrome DevTools MCP (default; the only option under WSL — targets Windows-host Chrome) or native `claude --chrome` when connected; environment-detected with graceful install-hint + shell-smoke fallback.
+- **Interactive hand-off menus:** arrow-selectable `AskUserQuestion` pickers as the primary presentation (numbered markdown demoted to fallback), with a hard guarantee that a hand-off never ends on a choiceless prompt. Supersedes the earlier numbered-markdown rule.
+- **Lifecycle identity fix:** `lifecycle.begin_feature()` — `/renmark:feature` now persists feature/branch identity at entry, so stage writes no longer inherit the prior feature's identity.
+
+Gates: `ruff`/`mypy`/plugin lint clean, `pytest` 337 passed. Local release only (no remote configured).
+
 ## [2026-06-04] — interactive (arrow-selectable) hand-off menus via AskUserQuestion
 
 **Interaction-layer change, not menu formatting.** The earlier "numbered, forced-choice markdown menu" change only made menus *print* as `1. [x] Option` text — readable, but still a static list with no arrow-key selection. This change makes hand-off gates present an actual arrow-key-navigable picker via Claude Code's **`AskUserQuestion`** tool when available, with the printed numbered list demoted to a graceful fallback. It **supersedes** the numbered-markdown-as-primary rule.
