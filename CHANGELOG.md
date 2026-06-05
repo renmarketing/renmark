@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-05 — project scope: PRD source of truth + `/renmark:prd`
+
+**Request:** Add a per-project PRD as the durable source of truth (peer to CLAUDE.md), informed by a study of TaskMaster; ship a `/renmark:prd` skill, wire it into `start`/`feature`, and add a lightweight, hygiene-preserving PRD↔work drift check.
+**Tech stack:** Python >=3.10 + Claude Code plugin (markdown skills/commands) — unchanged; this is a feature inside renmark itself.
+**Deployment:** N/A — distributed as the renmark Claude Code plugin.
+**MVP boundary:** PRD artifact + `/renmark:prd` (create/update, human-gated) + start/feature wiring + subagent-based drift flag + plan traceability note.
+**Out of scope:** prototype/schematic pipeline step (next, separate feature); REQ-ID coverage enforcement in verify; hard PRD↔plan gating; TaskMaster status-taxonomy / dependency-integrity tooling.
+
+**Locked decisions:**
+- PRD lives at the **project root** (`PRD.md`), committed — confirmed free of context cost (only CLAUDE.md/AGENTS.md auto-load).
+- The orchestrator/router **never reads the PRD body**; all alignment reading happens in an isolated subagent returning a bounded summary.
+- CLAUDE.md/AGENTS.md pointer is **plain text, never `@import`** (an import would auto-load the PRD every session).
+- Spec: `.renmark/specs/2026-06-05-prd-source-of-truth.spec.md`; research: `.renmark/research/2026-06-05-prd-taskmaster.research.md`.
+
 ## v0.5.9 — 2026-06-04 (fix: finish deletes merged branch + correct release routing)
 
 **Request:** "Once a release is created, the branch should get merged and deleted — but I keep seeing the feature branch left behind." Check the finish/release skill.
