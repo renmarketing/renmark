@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-06-05 — PRD touchpoint policy + brainstorm alignment
+
+**Request:** Analyze where the PRD overlaps across renmark skills, prevent
+duplication/over-engineering, and keep a single source of truth — then implement
+the one change that pays for itself.
+
+**Built:** Codified the **WRITE / ALIGN / NOTHING** PRD-touchpoint policy (one
+writer = `/renmark:prd`; one read-only align contract = `_shared/prd-alignment.md`;
+NOTHING for everyone else) and wired `brainstorm` into ALIGN:
+- `.renmark/memory/decisions.md` — ADR-005 records the policy, the rejected-as-bloat
+  list (brainstorm-as-writer, `verify --coverage`, roadmap progress view,
+  init/document PRD pointers, orchestrate reading the PRD), and the altitude rule.
+- `plugin/skills/_shared/prd-alignment.md` — new "PRD touchpoint policy" section
+  (the durable guard, co-located with the alignment contract skill authors read).
+- `plugin/skills/brainstorm/SKILL.md` — new Step 1b: read-only PRD alignment via
+  the shared subagent when `PRD.md` exists; a non-blocking "no PRD yet" nudge when
+  it doesn't; **no write path**. Step 6 gains an altitude note (spec non-goals are
+  feature-scoped; product non-goals live in the PRD).
+- `plugin/templates/PRD.md.template` + `plugin/skills/_shared/scope-contract.md` —
+  reciprocal altitude notes: product-level non-goals → PRD; a build's MVP cut →
+  scope contract. Cross-reference, never copy.
+
+**Do not change:**
+- **brainstorm must never write `PRD.md`** — it ALIGNs (read-only) and routes drift
+  to `/renmark:prd`. One writer only (ADR-005).
+- The brainstorm PRD check uses the `_shared/prd-alignment.md` subagent — it MUST
+  NOT read the PRD body into the skill's context.
+- `plan`'s `serves: REQ-n` is a light ID read, deliberately *not* a full ALIGN;
+  this is why `verify --coverage` stays unbuilt (coverage flows plan→tasks→verify).
+- Pre-existing unrelated test failures (3) live in lifecycle approval-routing
+  (`test_cold_start_recovery`, `test_smoke_full_lifecycle`); not caused by and not
+  in scope of this doc/skill change.
+
 ## 2026-06-05 — PRD source of truth + `/renmark:prd` (built)
 
 **Request:** Centralized per-project source of truth (a PRD), informed by studying TaskMaster; ship the skill, wire it into the pipelines, add a hygiene-preserving drift check.

@@ -11,6 +11,12 @@ those records and skips re-asking.
 - `plan` runs this in its Step 0 **only if** no spec/stack.md/CHANGELOG scope
   entry already covers the work — i.e. only when brainstorm was skipped.
 
+**Altitude vs the PRD (anti-duplication):** this contract owns a *build's* MVP
+boundary / out-of-scope (Q3) — ephemeral, per-feature. **Product-level**
+non-goals (what the product will never be) belong in `PRD.md`. Cross-reference,
+don't copy: the MVP cut here is "not in *this* version"; a PRD non-goal is "not
+*ever*." See the PRD touchpoint policy in `_shared/prd-alignment.md`.
+
 ---
 
 ## Presentation

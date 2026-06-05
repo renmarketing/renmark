@@ -18,6 +18,10 @@ status: draft
 
 ## Goals & Non-goals
 (List the intended outcomes and the explicit non-goals that prevent scope creep.)
+<!-- Non-goals here are PRODUCT-level and durable (what the product will never be).
+     A single build's MVP cut belongs in the scope contract (CHANGELOG scope entry
+     + stack.md), not here — cross-reference, don't duplicate. -->
+
 
 ## Requirements
 (Capture required behaviors and outcomes as numbered requirements, not proposed implementations or technical solutions.)

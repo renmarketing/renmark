@@ -8,6 +8,37 @@ the isolated subagent.
 
 ---
 
+## PRD touchpoint policy (read before adding any PRD coupling)
+
+Every renmark skill maps to **exactly one** of three PRD interactions. Before
+wiring the PRD into a skill, decide which one — if it isn't WRITE or ALIGN, the
+default is NOTHING. This is the guard against PRD duplication and context bloat
+(see ADR-005 in `.renmark/memory/decisions.md`).
+
+| Interaction | The only allowed mechanism | Skills |
+|---|---|---|
+| **WRITE** (create/update) | `/renmark:prd` only — every other skill *routes* (proposes), never writes `PRD.md` | `prd` |
+| **ALIGN** (read-only ≤5-line verdict) | this subagent contract only — never inline PRD reading | `feature`, `brainstorm` |
+| **NOTHING** | — | everything else (orchestrate, verify, finish, check-plan, init, roadmap, debug, codereview, resume, help, doctor) |
+
+- **One writer.** start / brainstorm / feature may *route* to `/renmark:prd`; none
+  write `PRD.md` themselves. This is what keeps "multiple entry points, one file"
+  safe.
+- **`plan` is a deliberate exception, not an ALIGN user:** it does a *light* read
+  of `REQ-n` IDs for the optional `serves:` field, not a full alignment check.
+  Coverage flows plan → tasks → verify transitively — which is why `verify
+  --coverage` is intentionally *not* built.
+- **Altitude rule (anti-duplication):** the PRD is product-level (one per
+  project); a brainstorm spec is feature-level (many). Product non-goals live in
+  the **PRD**; a build's MVP cut lives in the **scope contract**. Cross-reference,
+  never copy.
+
+Rejected as bloat (don't re-propose without revisiting ADR-005): brainstorm as a
+PRD writer, `verify --coverage`, roadmap progress view, init/document PRD
+pointers, orchestrate reading the PRD.
+
+---
+
 ## Why an isolated subagent
 
 PRD files are large context consumers. Loading one into the orchestrator would

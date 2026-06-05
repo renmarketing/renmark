@@ -52,6 +52,33 @@ On yes:
   ```
   If the commit is blocked (impersonation guard, no global config), skip it and tell the user: *"Scaffold files created. Run `git commit -m 'chore: renmark scaffold'` once you've set your git user config."*
 
+### 1b. PRD check (read-only — keep the spec aligned to product direction)
+
+A brainstorm spec is **feature-level**; the PRD is **product-level**. Before
+questioning, reconcile the two — without ever loading the PRD body into context.
+
+```bash
+test -f PRD.md && echo HAS_PRD || echo NO_PRD
+```
+
+- **`NO_PRD`** → surface a **one-line, non-blocking** nudge and continue:
+  *"No PRD yet — `/renmark:prd` pins the product direction this spec should serve.
+  Optional; brainstorm continues either way."* Do **not** create the PRD here and
+  do **not** block. (Brainstorm is not a PRD writer — see the PRD touchpoint
+  policy in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`.)
+- **`HAS_PRD`** → dispatch the PRD alignment subagent from
+  `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`: an **Agent tool call**
+  passing ONLY a one-line description of what's being brainstormed + the likely
+  file scope. Receive ONLY the ≤5-line `verdict`. **Do NOT read `PRD.md` in this
+  skill's context.**
+  - `verdict: aligned` → note it in one line and proceed; let the PRD's stated
+    goals shape your questioning and approaches.
+  - `verdict: drift` → surface the bounded reason. The brainstorm continues, but
+    the spec now has a product-direction question to resolve: either narrow the
+    idea back into PRD scope, or — if the product genuinely should grow — route
+    the subagent's `proposed_prd_addition` into `/renmark:prd` update mode
+    (human-gated). Never write `PRD.md` from here.
+
 ### 2. Brainstorm + establish the scope contract
 
 Ask the user questions ONE at a time. Prefer multiple-choice when possible. **Cap multiselect options at 4** — `AskUserQuestion` rejects arrays with >4 items. Bundle related options if more are needed. Cover:
@@ -109,6 +136,8 @@ In sections, scaled to complexity. Get approval per section. Cover: architecture
 ### 6. Write the spec + scope records
 
 Save the spec to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`. Include: context, goals, non-goals, architecture, components, success criteria, and a **Prior art & references** section pointing at the research artifact.
+
+**Altitude (anti-duplication):** the spec's non-goals are **feature-scoped** (what *this* build excludes). **Product-level** non-goals belong in `PRD.md`, not here — if a non-goal is durable product direction, reference the PRD rather than copying it, and (on drift) route it to `/renmark:prd`. The build's MVP cut lives in the scope contract (Step 6 records), not duplicated into the spec's non-goals.
 
 **Write the scope contract records** so `/renmark:plan` skips re-discovery (this is the shared-source-of-truth payoff). Using the formats in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md`:
 - Append a `## [date] — project scope: <feature>` entry to `CHANGELOG.md` with the confirmed stack / deployment / MVP boundary / out-of-scope.
