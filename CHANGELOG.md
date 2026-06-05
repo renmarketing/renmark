@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-06-05] — blueprint feature built (12 tasks)
+
+**Request:** Implement `/renmark:blueprint` — the Phase-3 prototype/schematic pipeline step.
+**Built:** Orchestrated 12 atomic tasks across 3 waves (sonnet/haiku/opus Agents + 1 escalation):
+- `renmark/blueprint.py` — marker-splice helper (`splice_generated_block`, `MarkerNotFoundError`), UI detection (`detect_ui`), marker builders/constants.
+- `plugin/templates/{SCHEMATIC.md,PROTOTYPE.html}.template` — skeletons with `RENMARK:GENERATED:*` marker blocks.
+- `plugin/skills/blueprint/SKILL.md` + `plugin/commands/blueprint.md` — the skill (freshness gate → UI gate → synthesize → splice → lifecycle touchpoint) and command entry.
+- Wiring: `start` (onboarding offer), `feature` (delta touchpoint), `help`, `DOMAIN_BY_SKILL` (build), CLAUDE.md/AGENTS.md tooling table.
+- `tests/test_blueprint.py` — 22 unit tests (splice byte-preservation, idempotency, human-edit preservation, missing-marker abort, `detect_ui` branches, source_sha).
+**Files changed:** see commits 8a1ddc7..51601e1 on `feature/blueprint`.
+**Gates:** 365 passed / 28 skipped; ruff clean on changed code. All 12 task verifiers PASS.
+**Do not change:**
+- T6 was escalated codex→sonnet: `renmark-execute --task` ran read-only in this env and didn't write the file. See `learnings.md`.
+- The `serves:` field in plan files breaks `renmark-execute` (parser drift) — logged Open in `bugs.md`; stripped from this plan.
+
 ## [2026-06-05] — project scope: blueprint (prototype/schematic step)
 
 **Request:** Add a renmark pipeline step (`/renmark:blueprint`) that generates a
