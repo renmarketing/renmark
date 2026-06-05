@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.7.0 — 2026-06-05 (blueprint: prototype/schematic step)
+
+**Release of the blueprint milestone.** Bumped 0.6.0 → 0.7.0 across all 7 version
+locations. Shipped on `main` via merge of `feature/blueprint` (codereview: 0 critical,
+4 major fixed; 374 tests pass).
+
+- **`/renmark:blueprint`** — generates a living `SCHEMATIC.md` (always, Mermaid) and
+  `PROTOTYPE.html` (UI builds only, self-contained HTML/CSS), synthesized from
+  `.renmark/memory/project-map.md` via a hybrid `<!-- RENMARK:GENERATED:*:START/END -->`
+  marker update. Standalone command + embedded touchpoints in `start` and `feature`.
+- **`renmark/blueprint.py`** — `splice_generated_block` (idempotent, marker-injection
+  guarded via `MarkerInjectionError`), `detect_ui` (parses canonical `**Frontend:**`
+  forms), marker builders/constants.
+- **Guardrails** — blueprint is an artifact touchpoint, NOT a lifecycle stage;
+  `project-map.md` is the sole architecture source (never rescans); `/renmark:init`
+  writes map/stack only, blueprint is sole writer of the two artifacts.
+- 22→31 unit tests; pipeline ran brainstorm → plan (12 tasks) → orchestrate (1
+  codex→sonnet escalation) → verify (8/8) → codereview → finish.
+
+
 ## [2026-06-05] — blueprint feature built (12 tasks)
 
 **Request:** Implement `/renmark:blueprint` — the Phase-3 prototype/schematic pipeline step.
