@@ -39,6 +39,10 @@ class MarkerNotFoundError(Exception):
     """Raised when a required START/END marker pair is absent or malformed."""
 
 
+class MarkerInjectionError(ValueError):
+    """Raised when new_content contains reserved marker strings for the target id."""
+
+
 # ---------------------------------------------------------------------------
 # splice_generated_block
 # ---------------------------------------------------------------------------
@@ -67,8 +71,18 @@ def splice_generated_block(
         If the START marker is absent, or START is present without a matching
         END marker.
     """
-    start_re = re.compile(_START_RE_TPL.format(id=re.escape(marker_id)))
     end_literal = _END_LITERAL_TPL.format(id=marker_id)
+    start_re = re.compile(_START_RE_TPL.format(id=re.escape(marker_id)))
+
+    # FINDING 3: Guard against injection — new_content must not contain
+    # the reserved marker strings for this marker_id.
+    _any_start_fragment = f"RENMARK:GENERATED:{marker_id}:START"
+    _any_end_fragment = f"RENMARK:GENERATED:{marker_id}:END"
+    if _any_start_fragment in new_content or _any_end_fragment in new_content:
+        raise MarkerInjectionError(
+            f"new_content contains a reserved marker string for '{marker_id}'. "
+            "Splicing this content would corrupt the artifact."
+        )
 
     start_match = start_re.search(text)
     if start_match is None:
@@ -97,50 +111,90 @@ def splice_generated_block(
 # detect_ui
 # ---------------------------------------------------------------------------
 
-_NONE_RE = re.compile(r"^\*{0,2}none\*{0,2}$", re.IGNORECASE)
+
+def _normalize_md_value(raw: str) -> str:
+    """Strip markdown decoration from a raw field value token.
+
+    Removes: leading list markers (``-`` / ``+``), leading and trailing runs
+    of ``*``, ``_``, and backtick characters independently (no symmetry
+    required), and extra whitespace.  The result is a plain lower-case string
+    suitable for comparison.
+
+    Stripping each end independently handles asymmetric fragments such as
+    ``** none`` (produced when ``**Frontend:** none`` is split on the first
+    colon, leaving the closing ``**`` on the value side).
+    """
+    v = raw.strip()
+    # Strip leading list marker (``- `` or ``+ `` or ``* ``)
+    v = re.sub(r"^[-+*]\s+", "", v)
+    # Strip leading decoration (* _ `) independently
+    v = re.sub(r"^[*_`]+", "", v)
+    # Strip trailing decoration (* _ `) independently
+    v = re.sub(r"[*_`]+$", "", v)
+    return v.strip()
 
 
 def detect_ui(stack_md_text: str | None) -> bool | None:
     """Parse the Frontend field from a stack.md body.
+
+    Supports two canonical formats (per scope-contract.md / stack.md):
+
+    * **Inline bold form** — ``**Frontend:** React`` or ``Frontend: React``
+    * **Section heading form** — ``## Frontend`` with the value on the next
+      non-empty line (may be markdown-decorated, e.g. ``- **none**``).
+
+    Parsing is line-oriented to avoid cross-line false matches (FINDING 2).
+    Values are markdown-normalized before comparison (FINDINGS 1, 5).
 
     Returns
     -------
     True
         Frontend is present and not none/empty.
     False
-        Frontend is explicitly ``none`` (or ``**none**``).
+        Frontend is explicitly ``none`` (case-insensitive, any decoration).
     None
-        *stack_md_text* is ``None``, or the text has no Frontend field.
+        *stack_md_text* is ``None``, the text has no Frontend field, or the
+        field is present but its value is blank.
     """
     if stack_md_text is None:
         return None
 
-    # --- Try inline form first: "Frontend: <value>" ---
-    inline_match = re.search(
-        r"^[#\s]*Frontend\s*:\s*(.+)$", stack_md_text, re.IGNORECASE | re.MULTILINE
-    )
-    if inline_match:
-        value = inline_match.group(1).strip()
-        return not (not value or _NONE_RE.match(value))
+    lines = stack_md_text.splitlines()
+    in_frontend_section = False
 
-    # --- Try section heading form: "## Frontend" ---
-    section_match = re.search(
-        r"^#{1,6}\s+Frontend\s*$", stack_md_text, re.IGNORECASE | re.MULTILINE
-    )
-    if section_match:
-        # Collect non-empty lines after the heading until the next heading.
-        rest = stack_md_text[section_match.end():]
-        lines = rest.splitlines()
-        value_lines: list[str] = []
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("#"):
+    for line in lines:
+        # --- Section heading form: ## Frontend ---
+        if re.match(r"^#{1,6}\s+Frontend\s*$", line, re.IGNORECASE):
+            in_frontend_section = True
+            continue
+
+        if in_frontend_section:
+            # Stop at the next heading.
+            if re.match(r"^#{1,6}\s", line):
                 break
-            if stripped:
-                value_lines.append(stripped)
-        if not value_lines:
-            return None
-        combined = " ".join(value_lines)
-        return not _NONE_RE.match(combined.strip())
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # First non-empty line is the value.
+            norm = _normalize_md_value(stripped)
+            if not norm:
+                return None
+            return norm.lower() != "none"
+
+        # --- Inline form: **Frontend:** value  OR  Frontend: value ---
+        # FINDING 1: also match bolded ``**Frontend:**`` prefix.
+        # FINDING 2: restrict value to the same line ([^\n]* / end of string).
+        m = re.match(
+            r"^\*{0,2}Frontend\*{0,2}\s*:\s*([^\n]*)",
+            line,
+            re.IGNORECASE,
+        )
+        if m:
+            raw_value = m.group(1)
+            norm = _normalize_md_value(raw_value)
+            if not norm:
+                # Blank value on this line — field present but unknown.
+                return None
+            return norm.lower() != "none"
 
     return None
