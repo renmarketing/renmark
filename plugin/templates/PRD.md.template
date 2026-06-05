@@ -1,0 +1,36 @@
+---
+artifact_type: prd
+schema_version: 1
+created_at: {{DATE}}
+last_reviewed: {{DATE}}
+status: draft
+---
+
+<!-- Living source of truth; updated only on reviewed, approved change. -->
+
+# {{PROJECT_NAME}} — Product Requirements Document
+
+## Vision / Problem
+(Describe the WHY: the user problem, business need, or opportunity this project exists to address.)
+
+## Target users
+(Identify the primary users, stakeholders, and who this document is intended to serve.)
+
+## Goals & Non-goals
+(List the intended outcomes and the explicit non-goals that prevent scope creep.)
+
+## Requirements
+(Capture required behaviors and outcomes as numbered requirements, not proposed implementations or technical solutions.)
+
+1. `REQ-1` (Describe the first required behavior or outcome in user-facing or business-facing terms.)
+2. `REQ-2` (Describe the next required behavior or outcome in user-facing or business-facing terms.)
+3. `REQ-3` (Describe the next required behavior or outcome in user-facing or business-facing terms.)
+
+## Success metrics
+(Define how success will be measured, including user, business, or operational signals.)
+
+## Scope boundaries
+(Clarify what is in scope, out of scope, and explicitly deferred for later.)
+
+## Open questions
+(List unresolved decisions, assumptions to validate, or information still needed.)
