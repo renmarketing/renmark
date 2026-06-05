@@ -15,6 +15,7 @@ Reads a spec (from `/renmark:brainstorm` or any markdown file) and emits a renma
 - `executor` — opus / codex / sonnet / haiku (auto-assigned, ordered by capability)
 - `parallel_group` — tasks sharing a group run concurrently
 - `verifier` — shell command that exits 0 when the task is done
+- `serves` — optional one-line traceability note such as `REQ-3` or `new`; best-effort only when a `PRD.md` exists, using requirement IDs already surfaced by alignment/spec work
 - `est_tokens` and `est_cost_usd` — planner's estimates
 - `spec` — prose telling the executor what to build
 
@@ -182,6 +183,7 @@ On **4 / n** → stop. Plan stays on disk for later (already validated at `plan-
 - **est_tokens:** 150
 - **est_cost_usd:** 0.00
 - **verifier:** test -f .gitignore
+- **serves:** REQ-1
 - **spec:**
   Create a .gitignore with __pycache__/, *.pyc, .venv/, .pytest_cache/.
 
@@ -194,6 +196,7 @@ On **4 / n** → stop. Plan stays on disk for later (already validated at `plan-
 - **est_tokens:** 900
 - **est_cost_usd:** 0.02
 - **verifier:** python3 -m py_compile server.py
+- **serves:** new
 - **spec:**
   ...
 ```

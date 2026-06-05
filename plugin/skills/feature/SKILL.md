@@ -52,15 +52,38 @@ lifecycle.begin_feature(repo, feature="<slug>", branch="feature/<slug>")
 
 `begin_feature` resets lifecycle to a clean `init` state for the new feature (empty `stages_completed`, empty `artifacts`). Skipping this is the identity bug that left `/renmark:finish`'s ADR and lifecycle pointing at the *prior* feature — the router owns identity; stage skills only advance `stage`.
 
-### 2. Plan
+### 2. PRD Alignment
+
+Before planning, dispatch the PRD alignment subagent per
+`plugin/skills/_shared/prd-alignment.md` (the single source of truth — do NOT inline its logic here).
+
+*Dispatch the PRD alignment subagent from
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`: Agent tool call,
+passing ONLY `feature_description` + `file_scope`. Receive ONLY the ≤5-line
+verdict summary. Do NOT read PRD.md in the orchestrator context.*
+
+The router MUST NOT read the `PRD.md` body. It passes only the feature description
+and file scope to the subagent and receives only the bounded `verdict`.
+
+**Route on verdict:**
+
+| Verdict | Action |
+|---|---|
+| `aligned` | Proceed to Plan (Step 3). |
+| `drift` | Route the `proposed_prd_addition` into `/renmark:prd` update mode (human-gated). **Pause the feature plan until the human approves or rejects the PRD addition.** Do not proceed to planning while `drift` is unresolved. |
+
+`prd-alignment` is the contract key for this gate — see the shared file for the
+full bounded-return format and examples.
+
+### 3. Plan
 
 Invoke `/renmark:plan <description or spec-path>`. The plan skill runs the Scope Contract discovery (Q1–Q3), writes CHANGELOG + stack.md, then decomposes into tasks.
 
-### 3. Execute
+### 4. Execute
 
 Invoke `/renmark:orchestrate` with the produced plan. Orchestrate runs check-plan in pre-flight, executes waves, re-verifies on completion, and shows the hand-off menu.
 
-### 4. Verify + Finish
+### 5. Verify + Finish
 
 From orchestrate's menu:
 - Choose **[v] Verify** → `/renmark:verify` runs goal-backward smoke tests

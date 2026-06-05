@@ -23,6 +23,18 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+
+
+
+- (2026-06-05, bug) **pre-existing: 3 integration tests fail under RENMARK_SMOKE=1** — Integration tests gate on RENMARK_SMOKE=1 and were not being exercised; surfaced during PRD verify. Track and fix independently.
+
+- (2026-06-05, .renmark/reviews/2026-06-05-ebf06f951e88958c0e4d005d15da87cbb5e7843a.verification.md) model `verify`: **verify-prd-source-of-truth** — 6/6 behaviors verified; 0 new regressions; fixed _shared parity test; 3 pre-existing integration failures remain (cold_start_with_pending_approval, cold_start_recovers_at_every_stage, human_approval_gate_blocks_progression) under RENMARK_SMOKE=1, unrelated to PRD work.
+
+- (2026-06-05, orchestrate) **test_commands_directory_complete + _shared/ dir** — Parity test treated every plugin/skills/ subdir as a skill needing a command; _shared/ broke it under RENMARK_SMOKE=1. Pre-existing; fixed by excluding underscore-prefixed dirs. Run integration tests with RENMARK_SMOKE=1 — they skip by default and hide real failures.
+
+- (2026-06-05, orchestrate) model `haiku`: **parallel mirror-pair edits (CLAUDE.md.template + AGENTS.md.template)** — A task scoped to one file edited BOTH mirror files; resolved benignly (idempotent insert, no dup) but for mirror pairs prefer one task owning both files or sequential dispatch.
+
 - (2026-06-04, .renmark/reviews/2026-06-04-eb5ce2d.verification.md) model `verify`: **verify-qa-flow-memory** — 7/7 behaviors verified; failed: none; full suite 343 passed/0 failed (+6 new tests).
 
 - (2026-06-04, orchestrate run 20260604-qa-flow-memory) **mixed-executor plan, lone codex task in wave 2** — Dispatch a single codex task via a one-task plan + `renmark-execute --no-commit`. The ad-hoc `--task` mode forces YAML-frontmatter artifact format, which corrupts .py source targets; the normal plan path (run_codex_task) edits the source file directly.

@@ -108,6 +108,22 @@ Wait for explicit confirmation before continuing. If the user redirects, adjust 
 
 ---
 
+### 5a. Offer PRD creation (new projects only)
+
+Check whether `PRD.md` exists at the project root. If it does **not** exist, offer once — do not block:
+
+> "Would you like me to create a `PRD.md` for this project? It captures the goal, users, and success criteria as a living source of truth — useful when the project grows or when handing off context.
+>
+> 1. [a] Yes — run `/renmark:prd` now before we continue
+> 2. [b] Skip — continue with the normal next step"
+
+- If the user chooses **[a]**: invoke `/renmark:prd` (create mode), then return here and continue to Step 6 once it completes.
+- If the user chooses **[b]**, or if `PRD.md` already exists: skip silently and continue.
+
+Do not mention this step if `PRD.md` already exists. Do not block or repeat the offer.
+
+---
+
 ### 6. Inject best practices into plan context
 
 Before routing to the next step, establish these as non-negotiable task requirements. Do NOT add them as separate tasks — weave them into the task specs for the relevant implementation tasks:

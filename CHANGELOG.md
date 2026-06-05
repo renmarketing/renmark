@@ -1,5 +1,104 @@
 # Changelog
 
+## 2026-06-05 — PRD branch codereview fixes (pre-merge)
+
+**Request:** Codex review of `main..HEAD` before merging prd-source-of-truth; fix
+the doc-consistency findings.
+
+**Built:** Codex pass = 0 Critical / 3 Major / 2 Minor / 1 Nit (all
+doc-consistency, no runtime bugs; review at
+`.renmark/reviews/2026-06-05-3eb9b02…review.md`). Fixed all 6:
+- `_shared/prd-alignment.md` — clarified the ≤5-line budget applies to the
+  orchestrator-visible `verdict`+`reason`; `proposed_prd_addition` is a separate
+  bounded snippet routed to `/renmark:prd`, not counted against it (resolved the
+  contract's internal contradiction).
+- `plugin/skills/prd/SKILL.md` — `/renmark:approve` reframed as *planned* (not
+  shipped); manual gate is the current path. Read-only "what does the PRD say"
+  use case clarified as UPDATE-mode's read step. G6 row states the PRD's
+  human-owned **exemption** from generated-artifact provenance fields.
+- `plugin/templates/PRD.md.template` — header comment documents the same exemption.
+- `plugin/skills/start/SKILL.md` — "[b] Skip" copy no longer claims it always
+  goes to the build plan (start can route to brainstorm).
+- `plugin/skills/help/SKILL.md` — dropped the hardcoded "six commands" count.
+
+**Do not change:**
+- `/renmark:approve` is **not shipped** — `lifecycle.next_recommended()` (line ~289)
+  intentionally surfaces a manual gate. Docs must not present approve as shipped.
+- 3 pre-existing test failures (`test_cold_start_recovery`,
+  `test_smoke_full_lifecycle`) assert `/renmark:approve` in `next_recommended()`
+  output — they are **stale** (code is correct by design). Separate follow-up on
+  main; not introduced by this branch.
+
+## 2026-06-05 — PRD touchpoint policy + brainstorm alignment
+
+**Request:** Analyze where the PRD overlaps across renmark skills, prevent
+duplication/over-engineering, and keep a single source of truth — then implement
+the one change that pays for itself.
+
+**Built:** Codified the **WRITE / ALIGN / NOTHING** PRD-touchpoint policy (one
+writer = `/renmark:prd`; one read-only align contract = `_shared/prd-alignment.md`;
+NOTHING for everyone else) and wired `brainstorm` into ALIGN:
+- `.renmark/memory/decisions.md` — ADR-005 records the policy, the rejected-as-bloat
+  list (brainstorm-as-writer, `verify --coverage`, roadmap progress view,
+  init/document PRD pointers, orchestrate reading the PRD), and the altitude rule.
+- `plugin/skills/_shared/prd-alignment.md` — new "PRD touchpoint policy" section
+  (the durable guard, co-located with the alignment contract skill authors read).
+- `plugin/skills/brainstorm/SKILL.md` — new Step 1b: read-only PRD alignment via
+  the shared subagent when `PRD.md` exists; a non-blocking "no PRD yet" nudge when
+  it doesn't; **no write path**. Step 6 gains an altitude note (spec non-goals are
+  feature-scoped; product non-goals live in the PRD).
+- `plugin/templates/PRD.md.template` + `plugin/skills/_shared/scope-contract.md` —
+  reciprocal altitude notes: product-level non-goals → PRD; a build's MVP cut →
+  scope contract. Cross-reference, never copy.
+
+**Do not change:**
+- **brainstorm must never write `PRD.md`** — it ALIGNs (read-only) and routes drift
+  to `/renmark:prd`. One writer only (ADR-005).
+- The brainstorm PRD check uses the `_shared/prd-alignment.md` subagent — it MUST
+  NOT read the PRD body into the skill's context.
+- `plan`'s `serves: REQ-n` is a light ID read, deliberately *not* a full ALIGN;
+  this is why `verify --coverage` stays unbuilt (coverage flows plan→tasks→verify).
+- Pre-existing unrelated test failures (3) live in lifecycle approval-routing
+  (`test_cold_start_recovery`, `test_smoke_full_lifecycle`); not caused by and not
+  in scope of this doc/skill change.
+
+## 2026-06-05 — PRD source of truth + `/renmark:prd` (built)
+
+**Request:** Centralized per-project source of truth (a PRD), informed by studying TaskMaster; ship the skill, wire it into the pipelines, add a hygiene-preserving drift check.
+
+**Built:** 14-task plan executed (10 Claude via Agent, 4 codex via renmark-execute):
+- `plugin/skills/prd/SKILL.md` — `/renmark:prd` create/update modes, human-gated living updates, Governance-compliance section.
+- `plugin/skills/_shared/prd-alignment.md` — drift-check subagent contract; router passes only feature description + file scope, gets a ≤5-line `verdict`, never reads the PRD body.
+- `plugin/commands/prd.md` — command shim.
+- `plugin/templates/PRD.md.template` — lean sections (vision/users/goals+non-goals/REQ-n/metrics/scope/open-questions) + provenance header.
+- `renmark/lifecycle.py` — `prd` registered in `DOMAIN_BY_SKILL` (build).
+- `start` offers PRD create for new projects; `feature` dispatches the alignment subagent; `plan` carries an optional `serves: REQ-n` traceability note; `help` lists the command.
+- Plain-text PRD pointers added to `CLAUDE.md`/`AGENTS.md` + both templates (never `@import`).
+- `tests/integration/test_plugin_install.py` — enforces `prd` in the documented-skill set; excludes `_shared/` from the skills↔commands parity check.
+
+**Files changed:** see plan `.renmark/plans/2026-06-05-prd-source-of-truth.plan.md`. Full suite: 343 passed, 28 skipped; ruff clean on `renmark/` (34 pre-existing repo-wide ruff errors untouched).
+
+**Do not change:**
+- PRD pointers in CLAUDE.md/AGENTS.md/templates MUST stay **plain text — never `@PRD.md` import** (an import auto-loads the whole PRD into every session, breaking context hygiene).
+- The orchestrator/router/`feature` MUST NOT read `PRD.md` into context — always dispatch the `_shared/prd-alignment.md` subagent and consume only its bounded verdict.
+- PRD writes are **human-gated**; automated stages propose, they never write the PRD without approval.
+- Integration tests gate on `RENMARK_SMOKE=1` — run with it set, or real failures stay hidden as skips.
+- The prototype/schematic pipeline step is the **next** feature (recorded in memory), intentionally not built here.
+
+## 2026-06-05 — project scope: PRD source of truth + `/renmark:prd`
+
+**Request:** Add a per-project PRD as the durable source of truth (peer to CLAUDE.md), informed by a study of TaskMaster; ship a `/renmark:prd` skill, wire it into `start`/`feature`, and add a lightweight, hygiene-preserving PRD↔work drift check.
+**Tech stack:** Python >=3.10 + Claude Code plugin (markdown skills/commands) — unchanged; this is a feature inside renmark itself.
+**Deployment:** N/A — distributed as the renmark Claude Code plugin.
+**MVP boundary:** PRD artifact + `/renmark:prd` (create/update, human-gated) + start/feature wiring + subagent-based drift flag + plan traceability note.
+**Out of scope:** prototype/schematic pipeline step (next, separate feature); REQ-ID coverage enforcement in verify; hard PRD↔plan gating; TaskMaster status-taxonomy / dependency-integrity tooling.
+
+**Locked decisions:**
+- PRD lives at the **project root** (`PRD.md`), committed — confirmed free of context cost (only CLAUDE.md/AGENTS.md auto-load).
+- The orchestrator/router **never reads the PRD body**; all alignment reading happens in an isolated subagent returning a bounded summary.
+- CLAUDE.md/AGENTS.md pointer is **plain text, never `@import`** (an import would auto-load the PRD every session).
+- Spec: `.renmark/specs/2026-06-05-prd-source-of-truth.spec.md`; research: `.renmark/research/2026-06-05-prd-taskmaster.research.md`.
+
 ## v0.5.9 — 2026-06-04 (fix: finish deletes merged branch + correct release routing)
 
 **Request:** "Once a release is created, the branch should get merged and deleted — but I keep seeing the feature branch left behind." Check the finish/release skill.

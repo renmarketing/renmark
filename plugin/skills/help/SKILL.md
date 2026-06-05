@@ -1,13 +1,13 @@
 ---
 name: help
-description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Prints all six /renmark:* commands with one-sentence descriptions and the typical workflow order. Zero-cost — no LLM calls.
+description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Prints all /renmark:* commands with one-sentence descriptions and the typical workflow order. Zero-cost — no LLM calls.
 ---
 
 # help
 
 ## Overview
 
-Lists the renmark plugin's six commands with brief descriptions and the recommended workflow order. Pure text output, no API calls.
+Lists the renmark plugin's commands with brief descriptions and the recommended workflow order. Pure text output, no API calls.
 
 ## When invoked
 
@@ -49,6 +49,10 @@ Commands:
       Scan the repo and write a project map (file tree, modules, public
       functions, commands) into a managed block in CLAUDE.md and AGENTS.md.
       Renmark's analog to Claude Code's native /init. Idempotent.
+
+  /renmark:prd
+      Create or update the project's PRD — the per-project source of truth
+      that plans and features align to.
 
   /renmark:doctor
       Diagnose Claude Code plugin install health. Run when /renmark:*

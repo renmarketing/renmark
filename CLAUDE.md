@@ -359,6 +359,7 @@ flip the bit. AI may generate code; the human owns merges and releases.
 |---|---|
 | `/renmark:start` | Starting point for vibe coders — plain-English entry to the full pipeline |
 | `/renmark:brainstorm <topic>` | Fleshing out an idea into a spec |
+| `/renmark:prd` | Create/update the project PRD — the source of truth that plans and features align to |
 | `/renmark:plan <spec>` | Decomposing a spec into atomic, executor-tagged tasks |
 | `/renmark:orchestrate <plan>` | Executing a plan (Haiku / Codex / Sonnet / Opus) |
 | `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
@@ -375,6 +376,8 @@ flip the bit. AI may generate code; the human owns merges and releases.
 - Memory: `.renmark/memory/` (committed) — `INDEX.md`, `project.md`, `routing.md`, etc.
 - Runtime: `.renmark/state/` (gitignored)
 - Changelog: `CHANGELOG.md` (committed) — read before tasks, update after
+
+Source of truth: `PRD.md`. For new features/changes, dispatch a subagent to read `PRD.md` + docs and return a bounded alignment/drift summary — never load the full PRD into the orchestrator.
 
 ## Executor preferences
 

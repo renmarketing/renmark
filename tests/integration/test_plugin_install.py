@@ -71,12 +71,12 @@ def test_install_sh_idempotent(repo_root: Path, tmp_path: Path):
 
 
 def test_plugin_has_required_skill_files(repo_root: Path):
-    """A deployed plugin must have all 14 documented skills with SKILL.md."""
+    """A deployed plugin must have all 15 documented skills with SKILL.md."""
     skills_dir = repo_root / "plugin" / "skills"
     required = {
         "start", "setup", "brainstorm", "plan", "check-plan", "orchestrate",
         "verify", "finish", "feature", "debug", "codereview", "roadmap",
-        "help", "resume",
+        "help", "resume", "prd",
     }
     actual = {p.name for p in skills_dir.iterdir() if p.is_dir()}
     missing = required - actual
@@ -89,7 +89,12 @@ def test_commands_directory_complete(repo_root: Path):
     """The commands/ shim layer must mirror skills/ exactly."""
     skills_dir = repo_root / "plugin" / "skills"
     commands_dir = repo_root / "plugin" / "commands"
-    skill_names = {p.name for p in skills_dir.iterdir() if p.is_dir()}
+    # Underscore-prefixed dirs (e.g. _shared/) hold shared contract docs, not
+    # skills — they have no command shim and are excluded from the parity check.
+    skill_names = {
+        p.name for p in skills_dir.iterdir()
+        if p.is_dir() and not p.name.startswith("_")
+    }
     command_names = {p.stem for p in commands_dir.glob("*.md")}
     assert skill_names == command_names, (
         f"skills/ vs commands/ mismatch:\n"
