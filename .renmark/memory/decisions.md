@@ -1,6 +1,26 @@
 # Decisions (ADRs)
 
 
+
+## ADR-007 — Escalated task 6 from codex to sonnet
+
+**Date:** 2026-06-05
+**Status:** Accepted
+
+**Context.** codex --task ran in a read-only sandbox and could not write tests/test_blueprint.py; sonnet Agent wrote 22 passing tests. (plan: .renmark/plans/2026-06-05-blueprint.plan.md)
+
+**Decision.** Re-route to sonnet
+
+**Alternatives considered.**
+- Retry codex
+- Fail the task
+
+**Consequences.**
+- Higher cost
+- Higher capability
+
+---
+
 ## ADR-006 — Finished feature prd-source-of-truth
 
 **Date:** 2026-06-05

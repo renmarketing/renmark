@@ -5,6 +5,15 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 ## Open
 
 
+
+### 2026-06-05 — plan parser rejects documented serves field
+
+**Severity:** medium
+**Symptom:** renmark-execute --dry-run aborts: "unknown field serves" on any plan written to the documented format (plan SKILL.md lists serves: REQ-n / new as a task field).
+**Root cause:** renmark/parser.py allowed-fields branch (~line 149) was never updated when the v0.6.0 PRD feature added serves traceability to the plan skill + format example. Parser and plan-format docs drifted.
+
+---
+
 (Unresolved bugs. Move to `Fixed` once a commit lands.)
 
 ### 2026-06-05 — install.ps1 fails to parse under Windows PowerShell 5.1 (encoding)
