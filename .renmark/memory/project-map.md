@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-04 @ 3618c38 -->
+<!-- Last refreshed: 2026-06-05 @ 8b5f07e -->
 
 # Project map — ai-system
 
@@ -60,6 +60,7 @@ ai-system/
 | `/renmark:init` | Use when the user wants renmark to document the project itself — scans the repo for file structure, modules, and public  |
 | `/renmark:orchestrate` | Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "build it", "run the plan". |
 | `/renmark:plan` | Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases li |
+| `/renmark:prd` | Use to create or update the project's PRD (Product Requirements Document) — the per-project source of truth that plans a |
 | `/renmark:resume` | Use after `/clear` or `/compact`, or at the start of a fresh session, to discover where the in-flight renmark feature st |
 | `/renmark:roadmap` | Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, "show the |
 | `/renmark:setup` | Use when adding renmark to an existing project — creates missing CLAUDE.md, AGENTS.md, CHANGELOG.md, and .renmark/ struc |
