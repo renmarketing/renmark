@@ -6,6 +6,17 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-05 — PRD source of truth + /renmark:prd
+
+**Files:** `plugin/skills/prd/SKILL.md`, `plugin/skills/_shared/prd-alignment.md`, `plugin/commands/prd.md`, `plugin/templates/PRD.md.template`, `renmark/lifecycle.py`
+**Spec:** `.renmark/specs/2026-06-05-prd-source-of-truth.spec.md`
+**Plan:** `.renmark/plans/2026-06-05-prd-source-of-truth.plan.md`
+
+Per-project root PRD.md as durable source of truth; /renmark:prd create/update skill (human-gated); start/feature wiring; subagent-based PRD drift check (orchestrator never reads PRD body); plan traceability note; plain-text (never @import) pointers in CLAUDE.md/AGENTS.md + templates.
+
+---
+
 ### 2026-06-04 — QA flow memory + QA bootstrap
 
 **Files:** `.renmark/memory/qa-flows.md`, `plugin/skills/verify/SKILL.md`, `.renmark/memory/INDEX.md`, `plugin/skills/orchestrate/SKILL.md`, `tests/test_qa_flows.py`

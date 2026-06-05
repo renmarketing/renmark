@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-06-05 — PRD source of truth + `/renmark:prd` (built)
+
+**Request:** Centralized per-project source of truth (a PRD), informed by studying TaskMaster; ship the skill, wire it into the pipelines, add a hygiene-preserving drift check.
+
+**Built:** 14-task plan executed (10 Claude via Agent, 4 codex via renmark-execute):
+- `plugin/skills/prd/SKILL.md` — `/renmark:prd` create/update modes, human-gated living updates, Governance-compliance section.
+- `plugin/skills/_shared/prd-alignment.md` — drift-check subagent contract; router passes only feature description + file scope, gets a ≤5-line `verdict`, never reads the PRD body.
+- `plugin/commands/prd.md` — command shim.
+- `plugin/templates/PRD.md.template` — lean sections (vision/users/goals+non-goals/REQ-n/metrics/scope/open-questions) + provenance header.
+- `renmark/lifecycle.py` — `prd` registered in `DOMAIN_BY_SKILL` (build).
+- `start` offers PRD create for new projects; `feature` dispatches the alignment subagent; `plan` carries an optional `serves: REQ-n` traceability note; `help` lists the command.
+- Plain-text PRD pointers added to `CLAUDE.md`/`AGENTS.md` + both templates (never `@import`).
+- `tests/integration/test_plugin_install.py` — enforces `prd` in the documented-skill set; excludes `_shared/` from the skills↔commands parity check.
+
+**Files changed:** see plan `.renmark/plans/2026-06-05-prd-source-of-truth.plan.md`. Full suite: 343 passed, 28 skipped; ruff clean on `renmark/` (34 pre-existing repo-wide ruff errors untouched).
+
+**Do not change:**
+- PRD pointers in CLAUDE.md/AGENTS.md/templates MUST stay **plain text — never `@PRD.md` import** (an import auto-loads the whole PRD into every session, breaking context hygiene).
+- The orchestrator/router/`feature` MUST NOT read `PRD.md` into context — always dispatch the `_shared/prd-alignment.md` subagent and consume only its bounded verdict.
+- PRD writes are **human-gated**; automated stages propose, they never write the PRD without approval.
+- Integration tests gate on `RENMARK_SMOKE=1` — run with it set, or real failures stay hidden as skips.
+- The prototype/schematic pipeline step is the **next** feature (recorded in memory), intentionally not built here.
+
 ## 2026-06-05 — project scope: PRD source of truth + `/renmark:prd`
 
 **Request:** Add a per-project PRD as the durable source of truth (peer to CLAUDE.md), informed by a study of TaskMaster; ship a `/renmark:prd` skill, wire it into `start`/`feature`, and add a lightweight, hygiene-preserving PRD↔work drift check.
