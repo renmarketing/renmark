@@ -89,7 +89,12 @@ def test_commands_directory_complete(repo_root: Path):
     """The commands/ shim layer must mirror skills/ exactly."""
     skills_dir = repo_root / "plugin" / "skills"
     commands_dir = repo_root / "plugin" / "commands"
-    skill_names = {p.name for p in skills_dir.iterdir() if p.is_dir()}
+    # Underscore-prefixed dirs (e.g. _shared/) hold shared contract docs, not
+    # skills — they have no command shim and are excluded from the parity check.
+    skill_names = {
+        p.name for p in skills_dir.iterdir()
+        if p.is_dir() and not p.name.startswith("_")
+    }
     command_names = {p.stem for p in commands_dir.glob("*.md")}
     assert skill_names == command_names, (
         f"skills/ vs commands/ mismatch:\n"
