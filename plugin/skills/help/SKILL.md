@@ -1,13 +1,13 @@
 ---
 name: help
-description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Prints all six /renmark:* commands with one-sentence descriptions and the typical workflow order. Zero-cost — no LLM calls.
+description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Prints all /renmark:* commands with one-sentence descriptions and the typical workflow order. Zero-cost — no LLM calls.
 ---
 
 # help
 
 ## Overview
 
-Lists the renmark plugin's six commands with brief descriptions and the recommended workflow order. Pure text output, no API calls.
+Lists the renmark plugin's commands with brief descriptions and the recommended workflow order. Pure text output, no API calls.
 
 ## When invoked
 

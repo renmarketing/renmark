@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-06-05 — PRD branch codereview fixes (pre-merge)
+
+**Request:** Codex review of `main..HEAD` before merging prd-source-of-truth; fix
+the doc-consistency findings.
+
+**Built:** Codex pass = 0 Critical / 3 Major / 2 Minor / 1 Nit (all
+doc-consistency, no runtime bugs; review at
+`.renmark/reviews/2026-06-05-3eb9b02…review.md`). Fixed all 6:
+- `_shared/prd-alignment.md` — clarified the ≤5-line budget applies to the
+  orchestrator-visible `verdict`+`reason`; `proposed_prd_addition` is a separate
+  bounded snippet routed to `/renmark:prd`, not counted against it (resolved the
+  contract's internal contradiction).
+- `plugin/skills/prd/SKILL.md` — `/renmark:approve` reframed as *planned* (not
+  shipped); manual gate is the current path. Read-only "what does the PRD say"
+  use case clarified as UPDATE-mode's read step. G6 row states the PRD's
+  human-owned **exemption** from generated-artifact provenance fields.
+- `plugin/templates/PRD.md.template` — header comment documents the same exemption.
+- `plugin/skills/start/SKILL.md` — "[b] Skip" copy no longer claims it always
+  goes to the build plan (start can route to brainstorm).
+- `plugin/skills/help/SKILL.md` — dropped the hardcoded "six commands" count.
+
+**Do not change:**
+- `/renmark:approve` is **not shipped** — `lifecycle.next_recommended()` (line ~289)
+  intentionally surfaces a manual gate. Docs must not present approve as shipped.
+- 3 pre-existing test failures (`test_cold_start_recovery`,
+  `test_smoke_full_lifecycle`) assert `/renmark:approve` in `next_recommended()`
+  output — they are **stale** (code is correct by design). Separate follow-up on
+  main; not introduced by this branch.
+
 ## 2026-06-05 — PRD touchpoint policy + brainstorm alignment
 
 **Request:** Analyze where the PRD overlaps across renmark skills, prevent

@@ -6,7 +6,10 @@ last_reviewed: {{DATE}}
 status: draft
 ---
 
-<!-- Living source of truth; updated only on reviewed, approved change. -->
+<!-- Living source of truth; updated only on reviewed, approved change.
+     This is a HUMAN-OWNED doc, not a generated artifact: the lean header above is
+     intentional and exempt from the generated-artifact provenance fields
+     (source_sha, generator, dependency_refs) required of machine-emitted artifacts. -->
 
 # {{PROJECT_NAME}} — Product Requirements Document
 

@@ -103,7 +103,14 @@ proposed_prd_addition: <small markdown snippet — optional, only when verdict i
 ```
 
 `verdict` is the required field. `reason` and `proposed_prd_addition` are
-included only when `verdict: drift`. The total return MUST NOT exceed 5 lines.
+included only when `verdict: drift`.
+
+**Line budget.** The **orchestrator-visible** part — `verdict` + `reason` — MUST
+NOT exceed 5 lines; that is all the router reads. `proposed_prd_addition`, when
+present, is NOT counted against that budget: it is a small snippet (or a pointer
+to one) handed straight to `/renmark:prd` update mode for the human, and never
+enters the orchestrator/router context. Keep it short — a few lines or an
+artifact pointer, not a full draft.
 
 ---
 

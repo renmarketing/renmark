@@ -13,7 +13,7 @@ description: Use when the user wants to author or maintain the project's Product
 
 - "Write the PRD for this project" / "we don't have a PRD yet"
 - "Update the PRD — we just decided to drop the export feature"
-- "What does the PRD say about X?" (read + reconcile, then propose an edit)
+- "What does the PRD say about X?" — answered inside UPDATE mode's read step (it reads the PRD, then proposes any edit); there is no separate read-only mode
 - A fresh project that needs its product definition pinned down before any feature work
 - A mature project whose product definition lives implicitly in CLAUDE.md / specs / changelog and should be made explicit
 - An automated stage (e.g. `/renmark:feature`'s drift check) detected the request diverges from the PRD and wants the PRD reconsidered — routed here for a human-gated edit
@@ -101,7 +101,7 @@ When a PRD write is **proposed by an automated stage** rather than typed by the 
       human_review_for="prd-edit: <one-line description of the proposed change>",
   )
   ```
-- **Never write `PRD.md` while `human_review_required and not human_review_completed`.** Present the draft/diff and stop until the human approves (the only way to flip `human_review_completed` is via `/renmark:approve`).
+- **Never write `PRD.md` while `human_review_required and not human_review_completed`.** Present the draft/diff and stop until the human approves. (`/renmark:approve` is the *planned* skill to flip `human_review_completed`; until it ships, `lifecycle.next_recommended()` surfaces a manual gate message and the human clears it by approving the draft/diff here.)
 - After the human approves and the write lands, clear the gate (`human_review_required=False, human_review_completed=False, human_review_for=None`) so it doesn't leak into the next stage.
 - A user typing `/renmark:prd` directly **is** the human in the loop — the explicit draft/diff approval above satisfies the gate; you don't additionally block on the lifecycle bit unless an automated stage set it.
 
@@ -116,7 +116,7 @@ The full PRD body is read **only inside this dedicated `/renmark:prd` invocation
 | G2 | Canonical state | The PRD lives on disk at `PRD.md` (committed) and every change is logged to `CHANGELOG.md`; approval gates persist in `.renmark/state/lifecycle.json`. Nothing relies on "what was said earlier" — the product definition is a file, not conversation memory. |
 | G3 | Summary boundary | Callers consume only the alignment subagent's ≤5-line summary; the PRD body never crosses into orchestrator/router context. CHANGELOG entries are compact and structured. |
 | G5 | Executor isolation | Heavy PRD reading (synthesis from CLAUDE.md/specs/changelog in CREATE, full read in UPDATE) happens inside this dedicated invocation; for any *other* skill the heavy read is delegated to the `_shared/prd-alignment.md` alignment subagent — the orchestrator never reads the PRD body itself. |
-| G6 | Artifact governance | `PRD.md` carries the provenance/metadata header from `PRD.md.template` (created_at, last_reviewed, generator); UPDATE mode bumps `last_reviewed` so freshness is checkable without reading the body. |
+| G6 | Artifact governance | `PRD.md` is a **human-owned source-of-truth doc, not a generated artifact**, so it carries a deliberately lean header (`artifact_type`, `schema_version`, `created_at`, `last_reviewed`, `status`) and is explicitly exempt from the generated-artifact provenance fields (`source_sha`, `generator`, `dependency_refs`). UPDATE mode bumps `last_reviewed` so freshness is checkable without reading the body. |
 | G7 | Compact semantics | The PRD and its approval state are on disk (`PRD.md`, `lifecycle.json`); after `/compact` mid-skill the proposed change can be re-derived from the file and the pending `human_review_for` field — no transcript dependency. |
 | G8 | Compounding verification | Every create/update appends a structured `CHANGELOG.md` entry (request + built + files + invariants), so product decisions and pinned non-goals accrue as durable project memory rather than vanishing. |
 | G9 | Failure transparency | Writes happen only on explicit approval; a declined/edited draft stays unwritten and is reported honestly as not-yet-applied rather than claimed complete. The metadata header reflects actual `last_reviewed`, never a fabricated date. |
