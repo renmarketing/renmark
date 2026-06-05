@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-06-05] — project scope: blueprint (prototype/schematic step)
+
+**Request:** Add a renmark pipeline step (`/renmark:blueprint`) that generates a
+living architecture **schematic** (always) and a visual UI **prototype** (only
+when the build has a UI), updated as the project evolves like the PRD.
+**Tech stack:** Python ≥3.10 + Claude Code plugin markdown — existing renmark stack, **no new deps**.
+**Deployment:** local plugin install (WSL + Windows), unchanged.
+**MVP boundary:** schematic + conditional prototype + hybrid marker-based update + pipeline wiring (start/feature/standalone).
+**Out of scope:** deterministic language parsers (deferred), full 4-level C4 (Container level only), image/SVG export, full-repo rescan.
+
+**Locked decisions:**
+- Command slug `/renmark:blueprint`; artifacts `SCHEMATIC.md` (always) + `PROTOTYPE.html` (UI only) at project root, like `PRD.md`.
+- Schematic = Mermaid in Markdown; prototype = self-contained static HTML/CSS.
+- `project-map.md` is the ONLY architecture source — blueprint synthesizes, never rescans the repo.
+- Hybrid update: regenerate only content between `<!-- RENMARK:GENERATED:*:START/END -->` markers; preserve human prose; single current-state artifact.
+- Blueprint is an artifact **touchpoint like PRD, NOT a lifecycle stage** — must not advance the `init→…→released` chain.
+- `source_sha` in a generated block = hash of `project-map.md`, not an implied repo scan.
+
+**Do not change:**
+- Do not add deterministic parsers in this phase — explicitly deferred.
+- Do not clobber an existing artifact that lacks markers — abort instead.
+- Do not let blueprint fabricate architecture when `project-map.md` is missing/stale — route to `/renmark:init`.
+
 ## v0.6.0 — 2026-06-05 (PRD source of truth)
 
 **Release of the PRD source-of-truth milestone.** Bumped 0.5.9 → 0.6.0 across all

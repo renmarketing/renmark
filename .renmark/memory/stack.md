@@ -4,28 +4,43 @@ What this project depends on and how it runs. Updated by `/renmark:brainstorm` i
 
 ## Languages
 
-(e.g., Python 3.11, TypeScript 5.4)
+- Python ≥3.10 (pyproject.toml)
+- Markdown (Claude Code plugin: commands + skills)
 
 ## Frameworks / libraries
 
 | Library | Version | Purpose |
 |---|---|---|
-| (example) requests | >=2.32 | HTTP client |
+| (none — stdlib only) | — | Runtime has no third-party runtime deps; blueprint adds none |
 
 ## Development dependencies
 
 | Tool | Purpose |
 |---|---|
-| (example) pytest | unit testing |
+| pytest | unit testing (`pytest -q`) |
+| ruff | lint (`ruff check`) |
+| mypy | type checking (`mypy .`) |
 
 ## Runtime environment
 
-- OS / platform:
-- Required services:
-- Environment variables (see `.env.example`):
+- OS / platform: WSL2 Ubuntu on Windows 11; plugin installed on both WSL + Windows
+- Required services: none (Codex CLI optional as a bulk-emit executor)
+- Environment variables: none required
+
+## Frontend
+
+**none** — renmark is a CLI/plugin (code-only). Recorded explicitly because
+`/renmark:blueprint`'s UI gate reads this field: Frontend = none → schematic
+only, no prototype, for renmark itself.
 
 ## External APIs
 
 | Service | What for | Auth |
 |---|---|---|
-| (example) NVIDIA NIM | LLM inference | `NVIDIA_NIM_API_KEY` |
+| (none) | — | — |
+
+## Notes
+
+- Stack confirmed during the `blueprint` (prototype/schematic step) brainstorm,
+  2026-06-05. The feature adds **no new runtime dependencies** — pure Python +
+  markdown, consistent with the existing plugin.
