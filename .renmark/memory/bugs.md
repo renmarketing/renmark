@@ -7,7 +7,26 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 (Unresolved bugs. Move to `Fixed` once a commit lands.)
 
-(Empty.)
+### 2026-06-05 — install.ps1 fails to parse under Windows PowerShell 5.1 (encoding)
+
+**Severity:** major (Windows install path is broken)
+**Symptom:** `powershell.exe -File install.ps1 -NoCodex` aborts with a cascade of
+spurious "Missing closing '}'" ParserErrors; line 200's em-dash renders as `�?"`.
+**Root cause:** `install.ps1` contains non-ASCII characters (em-dashes `—`,
+ellipses `…`, curly quotes) and is saved as UTF-8 **without a BOM**; Windows
+PowerShell 5.1 decodes BOM-less `.ps1` files as the system ANSI codepage, turning
+those bytes into mojibake that corrupts tokens and breaks brace matching.
+**Fix:** (pending) save `install.ps1` as UTF-8-with-BOM, OR replace all non-ASCII
+chars with ASCII equivalents (`—`→`-`, `…`→`...`, smart quotes→straight). The
+ASCII-only route is the most robust (codepage/BOM-independent). PowerShell 7
+(`pwsh`) is unaffected but is not installed on this Windows host.
+**Workaround used 2026-06-05:** Windows plugin updated WITHOUT the installer —
+git fast-forwarded the Windows repo copy (`C:\Users\roberto.renteria\ai-system`,
+whose `origin` is the WSL repo) to v0.6.0, then patched the recorded version in
+`%USERPROFILE%\.claude\plugins\installed_plugins.json` (settings.json registration
+entries already present). Directory-marketplace install means content was already live.
+**Lesson:** Cross-platform shell scripts must be ASCII-only or BOM-tagged — a
+WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ---
 
