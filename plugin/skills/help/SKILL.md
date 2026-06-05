@@ -54,6 +54,9 @@ Commands:
       Create or update the project's PRD — the per-project source of truth
       that plans and features align to.
 
+  /renmark:blueprint
+      Generate the project's living schematic (always) and UI prototype (when there's a UI).
+
   /renmark:doctor
       Diagnose Claude Code plugin install health. Run when /renmark:*
       commands aren't appearing or after a version bump. Pass --fix to

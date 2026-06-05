@@ -52,6 +52,17 @@ Returns server status and version. Used by load balancers and uptime monitoring.
 
 ## In progress
 
+
+### 2026-06-05 — blueprint (/renmark:blueprint)
+
+**Spec:** `.renmark/specs/2026-06-05-blueprint.spec.md`
+**Plan:** `.renmark/plans/2026-06-05-blueprint.plan.md`
+**Commits:** `8a1ddc7..HEAD on feature/blueprint`
+
+Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from project-map.md via hybrid marker-based update; standalone + start/feature touchpoints.
+
+---
+
 (Features the current plan is mid-execution on. Cleared on completion.)
 
 (Empty.)

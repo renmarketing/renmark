@@ -1,0 +1,31 @@
+---
+artifact_type: schematic
+schema_version: 1
+created_at: {{DATE}}
+---
+
+<!-- SCHEMATIC is a HUMAN-OWNED doc with a generated architecture diagram block.
+     The sections marked RENMARK:GENERATED:SCHEMATIC:START...END are auto-updated
+     by /renmark:prd and related skills. Everything outside those markers is yours
+     to edit freely and will be preserved across regeneration. -->
+
+# Schematic
+
+## Overview
+
+<!-- HUMAN-OWNED: Replace this with a one-sentence high-level description of the system's main components and data flow. This section is not regenerated. -->
+(Describe the major subsystems, their roles, and how data flows between them.)
+
+## Current Architecture
+
+<!-- RENMARK:GENERATED:SCHEMATIC:START source-sha=PENDING -->
+```mermaid
+flowchart TD
+    A["System architecture diagram will be generated here"]
+```
+<!-- RENMARK:GENERATED:SCHEMATIC:END -->
+
+## Notes / Decisions
+
+<!-- HUMAN-OWNED: Use this section to capture architectural decisions, trade-offs, known limitations, and design rationale. This section is not regenerated. -->
+(Record why certain components were chosen, trade-offs made, constraints discovered, and evolution notes. Link to CHANGELOG for when major changes occurred.)

@@ -1,5 +1,43 @@
 # Changelog
 
+## [2026-06-05] — blueprint feature built (12 tasks)
+
+**Request:** Implement `/renmark:blueprint` — the Phase-3 prototype/schematic pipeline step.
+**Built:** Orchestrated 12 atomic tasks across 3 waves (sonnet/haiku/opus Agents + 1 escalation):
+- `renmark/blueprint.py` — marker-splice helper (`splice_generated_block`, `MarkerNotFoundError`), UI detection (`detect_ui`), marker builders/constants.
+- `plugin/templates/{SCHEMATIC.md,PROTOTYPE.html}.template` — skeletons with `RENMARK:GENERATED:*` marker blocks.
+- `plugin/skills/blueprint/SKILL.md` + `plugin/commands/blueprint.md` — the skill (freshness gate → UI gate → synthesize → splice → lifecycle touchpoint) and command entry.
+- Wiring: `start` (onboarding offer), `feature` (delta touchpoint), `help`, `DOMAIN_BY_SKILL` (build), CLAUDE.md/AGENTS.md tooling table.
+- `tests/test_blueprint.py` — 22 unit tests (splice byte-preservation, idempotency, human-edit preservation, missing-marker abort, `detect_ui` branches, source_sha).
+**Files changed:** see commits 8a1ddc7..51601e1 on `feature/blueprint`.
+**Gates:** 365 passed / 28 skipped; ruff clean on changed code. All 12 task verifiers PASS.
+**Do not change:**
+- T6 was escalated codex→sonnet: `renmark-execute --task` ran read-only in this env and didn't write the file. See `learnings.md`.
+- The `serves:` field in plan files breaks `renmark-execute` (parser drift) — logged Open in `bugs.md`; stripped from this plan.
+
+## [2026-06-05] — project scope: blueprint (prototype/schematic step)
+
+**Request:** Add a renmark pipeline step (`/renmark:blueprint`) that generates a
+living architecture **schematic** (always) and a visual UI **prototype** (only
+when the build has a UI), updated as the project evolves like the PRD.
+**Tech stack:** Python ≥3.10 + Claude Code plugin markdown — existing renmark stack, **no new deps**.
+**Deployment:** local plugin install (WSL + Windows), unchanged.
+**MVP boundary:** schematic + conditional prototype + hybrid marker-based update + pipeline wiring (start/feature/standalone).
+**Out of scope:** deterministic language parsers (deferred), full 4-level C4 (Container level only), image/SVG export, full-repo rescan.
+
+**Locked decisions:**
+- Command slug `/renmark:blueprint`; artifacts `SCHEMATIC.md` (always) + `PROTOTYPE.html` (UI only) at project root, like `PRD.md`.
+- Schematic = Mermaid in Markdown; prototype = self-contained static HTML/CSS.
+- `project-map.md` is the ONLY architecture source — blueprint synthesizes, never rescans the repo.
+- Hybrid update: regenerate only content between `<!-- RENMARK:GENERATED:*:START/END -->` markers; preserve human prose; single current-state artifact.
+- Blueprint is an artifact **touchpoint like PRD, NOT a lifecycle stage** — must not advance the `init→…→released` chain.
+- `source_sha` in a generated block = hash of `project-map.md`, not an implied repo scan.
+
+**Do not change:**
+- Do not add deterministic parsers in this phase — explicitly deferred.
+- Do not clobber an existing artifact that lacks markers — abort instead.
+- Do not let blueprint fabricate architecture when `project-map.md` is missing/stale — route to `/renmark:init`.
+
 ## v0.6.0 — 2026-06-05 (PRD source of truth)
 
 **Release of the PRD source-of-truth milestone.** Bumped 0.5.9 → 0.6.0 across all

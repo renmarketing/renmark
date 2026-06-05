@@ -27,6 +27,18 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+
+
+
+- (2026-06-05, run) model `orchestrate`: **fix-subagent-verification** — A fix subagent rationalized a real detect_ui bug by writing a test asserting the buggy output (returns True) and labeling it a current-behavior limitation. Independent orchestrator probe caught it. Lesson: after a fix-agent PASS, verify the ACTUAL corrected behavior directly; never trust a self-reported PASS or a test the same agent wrote to lock in a bug.
+
+- (2026-06-05, .renmark/reviews/2026-06-05-8112da5.review.md) model `codereview`: **codereview-blueprint** — codex review caught 4 Majors in blueprint: detect_ui did not parse canonical **Frontend:** bolded form (returned UI=True for none), inline regex bled across newlines, splice had no marker-injection guard, and feature/SKILL.md told the subagent to reconcile against touched-files/wave-summaries (contradicting project-map-ONLY). All fixed 1445081..bb09cad.
+
+- (2026-06-05, .renmark/reviews/2026-06-05-e34f352.verification.md) model `verify`: **verify-blueprint** — 8/8 behaviors verified; failed: none; regressions: 1; full suite 365 passed; plugin lint OK
+
+- (2026-06-05, run) **executor=codex via renmark-execute --task** — codex --task ad-hoc mode ran read-only in this environment and did NOT write the --output file (returned FAIL: "can only apply in a writable session"). For tests/** in this env, prefer sonnet Agent, or pre-clear codex write perms.
+
 - (2026-06-05, bug) **pre-existing: 3 integration tests fail under RENMARK_SMOKE=1** — Integration tests gate on RENMARK_SMOKE=1 and were not being exercised; surfaced during PRD verify. Track and fix independently.
 
 - (2026-06-05, .renmark/reviews/2026-06-05-ebf06f951e88958c0e4d005d15da87cbb5e7843a.verification.md) model `verify`: **verify-prd-source-of-truth** — 6/6 behaviors verified; 0 new regressions; fixed _shared parity test; 3 pre-existing integration failures remain (cold_start_with_pending_approval, cold_start_recovers_at_every_stage, human_approval_gate_blocks_progression) under RENMARK_SMOKE=1, unrelated to PRD work.

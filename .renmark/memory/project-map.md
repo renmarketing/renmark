@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-05 @ 8b5f07e -->
+<!-- Last refreshed: 2026-06-05 @ dd0926d -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=69
+**Languages:** python=71
 
 ## Directory tree
 
@@ -33,6 +33,7 @@ ai-system/
 | `renmark/shadow.py` | subsystems. | `register`, `registered_subsystems`, `ShadowDiff`, `list_cases`, `run_subsystem`, `run_all` |
 | `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `current_version`, `check_drift`, `drift_report` |
 | `renmark/summary.py` | governance metadata), G9 (failure transparency). | `SummaryBoundaryError`, `ArtifactMetadata`, `write_artifact`, `emit_pointer`, `read_metadata`, `is_stale` |
+| `tests/test_blueprint.py` | Unit tests for renmark.blueprint — marker builders, splice, detect_ui. | `test_marker_constants`, `test_build_start_marker_contains_sha`, `test_build_end_marker`, `test_build_markers_use_supplied_id`, `test_splice_replaces_only_inner_region`, `test_splice_sha_recorded_in_output` |
 | `tests/test_dispatch_isolation.py` | Unit tests for G11 task-isolation contract in dispatch.py. | `make_task`, `test_subagent_input_serializes_to_json`, `test_build_subagent_input_bounds_inputs`, `test_subagent_output_valid`, `test_subagent_output_rejects_too_many_summary_lines`, `test_subagent_output_rejects_oversized_summary_line` |
 | `tests/test_lint.py` | Tests for renmark.lint — plugin contract linter. | `test_parse_frontmatter_extracts_simple_kv`, `test_parse_frontmatter_strips_quotes`, `test_parse_frontmatter_returns_none_without_block`, `test_parse_frontmatter_ignores_comments_and_blanks`, `test_lint_skill_files_passes_valid`, `test_lint_skill_files_catches_missing_skill_md` |
 | `tests/test_hygiene.py` | Write a .renmark artifact with frontmatter so hygiene can read it. | `test_scan_empty_repo`, `test_scan_fresh_artifact_kept`, `test_scan_expired_stale_after_archived`, `test_scan_ttl_fallback`, `test_scan_referenced_never_archived`, `test_scan_dry_run_no_writes` |
@@ -41,13 +42,13 @@ ai-system/
 | `renmark/hygiene.py` | Single source of truth for renmark's diagnostic hygiene operations. Walks the | `ScanReport`, `PruneReport`, `scan_artifacts`, `prune_memory`, `main` |
 | `renmark/schemas.py` | payloads. Zero external dependencies — validation is structural, not full | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `main` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
-| `renmark/parser.py` | Parses markdown plan files of the form: | `PlanError`, `Task`, `parse_plan` |
-| `renmark/lint.py` | CLAUDE.md.template rule blocks are well-formed. | — |
+| `renmark/parser.py` | Parses markdown plan files of the form: | — |
 
 ## Commands (user-facing)
 
 | Command | Purpose |
 |---|---|
+| `/renmark:blueprint` | Use to create or update the project's blueprint — the technical architecture and implementation guide that plans and fea |
 | `/renmark:brainstorm` | Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's  |
 | `/renmark:check-plan` | Use before executing a renmark plan — validates task count, verifier presence, and parallel group safety. |
 | `/renmark:codereview` | Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my c |
