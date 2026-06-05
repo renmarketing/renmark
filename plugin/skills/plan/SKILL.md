@@ -150,6 +150,20 @@ Save to `.renmark/plans/YYYY-MM-DD-<topic>.plan.md`. Include:
 
 **8b. Dispatch gate.** This is the critical approval gate. Once `/renmark:orchestrate` runs, real API tokens start flowing. Make the user actively approve.
 
+**Invocation-context contract (single dispatch gate — never two, never silent).**
+The dispatch gate has exactly one owner per flow:
+
+- **Standalone** (`/renmark:plan` invoked directly by the user): `plan` **owns** this Step 8b
+  dispatch gate. Run it as written below.
+- **Embedded in `/renmark:feature`** (plan invoked as that wrapper's Step 3): `plan`
+  **suppresses** this Step 8b gate entirely. It stops after 8a at `plan-validated` and
+  returns control to the `feature` router — `feature` owns the single dispatch approval
+  before it invokes orchestrate (see `feature/SKILL.md` §3–4). Do **not** show the
+  dispatch menu, and do **not** auto-invoke orchestrate, from within the embedded plan.
+
+This guarantees the wrapper flow presents **one** dispatch approval (owned by `feature`),
+never two, and orchestrate is **never** reached without an explicit human approval.
+
 Show a clear summary:
 
 > *"Plan written to `.renmark/plans/<name>.plan.md` — validated ✓ (check-plan: PASS, W warnings)*

@@ -79,9 +79,24 @@ full bounded-return format and examples.
 
 Invoke `/renmark:plan <description or spec-path>`. The plan skill runs the Scope Contract discovery (Q1–Q3), writes CHANGELOG + stack.md, then decomposes into tasks.
 
+**Plan runs in validation-only mode here (single-gate contract).** Because `feature`
+is the wrapper, `plan` **suppresses its own Step 8b dispatch gate**: it stops after
+auto-validation at stage `plan-validated` and returns control to this router. `feature`
+owns the **one** dispatch approval (Step 4). This is the mirror of the contract documented
+in `plan/SKILL.md` §8b — there must never be two dispatch gates, and orchestrate must
+never be reached without an explicit human approval.
+
 ### 4. Execute
 
-Invoke `/renmark:orchestrate` with the produced plan. Orchestrate runs check-plan in pre-flight, executes waves, re-verifies on completion, and shows the hand-off menu.
+**Dispatch gate (the single approval point for the wrapper flow).** Since `plan`
+suppressed its gate in Step 3, `feature` owns the dispatch approval before any tokens
+flow. Present the validated plan's cost summary and require an explicit human approval to
+proceed (orchestrate's own pre-flight cost-preview `Proceed? [y/N]` satisfies this when
+you invoke it — do not bypass it). Never auto-dispatch silently.
+
+On approval, invoke `/renmark:orchestrate` with the produced plan. Orchestrate runs
+check-plan in pre-flight, executes waves, re-verifies on completion, and shows the
+hand-off menu. If the user declines, stop with the validated plan on disk.
 
 ### 5. Blueprint Update
 
