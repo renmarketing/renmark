@@ -83,7 +83,34 @@ Invoke `/renmark:plan <description or spec-path>`. The plan skill runs the Scope
 
 Invoke `/renmark:orchestrate` with the produced plan. Orchestrate runs check-plan in pre-flight, executes waves, re-verifies on completion, and shows the hand-off menu.
 
-### 5. Verify + Finish
+### 5. Blueprint Update
+
+After orchestrate completes (whether or not all tasks pass), invoke `/renmark:blueprint`
+to reconcile the living blueprint with this feature's delta.
+
+**This is an artifact touchpoint, NOT a new lifecycle stage.** It does not gate
+the build — the pipeline continues regardless of the blueprint result.
+
+*Dispatch as a non-blocking subagent call (Agent tool, bounded return):*
+
+- Subagent reads `SCHEMATIC.md` and `PROTOTYPE.html` (if present) and reconciles
+  them against the feature's touched files and wave summaries.
+- It MUST NOT fabricate architecture. If `project-map.md` is missing or stale
+  (older than the current feature branch), route to `/renmark:init` first to
+  regenerate the map, then re-invoke blueprint.
+- The subagent returns ONLY: `updated_artifacts` (list of paths written) +
+  `skipped_reason` (if nothing was updated) ≤ 3 lines total. The orchestrator
+  does NOT read the blueprint body — only the bounded return.
+
+**Route on result:**
+
+| Result | Action |
+|---|---|
+| `updated` | Continue to Verify + Finish (Step 6). |
+| `skipped` (project-map stale / missing) | Dispatch `/renmark:init`, then re-invoke blueprint, then continue. |
+| `skipped` (nothing to reconcile) | Continue to Step 6 — no action needed. |
+
+### 6. Verify + Finish
 
 From orchestrate's menu:
 - Choose **[v] Verify** → `/renmark:verify` runs goal-backward smoke tests
