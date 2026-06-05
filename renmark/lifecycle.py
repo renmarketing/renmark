@@ -104,6 +104,7 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "verify": "build",
     "finish": "build",
     "feature": "build",
+    "prd": "build",
     "secure": "audit",
     "document": "audit",
     "map": "audit",
