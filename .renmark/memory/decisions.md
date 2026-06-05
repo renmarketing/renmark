@@ -1,5 +1,17 @@
 # Decisions (ADRs)
 
+
+## ADR-006 — Finished feature prd-source-of-truth
+
+**Date:** 2026-06-05
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created; codereview 0 critical
+
+**Decision.** Branch feature/prd-source-of-truth merged to main; reached stage ready-to-release
+
+---
+
 ## ADR-005 — PRD touchpoint policy: one writer, one align contract, nothing else
 
 **Date:** 2026-06-05

@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.6.0 — 2026-06-05 (PRD source of truth)
+
+**Release of the PRD source-of-truth milestone.** Bumped 0.5.9 → 0.6.0 across all
+7 version locations. Shipped on `main` via merge of `feature/prd-source-of-truth`
+(codereview: 0 critical).
+
+- **`/renmark:prd`** — create/update skill for a per-project `PRD.md`, the
+  human-owned source of truth; every write human-gated.
+- **WRITE / ALIGN / NOTHING touchpoint policy** (ADR-005) — one writer
+  (`/renmark:prd`), one read-only align contract (`_shared/prd-alignment.md`),
+  nothing for everyone else. Guards against PRD duplication/over-engineering.
+- **Pipeline wiring** — `start` offers PRD create; `feature` runs the alignment
+  drift gate; `brainstorm` runs read-only alignment (+ no-PRD nudge); `plan`
+  carries `serves: REQ-n` traceability; `help` lists the command.
+- Codereview pass fixed 6 doc-consistency findings (approve-skill framing, the
+  5-line budget contradiction, PRD artifact-governance exemption, etc.).
+
+Gates: 368 passed; ruff + plugin lint clean. 3 pre-existing stale `approve`-gate
+tests remain (separate follow-up; not introduced here). Local release (no remote).
+
 ## 2026-06-05 — PRD branch codereview fixes (pre-merge)
 
 **Request:** Codex review of `main..HEAD` before merging prd-source-of-truth; fix
