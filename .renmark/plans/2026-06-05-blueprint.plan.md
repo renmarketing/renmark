@@ -40,7 +40,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 1200
 - **est_cost_usd:** 0.034
 - **verifier:** python3 -c "import renmark.blueprint" && ruff check renmark/blueprint.py
-- **serves:** new
 - **spec:**
   Create `renmark/blueprint.py`, the deterministic core of the blueprint feature.
   Pure stdlib, PEP 8, fully type-annotated (mypy clean). Provide:
@@ -76,7 +75,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 400
 - **est_cost_usd:** 0.001
 - **verifier:** test -f plugin/templates/SCHEMATIC.md.template && grep -q "RENMARK:GENERATED:SCHEMATIC:START" plugin/templates/SCHEMATIC.md.template && grep -q "RENMARK:GENERATED:SCHEMATIC:END" plugin/templates/SCHEMATIC.md.template
-- **serves:** new
 - **spec:**
   Create the `SCHEMATIC.md` skeleton template. Structure exactly:
   `# Schematic` title; a `## Overview` section with a one-line human-editable
@@ -98,7 +96,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 600
 - **est_cost_usd:** 0.001
 - **verifier:** test -f plugin/templates/PROTOTYPE.html.template && grep -q "RENMARK:GENERATED:PROTOTYPE:START" plugin/templates/PROTOTYPE.html.template && grep -q "RENMARK:GENERATED:PROTOTYPE:END" plugin/templates/PROTOTYPE.html.template
-- **serves:** new
 - **spec:**
   Create the `PROTOTYPE.html` skeleton template: a self-contained, dependency-free
   HTML5 document (`<!DOCTYPE html>`, `<head>` with `<title>{{PROJECT_NAME}} — Prototype</title>`
@@ -118,7 +115,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 2500
 - **est_cost_usd:** 0.188
 - **verifier:** test -f plugin/skills/blueprint/SKILL.md && grep -q "name: blueprint" plugin/skills/blueprint/SKILL.md
-- **serves:** new
 - **spec:**
   Author the `blueprint` skill, mirroring the structure/voice of
   `plugin/skills/prd/SKILL.md`. Frontmatter `name: blueprint` + a description in
@@ -157,7 +153,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 300
 - **est_cost_usd:** 0.001
 - **verifier:** test -f plugin/commands/blueprint.md && grep -qi "blueprint/SKILL.md" plugin/commands/blueprint.md
-- **serves:** new
 - **spec:**
   Create the thin command entry `plugin/commands/blueprint.md`, structurally
   identical to `plugin/commands/prd.md` (read it first and mirror its
@@ -174,7 +169,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 1200
 - **est_cost_usd:** 0.024
 - **verifier:** pytest -q tests/test_blueprint.py
-- **serves:** new
 - **spec:**
   Pytest unit tests for `renmark.blueprint` (import as `from renmark import blueprint`).
   Cover: (1) `splice_generated_block` replaces only the marked span and
@@ -196,7 +190,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 150
 - **est_cost_usd:** 0.001
 - **verifier:** python3 -c "from renmark.lifecycle import DOMAIN_BY_SKILL; assert DOMAIN_BY_SKILL.get('blueprint')=='build'"
-- **serves:** new
 - **spec:**
   In `renmark/lifecycle.py`, add a single entry `"blueprint": "build",` to the
   `DOMAIN_BY_SKILL` dict (near the other `build`-domain skills, after `"prd": "build",`).
@@ -212,7 +205,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 700
 - **est_cost_usd:** 0.032
 - **verifier:** grep -qi "blueprint" plugin/skills/start/SKILL.md
-- **serves:** new
 - **spec:**
   Read the existing PRD touchpoint at `plugin/skills/start/SKILL.md` §"5a. Offer
   PRD creation" and mirror its non-blocking, offer-once style. Add a step
@@ -230,7 +222,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 700
 - **est_cost_usd:** 0.032
 - **verifier:** grep -qi "blueprint" plugin/skills/feature/SKILL.md
-- **serves:** new
 - **spec:**
   Read the existing PRD-alignment touchpoint at `plugin/skills/feature/SKILL.md`
   §2 and mirror its placement. Add a step where the feature pipeline updates the
@@ -249,7 +240,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 200
 - **est_cost_usd:** 0.001
 - **verifier:** grep -qi "blueprint" plugin/skills/help/SKILL.md
-- **serves:** new
 - **spec:**
   In `plugin/skills/help/SKILL.md`, add a `/renmark:blueprint` entry to the
   command list, in the same two-line format as the adjacent `/renmark:prd` entry
@@ -266,7 +256,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 300
 - **est_cost_usd:** 0.001
 - **verifier:** grep -q "renmark:blueprint" CLAUDE.md
-- **serves:** new
 - **spec:**
   In the project `CLAUDE.md`, add a row to the "Tooling — renmark workflow" table
   for `/renmark:blueprint` with the when-to-use: "Generate/refresh the living
@@ -283,7 +272,6 @@ code/templates → command/integration/docs → skill + tests.
 - **est_tokens:** 300
 - **est_cost_usd:** 0.001
 - **verifier:** grep -q "renmark:blueprint" AGENTS.md
-- **serves:** new
 - **spec:**
   Mirror Task 11 exactly in `AGENTS.md`: add the same `/renmark:blueprint` row to
   the renmark workflow / tooling table, identical wording, same placement relative
