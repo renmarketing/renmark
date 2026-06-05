@@ -60,6 +60,22 @@
 - Tests: run via command in `CLAUDE.md` § Testing
 - Source of truth: `PRD.md`. For new features/changes, dispatch a subagent to read `PRD.md` + docs and return a bounded alignment/drift summary — never load the full PRD into the orchestrator.
 
+## Tooling — renmark workflow
+
+| Command | When to use |
+|---|---|
+| `/renmark:start` | Starting point for vibe coders — plain-English entry to the full pipeline |
+| `/renmark:brainstorm <topic>` | Fleshing out an idea into a spec |
+| `/renmark:prd` | Create/update the project PRD — the source of truth that plans and features align to |
+| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype when there's a UI) |
+| `/renmark:plan <spec>` | Decomposing a spec into atomic, executor-tagged tasks |
+| `/renmark:orchestrate <plan>` | Executing a plan (Haiku / Codex / Sonnet / Opus) |
+| `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
+| `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
+| `/renmark:finish` | Close branch — create PR, merge, or clean up |
+| `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
+| `/renmark:codereview <ref>` | Multi-pass diff review (adversarial + quality + architecture) |
+
 ## What renmark expects
 
 When implementing a task from `.renmark/plans/*.plan.md`:
