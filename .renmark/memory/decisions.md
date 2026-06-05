@@ -2,6 +2,18 @@
 
 
 
+
+## ADR-008 — Finished feature blueprint
+
+**Date:** 2026-06-05
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified, ready-to-release
+
+**Decision.** Branch feature/blueprint reached stage ready-to-release
+
+---
+
 ## ADR-007 — Escalated task 6 from codex to sonnet
 
 **Date:** 2026-06-05
