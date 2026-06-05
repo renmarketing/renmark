@@ -86,15 +86,20 @@ Invoke `/renmark:orchestrate` with the produced plan. Orchestrate runs check-pla
 ### 5. Blueprint Update
 
 After orchestrate completes (whether or not all tasks pass), invoke `/renmark:blueprint`
-to reconcile the living blueprint with this feature's delta.
+as a non-blocking touchpoint to keep the living blueprint current.
 
 **This is an artifact touchpoint, NOT a new lifecycle stage.** It does not gate
 the build — the pipeline continues regardless of the blueprint result.
 
 *Dispatch as a non-blocking subagent call (Agent tool, bounded return):*
 
-- Subagent reads `SCHEMATIC.md` and `PROTOTYPE.html` (if present) and reconciles
-  them against the feature's touched files and wave summaries.
+- The subagent simply invokes `/renmark:blueprint` as-is. Blueprint reads
+  architecture exclusively from `.renmark/memory/project-map.md` (and `stack.md`);
+  do NOT feed it diff content, touched-file lists, or wave summaries — those are
+  never architecture inputs.
+- The fact that a feature shipped may be used ONLY as a signal for whether it is
+  worth re-running blueprint (e.g. skip if no files were changed). It must not
+  be used to drive architecture updates.
 - It MUST NOT fabricate architecture. If `project-map.md` is missing or stale
   (older than the current feature branch), route to `/renmark:init` first to
   regenerate the map, then re-invoke blueprint.
