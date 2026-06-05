@@ -3,17 +3,16 @@ from __future__ import annotations
 
 import pytest
 
-from renmark import blueprint
 from renmark.blueprint import (
     MARKER_PROTOTYPE,
     MARKER_SCHEMATIC,
+    MarkerInjectionError,
     MarkerNotFoundError,
     build_end_marker,
     build_start_marker,
     detect_ui,
     splice_generated_block,
 )
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -210,3 +209,62 @@ def test_detect_ui_section_heading_empty_body_returns_none() -> None:
     # No content lines after the ## Frontend heading before the next heading
     text = "## Frontend\n\n## Backend\n\nPython\n"
     assert detect_ui(text) is None
+
+
+# ---------------------------------------------------------------------------
+# FINDING 6 — new coverage: parser/splice failure modes
+# ---------------------------------------------------------------------------
+
+
+# 1. Canonical bolded stack.md form: **Frontend:** <value>
+def test_detect_ui_bolded_field_with_value_returns_true() -> None:
+    assert detect_ui("**Frontend:** React") is True
+
+
+def test_detect_ui_bolded_field_none_value() -> None:
+    # The canonical scope-contract form "**Frontend:** none" has the bold
+    # closing markers before the colon ("**Frontend:**"), so the captured value
+    # is "** none". The normalizer strips leading/trailing markdown decoration
+    # independently, reducing "** none" -> "none", so this is correctly False
+    # (no UI -> schematic only, no prototype).
+    assert detect_ui("**Frontend:** none") is False
+
+
+# 2. Empty-after-colon multiline: blank value before the next field must NOT
+#    bleed into the next line — returns None (not True).
+def test_detect_ui_bolded_field_empty_value_followed_by_another_field_returns_none() -> None:
+    # The Frontend value is empty; the next line starts a new field.
+    assert detect_ui("**Frontend:**\n**Backend:** Express") is None
+
+
+# 3. Markdown-decorated none in the ## Frontend section form
+def test_detect_ui_section_bold_none_returns_false() -> None:
+    assert detect_ui("## Frontend\n- **none**\n") is False
+
+
+def test_detect_ui_section_undecorated_bold_none_returns_false() -> None:
+    assert detect_ui("## Frontend\n**none**\n") is False
+
+
+def test_detect_ui_section_real_value_returns_true() -> None:
+    assert detect_ui("## Frontend\nReact\n") is True
+
+
+# 4. Marker-injection guard: splice_generated_block raises MarkerInjectionError
+#    when new_content embeds the reserved START or END marker for the target id.
+def test_splice_raises_marker_injection_on_start_fragment() -> None:
+    doc = _make_doc("SCHEMATIC", "sha0", "initial")
+    poisoned = "some text <!-- RENMARK:GENERATED:SCHEMATIC:START source-sha=evil --> more"
+    with pytest.raises(MarkerInjectionError):
+        splice_generated_block(doc, "SCHEMATIC", poisoned, source_sha="sha1")
+
+
+def test_splice_raises_marker_injection_on_end_fragment() -> None:
+    doc = _make_doc("SCHEMATIC", "sha0", "initial")
+    poisoned = "legit text <!-- RENMARK:GENERATED:SCHEMATIC:END --> trailing"
+    with pytest.raises(MarkerInjectionError):
+        splice_generated_block(doc, "SCHEMATIC", poisoned, source_sha="sha1")
+
+
+def test_marker_injection_error_is_value_error_subclass() -> None:
+    assert issubclass(MarkerInjectionError, ValueError)
