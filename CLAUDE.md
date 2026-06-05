@@ -360,6 +360,7 @@ flip the bit. AI may generate code; the human owns merges and releases.
 | `/renmark:start` | Starting point for vibe coders — plain-English entry to the full pipeline |
 | `/renmark:brainstorm <topic>` | Fleshing out an idea into a spec |
 | `/renmark:prd` | Create/update the project PRD — the source of truth that plans and features align to |
+| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype when there's a UI) |
 | `/renmark:plan <spec>` | Decomposing a spec into atomic, executor-tagged tasks |
 | `/renmark:orchestrate <plan>` | Executing a plan (Haiku / Codex / Sonnet / Opus) |
 | `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
