@@ -124,6 +124,22 @@ Do not mention this step if `PRD.md` already exists. Do not block or repeat the 
 
 ---
 
+### 5b. Offer blueprint generation (new projects only)
+
+Check whether `SCHEMATIC.md` exists at the project root. If it does **not** exist, offer once — do not block:
+
+> "Would you like me to generate a project blueprint via `/renmark:blueprint`? It produces a living `SCHEMATIC.md` (architecture overview, module map, data flow) — and a `PROTOTYPE.html` interactive mock-up if the build has a UI.
+>
+> 1. [a] Yes — run `/renmark:blueprint` now before we continue
+> 2. [b] Skip — continue with the normal next step"
+
+- If the user chooses **[a]**: invoke `/renmark:blueprint`, then return here and continue to Step 6 once it completes.
+- If the user chooses **[b]**, or if `SCHEMATIC.md` already exists: skip silently and continue.
+
+Do not mention this step if `SCHEMATIC.md` already exists. Do not block or repeat the offer.
+
+---
+
 ### 6. Inject best practices into plan context
 
 Before routing to the next step, establish these as non-negotiable task requirements. Do NOT add them as separate tasks — weave them into the task specs for the relevant implementation tasks:
