@@ -31,6 +31,8 @@
 
 **Canonical state lives outside the conversation.** Truth lives in `.renmark/specs/`, `.renmark/reviews/`, `.renmark/memory/`, `.renmark/state/`, and CHANGELOG.md — not in chat history. See `CLAUDE.md` § `canonical-state-rule`.
 
+**Source of truth: `PRD.md` (if present).** For new features/changes, dispatch a subagent to read `PRD.md` + docs and return a bounded alignment/drift summary — never load the full PRD into the orchestrator. See `CLAUDE.md` § `prd-delegation-rule`.
+
 **All renmark output stays inside the project.** Specs, plans, reviews, research, logs, memory — everything goes under this project's `.renmark/` subtree or a project-root doc. Never write to the global plugin install (`${CLAUDE_PLUGIN_ROOT}`, `~/.claude/...`), `$HOME`, or above the project root. Reading templates/reference files from the plugin is fine; the install is read-only. See `CLAUDE.md` § `project-write-boundary-rule`.
 
 **Orchestrator-visible output ≤ 5 lines or ≤ 300 tokens.** Long task results live in artifact files; the orchestrator reads only a structured summary. Never paste diffs, generated code, or audit bodies back into conversation. See `CLAUDE.md` § `summary-boundary-rule`.

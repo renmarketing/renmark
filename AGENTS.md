@@ -58,6 +58,7 @@
 - Project memory: `.renmark/memory/` — read `INDEX.md` first
 - Changelog: `CHANGELOG.md` — persistent project history
 - Tests: run via command in `CLAUDE.md` § Testing
+- Source of truth: `PRD.md`. For new features/changes, dispatch a subagent to read `PRD.md` + docs and return a bounded alignment/drift summary — never load the full PRD into the orchestrator.
 
 ## What renmark expects
 
