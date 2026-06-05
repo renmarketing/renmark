@@ -71,12 +71,12 @@ def test_install_sh_idempotent(repo_root: Path, tmp_path: Path):
 
 
 def test_plugin_has_required_skill_files(repo_root: Path):
-    """A deployed plugin must have all 14 documented skills with SKILL.md."""
+    """A deployed plugin must have all 15 documented skills with SKILL.md."""
     skills_dir = repo_root / "plugin" / "skills"
     required = {
         "start", "setup", "brainstorm", "plan", "check-plan", "orchestrate",
         "verify", "finish", "feature", "debug", "codereview", "roadmap",
-        "help", "resume",
+        "help", "resume", "prd",
     }
     actual = {p.name for p in skills_dir.iterdir() if p.is_dir()}
     missing = required - actual
