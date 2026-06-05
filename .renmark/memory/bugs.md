@@ -13,6 +13,17 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ## Fixed
 
+
+### 2026-06-05 — pre-existing: 3 integration tests fail under RENMARK_SMOKE=1
+
+**Severity:** medium
+**Symptom:** test_cold_start_with_pending_approval, test_cold_start_recovers_at_every_stage, test_human_approval_gate_blocks_progression fail on main and branch alike
+**Root cause:** (unknown — pre-existing on main, NOT caused by PRD feature; route to /renmark:debug)
+**Fix:** (pending — separate from PRD feature)
+**Lesson:** Integration tests gate on RENMARK_SMOKE=1 and were not being exercised; surfaced during PRD verify. Track and fix independently.
+
+---
+
 (Each entry: symptom, root cause, fix, lesson. The lesson goes to `learnings.md` too for cross-project carry-over.)
 
 ### 2026-06-04 — /renmark:feature does not write feature identity to lifecycle.json
