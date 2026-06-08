@@ -4,6 +4,18 @@
 
 
 
+
+## ADR-011 — Finished feature init-pipeline
+
+**Date:** 2026-06-08
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified; codereview 0 critical, 4 Major + 1 Minor all fixed+re-verified+tested
+
+**Decision.** Branch feature/init-pipeline reached stage ready-to-release
+
+---
+
 ## ADR-010 — Finished feature next-step-engine
 
 **Date:** 2026-06-08
