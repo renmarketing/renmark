@@ -45,6 +45,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 ## Fixed
 
 
+
+### 2026-06-08 — sizing classifier produced false-lite on code-with-template, malformed tasks, and --lite override
+
+**Severity:** critical
+**Symptom:** _is_doc_or_config matched "template" as a substring (real .py code → doc → lite); classify_plan([object()]) → lite; --lite override bypassed the hard/core safety floor — all FALSE-LITE (skips full review on risky code)
+**Root cause:** substring (not suffix) matching; unvalidated task shape reaching the lite branch; override specified to always beat the classifier
+**Fix:** code-suffix-wins + .template/.j2 suffix matching; validate task shape before lite (else standard); resolve_override() — --full escalates, --lite only narrows standard; +regression tests
+
+---
+
 ### 2026-06-08 — merge_rule_blocks corrupted files on malformed markers
 
 **Severity:** major
