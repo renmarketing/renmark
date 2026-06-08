@@ -46,6 +46,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-08, codereview) model `opus`: **advisory metrics still need accuracy review** — Even an ADVISORY lens must be accurate or it misleads: codereview found the modularity analyzer both under-reported (span/branch math) and over-suppressed (substring match hid real files). A health lens that silently drops real findings is worse than none. Adversarially review the metric math + the SUPPRESSION rules, not just the happy path.
+
 - (2026-06-08, .renmark/reviews/2026-06-08-25e2ee93f8b830c2ef62c79059c8a05cf6062096.verification.md) model `verify`: **verify-modularity-health-lens** — 6/6 verified; advisory ast lens; HEALTH line bounded; renmark self-scan flagged 111 gaps (its own code has oversized files/functions). core ast code → keep full codereview.
 
 - (2026-06-08, codereview) model `opus`: **a safety classifier must be adversarially reviewed for its DANGEROUS direction** — proportional-pipeline routed its OWN review to full codex (classify_diff self-tiered full) — which then found 2 Critical false-lite holes in the classifier (substring match, malformed→lite, override bypass). The dangerous direction (false-lite skips review) needs explicit adversarial tests, not just happy-path. The user repeatedly choosing codereview over my skip-recommendation kept paying off.
