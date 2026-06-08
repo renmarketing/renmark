@@ -97,24 +97,7 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 (Backlog. Hand-edited or written by `/renmark:brainstorm` when scoping future work.)
 
-### init-as-front-door pipeline + setup consolidation (decided 2026-06-08 — Option A)
-
-**Problem:** `/renmark:init` hard-errors (`init.py:1295`, exit 1) when `CLAUDE.md` is
-absent — it requires a pre-existing CLAUDE.md and only refreshes the map. Users
-(matching Claude Code's native `/init`) expect it to *initialize* the project.
-`/renmark:setup` is the actual bootstrapper, so the two-door onboarding is confusing
-and overlaps (both touch CLAUDE.md/AGENTS.md/.renmark/ + stack detection).
-
-**Decision (Option A):** make `/renmark:init` the single front-door **pipeline**:
-1. Detect project state (CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/, git, stack)
-2. Scaffold-if-missing (create CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/ from templates + merge rule blocks) — setup's bootstrap, folded in
-3. Scan & map (symbols → project-map.md; merge project-stub block)
-4. Standards (dev-standards.md + health gaps)
-5. **Roadmap gap discovery as the final step** (`/renmark:roadmap --gaps`; nudge `/renmark:prd` if no PRD) — added per user 2026-06-08
-6. Hand off
-
-`/renmark:setup` folds into init (or becomes a thin "refresh rule blocks" alias).
-Scaffold logic lives in ONE place. **Build via `/renmark:feature` after a `/clear`.**
+*(init-as-front-door pipeline + setup consolidation — SHIPPED 2026-06-08, see Shipped section above.)*
 
 ### acceptance criteria in the PRD (decided 2026-06-08 — ADD)
 
@@ -134,6 +117,6 @@ like the existing advisory health gaps (never blocking). Build via `/renmark:fea
 
 ### Sequencing (decided 2026-06-08)
 
-`/clear` first (long session), then build in order: **(1) init/setup front-door
-pipeline** → (2) acceptance-criteria-in-PRD → (3) modularity health lens. Each via
+Build order: ~~(1) init/setup front-door pipeline~~ ✅ SHIPPED 2026-06-08 →
+**(2) acceptance-criteria-in-PRD** (next) → (3) modularity health lens. Each via
 `/renmark:feature` (or `/renmark:prd` for #2's template part).
