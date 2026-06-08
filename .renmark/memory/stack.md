@@ -54,3 +54,6 @@ only, no prototype, for renmark itself.
   — new `renmark/sizing.py` is a deterministic stdlib classifier reusing
   `parser.Task` signals + `git diff` stat; cheap-review lane uses the existing
   built-in `/review`, not a new dependency.
+- 2026-06-08 (`modularity-health-lens` brainstorm): no stack change. **No new deps**
+  — new `renmark/modularity.py` uses stdlib `ast` only (no radon/pylint); feeds
+  init's existing standards-health pipeline; advisory, zero-LLM, never raises.

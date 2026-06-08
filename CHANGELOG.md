@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-08] — project scope: modularity-health-lens
+
+**Request:** Advisory modularity/scalability health lens — renmark enforces modularity at plan-time but never measures it on the shipped codebase. (User asked to research how other tools do it + reuse what renmark already has.)
+**Tech stack:** Python ≥3.10 stdlib + markdown — **no new deps**. New `renmark/modularity.py` is a pure-`ast` analyzer; reuses `init.py`'s standards-health pipeline + `sizing.py` style.
+**Deployment:** Claude Code plugin (unchanged).
+**MVP boundary:** new `renmark/modularity.py` (5 ast metrics — module LOC, function length, cyclomatic branch count, import fan-out, nesting-weighted cognitive complexity; two bands each; FP suppression) → merged into `init.py` `evaluate_health` → `dev-standards.md` + `HEALTH:` line; one-line `init/SKILL.md` note; tests. ADVISORY / never blocking / never auto-refactors.
+**Out of scope:** a separate `/renmark:hygiene` surface; blocking the pipeline; third-party metric deps (radon/pylint); auto-refactor.
+
+**Locked decisions:**
+- Ship all 5 metrics (LOC, fn length, cyclomatic, import fan-out [coupling/scalability], cognitive complexity); thresholds mirror pylint/mccabe/SonarQube defaults
+- Surfaces ONLY through init's existing standards-health (no new /hygiene surface); reuses init's Gap dataclass + HEALTH pipeline
+- Pure stdlib `ast`, zero-LLM, never raises (skip unparseable files); advisory — init still exits 0
+- FP suppression mandatory: skip tests/generated/__init__ fan-out/data; count code lines not raw
+
 ## v0.7.4 — 2026-06-08 (proportional pipeline — cost ∝ feature size/risk)
 
 **Release of the proportional-pipeline feature.** Bumped 0.7.3 → 0.7.4 across all 7
