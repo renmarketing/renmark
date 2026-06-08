@@ -128,6 +128,10 @@ conversation. If you find yourself relying on "what was said earlier" to
 continue work, write that fact to disk instead.
 <!-- END:canonical-state-rule -->
 
+<!-- BEGIN:prd-delegation-rule -->
+Source of truth: `PRD.md` (if present). For new features/changes, dispatch a subagent to read `PRD.md` + docs and return a bounded alignment/drift summary — never load the full PRD into the orchestrator.
+<!-- END:prd-delegation-rule -->
+
 <!-- BEGIN:project-write-boundary-rule -->
 ## All renmark output stays inside the project
 Every file renmark generates — specs, plans, reviews, research, audits,

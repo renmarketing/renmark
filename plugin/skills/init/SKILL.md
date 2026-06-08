@@ -1,60 +1,89 @@
 ---
 name: init
-description: Use when the user wants renmark to document the project itself — scans the repo for file structure, modules, and public functions/exports. Writes a tiny stub into CLAUDE.md/AGENTS.md (always loaded) and the full detailed map into .renmark/memory/project-map.md (read on demand). Renmark's analog to Claude Code's native /init, designed for context-window hygiene. Idempotent — re-run anytime to refresh.
+description: Use when the user wants renmark to onboard or document a project — the non-destructive front door. Scaffolds missing CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/, back-fills missing rule blocks byte-verbatim, scans the repo for structure, modules, and public symbols, writes a tiny stub into CLAUDE.md/AGENTS.md (always loaded) and the full map into .renmark/memory/project-map.md (read on demand), reports standards health, then hands off to roadmap gap discovery. Renmark's analog to Claude Code's native /init. Idempotent — re-run anytime; works with or without a pre-existing CLAUDE.md and never dead-ends.
 ---
 
 # init
 
 ## Overview
 
-Generates a *codebase map* and *dev-standards report*, split across three locations for context-window hygiene:
+`/renmark:init` is renmark's **non-destructive front door** — the named adoption
+pipeline for bringing renmark into any project, with or without an existing
+`CLAUDE.md`. It both *initializes* (scaffolds what's missing) and *documents*
+(maps the code), then routes the now-mapped project at its uncovered gaps.
+
+All scanning, scaffolding, rule-block merging, regex, rendering, and file I/O is
+done by the **deterministic, zero-LLM** Python module `renmark.init`. **No LLM
+calls are made for the work itself.** The agent's only jobs are: invoke the
+script, relay its bounded summary line, and hand off. The agent does **not** read
+or merge file bodies, templates, or rule blocks itself — `init.py` does all of
+that deterministically (byte-verbatim, unit-tested, idempotent), which is what
+keeps the orchestrator's context clean.
+
+Outputs are split across three locations for context-window hygiene:
 
 - **CLAUDE.md / AGENTS.md** get a tiny **stub** (~10-15 lines, ~250 tokens) inside a managed `<!-- BEGIN:project-stub -->` block. Always-loaded context. Includes a `Dev gates:` line listing the project's test/lint/typecheck commands when detected.
 - **`.renmark/memory/project-map.md`** — full directory tree, module tables with symbols, command catalog. Not auto-loaded.
 - **`.renmark/memory/dev-standards.md`** — detected dev standards (test, lint, formatter, type checker, CI, pre-commit, env schema, DB tooling, local-dev commands, code style, dep policy) **plus** a *Standards health* section that flags gaps and proposes tighten-this recommendations (e.g. "no linter configured", "TypeScript not in strict mode", "secrets risk: `.env` is committed"). Not auto-loaded.
 
-All scanning, regex, rendering, and file I/O is done by the deterministic Python module `renmark.init`. **No LLM calls are made for the work itself.** The agent's only job is to invoke the script and relay its summary lines.
-
 ## When to Use
 
-- First time onboarding renmark to a project that already has substantial code
+- Onboarding renmark to a project — **even an empty or unscaffolded one** (init scaffolds; you no longer need to run `/renmark:setup` first)
+- First-time onboarding to a project that already has substantial code
 - After a major restructure (new top-level dirs, renamed modules, new entry points)
-- The user says "document the project", "renmark init", "refresh the project map"
-- Called as a sub-step from `/renmark:setup` (first-time bootstrap) and `/renmark:finish` (post-feature refresh)
+- The user says "document the project", "renmark init", "initialize this project", "refresh the project map"
+- Called as a sub-step from `/renmark:finish` (post-feature refresh)
 
-**Not for**: rule scaffolding (`/renmark:setup`), spec design (`/renmark:brainstorm`), task decomposition (`/renmark:plan`).
+**Not for**: spec design (`/renmark:brainstorm`), task decomposition (`/renmark:plan`).
+Note: `/renmark:setup` is now a **thin rule-block-refresh alias of init** (see below) — it is no longer a separate bootstrapper.
+
+## The 6-step front-door pipeline
+
+The SKILL orchestrates; `renmark/init.py` (the CLI) does the deterministic work.
+A single `python -m renmark.init` invocation performs steps 1–5; the SKILL adds
+the step-6 hand-off.
+
+1. **Detect** — project state: `CLAUDE.md` / `AGENTS.md` / `CHANGELOG.md` / `.renmark/` presence, git status, stack (`pyproject.toml` / `package.json` / `go.mod` / `Cargo.toml` / Claude Code plugin manifest). The CLI detects stack; the SKILL surfaces the state from the summary line.
+2. **Scaffold-if-missing** — done by `python -m renmark.init`. At the top of `init.run()` it calls `bootstrap(repo, init_git=False)` and creates `CHANGELOG.md` if absent, scaffolding `CLAUDE.md` / `AGENTS.md` / `.gitignore` / `.renmark/` from templates. **Existence-skip = non-destructive.** Because of this, init **no longer errors when `CLAUDE.md` is absent** — it creates it.
+3. **Rule-block back-fill (deterministic, zero-LLM)** — `merge_rule_blocks()` in `init.py`. For an existing `CLAUDE.md` missing canonical `<!-- BEGIN:<name> -->`…`<!-- END:<name> -->` rule blocks, it inserts the template's blocks **byte-verbatim** at the right markers, reusing the marker primitives proven in lint. Idempotent (skips blocks already present), non-destructive (never edits existing block content, never overwrites hand-modified blocks). `CLAUDE.md.template` is the only template carrying managed markers, so this step is effectively CLAUDE.md-only — **there is no CLAUDE.md↔AGENTS.md rule-block back-fill/mirroring** (AGENTS.md is created from its own template by scaffold; rule-block parity is the human/`sync-note` discipline). **Safety:** before inserting into any file, its existing markers are validated for balance — a file with orphan/unclosed/duplicate/out-of-order markers is **skipped, never written**, and init exits **2** (user-fixable document corruption). On malformed input merge SKIPS; it never inserts and never produces unbalanced markers. **The agent does NOT read or merge rule blocks — init.py does it deterministically.**
+4. **Scan & map** — walks the repo, extracts public symbols, writes the full map to `.renmark/memory/project-map.md`, and merges the `BEGIN:project-stub` block into CLAUDE.md/AGENTS.md. Byte-equality skip avoids prompt-cache busting.
+5. **Standards + health gaps** — writes `.renmark/memory/dev-standards.md` plus the *Standards health* gap report.
+6. **Roadmap `--gaps` hand-off at the end** — SKILL-level (per ADR-009). A freshly initialized or re-mapped project is exactly when "what are the uncovered gaps / next moves?" matters most, so init ends by routing into roadmap's **gap-discovery mode** rather than dead-ending. If the project has no `PRD.md`, nudge `/renmark:prd` first.
 
 ## Steps
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'init')`. If it returns a non-None hint, surface as a one-line note.
 
-### 1. Run the scanner
+### 1. Run the pipeline
 
 ```bash
 python -m renmark.init
 ```
 
-That's the whole operation. The script:
+That single command runs steps 1–5 above (detect → scaffold → back-fill → scan/map → standards). The script:
 
-1. Walks the repo (excludes `.git`, `node_modules`, `.venv`, `dist`, `build`, `.renmark/state`, `.renmark/debug`, etc.).
-2. Detects stack from `pyproject.toml` / `package.json` / `go.mod` / `Cargo.toml` / Claude Code plugin manifest.
-3. Extracts public symbols from the top-20 largest source files (Python, JS/TS, Go, Rust, Ruby).
-4. Renders a stub and the full map.
-5. **Byte-equality-skip:** if the rendered stub body matches what's already in CLAUDE.md, the file isn't rewritten — no prompt-cache bust. Same for `project-map.md`.
-6. Writes whatever changed; prints a one-line summary to stdout.
+1. Scaffolds any missing `CLAUDE.md` / `AGENTS.md` / `.gitignore` / `.renmark/` / `CHANGELOG.md` (existence-skip, non-destructive).
+2. Back-fills any missing canonical rule blocks byte-verbatim (idempotent, never edits existing blocks).
+3. Walks the repo (excludes `.git`, `node_modules`, `.venv`, `dist`, `build`, `.renmark/state`, `.renmark/debug`, etc.).
+4. Detects stack from `pyproject.toml` / `package.json` / `go.mod` / `Cargo.toml` / Claude Code plugin manifest.
+5. Extracts public symbols from the top-20 largest source files (Python, JS/TS, Go, Rust, Ruby).
+6. Renders a stub and the full map; merges the `project-stub` block.
+7. **Byte-equality-skip:** if the rendered stub body matches what's already in CLAUDE.md, the file isn't rewritten — no prompt-cache bust. Same for `project-map.md`.
+8. Writes whatever changed; prints a one-line summary to stdout.
 
 **Stdout format:**
 ```
-OK  stub=<created|refreshed|unchanged> agents=<…|skipped> map=<…> standards=<…> modules=<N> commands=<N> langs=<py,ts,…> ref=YYYY-MM-DD@<git-sha>
+OK  stub=<created|refreshed|unchanged> agents=<…|skipped> map=<…> standards=<…> blocks=<N back-filled|none> modules=<N> commands=<N> langs=<py,ts,…> ref=YYYY-MM-DD@<git-sha>
 HEALTH: <N> gaps (<X danger>, <Y warn>, <Z info>) — see `.renmark/memory/dev-standards.md`
 ```
 
-The `HEALTH:` line only appears when there's at least one gap. A clean project produces just the `OK` line.
+The `HEALTH:` line only appears when there's at least one gap. A clean, fully-initialized project produces just the `OK` line with everything `unchanged`.
 
 **Exit codes:**
-- `0` — success (whether or not anything changed)
-- `1` — CLAUDE.md missing (tell user to run `/renmark:setup` first)
-- `2` — corrupted markers (multiple `BEGIN:project-stub`) or bad CLI usage
+- `0` — success (whether or not anything changed; this is the normal path even when CLAUDE.md was absent and had to be scaffolded)
+- `2` — corrupted markers (multiple `BEGIN:project-stub`, unbalanced rule-block markers) or bad CLI usage
+
+There is **no longer an exit 1 for "CLAUDE.md missing"** — init scaffolds it. (A post-scaffold guard remains as a should-never-happen safety net.)
 
 ### 2. Flags
 
@@ -63,18 +92,19 @@ The `HEALTH:` line only appears when there's at least one gap. A clean project p
 - `python -m renmark.init --deep` — add expensive standards checks (samples last 20 commits for conventional-commits style; future: `gh api` branch-protection lookups, test-naming inference). Always safe to combine with refresh or scan.
 - `python -m renmark.init <path>` — operate on a different repo path (default `.`)
 
-**The baseline dev-standards scan runs every time, no flag needed.** The `--deep` flag adds the slow / opinionated checks on top.
+**The baseline scaffold + back-fill + dev-standards scan runs every time, no flag needed.** The `--deep` flag adds the slow / opinionated checks on top.
 
 ### 3. Relay the result
 
-Pass the stdout line through to the user as-is, optionally with a one-sentence interpretation. If exit code is non-zero, surface the FAIL line and stop — do not attempt manual fallback steps.
+Pass the stdout line through to the user as-is, optionally with a one-sentence interpretation. If exit code is non-zero, surface the FAIL line and stop — do not attempt manual fallback steps. Never read the scaffolded files, templates, or merged rule blocks into the conversation; the bounded stdout line is the only thing the orchestrator consumes.
 
-### 4. What's next
+### 4. What's next — roadmap hand-off (step 6)
 
-Init's map-writing is done — but a freshly initialized or re-mapped project is
-exactly when "what are the uncovered gaps / next moves?" matters most. So init
-ends by routing into roadmap's **gap-discovery mode** (per ADR-009), giving the
-user a guided hand-off instead of an informational dead-end.
+A freshly initialized or re-mapped project is exactly when "what are the uncovered
+gaps / next moves?" matters most. So init ends by routing into roadmap's
+**gap-discovery mode** (per ADR-009), giving the user a guided hand-off instead of
+an informational dead-end. If the project has no `PRD.md`, nudge `/renmark:prd`
+first so gap discovery has a source of truth to compare against.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "init")` and render per
 > `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
@@ -84,26 +114,40 @@ user a guided hand-off instead of an informational dead-end.
 
 For init specifically, the **PRIMARY recommended action is
 `/renmark:roadmap` (gap mode)** — point the now-mapped project at its uncovered
-gaps and next moves. Surface the in-flight feature's resume step (or
-`/renmark:start` if none) as an alternate, plus `Nothing`. Init never
-auto-proceeds — it hands off through an explicit choice.
+gaps and next moves (nudge `/renmark:prd` first if no PRD exists). Surface the
+in-flight feature's resume step (or `/renmark:start` if none) as an alternate,
+plus `Nothing`. Init never auto-proceeds — it hands off through an explicit choice.
+
+## `/renmark:setup` is now a thin alias of init
+
+Per PRD REQ-8, `/renmark:setup` is no longer a separate bootstrapper — it is a
+**thin rule-block-refresh alias of init**. Its SKILL/command pair stays (lint
+pairing green, `name: setup`, cites `next-steps.md` as an aux-class skill), but
+its body delegates to init's **rule-block back-fill** (step 3) rather than
+duplicating scaffold logic. Use `/renmark:init` for full onboarding; `/renmark:setup`
+when you specifically want to refresh/back-fill canonical rule blocks into existing
+CLAUDE.md/AGENTS.md.
 
 ## When called as a sub-step (not standalone)
 
-`/renmark:setup` and `/renmark:finish` invoke `python -m renmark.init` directly. They:
+`/renmark:finish` invokes `python -m renmark.init` directly. It:
 
-- Don't repeat init's lifecycle preamble (the caller already did one).
-- Capture the stdout line and fold it into their own summary report.
+- Doesn't repeat init's lifecycle preamble (the caller already did one).
+- Captures the stdout line and folds it into its own summary report.
 - For `/renmark:finish`: if the script wrote anything, `git add` the changed files and commit as `docs: refresh project map`.
 
 ## Fallback (if `renmark.init` is unavailable)
 
-If `python -m renmark.init` returns "module not found" — older renmark install — tell the user to run `bin/renmark-install` or update renmark. Do not implement the scan manually in the agent context; that wastes tokens and re-introduces the very problem the script exists to solve.
+If `python -m renmark.init` returns "module not found" — older renmark install — tell the user to run `bin/renmark-install` or update renmark. Do not implement the scan, scaffold, or rule-block merge manually in the agent context; that wastes tokens and re-introduces the very problem the script exists to solve.
 
 ## Boundaries
 
-- **Read-only on source.** The script never edits, renames, or deletes anything under the project tree except the stub block in CLAUDE.md/AGENTS.md and the generated `.renmark/memory/project-map.md`.
-- **No LLM calls.** Pure Python; near-zero token cost per invocation.
+- **`init.py` is strictly ZERO-LLM.** Pure Python; near-zero token cost per invocation. All scaffolding, rule-block merging, scanning, and rendering is deterministic. The roadmap gap-discovery hand-off (step 6) is the only LLM-touching part, and it lives at the **SKILL level**, never inside `init.py`.
+- **Non-destructive + idempotent.** Existence-skip on create; byte-equality skip on managed blocks; rule-block back-fill only inserts *missing* canonical blocks and never edits existing or hand-modified content. Re-running on a fully-initialized project byte/existence-skips everything → "unchanged".
+- **AGENTS.md is created from its own template — NOT rule-block-mirrored.** Scaffold creates `AGENTS.md` from `AGENTS.md.template` when absent. That template carries **no managed rule-block markers**, so `merge_rule_blocks` always reports `AGENTS.md: 0` and performs **no CLAUDE.md→AGENTS.md back-fill**. Rule-block parity between the two files is the human/`sync-note` discipline, not an automated merge — do not claim mirroring.
+- **Bounded source edits.** The script never edits, renames, or deletes anything under the project tree except: scaffolded onboarding files (when absent), the managed `project-stub` and canonical rule blocks in CLAUDE.md, and the generated `.renmark/memory/` files.
 - **No `.renmark/state/` writes** beyond optional lifecycle tick.
-- **Respect freeze.** If `/freeze` is active and CLAUDE.md is outside the allowed path, abort with a message.
+- **Respect freeze.** If `/freeze` is active and a target file is outside the allowed path, abort with a message.
+- **Malformed markers never corrupt a file.** Before inserting, `merge_rule_blocks` validates each target's markers for balance. A file with orphan `END`, unclosed `BEGIN`, duplicate, or out-of-order markers is **skipped — never written** (no partial insert, no block placed inside an open block) — and raises `MarkerCorruptionError`. On malformed input the merge SKIPS the file; it never inserts.
+- **Exit codes.** `0` = success (whether or not anything was written). `1` = scaffold/template-availability failure (CLAUDE.md still absent, or the renmark templates directory could not be located). `2` = user-fixable document corruption (a CLAUDE.md/AGENTS.md has unbalanced managed markers) or bad CLI usage — the file is left untouched; fix the markers and re-run.
 - **Cache discipline.** Byte-equality skip is the script's responsibility — agents don't need to check separately.

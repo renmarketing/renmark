@@ -88,8 +88,11 @@ it never accumulates, and durable state lives on disk, not in the conversation.
    subtree (or a project-root doc); the global plugin install stays read-only.
 7. `REQ-7` Plans are validated before execution and features are verified
    goal-backward after execution; completion claims require fresh evidence.
-8. `REQ-8` Existing projects can adopt renmark non-destructively (`/renmark:setup`),
-   and a broken install is diagnosable (`/renmark:doctor`).
+8. `REQ-8` Existing projects can adopt renmark non-destructively through the
+   `/renmark:init` front door — it scaffolds missing `CLAUDE.md` / `AGENTS.md` /
+   `CHANGELOG.md` / `.renmark/` and merges missing rule blocks without
+   overwriting — and a broken install is diagnosable (`/renmark:doctor`).
+   `/renmark:setup` remains as a thin rule-block-refresh alias.
 
 ## Success metrics
 
@@ -108,8 +111,9 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 
 - **In scope:** the `/renmark:*` skill pipeline (start, brainstorm, prd,
   blueprint, plan, check-plan, orchestrate, verify, finish, feature, debug,
-  codereview, secure, setup, doctor, resume, roadmap, help, init, hygiene); the
-  Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
+  codereview, secure, doctor, resume, roadmap, help, hygiene, and `init` — the
+  front-door adoption pipeline, with `setup` as its rule-block-refresh alias);
+  the Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
   `.renmark/` state and memory; cross-platform install.
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.

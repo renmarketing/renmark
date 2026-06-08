@@ -18,14 +18,24 @@ CLI:
     python -m renmark.init scan        # print scan summary only, no writes
     python -m renmark.init --full      # include private symbols (leading _)
 
+The CLI self-bootstraps: if CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/ are
+missing, ``run()`` scaffolds them from templates (existence-skip, zero-LLM)
+before scanning, then back-fills any missing canonical ``BEGIN:<name>`` rule
+blocks. ``/renmark:init`` therefore *initializes* a project rather than
+dead-ending — matching Claude Code's native ``/init``.
+
 Exit codes:
     0  success (whether or not anything was written)
-    1  CLAUDE.md missing — run /renmark:setup first
-    2  bad usage or corrupted markers (multiple BEGIN found)
+    1  scaffold/template-availability failure — CLAUDE.md still absent, or the
+       renmark templates directory could not be located (genuine internal fault)
+    2  user-fixable document corruption — a CLAUDE.md/AGENTS.md has unbalanced
+       managed markers (orphan/duplicate/out-of-order BEGIN/END), or bad CLI
+       usage. The file is left untouched; resolve markers and re-run.
 
 Stdout (success):
     OK  stub=<created|refreshed|unchanged> map=<created|refreshed|unchanged>
-        modules=<N> commands=<N> langs=<py,ts,...> ref=YYYY-MM-DD@<sha>
+        blocks=<N|unchanged> modules=<N> commands=<N> langs=<py,ts,...>
+        ref=YYYY-MM-DD@<sha>
 """
 
 from __future__ import annotations
@@ -1287,14 +1297,224 @@ def write_standards_md(repo: Path, repo_name: str, today: str, git_sha: str | No
     return "created"
 
 
+# ── Scaffold-if-missing & rule-block back-fill ───────────────────────────────
+
+
+class MarkerCorruptionError(RuntimeError):
+    """A target file's managed markers are unbalanced/malformed.
+
+    Raised by ``merge_rule_blocks`` BEFORE any write when a CLAUDE.md/AGENTS.md
+    has orphan, duplicate, nested, or out-of-order ``BEGIN:``/``END:`` markers.
+    The file is SKIPPED (never written to) so a corrupt file is never made
+    worse. ``run()`` maps this to exit code 2 (user-fixable document
+    corruption), distinct from a genuine scaffold/template failure (exit 1).
+
+    ``files`` maps each corrupted filename to its list of marker problems.
+    """
+
+    def __init__(self, files: dict[str, list[str]]) -> None:
+        self.files = files
+        detail = "; ".join(f"{fname}: {', '.join(probs)}" for fname, probs in files.items())
+        super().__init__(
+            f"managed markers are unbalanced in {', '.join(files)} — "
+            f"resolve manually before re-running init ({detail})"
+        )
+
+
+def _scaffold_missing(repo: Path) -> None:
+    """Create CLAUDE.md/AGENTS.md/.gitignore/.renmark/ and CHANGELOG.md if absent.
+
+    Delegates to ``bootstrap(repo, init_git=False)`` for everything it covers
+    (existence-skip = non-destructive) and then creates ``CHANGELOG.md`` from
+    its template — bootstrap does not. Zero-LLM, idempotent.
+    """
+    from . import bootstrap as _bootstrap
+    from . import memory
+
+    _bootstrap.bootstrap(repo, init_git=False)
+
+    changelog = repo / "CHANGELOG.md"
+    if not changelog.exists():
+        tdir = memory.template_dir()
+        if tdir is not None:
+            src = tdir.parent / "CHANGELOG.md.template"
+            if src.is_file():
+                today = date.today().isoformat()
+                changelog.write_text(
+                    src.read_text(encoding="utf-8").replace("{{DATE}}", today),
+                    encoding="utf-8",
+                )
+
+
+def merge_rule_blocks(repo: Path, *, template_dir: Path | None = None) -> dict[str, int]:
+    """Back-fill MISSING canonical ``BEGIN:<name>``…``END:<name>`` rule blocks.
+
+    Manages the canonical rule blocks of any onboarding file that defines them
+    via its template. In practice that is **CLAUDE.md** — ``CLAUDE.md.template``
+    is the only template carrying managed ``<!-- BEGIN:name -->`` markers.
+    ``AGENTS.md.template`` has no managed markers, so AGENTS.md (if present) is
+    always reported as ``0`` blocks added: there is **no CLAUDE.md↔AGENTS.md
+    rule-block back-fill or mirroring**. AGENTS.md is created from its own
+    template by ``bootstrap``; rule-block parity between the two files is the
+    human/``sync-note`` discipline, not an automated merge.
+
+    For each managed file that exists, the canonical blocks defined by its own
+    template are compared against the blocks already present. Any canonical
+    block whose ``<name>`` is ABSENT is inserted BYTE-VERBATIM at the position
+    implied by template order; present blocks are left untouched (idempotent +
+    non-destructive — existing block content is never edited or reordered).
+
+    **Pre-insert corruption gate (safety property):** before inserting anything
+    into a file, its existing managed markers are validated for balance
+    (``lint.validate_rule_markers``). If they are malformed — orphan ``END``,
+    unclosed ``BEGIN``, duplicate or out-of-order markers — the file is SKIPPED
+    (never written) and collected into a ``MarkerCorruptionError`` raised after
+    all well-formed files are processed. This guarantees ``merge_rule_blocks``
+    never produces a file with unbalanced markers: on malformed input it skips,
+    it does not insert.
+
+    A well-formed file with a missing block that happens to share a name with a
+    present BEGIN is still safe — present names are never re-inserted.
+
+    ``template_dir`` overrides the template lookup (mainly for tests); it must
+    point at the directory holding ``CLAUDE.md.template`` / ``AGENTS.md.template``.
+
+    Returns a dict mapping each touched filename to the count of blocks added,
+    e.g. ``{"CLAUDE.md": 2, "AGENTS.md": 0}``. Files that don't exist are
+    omitted. Raises ``MarkerCorruptionError`` if any present file's markers are
+    malformed.
+    """
+    from . import memory
+    from .lint import _BEGIN_RE, iter_rule_blocks, validate_rule_markers
+
+    tdir = template_dir
+    if tdir is None:
+        mem_tdir = memory.template_dir()
+        tdir = mem_tdir.parent if mem_tdir is not None else None
+    if tdir is None:
+        raise RuntimeError("renmark templates directory not found; cannot back-fill rule blocks.")
+
+    result: dict[str, int] = {}
+    corrupted: dict[str, list[str]] = {}
+    for fname in ("CLAUDE.md", "AGENTS.md"):
+        target = repo / fname
+        if not target.exists():
+            continue
+        tmpl = tdir / f"{fname}.template"
+        if not tmpl.is_file():
+            result[fname] = 0
+            continue
+
+        original = target.read_text(encoding="utf-8")
+
+        # SAFETY GATE: never insert into a file whose markers are already
+        # malformed/unbalanced — that risks turning a recoverable file into an
+        # unrecoverable one. Skip it and signal corruption to run() (→ exit 2).
+        marker_issues = validate_rule_markers(original)
+        if marker_issues:
+            corrupted[fname] = marker_issues
+            continue
+
+        canonical = iter_rule_blocks(tmpl.read_text(encoding="utf-8"))
+        present = {name for name, _ in iter_rule_blocks(original)}
+        # Belt-and-suspenders: a name with any BEGIN marker is "present" so it
+        # is never duplicated. (After the balance gate above, every BEGIN here
+        # is part of a well-formed pair, but keep this for defensive clarity.)
+        present |= {m.group(1) for m in _BEGIN_RE.finditer(original)}
+
+        missing = [(name, block) for name, block in canonical if name not in present]
+        if not missing:
+            result[fname] = 0
+            continue
+
+        text = original
+        for name, block in missing:
+            text = _insert_block(text, name, block, canonical)
+        target.write_text(text, encoding="utf-8")
+        result[fname] = len(missing)
+
+    if corrupted:
+        raise MarkerCorruptionError(corrupted)
+
+    return result
+
+
+def _insert_block(text: str, name: str, block: str, canonical: list[tuple[str, str]]) -> str:
+    """Insert ``block`` (verbatim) into ``text`` at the position implied by
+    ``canonical`` template order.
+
+    Strategy: find the nearest canonical block that PRECEDES ``name`` and is
+    already present in ``text`` — insert right after it. If none precede,
+    find the nearest canonical block that FOLLOWS ``name`` and is present —
+    insert right before it. If neither anchor exists, append at EOF.
+    """
+    from .lint import _BEGIN_RE, _END_RE
+
+    order = [n for n, _ in canonical]
+    idx = order.index(name)
+
+    def _begin_pos(n: str) -> int | None:
+        for m in _BEGIN_RE.finditer(text):
+            if m.group(1) == n:
+                return text.rfind("\n", 0, m.start()) + 1
+        return None
+
+    def _end_line_end(n: str) -> int | None:
+        for m in _END_RE.finditer(text):
+            if m.group(1) == n:
+                nl = text.find("\n", m.end())
+                return len(text) if nl < 0 else nl + 1
+        return None
+
+    # Prefer inserting AFTER the closest preceding present block.
+    for prev in reversed(order[:idx]):
+        pos = _end_line_end(prev)
+        if pos is not None:
+            chunk = block if block.endswith("\n") else block + "\n"
+            return text[:pos] + "\n" + chunk + text[pos:]
+
+    # Else insert BEFORE the closest following present block.
+    for nxt in order[idx + 1 :]:
+        pos = _begin_pos(nxt)
+        if pos is not None:
+            chunk = block if block.endswith("\n") else block + "\n"
+            return text[:pos] + chunk + "\n" + text[pos:]
+
+    # No anchors — append at EOF.
+    suffix = "" if text.endswith("\n") else "\n"
+    chunk = block if block.endswith("\n") else block + "\n"
+    return text + suffix + "\n" + chunk
+
+
 # ── Top-level run ────────────────────────────────────────────────────────────
 
 
 def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[int, str]:
     """Returns (exit_code, summary_line)."""
+    # Scaffold-if-missing FIRST: create CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/
+    # from templates (existence-skip), so init initializes rather than dead-ends.
+    try:
+        _scaffold_missing(repo)
+    except RuntimeError as exc:
+        return 1, f"FAIL  {exc}"
+
     claude_md = repo / "CLAUDE.md"
     if not claude_md.exists():
-        return 1, ("FAIL  CLAUDE.md not found. Run /renmark:setup first to create it, then re-run /renmark:init.")
+        # Should never happen: scaffold ran above. Only fires if templates were
+        # unavailable and bootstrap silently produced nothing.
+        return 1, "FAIL  CLAUDE.md still absent after scaffold — renmark templates unavailable?"
+
+    # Back-fill any missing canonical rule blocks (verbatim, idempotent).
+    # Two distinct failure classes:
+    #   - MarkerCorruptionError → user-fixable document corruption → exit 2
+    #   - any other RuntimeError (e.g. templates unavailable)      → exit 1
+    try:
+        blocks_added = merge_rule_blocks(repo)
+    except MarkerCorruptionError as exc:
+        return 2, f"FAIL  {exc}"
+    except RuntimeError as exc:
+        return 1, f"FAIL  {exc}"
+    n_blocks_added = sum(blocks_added.values())
 
     scan = scan_repo(repo, include_private=include_private)
     # Standards scan runs first so the stub can include the gates line
@@ -1312,9 +1532,10 @@ def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[
     sha = scan.git_sha or "no-git"
     langs_summary = ",".join(sorted(scan.lang_counts.keys())) or "—"
     n_gaps = len(scan.standards.gaps)
+    blocks_field = str(n_blocks_added) if n_blocks_added else "unchanged"
     summary_lines = [
         f"OK  stub={stub_status} agents={agents_status} map={map_status} standards={standards_status} "
-        f"modules={len(scan.files)} commands={len(scan.commands)} "
+        f"blocks={blocks_field} modules={len(scan.files)} commands={len(scan.commands)} "
         f"langs={langs_summary} ref={scan.today}@{sha}"
     ]
     if n_gaps > 0:

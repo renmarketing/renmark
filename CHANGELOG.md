@@ -1,5 +1,46 @@
 # Changelog
 
+## [2026-06-08] — init-pipeline: marker hardening + corruption-safe back-fill
+
+**Request:** Fix 5 verified codereview findings in the init-pipeline feature; core safety property — `merge_rule_blocks` must NEVER corrupt a file (SKIP malformed input, never insert).
+**Built:**
+- **#1** Tightened `_BEGIN_RE`/`_END_RE` (lint.py) to match ONLY a full managed-marker HTML comment on its own line (`^[ \t]*<!--[ \t]*BEGIN:name[ \t]*-->[ \t]*$`, MULTILINE) — bare prose `BEGIN:example` is no longer a marker. Horizontal-only whitespace classes keep block boundaries exact.
+- **#2/#3** `merge_rule_blocks` now pre-validates each target's markers (new `lint.validate_rule_markers`) BEFORE inserting; malformed (orphan END, unclosed BEGIN, duplicate, out-of-order) → file SKIPPED, never written, collected into new `init.MarkerCorruptionError`.
+- **#4** Scoped out AGENTS rule-block back-fill/mirroring in docstring + init/SKILL.md + setup/SKILL.md (AGENTS.md.template has no managed markers).
+- **#5** `run()` maps `MarkerCorruptionError` → exit **2** (user-fixable corruption), other RuntimeError → exit **1**, success → **0**; documented in module docstring + init/SKILL.md.
+**Files changed:**
+- `renmark/lint.py` — tightened marker regexes; added `validate_rule_markers`.
+- `renmark/init.py` — `MarkerCorruptionError`; pre-insert balance gate in `merge_rule_blocks`; exit-2 mapping in `run()`; honest docstrings.
+- `plugin/skills/init/SKILL.md`, `plugin/skills/setup/SKILL.md` — dropped AGENTS-mirroring claims; documented skip-on-corruption + exit codes.
+- `tests/test_init_pipeline.py` — replaced old unclosed-BEGIN test (asserted the OLD vulnerable behavior) with skip+raise; added orphan-END, exit-2, prose-marker tests.
+- `tests/test_lint.py` — fixtures use real `<!-- BEGIN:name -->` form; added prose-marker non-match test.
+**Do not change:**
+- Markers are ONLY the `<!-- BEGIN:name -->` / `<!-- END:name -->` comment form — the regexes must use `[ \t]*` (not `\s*`) so MULTILINE `^`/`$` don't eat the preceding newline (would corrupt `iter_rule_blocks` block boundaries).
+- `MarkerCorruptionError` subclasses `RuntimeError`; in `run()` it MUST be caught BEFORE the generic `RuntimeError` handler or exit-2 collapses to exit-1.
+- There is NO CLAUDE.md↔AGENTS.md rule-block mirroring — AGENTS.md.template has no managed markers; `merge_rule_blocks` always reports `AGENTS.md: 0`.
+
+## [2026-06-08] — project scope: init-pipeline
+
+**Request:** Make `/renmark:init` the front-door "initialize renmark here" pipeline (scaffold-if-missing → back-fill rule blocks → scan/map → standards → roadmap gap discovery), folding `/renmark:setup`'s bootstrap in; fix the exit-1-when-CLAUDE.md-absent bug.
+**Tech stack:** Python ≥3.10 stdlib + markdown — **no new deps**. Reuses `bootstrap.py`, `memory.template_dir()`, and lint's BEGIN/END marker logic.
+**Deployment:** Claude Code plugin (unchanged).
+**MVP boundary:** init.py scaffold phase (delegating to `bootstrap(init_git=False)` + CHANGELOG create) + new deterministic `merge_rule_blocks()` back-fill; init/SKILL.md redefined as the 6-step pipeline; setup/SKILL.md → thin alias; tests. Roadmap-at-end is inherited from ADR-009 (already wired).
+**Out of scope:** removing `/renmark:setup`; any LLM call in init.py; new runtime deps.
+
+**Locked decisions:**
+- Tech stack + deployment locked for this plan
+- Rule-block merge is **deterministic Python** (Option A) — best for context hygiene AND accuracy (canonical marker-delimited blocks inserted byte-verbatim, unit-tested), not agent/markdown
+- `init.py` stays **zero-LLM**; roadmap `--gaps` hand-off stays SKILL-level (ADR-009)
+- Non-destructive: existence-skip on create, byte-skip on managed blocks, never overwrite hand-written content
+
+## [2026-06-08] — PRD updated
+**Request:** Feature `init-pipeline`'s drift gate proposed consolidating `/renmark:setup` into `/renmark:init` as the front-door adoption pipeline; REQ-8 named setup explicitly.
+**Built:** Reconciled REQ-8 + Scope boundaries of PRD.md — `/renmark:init` is now the named non-destructive adoption front door; `/renmark:setup` is recorded as its rule-block-refresh alias. last_reviewed already 2026-06-08.
+**Files changed:**
+- `PRD.md` — REQ-8 reworded; Scope-boundaries skill list reflects init-as-front-door + setup-as-alias
+**Do not change:**
+- PRD is human-owned; this edit was human-approved through the /renmark:prd gate. `setup` is an alias of `init`, not a separate adoption command.
+
 ## [2026-06-08] — fix: plan parser accepts the documented `serves` field
 **Request:** Fix the `serves:` parser bug surfaced by gap discovery (Open Q1 / bugs.md).
 **Built:** `renmark/parser.py` now accepts `serves` (parser keys + `Task.serves` field + `_build_task` pass-through), so plans using the documented `serves: REQ-n` traceability field parse instead of aborting with "unknown field serves".
