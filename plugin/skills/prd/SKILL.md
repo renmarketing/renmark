@@ -109,6 +109,25 @@ When a PRD write is **proposed by an automated stage** rather than typed by the 
 
 The full PRD body is read **only inside this dedicated `/renmark:prd` invocation**. Orchestrator and router callers — `/renmark:orchestrate`, `/renmark:feature`, and any skill checking "does this change still match the product?" — **MUST NOT read the PRD body into their context.** They dispatch the alignment subagent defined at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`, which reads the PRD in isolation and returns only a bounded **≤5-line** summary (aligned / drift + which non-goal or capability is at issue). The PRD's plain-text pointer in CLAUDE.md/AGENTS.md (never an `@import`) keeps it off the always-loaded path; this skill is the only place the body legitimately enters a conversation.
 
+## What's next
+
+`prd` is a **pipeline skill** (class 1) in the next-step contract. After a PRD
+create or update lands and the human gate (above) is satisfied, hand off — never
+dead-end on a written file.
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "prd")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
+
+The state-derived recommendation follows the in-flight feature's lifecycle stage:
+if a feature is in flight, `next_steps` returns its current `next_recommended()`
+stage (resume the pipeline where it left off). If **no feature is in flight**,
+the recommended next step is `/renmark:roadmap` (gap mode) — surface unbuilt
+PRD promises against `CHANGELOG.md` + `features.md` now that the product
+definition is pinned. Do not paste the rendering rules — cite the file.
+
 ## Governance compliance
 
 | # | Rule | How this skill complies |
