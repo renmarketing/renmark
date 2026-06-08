@@ -88,6 +88,35 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
     return issues
 
 
+def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
+    """Verify every skills/<name>/SKILL.md cites a hand-off contract — either
+    ``next-steps.md`` or ``handoff-menu.md``. Skills that end without pointing
+    the user to a next move are dead ends; gate skills satisfy this via
+    handoff-menu.md, so either citation is accepted."""
+    issues: list[str] = []
+    skills_dir = plugin_dir / "skills"
+    if not skills_dir.is_dir():
+        return [f"plugin: missing skills/ directory at {skills_dir}"]
+
+    for skill_path in sorted(skills_dir.iterdir()):
+        if not skill_path.is_dir():
+            continue
+        # Underscore-prefixed dirs (e.g. _shared/) hold cross-skill reference
+        # files, not skills — they have no SKILL.md and no paired command.
+        if skill_path.name.startswith("_"):
+            continue
+        skill_md = skill_path / "SKILL.md"
+        if not skill_md.exists():
+            continue
+        text = skill_md.read_text(encoding="utf-8")
+        if "next-steps.md" not in text and "handoff-menu.md" not in text:
+            issues.append(
+                f"skills/{skill_path.name}/SKILL.md: missing next-steps.md citation "
+                "(cite _shared/next-steps.md or handoff-menu.md)"
+            )
+    return issues
+
+
 def lint_command_shims(plugin_dir: Path) -> list[str]:
     """Verify every commands/<name>.md has a matching skills/<name>/SKILL.md
     and vice versa. Slash commands without backing skills are dead links;
@@ -193,6 +222,7 @@ def lint_all(
     issues: list[str] = []
     issues.extend(lint_plugin_json(plugin_dir))
     issues.extend(lint_skill_files(plugin_dir))
+    issues.extend(lint_next_steps_citation(plugin_dir))
     issues.extend(lint_command_shims(plugin_dir))
     if template_path is None:
         template_path = plugin_dir / "templates" / "CLAUDE.md.template"
