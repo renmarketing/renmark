@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.7.2 — 2026-06-08 (init front-door pipeline + serves parser fix)
+
+**Release of the init-pipeline feature + accumulated fixes.** Bumped 0.7.1 → 0.7.2
+across all 7 version locations. Shipped on `main` via `--no-ff` merge of
+`feature/init-pipeline` (codereview: 0 critical, 4 Major + 1 Minor all fixed +
+independently re-verified; 416 tests pass, mypy + ruff + lint_all clean).
+
+- **`/renmark:init` is now the non-destructive front door** — scaffolds missing
+  `CLAUDE.md`/`AGENTS.md`/`CHANGELOG.md`/`.renmark/` (via `bootstrap`) instead of
+  the old exit-1 dead-end, deterministically back-fills missing `BEGIN/END` rule
+  blocks byte-verbatim, scans/maps, reports standards health, then hands off to
+  `/renmark:roadmap` gap discovery. Works with or without a pre-existing CLAUDE.md.
+- **`merge_rule_blocks()`** (zero-LLM, in `init.py`) — corruption-safe: tightened
+  marker regex to full `<!-- BEGIN:name -->` own-line comments; pre-validates
+  balanced markers and SKIPS a malformed file (`MarkerCorruptionError` → exit 2)
+  rather than corrupting it. Shared `iter_rule_blocks`/`validate_rule_markers` with lint.
+- **`/renmark:setup`** is now a thin rule-block-refresh alias of init (PRD REQ-8
+  updated + human-approved).
+- **`serves` plan field** now parses (`parser.py` + `Task` + `_build_task`) —
+  closes the documented-but-rejected traceability field.
+- PRD REQ-8 + Scope boundaries reconciled to init-as-front-door.
+
 ## [2026-06-08] — init-pipeline: marker hardening + corruption-safe back-fill
 
 **Request:** Fix 5 verified codereview findings in the init-pipeline feature; core safety property — `merge_rule_blocks` must NEVER corrupt a file (SKIP malformed input, never insert).
