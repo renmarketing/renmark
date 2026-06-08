@@ -28,8 +28,12 @@ status: draft
 
 ## Requirements
 (Capture required behaviors and outcomes as numbered requirements, not proposed implementations or technical solutions.)
+Each requirement MAY carry optional **acceptance criteria** — short, plain-English, product-level "done when…" outcome bullets (NOT task/implementation steps, NOT Gherkin); omit them when the outcome is self-evident.
+<!-- Acceptance criteria are per-REQ "done when…" outcomes that confirm THAT requirement is met;
+     Success metrics (below) are project-wide signals of overall success. Don't conflate the two. -->
 
 1. `REQ-1` (Describe the first required behavior or outcome in user-facing or business-facing terms.)
+   - *Acceptance:* done when (an observable product outcome); done when (another).
 2. `REQ-2` (Describe the next required behavior or outcome in user-facing or business-facing terms.)
 3. `REQ-3` (Describe the next required behavior or outcome in user-facing or business-facing terms.)
 
