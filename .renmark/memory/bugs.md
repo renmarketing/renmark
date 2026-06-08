@@ -42,6 +42,27 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 ## Fixed
 
 
+
+
+### 2026-06-08 — deep-QA gate could be unlocked by a foreign .qa.md
+
+**Severity:** medium
+**Symptom:** _gates_not_run counted any complete .qa.md for HEAD as a passed QA gate, ignoring generator
+**Root cause:** metadata match omitted the documented generator==verify-qa constraint (handoff-menu rule 2)
+**Fix:** per-gate (glob, required-generator) spec; qa requires generator==verify-qa. Test added (foreign generator stays not-run).
+
+---
+
+### 2026-06-08 — next_steps() raised on non-str skill
+
+**Severity:** medium
+**Symptom:** lifecycle.next_steps(repo, []) raised TypeError (unhashable as set/dict key), violating the never-raise contract
+**Root cause:** skill_class() and the aux AUX_LOCAL_ACTIONS.get() ran membership/key ops on raw skill before any type guard
+**Fix:** skill_class(skill: object) isinstance-guards; aux lookup guarded by isinstance(skill,str); both typed object. Tests added.
+**Lesson:** A try/except around state reads is not enough — defend every hashable-key op on untrusted input; the FIRST guard fix missed the aux dict lookup, caught only by re-running the repro.
+
+---
+
 ### 2026-06-05 — pre-existing: 3 integration tests fail under RENMARK_SMOKE=1
 
 **Severity:** medium
