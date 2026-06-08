@@ -26,6 +26,9 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 
 
 
+
+- (2026-06-08) `target=plugin/templates|skills/*.md (doc/contract edits, mode=B)` → **haiku+sonnet** (passed (2/2, format aligned across files via shared spec), run=acceptance-criteria)
+
 - (2026-06-08) `target=renmark/init.py, complexity=hard, mode=B (scaffold+marker-merge, correctness-critical)` → **opus** (passed (1-shot, no codereview findings yet), run=init-pipeline)
 
 - (2026-06-08) `target=_shared/*.md contract + renmark/*.py helper+lint, complexity=medium/hard, mode=A/B` → **sonnet** (passed (8/8, no regressions in own verifiers), run=next-step-engine)
