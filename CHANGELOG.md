@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.7.4 — 2026-06-08 (proportional pipeline — cost ∝ feature size/risk)
+
+**Release of the proportional-pipeline feature.** Bumped 0.7.3 → 0.7.4 across all 7
+version locations. Shipped on `main` via `--no-ff` merge of
+`feature/proportional-pipeline` (codereview: full codex — 2 Critical + 2 Major + 1
+Minor *false-lite* holes, all fixed + independently re-verified + 11 regression
+tests; 437 tests + mypy + lint_all clean).
+
+- **`renmark/sizing.py`** — deterministic, zero-LLM tier classifier:
+  `classify_plan` / `classify_diff` → `lite | standard | full`. Code-suffix always
+  wins (no false-lite from a "template" substring); validates task shape; degrades
+  to `standard` on any uncertainty (never accidentally `lite`). `resolve_override`:
+  `--full` always escalates, `--lite` only narrows a `standard` classification
+  (refused on hard/core/full).
+- **Size-tier lite lane** (`/renmark:feature`): tiny features land on `main`, skip
+  the codex review + release ceremony — but **always** run plan-validation + verify.
+- **Proportional codereview** (`/renmark:codereview`): lite/doc diff → built-in
+  cheap `/review` by default + one-keystroke escalate to full codex; standard/full
+  → full codex. `--full` / `--skip` flags. Never silently skips.
+- Makes small features cheap by default (the steady-stream complaint) while keeping
+  full rigor where it matters — proven when the feature's own diff self-tiered
+  `full` and the codex review caught real classifier bugs.
+
 ## [2026-06-08] — project scope: proportional-pipeline (C+A)
 
 **Request:** Pipeline cost should be proportional to feature size/risk, not a fixed per-feature toll (a 2-task feature cost ~340k tokens, ~40% a 120–160k codex codereview run once regardless of size).
