@@ -187,12 +187,17 @@ Then classify the diff to make the review **proportional** to its size/risk:
 
 ```python
 from renmark.sizing import classify_diff
-tier = classify_diff(repo, base_ref)   # 'lite' | 'standard' | 'full'
+# Pass the ACTUAL review range. When the user gave a range (HEAD~3..HEAD,
+# main..feature), hand it through as diff_range so the tier reflects what is
+# actually being reviewed — not a base_ref..HEAD guess. With no range, the
+# base_ref default applies.
+tier = classify_diff(repo, base_ref, diff_range=review_range)  # 'lite' | 'standard' | 'full'
 ```
 
 `classify_diff` is deterministic and zero-LLM: it runs `git diff --stat` under the
-hood and degrades to `'standard'` (the safe middle) on no-git / error. Resolve the
-final lane:
+hood and degrades to `'standard'` (the safe middle) on no-git / error / an
+**unparseable or unsafe range** — which escalates to the full review, the safe
+direction. Resolve the final lane:
 
 - `--skip` present → skipped (explicit). State it and stop — no engine runs.
 - `--full` present → **full codex**, regardless of `tier`.
@@ -281,9 +286,14 @@ Avoid: running codereview after every single task. That creates one review per f
 
 ## Reference
 
-- Proportional classifier: `renmark.sizing.classify_diff(repo, base_ref='main') -> Tier`
-  where `Tier ∈ {lite, standard, full}` — deterministic, zero-LLM, degrades to
-  `standard` on no-git / error. Single source of truth for which lane runs.
+- Proportional classifier:
+  `renmark.sizing.classify_diff(repo, base_ref='main', diff_range=None) -> Tier`
+  where `Tier ∈ {lite, standard, full}` — deterministic, zero-LLM. Pass the
+  explicit review range as `diff_range` (e.g. `HEAD~3..HEAD`, `main..feature`)
+  so the tier matches what's reviewed; with no range the `base_ref..HEAD`
+  default applies. Degrades to `standard` on no-git / error / unsafe-or-
+  unparseable range (which escalates to the full review — the safe direction).
+  Single source of truth for which lane runs.
 - Codex review syntax: `codex review --help`
 - Built-in cheap **`/review`** slash command — the lite lane's in-context engine
   (also good for inspiration on prompt shape).

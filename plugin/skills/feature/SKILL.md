@@ -19,7 +19,10 @@ Full feature pipeline with branch isolation. Creates a feature branch, runs the 
 ```
 
 The **lane decision is made AFTER `plan-validated`** — classification needs the
-validated task list. The `--lite` / `--full` overrides always beat the heuristic.
+validated task list. Overrides are resolved by `sizing.resolve_override` (NOT a
+blind override): `--full` always escalates to full, but `--lite` only narrows a
+`standard` classification — it is **refused** when the change carries hard / core /
+full signals (lite must never skip the full review on a risky change).
 **plan validation and goal-backward verify (REQ-7) run on every tier, no exceptions.**
 
 ## When to Use
@@ -33,9 +36,9 @@ validated task list. The `--lite` / `--full` overrides always beat the heuristic
 
 **Invocation & overrides:**
 - `/renmark:feature <name>` — classify by heuristic (default; see Step 3.5).
-- `/renmark:feature <name> --full` — force the full pipeline (branch → codex review → PR/release), tier heuristic ignored.
-- `/renmark:feature <name> --lite` — force the **lite lane** (land on main, cheap review, no PR/codex/release).
-- Explicit `--lite` / `--full` ALWAYS beats the classifier. Even with an override,
+- `/renmark:feature <name> --full` — force the full pipeline (branch → codex review → PR/release). `--full` ALWAYS wins (escalation is the safe direction).
+- `/renmark:feature <name> --lite` — REQUEST the **lite lane** (land on main, cheap review, no PR/codex/release). `--lite` only narrows a `standard` classification to lite; it is **REFUSED** when the classifier returns `full` or hard / core / full signals are present (surface a clear one-line message and keep the classified tier).
+- Override resolution is deterministic via `sizing.resolve_override(classified_tier, override)`: `--full` always escalates to full; `--lite` downgrades to lite ONLY when `classified_tier == 'standard'`. Even with an override,
   **plan validation and goal-backward verify (REQ-7) still run** — those never skip.
 
 ## Steps
@@ -111,13 +114,29 @@ tier = sizing.classify_plan(tasks)   # → 'lite' | 'standard' | 'full'
 (the safe middle) on any uncertainty**, so the router never falls into `lite` by
 accident.
 
-**Override resolution (explicit beats the heuristic):**
+**Override resolution (deterministic, safety-floored — call `sizing.resolve_override`):**
 
-| Invocation | Effective tier |
-|---|---|
-| `--lite` flag present | `lite` (forced) |
-| `--full` flag present | `full` (forced) |
-| neither | `sizing.classify_plan(tasks)` result |
+The router does NOT apply overrides by hand. It resolves them through the
+classifier so `--lite` can never bypass the safety floor:
+
+```python
+from renmark import sizing
+classified = sizing.classify_plan(tasks)            # 'lite' | 'standard' | 'full'
+tier = sizing.resolve_override(classified, override)  # override ∈ {None,'lite','full'}
+```
+
+| Invocation | `classified` | Effective `tier` | Note |
+|---|---|---|---|
+| `--full` | any | `full` | always escalates — the safe direction |
+| `--lite` | `standard` | `lite` | the ONLY case `--lite` narrows the lane |
+| `--lite` | `full` | `full` | **REFUSED** — surface a one-line message; lite can't skip the full review on a risky change |
+| `--lite` | `lite` | `lite` | no-op |
+| neither | (any) | `classified` | heuristic stands |
+
+**When `--lite` is refused** (i.e. you passed `override='lite'` but
+`resolve_override` returned a non-`lite` tier), surface a clear one-line note,
+e.g. *"`--lite` refused: change carries full/core/hard signals — running the
+full lane to keep the full review."* Do NOT silently downgrade.
 
 **Lane routing by tier:**
 

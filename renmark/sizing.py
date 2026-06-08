@@ -31,6 +31,7 @@ Design contract:
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Literal
@@ -97,8 +98,10 @@ DOC_CONFIG_SUFFIXES: frozenset[str] = frozenset(
 #: Exact basenames (no useful suffix) treated as doc/config.
 DOC_CONFIG_BASENAMES: frozenset[str] = frozenset({".gitignore", ".gitattributes"})
 
-#: Path fragments that mark a file as a template (doc/config-leaning).
-TEMPLATE_MARKERS: tuple[str, ...] = ("template", "templates")
+#: Suffixes that mark a genuine template file (doc/config-leaning). Matched on
+#: the path SUFFIX only — never as a substring, so real code like
+#: ``renmark/template_loader.py`` (a ``.py`` file) is NEVER treated as a template.
+TEMPLATE_SUFFIXES: frozenset[str] = frozenset({".template", ".j2"})
 
 #: Core-module path roots: an edit under here is risk-bearing and forces
 #: ``>= standard`` even when small. ``renmark/`` is the runtime package; touching
@@ -135,6 +138,13 @@ def classify_plan(tasks: list[Task]) -> Tier:
         if not tasks:
             return DEFAULT_TIER
 
+        # ── validation floor: a malformed / unrecognized task must NEVER reach
+        # the lite branch. Any task missing a non-empty str target, or carrying
+        # an unrecognized complexity, degrades the whole plan to the safe
+        # default. ``lite`` requires confidently-well-formed input.
+        if not all(_is_well_formed_task(t) for t in tasks):
+            return DEFAULT_TIER
+
         n_tasks = len(tasks)
         has_hard = any(_task_complexity(t) == "hard" for t in tasks)
         targets = [_task_target(t) for t in tasks]
@@ -168,12 +178,20 @@ def classify_plan(tasks: list[Task]) -> Tier:
         return DEFAULT_TIER
 
 
-def classify_diff(repo: Path | str, base_ref: str = "main") -> Tier:
-    """Classify the working diff (``<base_ref>..HEAD``) into a :data:`Tier`.
+def classify_diff(
+    repo: Path | str, base_ref: str = "main", diff_range: str | None = None
+) -> Tier:
+    """Classify a git diff into a :data:`Tier`.
 
-    Runs ``git diff --stat <base_ref>..HEAD`` via :mod:`subprocess` and classifies
-    by files-changed, lines-changed, and doc-vs-code mix using the same tier
-    rules as :func:`classify_plan`:
+    By default classifies ``<base_ref>..HEAD``. Callers reviewing an explicit
+    range (e.g. codereview's ``HEAD~3..HEAD`` or ``main..feature``) pass it as
+    ``diff_range`` — that range is then handed to ``git diff --stat`` instead of
+    the ``base_ref`` form. A malformed / unsafe ``diff_range`` degrades to
+    :data:`DEFAULT_TIER` (so an unparseable review range escalates to the full
+    review — the safe direction), never raising.
+
+    Classifies by files-changed, lines-changed, and doc-vs-code mix using the
+    same tier rules as :func:`classify_plan`:
 
     - any **core-module** file touched (under :data:`CORE_MODULE_ROOTS`) → >= ``standard``;
     - many files (> :data:`FULL_MIN_FILES`) or large line churn
@@ -182,11 +200,12 @@ def classify_diff(repo: Path | str, base_ref: str = "main") -> Tier:
       no core-module, and doc/config-dominant → ``lite``;
     - otherwise → ``standard``.
 
-    Never raises: a missing git binary, a non-repo, an unknown ``base_ref``, a
-    timeout, or an unparseable stat all degrade to :data:`DEFAULT_TIER`.
+    Never raises: a missing git binary, a non-repo, an unknown ``base_ref`` /
+    ``diff_range``, a timeout, or an unparseable stat all degrade to
+    :data:`DEFAULT_TIER`.
     """
     try:
-        stat = _git_diff_stat(repo, base_ref)
+        stat = _git_diff_stat(repo, base_ref, diff_range)
         if stat is None:
             return DEFAULT_TIER
         files, total_lines = stat
@@ -216,18 +235,60 @@ def classify_diff(repo: Path | str, base_ref: str = "main") -> Tier:
         return DEFAULT_TIER
 
 
+def resolve_override(classified_tier: str, override: str | None) -> str:
+    """Resolve a user ``--lite`` / ``--full`` override against the classifier.
+
+    The safety floor: ``--lite`` must NEVER downgrade a change that the
+    classifier judged risky, because lite skips the full review.
+
+    - ``override is None`` → keep the classified tier unchanged.
+    - ``override == "full"`` → ALWAYS escalate to ``full`` (the safe direction —
+      more review never hurts).
+    - ``override == "lite"`` → downgrade to ``lite`` ONLY when
+      ``classified_tier == "standard"``. If the classifier said ``"full"`` (hard
+      task, core-module edit, large change), the ``--lite`` request is REFUSED
+      and the classified tier is kept. Lite on an already-``lite`` classification
+      is a no-op (stays lite).
+    - any unrecognized ``override`` → ignored (keep the classified tier).
+
+    Never raises. Returns a valid :data:`Tier` string. The caller is responsible
+    for surfacing a message when a ``--lite`` request was refused (i.e. when
+    ``override == "lite"`` but the returned tier is not ``"lite"``).
+    """
+    if override == TIER_FULL:
+        return TIER_FULL
+    if override == TIER_LITE:
+        # Lite may only narrow a 'standard' classification. Refused on 'full'
+        # (hard/core/large signals) — keep the classified tier instead.
+        if classified_tier == TIER_STANDARD:
+            return TIER_LITE
+        return classified_tier
+    # None or anything unrecognized: heuristic stands.
+    return classified_tier
+
+
 # ── Internal: file-type predicates ──────────────────────────────────────────
 
 
 def _is_doc_or_config(path: str) -> bool:
-    """True if ``path`` is a doc / config / template file (lite-leaning)."""
+    """True if ``path`` is a doc / config / template file (lite-leaning).
+
+    **Code suffix always wins.** A file whose suffix is in
+    :data:`CODE_SUFFIXES` is NEVER doc/config — even if its name contains a
+    word like ``template`` (e.g. ``renmark/template_loader.py`` or
+    ``src/templates_engine.py`` are real ``.py`` code, not templates). We match
+    template-ness by SUFFIX (``.template`` / ``.j2``), never by substring.
+    """
+    suffix = Path(path).suffix.lower()
+    # Code suffix is decisive: never doc/config from a substring or marker.
+    if suffix in CODE_SUFFIXES:
+        return False
     name = Path(path).name
     if name in DOC_CONFIG_BASENAMES:
         return True
-    lowered = path.lower()
-    if any(marker in lowered for marker in TEMPLATE_MARKERS):
+    if suffix in TEMPLATE_SUFFIXES:
         return True
-    return Path(path).suffix.lower() in DOC_CONFIG_SUFFIXES
+    return suffix in DOC_CONFIG_SUFFIXES
 
 
 def _is_core_module(path: str) -> bool:
@@ -243,6 +304,25 @@ def _is_core_module(path: str) -> bool:
 
 
 # ── Internal: Task field accessors (defensive — never raise) ─────────────────
+
+#: Complexity values the classifier recognizes (mirrors parser validation).
+#: A task whose complexity is anything else is treated as malformed.
+RECOGNIZED_COMPLEXITY: frozenset[str] = frozenset({"simple", "medium", "hard"})
+
+
+def _is_well_formed_task(task: object) -> bool:
+    """True only if ``task`` is shaped enough to safely classify toward ``lite``.
+
+    Requires a valid, non-empty ``str`` ``target`` AND a recognized
+    ``complexity``. A bare ``object()``, a missing/blank target, or an
+    unrecognized complexity fails — so unvalidated tasks can never reach the
+    lite branch. Never raises (all access is defensive ``getattr``).
+    """
+    target = getattr(task, "target", None)
+    if not isinstance(target, str) or not target.strip():
+        return False
+    complexity = getattr(task, "complexity", None)
+    return isinstance(complexity, str) and complexity.strip().lower() in RECOGNIZED_COMPLEXITY
 
 
 def _task_complexity(task: Task) -> str:
@@ -262,17 +342,48 @@ def _task_est_tokens(task: Task) -> int:
 
 # ── Internal: git ─────────────────────────────────────────────────────────────
 
+#: Characters allowed in a diff-range / ref argument. Covers refs, ``..``,
+#: ``...``, ``~``, ``^``, ``@``, ``{}`` (reflog), and path-like slashes. Anything
+#: outside this set (shell metacharacters, whitespace, NUL) is rejected so the
+#: range can never smuggle options or shell syntax — we degrade to ``standard``.
+_REV_ARG_RE = re.compile(r"^[A-Za-z0-9_./~^@{}-]+(?:\.{2,3}[A-Za-z0-9_./~^@{}-]+)?$")
 
-def _git_diff_stat(repo: Path | str, base_ref: str) -> tuple[list[str], int] | None:
-    """Return ``(changed_files, total_lines_changed)`` for ``<base_ref>..HEAD``.
 
-    Parses the trailing summary line of ``git diff --stat`` for line counts and
-    each preceding ``path | N`` row for filenames. Returns ``None`` on any
-    failure (no git, non-repo, unknown ref, timeout, empty output).
+def _is_safe_rev_arg(rev: str) -> bool:
+    """True if ``rev`` is a safe single revision/range token for ``git diff``.
+
+    Rejects empty strings, leading ``-`` (would parse as an option even after
+    ``--`` precautions are misused), whitespace, and shell metacharacters.
     """
+    rev = rev.strip()
+    if not rev or rev.startswith("-"):
+        return False
+    return bool(_REV_ARG_RE.match(rev))
+
+
+def _git_diff_stat(
+    repo: Path | str, base_ref: str, diff_range: str | None = None
+) -> tuple[list[str], int] | None:
+    """Return ``(changed_files, total_lines_changed)`` for the requested diff.
+
+    When ``diff_range`` is given it is used as the ``git diff --stat`` revision
+    argument (after a safety check); otherwise the default ``<base_ref>..HEAD``
+    form is used. Parses the trailing summary line of ``git diff --stat`` for
+    line counts and each preceding ``path | N`` row for filenames. Returns
+    ``None`` on any failure (no git, non-repo, unknown ref, unsafe/empty range,
+    timeout, empty output).
+    """
+    if diff_range is not None:
+        if not _is_safe_rev_arg(diff_range):
+            return None
+        rev_arg = diff_range
+    else:
+        rev_arg = f"{base_ref}..HEAD"
     try:
         proc = subprocess.run(
-            ["git", "-C", str(repo), "diff", "--stat", f"{base_ref}..HEAD"],
+            # ``--`` ends revision parsing so a malicious value can never be read
+            # as an option; the rev arg is a single positional token, never shell.
+            ["git", "-C", str(repo), "diff", "--stat", rev_arg, "--"],
             capture_output=True,
             text=True,
             check=False,
