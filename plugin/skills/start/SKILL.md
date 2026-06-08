@@ -178,6 +178,15 @@ Tell the user: *"This has a few moving parts — let me ask a couple of design q
 
 Do NOT mention plan files, spec files, or executor types to the user.
 
+The routing above IS the next step — defer its presentation to the shared
+next-step contract (class 1 — Tier-0 stage routing):
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "start")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
+
 ---
 
 ## Common Mistakes
