@@ -9,8 +9,10 @@ Covers the behavior added in this feature:
 3. `merge_rule_blocks()` back-fills ONLY missing canonical rule blocks,
    byte-verbatim, leaving present (and hand-modified) blocks untouched, and is
    idempotent on a second call.
-4. A malformed (unbalanced BEGIN, no END) existing block is skipped, not
-   duplicated or corrupted.
+4. A malformed file (orphan END, unclosed BEGIN, etc.) is SKIPPED — never
+   inserted into — and signaled via MarkerCorruptionError / run() exit 2, so a
+   corrupt file is never made worse. Bare prose like "BEGIN:example" is not a
+   managed marker. AGENTS.md rule-block back-fill is scoped out (#4).
 
 Hermetic: every test runs against `tmp_path`. The real plugin template dir is
 resolved via `renmark.memory.template_dir()`; no network, no mutation outside
@@ -169,8 +171,10 @@ def test_merge_rule_blocks_backfills_only_missing_verbatim(tmp_path: Path) -> No
 
 
 def test_merge_rule_blocks_agents_always_zero(tmp_path: Path) -> None:
-    """Design nuance: AGENTS.md.template has NO rule-block markers, so AGENTS.md
-    always reports 0 added — never assert symmetry with CLAUDE.md."""
+    """Scope-out (#4): AGENTS.md.template has NO managed rule-block markers, so
+    AGENTS.md always reports 0 added — there is no CLAUDE.md↔AGENTS.md rule-block
+    back-fill/mirroring. AGENTS.md is created from its own template by bootstrap.
+    Never assert symmetry with CLAUDE.md."""
     tdir = _template_dir()
     # Both files present, derived from their own templates.
     (tmp_path / "CLAUDE.md").write_text(
@@ -211,16 +215,21 @@ def test_merge_rule_blocks_raises_without_templates(tmp_path: Path, monkeypatch:
 # ── 4. Malformed markers — unbalanced BEGIN ──────────────────────────────────
 
 
-def test_merge_rule_blocks_skips_unbalanced_begin(tmp_path: Path) -> None:
-    """A CLAUDE.md with a BEGIN that has no matching END is left uncorrupted:
-    that block name is treated as 'present' (so it's never duplicated), no
-    partial insert happens, and no exception is raised."""
+def test_merge_rule_blocks_skips_unclosed_begin(tmp_path: Path) -> None:
+    """SAFETY: a CLAUDE.md with a BEGIN that has no matching END is MALFORMED.
+
+    merge_rule_blocks must NOT insert anything into it (an insert could land
+    inside the open block, corrupting the file further). Instead it skips the
+    file and raises MarkerCorruptionError — the file content is left byte-for-
+    byte unchanged, with no back-filled blocks and no new dangling markers.
+    """
     tdir = _template_dir()
     canonical = iter_rule_blocks(_claude_template_text())
     target_name = canonical[0][0]  # name we'll leave dangling
 
-    # File has a single unbalanced BEGIN marker for `target_name` and nothing
-    # else — none of the other canonical blocks are present.
+    # File has a single unbalanced (unclosed) BEGIN marker and nothing else —
+    # none of the other canonical blocks are present, but a later "missing
+    # block" insert must NOT be attempted because the file is malformed.
     malformed = (
         "# Project\n\n"
         f"<!-- BEGIN:{target_name} -->\n"
@@ -230,23 +239,92 @@ def test_merge_rule_blocks_skips_unbalanced_begin(tmp_path: Path) -> None:
     claude = tmp_path / "CLAUDE.md"
     claude.write_text(malformed, encoding="utf-8")
 
-    # Must not raise.
+    with pytest.raises(init.MarkerCorruptionError):
+        init.merge_rule_blocks(tmp_path, template_dir=tdir)
+
+    after = claude.read_text(encoding="utf-8")
+    # File is UNCHANGED — no insert inside the open block, nothing back-filled.
+    assert after == malformed, "malformed file must be left byte-for-byte unchanged"
+    # No new dangling markers were introduced and none of the missing canonical
+    # blocks leaked in.
+    assert after.count(f"BEGIN:{target_name}") == 1
+    assert f"END:{target_name}" not in after
+    other_missing = [n for n, _ in canonical if n != target_name]
+    for n in other_missing:
+        assert f"BEGIN:{n}" not in after, f"{n} must NOT be inserted into a malformed file"
+
+
+def test_merge_rule_blocks_skips_orphan_end(tmp_path: Path) -> None:
+    """SAFETY: a CLAUDE.md with an orphan END (no preceding BEGIN) is MALFORMED.
+
+    The original bug: merge inserted a fresh block AND left the dangling END
+    (1 BEGIN + 2 END = corrupt). Fix: the file is skipped, left unchanged, and
+    MarkerCorruptionError is raised. No block is inserted, no marker imbalance
+    is produced.
+    """
+    tdir = _template_dir()
+    canonical = iter_rule_blocks(_claude_template_text())
+    orphan_name = canonical[0][0]
+
+    malformed = (
+        "# Project\n\n"
+        "Some prose.\n\n"
+        f"<!-- END:{orphan_name} -->\n"
+        "Trailing prose.\n"
+    )
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_text(malformed, encoding="utf-8")
+
+    with pytest.raises(init.MarkerCorruptionError):
+        init.merge_rule_blocks(tmp_path, template_dir=tdir)
+
+    after = claude.read_text(encoding="utf-8")
+    # Unchanged: no inserted block, no new BEGIN, exactly one (orphan) END left.
+    assert after == malformed, "malformed file must be left byte-for-byte unchanged"
+    assert after.count(f"END:{orphan_name}") == 1
+    assert f"BEGIN:{orphan_name}" not in after
+
+
+def test_run_returns_exit_2_on_corrupted_claude_md(tmp_path: Path) -> None:
+    """run() maps marker corruption to exit code 2 (distinct from exit 1)."""
+    canonical = iter_rule_blocks(_claude_template_text())
+    orphan_name = canonical[0][0]
+    # Orphan END with no matching BEGIN → corruption.
+    (tmp_path / "CLAUDE.md").write_text(
+        f"# Project\n\nprose\n\n<!-- END:{orphan_name} -->\n", encoding="utf-8"
+    )
+
+    code, summary = init.run(tmp_path)
+    assert code == 2, f"expected exit 2 on corrupted markers, got {code}: {summary!r}"
+    assert summary.startswith("FAIL")
+
+
+def test_merge_rule_blocks_ignores_prose_marker(tmp_path: Path) -> None:
+    """A CLAUDE.md whose PROSE contains bare 'BEGIN:example' text (not a real
+    marker comment) is NOT treated as a managed marker. The file is well-formed,
+    the prose is untouched, and the real missing canonical blocks back-fill."""
+    tdir = _template_dir()
+    canonical = iter_rule_blocks(_claude_template_text())
+
+    # No real managed markers at all — just prose that mentions the token.
+    prose = (
+        "# Project\n\n"
+        "This document explains the BEGIN:example convention in plain words.\n"
+        "We also discuss END:example here, inline, as prose.\n"
+    )
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_text(prose, encoding="utf-8")
+
     result = init.merge_rule_blocks(tmp_path, template_dir=tdir)
 
     after = claude.read_text(encoding="utf-8")
-
-    # The dangling BEGIN is treated as present → not re-inserted, not duplicated.
-    assert after.count(f"BEGIN:{target_name}") == 1, "dangling block was duplicated"
-    # The unbalanced block (and its END) is NOT auto-closed/back-filled.
-    assert f"END:{target_name}" not in after
-    # Original prose is preserved — no corruption / partial insert over it.
-    assert "Some half-written rule with no closing marker." in after
-    assert "More prose below." in after
-
-    # Other canonical blocks (which WERE missing) still get back-filled, proving
-    # the merge proceeded past the malformed one rather than aborting.
-    other_missing = [n for n, _ in canonical if n != target_name]
-    assert result.get("CLAUDE.md", 0) == len(other_missing)
+    # Prose preserved verbatim.
+    assert "This document explains the BEGIN:example convention" in after
+    assert "We also discuss END:example here, inline, as prose." in after
+    # 'example' was never a managed block → not inserted, not duplicated.
     after_blocks = {n for n, _ in iter_rule_blocks(after)}
-    for n in other_missing:
+    assert "example" not in after_blocks
+    # ALL canonical blocks were missing → all back-filled correctly.
+    assert result.get("CLAUDE.md", 0) == len(canonical)
+    for n, _ in canonical:
         assert n in after_blocks, f"{n} should have been back-filled"

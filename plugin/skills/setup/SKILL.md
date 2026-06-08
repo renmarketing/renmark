@@ -33,9 +33,14 @@ use **`/renmark:init`** directly — it is the canonical pipeline.
 returns a non-None hint, surface it as a one-line note.
 
 **Delegate.** Invoke `/renmark:init`'s deterministic rule-block back-fill
-(`merge_rule_blocks`) — do NOT reimplement scaffold logic here. Mirror every rule
-block added to `CLAUDE.md` into `AGENTS.md` in the same pass (the two files are
-kept in sync). Report which blocks were back-filled, or that all were present.
+(`merge_rule_blocks`) — do NOT reimplement scaffold logic here. Back-fill targets
+**CLAUDE.md's** managed rule blocks; `AGENTS.md.template` carries no managed
+markers, so there is **no CLAUDE.md→AGENTS.md rule-block mirroring** — AGENTS.md is
+created from its own template by scaffold, and rule-block parity is the
+human/`sync-note` discipline. If a target file's markers are malformed,
+`merge_rule_blocks` **skips it (never writes)** and raises `MarkerCorruptionError`
+(init exits 2). Report which blocks were back-filled, that all were present, or
+that the file was skipped for corruption.
 
 ## What's next
 
