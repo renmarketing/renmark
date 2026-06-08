@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Local marketplace for the renmark multi-LLM orchestration plugin.",
-    "version": "0.7.0"
+    "version": "0.7.1"
   },
   "plugins": [
     {
       "name": "renmark",
       "description": "Vibe coder aide and multi-LLM orchestration plugin. /renmark:start is the plain-English entry point — describe what you want, renmark handles stack, scope, best practices, and pipeline routing. Skills: start, setup, init, doctor, brainstorm, plan, check-plan, orchestrate, verify, finish, feature, debug, codereview, roadmap, help. Persistent project memory in .renmark/.",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "author": {
         "name": "renmark"
       },
