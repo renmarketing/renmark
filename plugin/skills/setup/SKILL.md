@@ -146,3 +146,23 @@ Then prompt:
 **Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Brainstorm [b]`, `Plan [p]`, `Nothing [n]`. **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed.
 
 On **1 / b** → invoke `/renmark:brainstorm`. On **2 / p** → invoke `/renmark:plan`. On **3 / n** → stop.
+
+## What's next
+
+setup is an **aux / terminal skill** (class 3 in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It sits off the main pipeline line.
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "setup")` and render per
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
+> add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
+> rules 6–9); require an explicit choice.*
+
+After adding renmark to a project there's no in-flight feature yet, so the
+resume-pipeline option falls through to fresh-start local actions. Surface:
+
+- **`/renmark:prd` `(Recommended)`** — pin product direction first, so plans and
+  features have a source of truth to align to.
+- **`/renmark:start`** — jump straight into building if the direction is already clear.
+- **`/renmark:roadmap`** — survey what to build first when the next move is unclear.
+
+Do not paste the rendering rules or the gate menu — cite `next-steps.md`.
