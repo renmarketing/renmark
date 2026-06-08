@@ -35,6 +35,12 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+
+- (2026-06-08, run) model `sonnet`: **hardcoded counts in specs go stale** — Spec said 17 rule blocks; the live template has 23. The test subagent asserted dynamically against the template instead of hardcoding — correct. Avoid hardcoded magic counts in specs/tests.
+
+- (2026-06-08, run) model `opus`: **subagent factored a shared helper across files** — Task1 (one-file=init.py) also added iter_rule_blocks() to lint.py to avoid duplicating the BEGIN/END regex — a sensible cross-file refactor the spec invited. It did not collide with parallel wave-1 tasks (disjoint), but note: a 1-file task touching a 2nd shared file is OK only when no parallel task touches that file.
+
 - (2026-06-08, codereview) model `opus`: **codereview-incomplete-fix** — Codex flagged next_steps raising on non-str (verified). First fix guarded skill_class only; re-running the exact repro revealed the aux dict lookup still raised. Always re-run the reviewer-provided repro after fixing, not just the suite.
 
 - (2026-06-08, bug) **next_steps() raised on non-str skill** — A try/except around state reads is not enough — defend every hashable-key op on untrusted input; the FIRST guard fix missed the aux dict lookup, caught only by re-running the repro.

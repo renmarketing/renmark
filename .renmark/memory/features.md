@@ -8,6 +8,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — init-pipeline: /renmark:init as front-door adoption pipeline
+
+**Files:** `renmark/init.py`, `renmark/lint.py`, `plugin/skills/init/SKILL.md`, `plugin/skills/setup/SKILL.md`, `tests/test_init_pipeline.py`
+**Spec:** `.renmark/specs/2026-06-08-init-pipeline.spec.md`
+**Plan:** `.renmark/plans/2026-06-08-init-pipeline.plan.md`
+**Commits:** `e42b81b..87d03cc`
+
+init now scaffolds when CLAUDE.md is absent (bootstrap + CHANGELOG) instead of exit-1; new deterministic merge_rule_blocks() back-fills missing BEGIN/END rule blocks byte-verbatim (shared iter_rule_blocks helper in lint.py). init SKILL redefined as 6-step pipeline ending in roadmap gap discovery; setup is now a thin alias. 9 new tests.
+
+---
+
 ### 2026-06-08 — next-step-engine: guided next-step contract + roadmap gap discovery
 
 **Files:** `plugin/skills/_shared/next-steps.md`, `renmark/lifecycle.py`, `renmark/lint.py`, `plugin/skills/*/SKILL.md (16 refit)`, `tests/test_next_steps.py`, `tests/test_lint_next_steps.py`
