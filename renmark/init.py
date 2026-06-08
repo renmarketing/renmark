@@ -97,6 +97,10 @@ MODULES_CAP_FULL = 40
 LAYOUT_LINES_CAP = 7
 # How many files to extract symbols from (largest first)
 TOP_FILES_FOR_SYMBOLS = 20
+# Cap how many modularity gaps to list in dev-standards.md (majors first,
+# then warns). Remainder is summarized as a "+N more" note so the rendered
+# section can't be flooded by a 100+ gap scan.
+MODULARITY_GAPS_RENDER_CAP = 20
 
 
 # ── Data classes ─────────────────────────────────────────────────────────────
@@ -133,10 +137,18 @@ class Gap:
 
 @dataclass
 class StandardsScan:
-    """Result of scanning the repo for dev standards + health gaps."""
+    """Result of scanning the repo for dev standards + health gaps.
+
+    ``gaps`` are the standards-health gaps (linter/CI/tests/secrets …).
+    ``modularity_gaps`` are file-level modularity breaches from
+    :mod:`renmark.modularity` — kept in a SEPARATE list so the always-loaded
+    stub and the bounded ``HEALTH:`` stdout line can summarize them as counts
+    rather than dumping 100+ per-gap entries. Both feed the total gap count.
+    """
 
     standards: list[Standard] = field(default_factory=list)
     gaps: list[Gap] = field(default_factory=list)
+    modularity_gaps: list[Gap] = field(default_factory=list)
     deep: bool = False
 
 
@@ -1187,7 +1199,13 @@ def scan_standards(repo: Path, files: list[FileInfo], deep: bool = False) -> Sta
     )
     standards = [s for s in (d(repo) for d in detectors) if s is not None]
     gaps = evaluate_health(repo, standards, files, deep)
-    return StandardsScan(standards=standards, gaps=gaps, deep=deep)
+    # Additive: merge in file-level modularity breaches (separate list so the
+    # bounded stub / HEALTH line summarize them as counts, not a 100+ dump).
+    # analyze() never raises and returns [] on failure — keep init zero-LLM.
+    from . import modularity
+
+    modularity_gaps = modularity.analyze(repo)
+    return StandardsScan(standards=standards, gaps=gaps, modularity_gaps=modularity_gaps, deep=deep)
 
 
 # ── Standards rendering ──────────────────────────────────────────────────────
@@ -1214,6 +1232,40 @@ def render_dev_gates_line(standards: StandardsScan) -> str | None:
         wf_part = ci.detail.split(":", 1)[1].strip() if ":" in ci.detail else ci.detail
         parts.append(f"CI: {wf_part}")
     return "**Dev gates:** " + " · ".join(parts) if parts else None
+
+
+def _render_modularity_section(modularity_gaps: list[Gap]) -> list[str]:
+    """Render the modularity gaps as a bounded, grouped subsection.
+
+    Majors (``danger``) are listed first, then warns, capped at
+    ``MODULARITY_GAPS_RENDER_CAP`` total with a ``+N more`` note for the
+    remainder. Returns ``[]`` when there are no modularity gaps so the section
+    is omitted entirely (no empty heading).
+    """
+    if not modularity_gaps:
+        return []
+    order = {"danger": 0, "warn": 1, "info": 2}
+    ordered = sorted(modularity_gaps, key=lambda g: order.get(g.severity, 99))
+    n_major = sum(1 for g in modularity_gaps if g.severity == "danger")
+    n_warn = sum(1 for g in modularity_gaps if g.severity == "warn")
+    out: list[str] = []
+    out.append("## Modularity")
+    out.append("")
+    out.append(
+        f"**{len(modularity_gaps)} modularity gap{'s' if len(modularity_gaps) != 1 else ''}** "
+        f"({n_major} major, {n_warn} warn) — file-level size/complexity breaches. "
+        "Advisory: these never block init."
+    )
+    out.append("")
+    shown = ordered[:MODULARITY_GAPS_RENDER_CAP]
+    for g in shown:
+        prefix = _SEVERITY_PREFIX.get(g.severity, "•")
+        out.append(f"- {prefix} **{g.title}** — {g.detail} _{g.recommendation}_")
+    remaining = len(ordered) - len(shown)
+    if remaining > 0:
+        out.append(f"- _… +{remaining} more (re-run for the full list)_")
+    out.append("")
+    return out
 
 
 def render_standards_md(repo_name: str, today: str, git_sha: str | None, standards: StandardsScan) -> str:
@@ -1271,6 +1323,9 @@ def render_standards_md(repo_name: str, today: str, git_sha: str | None, standar
             out.append("")
             out.append(f"**Recommendation:** {g.recommendation}")
             out.append("")
+
+    # ── Modularity (own subsection, majors first, bounded list)
+    out.extend(_render_modularity_section(standards.modularity_gaps))
 
     if not standards.deep:
         out.append("")
@@ -1532,20 +1587,29 @@ def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[
     sha = scan.git_sha or "no-git"
     langs_summary = ",".join(sorted(scan.lang_counts.keys())) or "—"
     n_gaps = len(scan.standards.gaps)
+    mod_gaps = scan.standards.modularity_gaps
+    n_mod = len(mod_gaps)
     blocks_field = str(n_blocks_added) if n_blocks_added else "unchanged"
     summary_lines = [
         f"OK  stub={stub_status} agents={agents_status} map={map_status} standards={standards_status} "
         f"blocks={blocks_field} modules={len(scan.files)} commands={len(scan.commands)} "
         f"langs={langs_summary} ref={scan.today}@{sha}"
     ]
-    if n_gaps > 0:
-        counts = {"danger": 0, "warn": 0, "info": 0}
-        for g in scan.standards.gaps:
-            counts[g.severity] = counts.get(g.severity, 0) + 1
-        sev_part = ", ".join(f"{n} {sev}" for sev, n in counts.items() if n)
-        summary_lines.append(
-            f"HEALTH: {n_gaps} gap{'s' if n_gaps != 1 else ''} ({sev_part}) — see `.renmark/memory/dev-standards.md`"
-        )
+    # Bounded HEALTH line: counts ONLY — never the per-gap detail. Modularity
+    # can produce 100+ gaps; they live in dev-standards.md, not on stdout.
+    if n_gaps > 0 or n_mod > 0:
+        parts: list[str] = []
+        if n_gaps > 0:
+            counts = {"danger": 0, "warn": 0, "info": 0}
+            for g in scan.standards.gaps:
+                counts[g.severity] = counts.get(g.severity, 0) + 1
+            sev_part = ", ".join(f"{n} {sev}" for sev, n in counts.items() if n)
+            parts.append(f"{n_gaps} standards gap{'s' if n_gaps != 1 else ''} ({sev_part})")
+        if n_mod > 0:
+            n_major = sum(1 for g in mod_gaps if g.severity == "danger")
+            n_warn = sum(1 for g in mod_gaps if g.severity == "warn")
+            parts.append(f"{n_mod} modularity ({n_major} major/{n_warn} warn)")
+        summary_lines.append(f"HEALTH: {', '.join(parts)} — see `.renmark/memory/dev-standards.md`")
     return 0, "\n".join(summary_lines)
 
 

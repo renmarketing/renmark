@@ -11,6 +11,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — modularity-health-lens: advisory ast code-health gaps
+
+**Files:** `renmark/modularity.py`, `renmark/init.py`, `tests/test_modularity.py`, `plugin/skills/init/SKILL.md`
+**Spec:** `.renmark/specs/2026-06-08-modularity-health-lens.spec.md`
+**Plan:** `.renmark/plans/2026-06-08-modularity-health-lens.plan.md`
+**Commits:** `f830f8a..cd274fc`
+
+New renmark/modularity.py: pure-ast, zero-dep, never-raise analyzer — 5 metrics (module LOC, fn length, cyclomatic branch count, import fan-out, nesting-weighted cognitive complexity), two bands, FP suppression (tests/generated/__init__). Merged into init standards-health (HEALTH line stays a bounded summary; dev-standards.md gets a capped Modularity subsection). Advisory/never-blocking. 21 new tests. (renmark self-scan: 111 gaps — 20 major/91 warn.)
+
+---
+
 ### 2026-06-08 — proportional-pipeline: pipeline cost proportional to feature size/risk
 
 **Files:** `renmark/sizing.py`, `tests/test_sizing.py`, `plugin/skills/feature/SKILL.md`, `plugin/skills/codereview/SKILL.md`
@@ -132,17 +144,12 @@ Queue N planned/gap items → ONE plan→orchestrate→verify→codereview→fin
 amortizing fixed overhead. ~60% off for backlogs. Deferred (situational; reduces
 per-feature isolation; bigger build). Natural home for the modularity lens below.
 
-### modularity / scalability health lens (decided 2026-06-08 — BUILD advisory)
-
-Renmark enforces modularity at plan-time (one-file-per-task, no mode C) but never
-MEASURES it on the shipped codebase — no file-size/coupling/god-object health gap.
-**Decision:** build an ADVISORY modularity health lens — add oversized-file /
-coupling "gaps" to `init`'s standards-health (and/or `/renmark:hygiene`), surfaced
-like the existing advisory health gaps (never blocking). Build via `/renmark:feature`.
+*(modularity / scalability health lens — SHIPPED 2026-06-08, see Shipped section above.)*
 
 ### Sequencing (decided 2026-06-08)
 
 Build order: ~~(1) init/setup front-door pipeline~~ ✅ v0.7.2 →
 ~~(2) acceptance-criteria-in-PRD~~ ✅ v0.7.3 →
-~~(3) proportional-pipeline (C+A)~~ ✅ v0.7.4 (this session). **Remaining backlog:**
-**(4) roadmap-batch (B)** → (5) modularity health lens. Each via `/renmark:feature`.
+~~(3) proportional-pipeline (C+A)~~ ✅ v0.7.4 →
+~~(5) modularity health lens~~ ✅ v0.7.5 (this session). **Remaining backlog:**
+only **(4) roadmap-batch (B)** — one pipeline run over N items. Via `/renmark:feature`.

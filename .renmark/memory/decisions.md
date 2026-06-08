@@ -8,6 +8,18 @@
 
 
 
+
+## ADR-015 — Finished feature modularity-health-lens
+
+**Date:** 2026-06-08
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified; new core renmark/modularity.py; codereview full codex 3 Major + 2 Minor (metric accuracy/suppression) all fixed+re-verified
+
+**Decision.** Branch feature/modularity-health-lens reached stage ready-to-release
+
+---
+
 ## ADR-014 — Finished feature proportional-pipeline
 
 **Date:** 2026-06-08
