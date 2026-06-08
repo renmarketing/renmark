@@ -125,3 +125,11 @@ Renmark is a wizard pipeline. After reporting results:
 **Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Dispatch [d]` and `No [n]`. **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed.
 
 On **1 / d** → immediately invoke `/renmark:orchestrate`. On **2 / n** → stop.
+
+The recommended next step on PASS is `/renmark:orchestrate`, derived from the shared next-step contract (check-plan is a class-1 pipeline skill):
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "check-plan")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
