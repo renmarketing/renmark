@@ -69,3 +69,26 @@ Settings changes don't take effect until Claude Code reloads its plugin registry
 - Read-only by default. `--fix` writes only to `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, and `~/.claude/plugins/cache/renmark-local/`. Always with a timestamped backup of any pre-existing file.
 - No LLM calls. No network. No code in the project tree is touched.
 - Designed to be re-runnable. `--fix` is idempotent — applying it twice is a no-op on the second run.
+
+## What's next
+
+doctor is an **aux / terminal skill** (class 3 in
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). After diagnosis (and any
+`--fix`), don't dead-end — return the user to the pipeline.
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "doctor")` and render per
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
+> add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
+> rules 6–9); require an explicit choice.*
+
+The two doctor-local actions to surface alongside the resume-pipeline option:
+
+- **Re-run the skill that was failing** — the whole reason doctor was invoked was
+  a `/renmark:*` command that wouldn't surface or behave; once the install is
+  healthy (and after `/reload-plugins`), re-run that command.
+- **Resume the in-flight feature** — `next_recommended()` from `lifecycle.json`,
+  so the user lands back on the pipeline rather than stranded at a health report.
+
+If no feature is in flight, the resume option becomes `/renmark:start`. Do not
+paste the rendering rules — cite the file.
