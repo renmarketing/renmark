@@ -88,6 +88,54 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
     return issues
 
 
+def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
+    """Verify every skills/<name>/SKILL.md cites the hand-off contract.
+
+    The umbrella contract is ``next-steps.md``; ``handoff-menu.md`` is its gate
+    sub-menu. To keep the drift guard meaningful, the required citation depends
+    on the skill's class (per ``lifecycle.skill_class``):
+
+    - **pipeline / aux** skills MUST cite ``next-steps.md`` (citing only the gate
+      menu would not give them their state-derived next step).
+    - **gate** skills (verify, codereview) may cite EITHER ``next-steps.md`` or
+      ``handoff-menu.md`` — the gate sub-menu is their correct hand-off.
+
+    A skill that cites neither is a dead end.
+    """
+    from .lifecycle import skill_class
+
+    issues: list[str] = []
+    skills_dir = plugin_dir / "skills"
+    if not skills_dir.is_dir():
+        return [f"plugin: missing skills/ directory at {skills_dir}"]
+
+    for skill_path in sorted(skills_dir.iterdir()):
+        if not skill_path.is_dir():
+            continue
+        # Underscore-prefixed dirs (e.g. _shared/) hold cross-skill reference
+        # files, not skills — they have no SKILL.md and no paired command.
+        if skill_path.name.startswith("_"):
+            continue
+        skill_md = skill_path / "SKILL.md"
+        if not skill_md.exists():
+            continue
+        text = skill_md.read_text(encoding="utf-8")
+        cites_umbrella = "next-steps.md" in text
+        cites_gate = "handoff-menu.md" in text
+        if skill_class(skill_path.name) == "gate":
+            if not (cites_umbrella or cites_gate):
+                issues.append(
+                    f"skills/{skill_path.name}/SKILL.md: missing hand-off citation "
+                    "(gate skill must cite _shared/next-steps.md or handoff-menu.md)"
+                )
+        elif not cites_umbrella:
+            issues.append(
+                f"skills/{skill_path.name}/SKILL.md: missing next-steps.md citation "
+                "(pipeline/aux skill must cite _shared/next-steps.md)"
+            )
+    return issues
+
+
 def lint_command_shims(plugin_dir: Path) -> list[str]:
     """Verify every commands/<name>.md has a matching skills/<name>/SKILL.md
     and vice versa. Slash commands without backing skills are dead links;
@@ -193,6 +241,7 @@ def lint_all(
     issues: list[str] = []
     issues.extend(lint_plugin_json(plugin_dir))
     issues.extend(lint_skill_files(plugin_dir))
+    issues.extend(lint_next_steps_citation(plugin_dir))
     issues.extend(lint_command_shims(plugin_dir))
     if template_path is None:
         template_path = plugin_dir / "templates" / "CLAUDE.md.template"

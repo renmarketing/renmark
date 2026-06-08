@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-08] — project scope: next-step-engine
+
+**Request:** Make every renmark interaction guided — each skill recommends a state-derived next step; finishing a feature flows into PRD-vs-shipped gap discovery to suggest what to build next.
+**Tech stack:** Python ≥3.10 stdlib + markdown (Claude Code plugin) — no new runtime deps. Optional Tier-2 web research uses Claude Code's own tools, not a Python dependency.
+**Deployment:** Claude Code plugin (unchanged).
+**MVP boundary:** all 7 components land in this feature — `_shared/next-steps.md` umbrella contract; `lifecycle.next_steps()` helper; refit of all 19 skills' hand-off; `/renmark:roadmap` gap-discovery (T0/T1/T2, T2 opt-in); `/renmark:finish` + `/renmark:init` wiring into gap mode; tests + lint drift guard.
+**Out of scope:** a standalone `/renmark:next` skill (extends roadmap instead); web research on-by-default; auto-writing PRD/roadmap; per-skill bespoke menus.
+
+**Locked decisions:**
+- Tech stack and deployment target above are locked for this plan
+- Changing them requires a new project scope entry
+- Gap discovery extends `/renmark:roadmap` (supersedes the deferred roadmap view in ADR-005); it stays read-only/advisory/human-gated and never becomes a second PRD writer
+- Reuse `NEXT_BY_STAGE` / `next_recommended()` and the existing `handoff-menu.md` — generalize, do not rebuild
+
 ## [2026-06-08] — PRD created
 **Request:** Create the project's PRD via `/renmark:prd`.
 **Built:** Created PRD.md as the project's product source of truth (synthesized-from-docs — distilled from CLAUDE.md, .renmark/memory/, specs, and CHANGELOG since renmark is a mature project).

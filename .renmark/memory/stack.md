@@ -44,3 +44,6 @@ only, no prototype, for renmark itself.
 - Stack confirmed during the `blueprint` (prototype/schematic step) brainstorm,
   2026-06-05. The feature adds **no new runtime dependencies** — pure Python +
   markdown, consistent with the existing plugin.
+- 2026-06-08 (`next-step-engine` brainstorm): no stack change. Adds **no new
+  runtime deps** — `lifecycle.next_steps()` is stdlib; optional Tier-2 web
+  research uses Claude Code's own web tools, not a Python dependency.

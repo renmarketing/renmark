@@ -55,3 +55,21 @@ Pass the bounded ≤5-line stdout through to the user unchanged. The script emit
 - **Lifecycle-referenced artifacts never archived** — even if past their TTL.
 - **Curated memory files are off-limits.** Only `learnings.md`, `bugs.md`, `features.md` are pruned. Never touches `decisions.md`, `INDEX.md`, `project.md`, `stack.md`, `architecture.md`, `conventions.md`, `routing.md`, `dev-standards.md`, `MEMORY.md`, `project-map.md`.
 - **No LLM calls.** Deterministic Python only.
+
+## What's next
+
+Hygiene is an aux / terminal skill (class 3) — it sits off the main pipeline and
+never advances `lifecycle.json`. After a hygiene pass, return the user to the
+in-flight feature rather than leaving them on a terminal cliff:
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "hygiene")` and render per
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
+> add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
+> rules 6–9); require an explicit choice.*
+
+The recommended next step is **resume-pipeline**: the in-flight feature's
+`next_recommended()` (from `lifecycle.json`), so the user picks the cleaned-up
+`.renmark/` tree back up at its next stage. If no feature is in flight, the
+resume option becomes `/renmark:start`. Local follow-ups to offer: re-run with
+`--apply` (if the prior run was a dry-run), or `prune`/`scan` the other target.

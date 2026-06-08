@@ -161,6 +161,14 @@ Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestr
 - **2 / w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
 - **3 / n** → stop, and log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
 
+This hand-off follows the shared next-step contract (brainstorm is a class-1 pipeline skill):
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "brainstorm")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
+
 ## Common Mistakes
 
 | Mistake | Fix |

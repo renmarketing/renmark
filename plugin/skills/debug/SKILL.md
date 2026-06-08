@@ -107,6 +107,16 @@ Append to `.renmark/memory/learnings.md`:
 
 **No fixes without a confirmed root cause.** See CLAUDE.md § Root cause before any fix. Don't patch symptoms. If you can't articulate the root cause in one sentence, keep investigating.
 
+## What's next
+
+Debug is a class-3 aux / terminal skill. End by calling `renmark.lifecycle.next_steps(repo, "debug")` and render per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline + 1–2 local actions). The in-flight feature's next command is `(Recommended)`; add debug's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md rules 6–9); require an explicit choice — never auto-proceed.
+
+Debug-specific local actions, after a confirmed fix:
+- **`/renmark:verify`** — re-run the verifier to confirm the bug is gone and no regression slipped in (the repro must now pass, plus the goal-backward smoke test).
+- **Resume the in-flight feature** — debug doesn't advance `lifecycle.json.stage`, so the in-flight feature's `next_recommended()` (from `lifecycle.json`) returns the user to whatever pipeline stage was active before the bug. If no feature is in flight, this option becomes `/renmark:start`.
+
+If the failing verifier itself was the bug, re-running it directly is the right local action.
+
 ## Reference
 
 - `superpowers:systematic-debugging` SKILL.md for the broader pattern

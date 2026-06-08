@@ -80,6 +80,18 @@ Reference: ~/.claude/plugins/renmark/ (plugin install directory)
 
 Adapt the version number if it has changed. If the user asks for more detail on a specific command, refer them to that skill's SKILL.md or invoke it directly.
 
+## What's next
+
+`help` is a class-3 aux/terminal skill under
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (resume-pipeline + local
+actions). To keep `help` zero-cost / no-LLM, do **not** call
+`renmark.lifecycle.next_steps` here — emit a **static** pointer instead: after
+printing the command list, append one line steering the user back to the
+pipeline. If a feature appears to be in flight, point to `/renmark:resume` to
+pick up where it stopped; otherwise point to `/renmark:start`. This is a fixed
+suggestion, not a state-derived `AskUserQuestion` choice — no file reads, no
+subprocesses, no LLM calls.
+
 ## Do not
 
 - Make any HTTP calls or run subprocesses for `/renmark:help`. It's pure documentation.

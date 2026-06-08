@@ -23,6 +23,12 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 
 
 
+
+
+- (2026-06-08) `target=_shared/*.md contract + renmark/*.py helper+lint, complexity=medium/hard, mode=A/B` → **sonnet** (passed (8/8, no regressions in own verifiers), run=next-step-engine)
+
+- (2026-06-08) `target=plugin/skills/**/SKILL.md, complexity=simple, mode=B (citation refit)` → **haiku** (passed (13/13 refits, 1-shot), run=next-step-engine)
+
 - (2026-06-05) `target=tests/**, complexity=medium, mode=A` → **sonnet** (passed (escalated from codex read-only failure))
 
 - (2026-06-05) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260605-145814-f2fe)

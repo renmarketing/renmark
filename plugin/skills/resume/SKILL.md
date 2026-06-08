@@ -113,6 +113,10 @@ Next: /renmark:start
 
 Resume is a reporting skill — there is no automatic handoff. The user reads the recommendation and invokes it themselves. This is intentional: the human is the final merge authority (principle #7), and any automatic chaining from resume would undermine that.
 
+Resume is a **class 3 (aux / terminal) skill** in the next-step contract. It already derives and prints the recommended next command from `lifecycle.json` (Steps 1–3) — that recommendation IS the contract's class-3 **resume-pipeline** option. For the canonical hand-off format and class definition, see — by static reference, never pasted, and **without changing resume's zero-LLM / pure-file-IO cold-start logic**:
+
+> *Render the printed recommendation per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline + 1–2 local actions). The in-flight feature's next command is `(Recommended)`. Resume is zero-LLM, so it uses the printed numbered form (handoff-menu.md rule 7), not the interactive `AskUserQuestion` picker — and never auto-proceeds.*
+
 ## Governance compliance
 
 Resume IS the G7/G10/G12 recovery surface — it reads `lifecycle.json` (+ `pipeline.json` for `--resume` hints) and recommends the next step in ≤5 lines (G3), zero LLM calls, writing no workflow state. Other G-rules are N/A (it dispatches nothing and emits no artifact). See `CLAUDE.md` governance rules for definitions.

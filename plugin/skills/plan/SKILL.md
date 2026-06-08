@@ -185,6 +185,19 @@ On **2 / d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't ma
 On **3 / e** → ask what to change, rewrite the plan, re-run 8a (re-validate), then re-show the summary.
 On **4 / n** → stop. Plan stays on disk for later (already validated at `plan-validated`).
 
+**Next-step contract (shared, by reference — class 1 / Pipeline).** This hand-off
+follows the single-source next-step contract. Per
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`:
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "plan")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
+
+(The Dispatch gate above is plan's stage-derived recommendation when standalone;
+the single-dispatch-gate ownership rules in 8b are unchanged.)
+
 ## Plan file format example
 
 ```markdown

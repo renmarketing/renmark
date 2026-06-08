@@ -117,6 +117,16 @@ If a stray merged feature branch still exists at release time, delete it with
 
 **[n]:** Stop. Confirm branch name so user can run any of the above manually later.
 
+**Picking the next feature (post-merge / post-release hand-off).** Once the
+branch is closed (merged, released, or parked), do NOT dead-end on a generic
+"start a new one." The recommended way to choose what to build next is
+**`/renmark:roadmap` in gap mode** (advisory): it runs gap discovery —
+PRD-vs-shipped — comparing `PRD.md` against `CHANGELOG.md` + `.renmark/memory/features.md`
+to surface unbuilt promises and drift, then ranks the next candidate feature.
+That feeds straight into `/renmark:feature` for the one you pick. `/renmark:start`
+remains available for a free-form, blank-slate idea that isn't already implied by
+the PRD.
+
 ### 4. Release (package + version parity)
 
 Produce a versioned distribution that matches the committed/tagged version, with
@@ -173,3 +183,22 @@ command -v gh        # is the GitHub CLI installed + authed?
 **Versioning rule:** bak filename, git tag, and GitHub release tag are all
 `v<VERSION>` — one version string, three places, never drifting. The same
 discipline `renmark.release check` already enforces for the in-repo version files.
+
+## What's next
+
+finish is a **pipeline skill** (class 1). After the chosen branch-close action
+(PR / merge / release / nothing) completes:
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "finish")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
+
+For **choosing the next feature to build** (the post-merge / post-release
+hand-off), the recommended option is **`/renmark:roadmap` in gap mode** — gap
+discovery (PRD-vs-shipped) per the next-step contract's Tiered cost gating, not a
+generic "start a new one." `/renmark:start` stays available for blank-slate ideas.
+Do not paste the rendering rules — cite the file.
+
+*Mirror any rule changes in `AGENTS.md` in the same commit.*

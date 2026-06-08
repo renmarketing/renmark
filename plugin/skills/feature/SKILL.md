@@ -137,3 +137,11 @@ From orchestrate's menu:
 - Then **[f] Finish** → `/renmark:finish` shows branch summary and offers PR or merge
 
 The branch created in step 1 is the source branch for the PR.
+
+**Next-step hand-off (pipeline skill, class 1):**
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "feature")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*

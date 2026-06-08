@@ -7,6 +7,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — next-step-engine: guided next-step contract + roadmap gap discovery
+
+**Files:** `plugin/skills/_shared/next-steps.md`, `renmark/lifecycle.py`, `renmark/lint.py`, `plugin/skills/*/SKILL.md (16 refit)`, `tests/test_next_steps.py`, `tests/test_lint_next_steps.py`
+**Spec:** `.renmark/specs/2026-06-08-next-step-engine.spec.md`
+**Plan:** `.renmark/plans/2026-06-08-next-step-engine-part1.plan.md (+part2)`
+**Commits:** `10c6166..b477009`
+
+Shared _shared/next-steps.md hand-off contract + lifecycle.next_steps() state helper; all 19 skills now cite it (lint-enforced). roadmap gains PRD-vs-shipped gap discovery (T0/T1/T2, web research opt-in, ADR-009); finish/init route into it. 24 new tests.
+
+---
+
 ### 2026-06-05 — PRD source of truth + /renmark:prd
 
 **Files:** `plugin/skills/prd/SKILL.md`, `plugin/skills/_shared/prd-alignment.md`, `plugin/commands/prd.md`, `plugin/templates/PRD.md.template`, `renmark/lifecycle.py`

@@ -65,7 +65,11 @@ def _make_plugin(tmp_path: Path, *, skills: dict[str, str] | None = None,
 
 
 def _valid_skill_md(name: str) -> str:
-    return f"---\nname: {name}\ndescription: a skill for {name}\n---\n\n# {name}\n"
+    # A fully-compliant skill cites the shared hand-off contract (lint_next_steps_citation).
+    return (
+        f"---\nname: {name}\ndescription: a skill for {name}\n---\n\n# {name}\n\n"
+        f"## What's next\nSee `${{CLAUDE_PLUGIN_ROOT}}/skills/_shared/next-steps.md`.\n"
+    )
 
 
 def _valid_command_md(name: str) -> str:

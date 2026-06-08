@@ -11,6 +11,10 @@ Strict separation from ``pipeline.json``:
 - pipeline.json carries RUNTIME state (wave indices, retry counts, subprocess).
 
 If lifecycle.json exceeds ~1KB it's a bug — runtime cruft has leaked in.
+
+``next_steps()`` is the contract helper for
+``plugin/skills/_shared/next-steps.md`` — the single source of truth for the
+"what should the user do next?" hand-off rule across every renmark skill.
 """
 
 from __future__ import annotations
@@ -120,6 +124,80 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "issue": "meta",
     "hygiene": "meta",
 }
+
+# ── Skill classes (next-steps.md contract) ────────────────────────────────────
+#
+# Three classes from plugin/skills/_shared/next-steps.md. The class decides what
+# `next_steps()` surfaces. Mirror the DOMAIN_BY_SKILL style — module-level
+# frozensets, names aligned with the contract.
+
+# Class 1 — pipeline skills: Tier-0 stage routing (advance the lifecycle).
+PIPELINE_SKILLS: frozenset[str] = frozenset(
+    {
+        "start",
+        "brainstorm",
+        "plan",
+        "check-plan",
+        "orchestrate",
+        "finish",
+        "feature",
+        "prd",
+        "blueprint",
+    }
+)
+
+# Class 2 — quality gates: defer to handoff-menu.md's gate sub-menu.
+GATE_SKILLS: frozenset[str] = frozenset(
+    {
+        "verify",
+        "codereview",
+    }
+)
+
+# Class 3 — aux / terminal skills: resume-pipeline + 1–2 local actions.
+AUX_SKILLS: frozenset[str] = frozenset(
+    {
+        "debug",
+        "doctor",
+        "hygiene",
+        "roadmap",
+        "init",
+        "setup",
+        "help",
+        "resume",
+    }
+)
+
+# Per-skill local follow-ups for class 3 (up to 2 surfaced). Resume-pipeline is
+# always the recommended option; these are the domain-appropriate alternates.
+AUX_LOCAL_ACTIONS: dict[str, list[str]] = {
+    "debug": ["/renmark:verify the fix", "re-run the failing verifier"],
+    "doctor": ["re-run the failing skill", "/renmark:doctor --fix"],
+    "hygiene": ["/renmark:hygiene --fix", "review flagged artifacts"],
+    "roadmap": ["open the top-ranked roadmap item", "/renmark:plan"],
+    "init": ["/renmark:start", "/renmark:brainstorm"],
+    "setup": ["/renmark:start", "/renmark:brainstorm"],
+    "help": ["/renmark:start", "/renmark:resume"],
+    "resume": ["/renmark:start"],
+}
+
+
+def skill_class(skill: object) -> str:
+    """Return the next-steps class ('pipeline' | 'gate' | 'aux') for a skill.
+
+    Unknown skills default to 'aux' — the safest class (resume-pipeline floor,
+    never a stage advance the skill didn't earn). Non-string / unhashable input
+    also degrades to 'aux' rather than raising, so callers (e.g. ``next_steps``)
+    can honour their "never raise" contract.
+    """
+    if not isinstance(skill, str):
+        return "aux"
+    if skill in PIPELINE_SKILLS:
+        return "pipeline"
+    if skill in GATE_SKILLS:
+        return "gate"
+    return "aux"
+
 
 # ── Size guard ────────────────────────────────────────────────────────────────
 
@@ -304,6 +382,124 @@ def _resolve_next(candidate: str, stage: str) -> str:
     return (
         f"(manual: /renmark:{skill} is not yet implemented — see CHANGELOG / README for next step from stage {stage!r})"
     )
+
+
+@dataclass
+class NextSteps:
+    """Structured next-step set for a skill, per the next-steps.md contract.
+
+    JSON-trivial: every field is a str / list[str] / bool. The caller renders
+    ``suggestions`` via handoff-menu.md rules 6-9; ``tier0`` is always the
+    state-derived ``(Recommended)`` option.
+    """
+
+    tier0: str  # deterministic state-derived next command (always present)
+    suggestions: list[str]  # ordered options to surface (tier0 first)
+    skill_class: str  # 'pipeline' | 'gate' | 'aux'
+    defer_to_handoff_menu: bool = False  # gate skills set this
+    gates_not_run: list[str] = field(default_factory=list)  # best-effort gate detection
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+def next_steps(repo: Path | str, skill: object) -> NextSteps:
+    """Compute the structured next-step set for ``skill`` (next-steps.md contract).
+
+    Pure + stdlib/renmark-only. Reads lifecycle via ``read_lifecycle`` and reuses
+    the existing routing (``next_recommended`` → ``_resolve_next`` over
+    ``NEXT_BY_STAGE``). Per class:
+
+    - ``pipeline`` → ``suggestions = [tier0]`` (the stage transition).
+    - ``gate`` → ``defer_to_handoff_menu=True`` plus best-effort ``gates_not_run``
+      (review/qa artifacts whose ``source_sha`` != current HEAD or that are
+      absent for the current sha; mirrors handoff-menu rule 2).
+    - ``aux`` → ``[tier0]`` (resume-pipeline) + up to 2 per-skill local actions.
+
+    ``suggestions`` is the state-derived **recommended next action(s)** — NOT the
+    complete rendered menu. The calling SKILL.md adds the standard terminal
+    options (Finish / Nothing, and the gate sub-menu for gate skills) per the
+    handoff-menu.md rendering rules; do not treat ``suggestions`` as the full,
+    choice-complete menu.
+
+    NEVER raises into the caller: ``skill_class`` tolerates non-string input and
+    any state-read failure degrades to a minimal result carrying just the
+    cold-start ``next_recommended`` string.
+    """
+    cls = skill_class(skill)
+    try:
+        tier0 = next_recommended(repo)
+    except Exception:
+        # Absolute floor — never let a state read raise into a skill's hand-off.
+        return NextSteps(
+            tier0="/renmark:start (no feature in flight)",
+            suggestions=["/renmark:start (no feature in flight)"],
+            skill_class=cls,
+        )
+
+    if cls == "pipeline":
+        return NextSteps(tier0=tier0, suggestions=[tier0], skill_class="pipeline")
+
+    if cls == "gate":
+        gates_not_run = _gates_not_run(repo)
+        return NextSteps(
+            tier0=tier0,
+            suggestions=[tier0],
+            skill_class="gate",
+            defer_to_handoff_menu=True,
+            gates_not_run=gates_not_run,
+        )
+
+    # aux / terminal
+    local = AUX_LOCAL_ACTIONS.get(skill, [])[:2] if isinstance(skill, str) else []
+    suggestions = [tier0, *local]
+    return NextSteps(tier0=tier0, suggestions=suggestions, skill_class="aux")
+
+
+def _gates_not_run(repo: Path | str) -> list[str]:
+    """Best-effort: which quality gates have NOT run for the current HEAD sha.
+
+    Mirrors handoff-menu rule 2 — scan ``.renmark/reviews/*.qa.md`` and
+    ``*.review.md`` for an artifact with ``source_sha == HEAD`` and
+    ``completion_state == 'complete'``; any gate without one is "not run".
+    Degrades gracefully (returns ``[]``) if git or the summary helpers are
+    unavailable.
+    """
+    try:
+        from .summary import git_head_sha
+
+        head = git_head_sha(repo)
+        if not head:
+            return []
+        reviews = Path(repo) / ".renmark" / "reviews"
+        if not reviews.is_dir():
+            return ["qa", "codereview"]
+
+        # (glob, required generator) per gate. The generator constraint mirrors
+        # handoff-menu rule 2: a gate counts as "run" only when the artifact was
+        # produced by the gate's own generator — a stray/foreign .qa.md must not
+        # unlock Deep QA. generator=None means "no generator constraint".
+        gate_specs: dict[str, tuple[str, str | None]] = {
+            "qa": ("*.qa.md", "verify-qa"),
+            "codereview": ("*.review.md", None),
+        }
+        not_run: list[str] = []
+        for gate, (pattern, want_gen) in gate_specs.items():
+            ran = False
+            for artifact in reviews.glob(pattern):
+                meta = read_metadata(artifact)
+                if (
+                    meta.get("source_sha") == head
+                    and meta.get("completion_state") == "complete"
+                    and (want_gen is None or meta.get("generator") == want_gen)
+                ):
+                    ran = True
+                    break
+            if not ran:
+                not_run.append(gate)
+        return not_run
+    except Exception:
+        return []
 
 
 def domain_of(skill: str) -> str:
