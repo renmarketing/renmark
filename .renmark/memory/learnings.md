@@ -45,6 +45,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-08, .renmark/reviews/2026-06-08-25e2ee93f8b830c2ef62c79059c8a05cf6062096.verification.md) model `verify`: **verify-modularity-health-lens** — 6/6 verified; advisory ast lens; HEALTH line bounded; renmark self-scan flagged 111 gaps (its own code has oversized files/functions). core ast code → keep full codereview.
+
 - (2026-06-08, codereview) model `opus`: **a safety classifier must be adversarially reviewed for its DANGEROUS direction** — proportional-pipeline routed its OWN review to full codex (classify_diff self-tiered full) — which then found 2 Critical false-lite holes in the classifier (substring match, malformed→lite, override bypass). The dangerous direction (false-lite skips review) needs explicit adversarial tests, not just happy-path. The user repeatedly choosing codereview over my skip-recommendation kept paying off.
 
 - (2026-06-08, .renmark/reviews/2026-06-08-634af6df145e82e95692521316732de4a364836c.verification.md) model `verify`: **verify-proportional-pipeline** — 6/6 verified; sizing classifier degrades-to-standard confirmed; feature touches core code so full codex review warranted (it would self-classify standard/full)
