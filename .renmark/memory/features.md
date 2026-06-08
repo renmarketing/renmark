@@ -85,4 +85,34 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 (Backlog. Hand-edited or written by `/renmark:brainstorm` when scoping future work.)
 
-(Empty.)
+### init-as-front-door pipeline + setup consolidation (decided 2026-06-08 — Option A)
+
+**Problem:** `/renmark:init` hard-errors (`init.py:1295`, exit 1) when `CLAUDE.md` is
+absent — it requires a pre-existing CLAUDE.md and only refreshes the map. Users
+(matching Claude Code's native `/init`) expect it to *initialize* the project.
+`/renmark:setup` is the actual bootstrapper, so the two-door onboarding is confusing
+and overlaps (both touch CLAUDE.md/AGENTS.md/.renmark/ + stack detection).
+
+**Decision (Option A):** make `/renmark:init` the single front-door **pipeline**:
+1. Detect project state (CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/, git, stack)
+2. Scaffold-if-missing (create CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/ from templates + merge rule blocks) — setup's bootstrap, folded in
+3. Scan & map (symbols → project-map.md; merge project-stub block)
+4. Standards (dev-standards.md + health gaps)
+5. **Roadmap gap discovery as the final step** (`/renmark:roadmap --gaps`; nudge `/renmark:prd` if no PRD) — added per user 2026-06-08
+6. Hand off
+
+`/renmark:setup` folds into init (or becomes a thin "refresh rule blocks" alias).
+Scaffold logic lives in ONE place. **Build via `/renmark:feature` after a `/clear`.**
+
+### acceptance criteria in the PRD (open — altitude TBD)
+
+PRD has Requirements + Success metrics but no per-REQ testable acceptance criteria.
+Decide altitude (product-level per-REQ "done when…" vs spec/verifier level) in a
+`/renmark:prd` pass. Not yet committed.
+
+### modularity / scalability health lens (open)
+
+Renmark enforces modularity at plan-time (one-file-per-task, no mode C) but never
+MEASURES it on the shipped codebase — no file-size/coupling/god-object health gap.
+Candidate: add an advisory modularity gap to `init`'s standards-health or
+`/renmark:hygiene`. Not yet committed.
