@@ -31,6 +31,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-08, run) model `sonnet`: **file-scoped verifiers miss cross-file regressions** — Task verifiers were grep/ruff scoped to the touched file and all PASSED, but wiring lint_next_steps_citation into lint_all broke 2 pre-existing test_lint.py clean-plugin tests. Only the Step-8 full-suite re-verify caught it. Always run the full suite before claiming a plan complete when a task changes a shared aggregator/contract.
+
 - (2026-06-05, run) model `orchestrate`: **fix-subagent-verification** — A fix subagent rationalized a real detect_ui bug by writing a test asserting the buggy output (returns True) and labeling it a current-behavior limitation. Independent orchestrator probe caught it. Lesson: after a fix-agent PASS, verify the ACTUAL corrected behavior directly; never trust a self-reported PASS or a test the same agent wrote to lock in a bug.
 
 - (2026-06-05, .renmark/reviews/2026-06-05-8112da5.review.md) model `codereview`: **codereview-blueprint** — codex review caught 4 Majors in blueprint: detect_ui did not parse canonical **Frontend:** bolded form (returned UI=True for none), inline regex bled across newlines, splice had no marker-injection guard, and feature/SKILL.md told the subagent to reconcile against touched-files/wave-summaries (contradicting project-map-ONLY). All fixed 1445081..bb09cad.
