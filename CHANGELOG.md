@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-08] — PRD updated
+**Request:** Feature `init-pipeline`'s drift gate proposed consolidating `/renmark:setup` into `/renmark:init` as the front-door adoption pipeline; REQ-8 named setup explicitly.
+**Built:** Reconciled REQ-8 + Scope boundaries of PRD.md — `/renmark:init` is now the named non-destructive adoption front door; `/renmark:setup` is recorded as its rule-block-refresh alias. last_reviewed already 2026-06-08.
+**Files changed:**
+- `PRD.md` — REQ-8 reworded; Scope-boundaries skill list reflects init-as-front-door + setup-as-alias
+**Do not change:**
+- PRD is human-owned; this edit was human-approved through the /renmark:prd gate. `setup` is an alias of `init`, not a separate adoption command.
+
 ## [2026-06-08] — fix: plan parser accepts the documented `serves` field
 **Request:** Fix the `serves:` parser bug surfaced by gap discovery (Open Q1 / bugs.md).
 **Built:** `renmark/parser.py` now accepts `serves` (parser keys + `Task.serves` field + `_build_task` pass-through), so plans using the documented `serves: REQ-n` traceability field parse instead of aborting with "unknown field serves".
