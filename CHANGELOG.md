@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.7.5 — 2026-06-08 (modularity / scalability health lens)
+
+**Release of the modularity-health-lens feature.** Bumped 0.7.4 → 0.7.5 across all 7
+version locations. Shipped on `main` via `--no-ff` merge of
+`feature/modularity-health-lens` (codereview: full codex — 3 Major + 2 Minor
+metric-accuracy/suppression findings, all fixed + independently re-verified; 483
+tests + mypy + lint_all clean). Completes the user's original three-part request
+(init front-door pipeline + acceptance criteria + this).
+
+- **`renmark/modularity.py`** — pure-`ast`, zero-dep, never-raise analyzer. 5
+  metrics, each two bands: module LOC, function length, cyclomatic branch count,
+  import fan-out (coupling), nesting-weighted cognitive complexity. Thresholds
+  mirror pylint/mccabe/SonarQube. False-positive suppression: `tests/`, comment-
+  header generated files, `__init__.py` fan-out.
+- **`/renmark:init` standards-health** now surfaces advisory modularity gaps — the
+  `HEALTH:` stdout line stays a bounded summary; full detail (capped) goes to
+  `.renmark/memory/dev-standards.md`. Advisory / never blocking / never auto-refactors.
+- Self-scan on this repo surfaced 121 advisory gaps (20 major / 101 warn) — the
+  lens working on day one.
+
 ## [2026-06-08] — project scope: modularity-health-lens
 
 **Request:** Advisory modularity/scalability health lens — renmark enforces modularity at plan-time but never measures it on the shipped codebase. (User asked to research how other tools do it + reuse what renmark already has.)
