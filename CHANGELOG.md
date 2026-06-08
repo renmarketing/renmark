@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-08] — project scope: init-pipeline
+
+**Request:** Make `/renmark:init` the front-door "initialize renmark here" pipeline (scaffold-if-missing → back-fill rule blocks → scan/map → standards → roadmap gap discovery), folding `/renmark:setup`'s bootstrap in; fix the exit-1-when-CLAUDE.md-absent bug.
+**Tech stack:** Python ≥3.10 stdlib + markdown — **no new deps**. Reuses `bootstrap.py`, `memory.template_dir()`, and lint's BEGIN/END marker logic.
+**Deployment:** Claude Code plugin (unchanged).
+**MVP boundary:** init.py scaffold phase (delegating to `bootstrap(init_git=False)` + CHANGELOG create) + new deterministic `merge_rule_blocks()` back-fill; init/SKILL.md redefined as the 6-step pipeline; setup/SKILL.md → thin alias; tests. Roadmap-at-end is inherited from ADR-009 (already wired).
+**Out of scope:** removing `/renmark:setup`; any LLM call in init.py; new runtime deps.
+
+**Locked decisions:**
+- Tech stack + deployment locked for this plan
+- Rule-block merge is **deterministic Python** (Option A) — best for context hygiene AND accuracy (canonical marker-delimited blocks inserted byte-verbatim, unit-tested), not agent/markdown
+- `init.py` stays **zero-LLM**; roadmap `--gaps` hand-off stays SKILL-level (ADR-009)
+- Non-destructive: existence-skip on create, byte-skip on managed blocks, never overwrite hand-written content
+
 ## [2026-06-08] — PRD updated
 **Request:** Feature `init-pipeline`'s drift gate proposed consolidating `/renmark:setup` into `/renmark:init` as the front-door adoption pipeline; REQ-8 named setup explicitly.
 **Built:** Reconciled REQ-8 + Scope boundaries of PRD.md — `/renmark:init` is now the named non-destructive adoption front door; `/renmark:setup` is recorded as its rule-block-refresh alias. last_reviewed already 2026-06-08.

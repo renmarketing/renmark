@@ -47,3 +47,6 @@ only, no prototype, for renmark itself.
 - 2026-06-08 (`next-step-engine` brainstorm): no stack change. Adds **no new
   runtime deps** — `lifecycle.next_steps()` is stdlib; optional Tier-2 web
   research uses Claude Code's own web tools, not a Python dependency.
+- 2026-06-08 (`init-pipeline` brainstorm): no stack change. **No new deps** —
+  reuses `bootstrap.py`, `memory.template_dir()`, and lint's BEGIN/END marker
+  logic; new `merge_rule_blocks()` is stdlib; `init.py` stays zero-LLM.
