@@ -124,14 +124,9 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 *(acceptance criteria in the PRD — SHIPPED 2026-06-08 as v0.7.3, see Shipped above.)*
 
-### pipeline cost efficiency — C+A (IN PROGRESS, feature/proportional-pipeline)
+*(pipeline cost efficiency C+A / proportional-pipeline — SHIPPED 2026-06-08, see Shipped above.)*
 
-A 2-task feature cost ~340k tokens (~40% a 120–130k codex codereview paid once per
-feature regardless of size). **Building now (C+A):** proportional codereview
-(auto-skip/downgrade codex on tiny/doc diffs; opt-in always) + size-tier lite-lane
-(tiny features bypass heavy stages). Makes cost ∝ risk/size, automatic, low-risk.
-
-### roadmap-as-pipeline / batch execution — B (DEFERRED, next after C+A)
+### roadmap-as-pipeline / batch execution — B (DEFERRED, next)
 
 Queue N planned/gap items → ONE plan→orchestrate→verify→codereview→finish run,
 amortizing fixed overhead. ~60% off for backlogs. Deferred (situational; reduces
@@ -147,6 +142,7 @@ like the existing advisory health gaps (never blocking). Build via `/renmark:fea
 
 ### Sequencing (decided 2026-06-08)
 
-Build order: ~~(1) init/setup front-door pipeline~~ ✅ SHIPPED 2026-06-08 →
-**(2) acceptance-criteria-in-PRD** (next) → (3) modularity health lens. Each via
-`/renmark:feature` (or `/renmark:prd` for #2's template part).
+Build order: ~~(1) init/setup front-door pipeline~~ ✅ v0.7.2 →
+~~(2) acceptance-criteria-in-PRD~~ ✅ v0.7.3 →
+~~(3) proportional-pipeline (C+A)~~ ✅ v0.7.4 (this session). **Remaining backlog:**
+**(4) roadmap-batch (B)** → (5) modularity health lens. Each via `/renmark:feature`.

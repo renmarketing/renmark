@@ -7,6 +7,18 @@
 
 
 
+
+## ADR-014 — Finished feature proportional-pipeline
+
+**Date:** 2026-06-08
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified; touches core sizing.py; codereview full codex 2 Critical + 2 Major + 1 Minor (false-lite holes) all fixed+re-verified+11 regression tests
+
+**Decision.** Branch feature/proportional-pipeline reached stage ready-to-release
+
+---
+
 ## ADR-013 — Pipeline cost efficiency: build C+A (proportional+tiered) first, defer B (batch)
 
 **Date:** 2026-06-08
