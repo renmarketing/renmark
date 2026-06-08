@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.7.3 — 2026-06-08 (optional acceptance criteria in the PRD)
+
+**Release of the acceptance-criteria feature.** Bumped 0.7.2 → 0.7.3 across all 7
+version locations. Shipped on `main` via `--no-ff` merge of
+`feature/acceptance-criteria` (codereview: 0 critical, 1 Major + 1 Minor — a
+cross-file format inconsistency — both fixed; 416 tests + lint_all clean).
+
+- **Optional per-`REQ-n` acceptance criteria** in the PRD: a single indented
+  `- *Acceptance:* done when (outcome); done when (outcome).` bullet (1–3
+  semicolon-separated clauses), product-level OUTCOME criteria.
+- **`plugin/templates/PRD.md.template`** documents the format + example + a note
+  distinguishing per-REQ acceptance from project-wide Success metrics.
+- **`/renmark:prd`** CREATE asks for them one-REQ-at-a-time (skippable); UPDATE
+  edits them via the reconcile→diff→approval flow; always human-gated; a PRD with
+  zero criteria stays valid.
+- Altitude held (ADR-005): criteria are NOT plan task verifiers and do NOT
+  re-introduce the deferred `verify --coverage`.
+
 ## v0.7.2 — 2026-06-08 (init front-door pipeline + serves parser fix)
 
 **Release of the init-pipeline feature + accumulated fixes.** Bumped 0.7.1 → 0.7.2
