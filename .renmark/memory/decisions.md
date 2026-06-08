@@ -3,6 +3,18 @@
 
 
 
+
+## ADR-010 — Finished feature next-step-engine
+
+**Date:** 2026-06-08
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified; codereview 0 critical, 3 major + 1 minor all fixed+tested
+
+**Decision.** Branch feature/next-step-engine reached stage ready-to-release
+
+---
+
 ## ADR-009 — Gap discovery extends /renmark:roadmap (supersedes ADR-005 deferral)
 
 **Date:** 2026-06-08
