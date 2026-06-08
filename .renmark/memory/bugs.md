@@ -7,6 +7,16 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 
 
+
+### 2026-06-08 — init bootstrap re-creates .renmark/README.md + .gitkeep on every run
+
+**Severity:** minor
+**Symptom:** Running init on an already-populated repo leaves untracked .renmark/README.md + .gitkeep files each time (dropped manually in finish twice)
+**Root cause:** bootstrap creates scaffold artifacts via existence-skip even in dirs that already have committed content; the renmark repo never tracked these
+**Fix:** (pending) either commit them once, or have bootstrap skip README/.gitkeep when the .renmark subtree already has tracked content
+
+---
+
 (Unresolved bugs. Move to `Fixed` once a commit lands.)
 
 ### 2026-06-05 — install.ps1 fails to parse under Windows PowerShell 5.1 (encoding)

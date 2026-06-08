@@ -5,6 +5,18 @@
 
 
 
+
+## ADR-012 — Finished feature acceptance-criteria
+
+**Date:** 2026-06-08
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified; doc/skill-only; codereview 0 critical, 1 Major + 1 Minor (cross-file format) fixed
+
+**Decision.** Branch feature/acceptance-criteria reached stage ready-to-release
+
+---
+
 ## ADR-011 — Finished feature init-pipeline
 
 **Date:** 2026-06-08
