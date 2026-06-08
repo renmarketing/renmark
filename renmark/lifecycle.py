@@ -182,12 +182,16 @@ AUX_LOCAL_ACTIONS: dict[str, list[str]] = {
 }
 
 
-def skill_class(skill: str) -> str:
+def skill_class(skill: object) -> str:
     """Return the next-steps class ('pipeline' | 'gate' | 'aux') for a skill.
 
     Unknown skills default to 'aux' — the safest class (resume-pipeline floor,
-    never a stage advance the skill didn't earn).
+    never a stage advance the skill didn't earn). Non-string / unhashable input
+    also degrades to 'aux' rather than raising, so callers (e.g. ``next_steps``)
+    can honour their "never raise" contract.
     """
+    if not isinstance(skill, str):
+        return "aux"
     if skill in PIPELINE_SKILLS:
         return "pipeline"
     if skill in GATE_SKILLS:
@@ -399,7 +403,7 @@ class NextSteps:
         return asdict(self)
 
 
-def next_steps(repo: Path | str, skill: str) -> NextSteps:
+def next_steps(repo: Path | str, skill: object) -> NextSteps:
     """Compute the structured next-step set for ``skill`` (next-steps.md contract).
 
     Pure + stdlib/renmark-only. Reads lifecycle via ``read_lifecycle`` and reuses
@@ -412,8 +416,15 @@ def next_steps(repo: Path | str, skill: str) -> NextSteps:
       absent for the current sha; mirrors handoff-menu rule 2).
     - ``aux`` → ``[tier0]`` (resume-pipeline) + up to 2 per-skill local actions.
 
-    NEVER raises into the caller: any failure degrades to a minimal result
-    carrying just the cold-start ``next_recommended`` string.
+    ``suggestions`` is the state-derived **recommended next action(s)** — NOT the
+    complete rendered menu. The calling SKILL.md adds the standard terminal
+    options (Finish / Nothing, and the gate sub-menu for gate skills) per the
+    handoff-menu.md rendering rules; do not treat ``suggestions`` as the full,
+    choice-complete menu.
+
+    NEVER raises into the caller: ``skill_class`` tolerates non-string input and
+    any state-read failure degrades to a minimal result carrying just the
+    cold-start ``next_recommended`` string.
     """
     cls = skill_class(skill)
     try:
@@ -440,7 +451,7 @@ def next_steps(repo: Path | str, skill: str) -> NextSteps:
         )
 
     # aux / terminal
-    local = AUX_LOCAL_ACTIONS.get(skill, [])[:2]
+    local = AUX_LOCAL_ACTIONS.get(skill, [])[:2] if isinstance(skill, str) else []
     suggestions = [tier0, *local]
     return NextSteps(tier0=tier0, suggestions=suggestions, skill_class="aux")
 
@@ -464,13 +475,24 @@ def _gates_not_run(repo: Path | str) -> list[str]:
         if not reviews.is_dir():
             return ["qa", "codereview"]
 
-        gate_globs = {"qa": "*.qa.md", "codereview": "*.review.md"}
+        # (glob, required generator) per gate. The generator constraint mirrors
+        # handoff-menu rule 2: a gate counts as "run" only when the artifact was
+        # produced by the gate's own generator — a stray/foreign .qa.md must not
+        # unlock Deep QA. generator=None means "no generator constraint".
+        gate_specs: dict[str, tuple[str, str | None]] = {
+            "qa": ("*.qa.md", "verify-qa"),
+            "codereview": ("*.review.md", None),
+        }
         not_run: list[str] = []
-        for gate, pattern in gate_globs.items():
+        for gate, (pattern, want_gen) in gate_specs.items():
             ran = False
             for artifact in reviews.glob(pattern):
                 meta = read_metadata(artifact)
-                if meta.get("source_sha") == head and meta.get("completion_state") == "complete":
+                if (
+                    meta.get("source_sha") == head
+                    and meta.get("completion_state") == "complete"
+                    and (want_gen is None or meta.get("generator") == want_gen)
+                ):
                     ran = True
                     break
             if not ran:

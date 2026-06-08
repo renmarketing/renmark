@@ -89,10 +89,21 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
 
 
 def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
-    """Verify every skills/<name>/SKILL.md cites a hand-off contract — either
-    ``next-steps.md`` or ``handoff-menu.md``. Skills that end without pointing
-    the user to a next move are dead ends; gate skills satisfy this via
-    handoff-menu.md, so either citation is accepted."""
+    """Verify every skills/<name>/SKILL.md cites the hand-off contract.
+
+    The umbrella contract is ``next-steps.md``; ``handoff-menu.md`` is its gate
+    sub-menu. To keep the drift guard meaningful, the required citation depends
+    on the skill's class (per ``lifecycle.skill_class``):
+
+    - **pipeline / aux** skills MUST cite ``next-steps.md`` (citing only the gate
+      menu would not give them their state-derived next step).
+    - **gate** skills (verify, codereview) may cite EITHER ``next-steps.md`` or
+      ``handoff-menu.md`` — the gate sub-menu is their correct hand-off.
+
+    A skill that cites neither is a dead end.
+    """
+    from .lifecycle import skill_class
+
     issues: list[str] = []
     skills_dir = plugin_dir / "skills"
     if not skills_dir.is_dir():
@@ -109,10 +120,18 @@ def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
         if not skill_md.exists():
             continue
         text = skill_md.read_text(encoding="utf-8")
-        if "next-steps.md" not in text and "handoff-menu.md" not in text:
+        cites_umbrella = "next-steps.md" in text
+        cites_gate = "handoff-menu.md" in text
+        if skill_class(skill_path.name) == "gate":
+            if not (cites_umbrella or cites_gate):
+                issues.append(
+                    f"skills/{skill_path.name}/SKILL.md: missing hand-off citation "
+                    "(gate skill must cite _shared/next-steps.md or handoff-menu.md)"
+                )
+        elif not cites_umbrella:
             issues.append(
                 f"skills/{skill_path.name}/SKILL.md: missing next-steps.md citation "
-                "(cite _shared/next-steps.md or handoff-menu.md)"
+                "(pipeline/aux skill must cite _shared/next-steps.md)"
             )
     return issues
 

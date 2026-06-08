@@ -11,7 +11,6 @@ import pytest
 
 from renmark import lint
 
-
 # ── synthetic plugin fixture builder ─────────────────────────────────────────
 
 
@@ -40,10 +39,22 @@ def test_cites_next_steps_no_issue(tmp_path: Path):
     assert lint.lint_next_steps_citation(plugin) == []
 
 
-def test_cites_handoff_menu_no_issue(tmp_path: Path):
-    """Gate skills satisfy the contract via handoff-menu.md instead."""
-    plugin = _make_plugin(tmp_path, skills={"start": _skill_body("start", citation="handoff-menu.md")})
+def test_gate_skill_cites_handoff_menu_no_issue(tmp_path: Path):
+    """Gate skills (verify/codereview) satisfy the contract via handoff-menu.md."""
+    plugin = _make_plugin(
+        tmp_path, skills={"codereview": _skill_body("codereview", citation="handoff-menu.md")}
+    )
     assert lint.lint_next_steps_citation(plugin) == []
+
+
+def test_pipeline_skill_handoff_menu_only_is_issue(tmp_path: Path):
+    """A pipeline/aux skill citing ONLY the gate menu does NOT satisfy the
+    contract — it must cite next-steps.md (the drift guard would be toothless
+    otherwise)."""
+    plugin = _make_plugin(tmp_path, skills={"plan": _skill_body("plan", citation="handoff-menu.md")})
+    issues = lint.lint_next_steps_citation(plugin)
+    assert len(issues) == 1
+    assert "plan" in issues[0]
 
 
 def test_cites_neither_one_issue_naming_skill(tmp_path: Path):
@@ -69,9 +80,9 @@ def test_multiple_skills_only_offender_flagged(tmp_path: Path):
     plugin = _make_plugin(
         tmp_path,
         skills={
-            "good": _skill_body("good", citation="next-steps.md"),
-            "gate": _skill_body("gate", citation="handoff-menu.md"),
-            "bad": _skill_body("bad"),
+            "plan": _skill_body("plan", citation="next-steps.md"),       # pipeline, ok
+            "codereview": _skill_body("codereview", citation="handoff-menu.md"),  # gate, ok
+            "bad": _skill_body("bad"),                                     # aux, cites neither
         },
     )
     issues = lint.lint_next_steps_citation(plugin)

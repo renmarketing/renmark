@@ -221,6 +221,8 @@ Report the orchestrate completion line first, then let verify take over:
 
 (Verify renders the live menu per `_shared/handoff-menu.md` — an interactive `AskUserQuestion` choice when available, numbered text only as fallback; the user must pick a choice to continue.)
 
+**Next step is state-derived (pipeline skill, next-steps.md class 1).** Orchestrate's own next action after a clean run is the stage-routed `next_recommended(repo)` (= `/renmark:verify` at stage `created`), which it auto-invokes above. On a paused/failed run it does NOT advance — it surfaces the resume command. Per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 — Tier-0 stage routing); orchestrate hands directly to verify rather than rendering a separate picker.
+
 **Browser QA recommendation (not automatic).** The default auto-verify above stays a shell smoke test — browser QA is **not automatic**. When a clean run's changed files / feature scope touch user-visible or browser surfaces (templates, frontend JS/CSS, page routes/controllers, forms/buttons, settings, preview/render UI, checkout/pricing, browser-facing pages), Recommend `/renmark:verify --qa` for a live happy-path flow — and `--deep-qa` for risky UI/runtime changes or after a normal `--qa` passes. This is a recommendation surfaced to the user, not an automatic step.
 
 **Only auto-verify on a fully clean run.** If any task failed (paused / escalated), do NOT auto-verify and do NOT offer the next step — surface the failure and the resume command first. Verification of a half-built feature is noise.
