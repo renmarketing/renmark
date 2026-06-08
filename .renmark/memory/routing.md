@@ -27,6 +27,9 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 
 
 
+
+- (2026-06-08) `target=renmark/sizing.py (deterministic heuristic classifier, complexity=hard, mode=A)` → **opus** (passed (1-shot, thorough API; no codereview findings yet), run=proportional-pipeline)
+
 - (2026-06-08) `target=plugin/templates|skills/*.md (doc/contract edits, mode=B)` → **haiku+sonnet** (passed (2/2, format aligned across files via shared spec), run=acceptance-criteria)
 
 - (2026-06-08) `target=renmark/init.py, complexity=hard, mode=B (scaffold+marker-merge, correctness-critical)` → **opus** (passed (1-shot, no codereview findings yet), run=init-pipeline)

@@ -10,6 +10,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — proportional-pipeline: pipeline cost proportional to feature size/risk
+
+**Files:** `renmark/sizing.py`, `tests/test_sizing.py`, `plugin/skills/feature/SKILL.md`, `plugin/skills/codereview/SKILL.md`
+**Spec:** `.renmark/specs/2026-06-08-proportional-pipeline.spec.md`
+**Plan:** `.renmark/plans/2026-06-08-proportional-pipeline.plan.md`
+**Commits:** `451e869..e41bf1d`
+
+New deterministic sizing.classify_plan/classify_diff → lite|standard|full. Feature router adds a size-tier lite lane (tiny features land on main, skip codex/release, keep verify+plan-validate); --lite/--full overrides. codereview is proportional: lite/doc diff → cheap built-in /review default + one-key codex escalate (never silent skip), --full/--skip flags. verify+plan-validation always run (REQ-7). 10 new tests.
+
+---
+
 ### 2026-06-08 — acceptance-criteria: optional per-REQ done-when criteria in the PRD
 
 **Files:** `plugin/templates/PRD.md.template`, `plugin/skills/prd/SKILL.md`
