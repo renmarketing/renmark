@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-08 @ 521d2c8 -->
+<!-- Last refreshed: 2026-06-08 @ 38cfabd -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=74
+**Languages:** python=76
 
 ## Directory tree
 
@@ -33,16 +33,16 @@ ai-system/
 | `renmark/dispatch.py` | Groups tasks by parallel_group, validates that tasks sharing a group write | `TaskResult`, `WaveResult`, `group_tasks_by_wave`, `validate_wave`, `dispatch_wave`, `estimate_wave_cost` |
 | `renmark/shadow.py` | subsystems. | `register`, `registered_subsystems`, `ShadowDiff`, `list_cases`, `run_subsystem`, `run_all` |
 | `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `current_version`, `check_drift`, `drift_report` |
+| `tests/test_sizing.py` | Hermetic: no network, no real git history dependence (we init throwaway repos | `test_all_doc_small_set_is_lite`, `test_any_hard_task_is_never_lite`, `test_core_module_target_is_at_least_standard`, `test_many_tasks_is_full`, `test_empty_list_degrades_to_standard`, `test_classify_plan_never_raises_on_malformed_input` |
 | `tests/test_init_pipeline.py` | Covers the behavior added in this feature: | `test_run_scaffolds_when_claude_md_absent`, `test_run_does_not_overwrite_existing_custom_claude_md`, `test_run_is_idempotent`, `test_scaffold_missing_preserves_user_changelog`, `test_merge_rule_blocks_backfills_only_missing_verbatim`, `test_merge_rule_blocks_agents_always_zero` |
 | `renmark/summary.py` | governance metadata), G9 (failure transparency). | `SummaryBoundaryError`, `ArtifactMetadata`, `write_artifact`, `emit_pointer`, `read_metadata`, `is_stale` |
 | `tests/test_next_steps.py` | These cover the next-steps.md contract: the structured "what next?" set every | `test_skill_class_pipeline`, `test_skill_class_gate`, `test_skill_class_aux`, `test_skill_class_unknown_defaults_aux`, `test_pipeline_skill_at_brainstorm_complete`, `test_pipeline_skill_at_plan_validated` |
 | `tests/test_lint.py` | Tests for renmark.lint — plugin contract linter. | `test_parse_frontmatter_extracts_simple_kv`, `test_parse_frontmatter_strips_quotes`, `test_parse_frontmatter_returns_none_without_block`, `test_parse_frontmatter_ignores_comments_and_blanks`, `test_lint_skill_files_passes_valid`, `test_lint_skill_files_catches_missing_skill_md` |
-| `tests/test_blueprint.py` | Unit tests for renmark.blueprint — marker builders, splice, detect_ui. | `test_marker_constants`, `test_build_start_marker_contains_sha`, `test_build_end_marker`, `test_build_markers_use_supplied_id`, `test_splice_replaces_only_inner_region`, `test_splice_sha_recorded_in_output` |
-| `tests/test_dispatch_isolation.py` | Unit tests for G11 task-isolation contract in dispatch.py. | `make_task`, `test_subagent_input_serializes_to_json`, `test_build_subagent_input_bounds_inputs`, `test_subagent_output_valid`, `test_subagent_output_rejects_too_many_summary_lines`, `test_subagent_output_rejects_oversized_summary_line` |
 | `renmark/hygiene.py` | Single source of truth for renmark's diagnostic hygiene operations. Walks the | `ScanReport`, `PruneReport`, `scan_artifacts`, `prune_memory`, `main` |
 | `renmark/schemas.py` | payloads. Zero external dependencies — validation is structural, not full | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `main` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
-| `tests/test_hygiene.py` | Write a .renmark artifact with frontmatter so hygiene can read it. | — |
+| `renmark/sizing.py` | This is the **single source of truth** for "how big/risky is this change?" used | `classify_plan`, `classify_diff`, `resolve_override` |
+| `tests/test_blueprint.py` | Unit tests for renmark.blueprint — marker builders, splice, detect_ui. | — |
 
 ## Commands (user-facing)
 

@@ -1,26 +1,57 @@
 ---
 name: codereview
-description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Runs a single codex-based review pass in a read-only sandbox; codex emits a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean. Supports `--focus optimize` and `--focus standards` to swap the prompt template; default is correctness + quality.
+description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Review depth is proportional to the diff: a lite/doc diff runs the built-in cheap `/review` in-context by default (then offers a one-keystroke escalate to the full codex pass); a standard/full diff runs the full codex review pass in a read-only sandbox, emitting a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean. Supports `--full` (force codex), `--skip` (explicit skip), and `--focus optimize`/`--focus standards` to swap the prompt template; default focus is correctness + quality.
 ---
 
 # codereview
 
 ## Overview
 
-**Single-pass codex review.** Codex runs in `--sandbox read-only` mode, reads the diff, and emits a structured findings report. Opus orchestrates but never ingests the diff body — that's the whole point of routing this to codex.
+**Review depth is proportional to the diff.** Before choosing a review engine, the
+skill classifies the range with `renmark.sizing.classify_diff(repo, base_ref)` →
+`Tier ∈ {lite, standard, full}` (deterministic, zero-LLM; runs `git diff --stat`;
+degrades to `standard` on any no-git / error). The classified tier picks the lane:
 
-No Sonnet or Opus passes. Earlier designs included them; experience showed that putting code into the conversation defeats the context-hygiene goal renmark is built for. Codex is purpose-built for adversarial bug-finding and that's the most valuable single lens.
+- **`lite` (doc/config-dominant or a very small code diff) → built-in cheap `/review`
+  by DEFAULT.** This runs in-context (~10–25k tokens) and catches the obvious bugs
+  plus cross-file / consistency issues. It is **never silently skipped** — the skill
+  always states which review ran and always **offers a one-keystroke escalate to the
+  full codex pass**.
+- **`standard` / `full` → full codex review** (the heavy lane, below). Codex runs in
+  `--sandbox read-only` mode, reads the diff, and emits a structured findings report.
+  Opus orchestrates but never ingests the diff body — that's the whole point of
+  routing this to codex.
 
-Output: structured markdown at `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` with findings grouped by severity (Critical / Major / Minor / Nit).
+No Sonnet or Opus passes for the heavy lane. Earlier designs included them; experience
+showed that putting code into the conversation defeats the context-hygiene goal renmark
+is built for. Codex is purpose-built for adversarial bug-finding and that's the most
+valuable single lens — but it's overkill for a one-line doc tweak, hence the
+proportional default.
+
+The heavy lane's output: structured markdown at `.renmark/reviews/YYYY-MM-DD-<sha>.review.md`
+with findings grouped by severity (Critical / Major / Minor / Nit). The cheap `/review`
+lane reports its findings in-context (it does not write a `.review.md` artifact).
 
 Recommended cadence: **after a full plan completes**, not after every task. `/renmark:orchestrate` offers a hand-off prompt at the end of a successful run.
 
 ## Argument parsing
 
-- `$ARGUMENTS` may contain a git ref range AND/OR `--focus <mode>`.
-- Recognized modes: `optimize`, `standards`. Anything else (or absent) = default.
-- Parse rule: strip the `--focus <mode>` pair from `$ARGUMENTS`; remaining text is the ref range (passed unchanged to Step 1).
-- Unknown mode → print a one-line note (`unknown --focus <mode> — falling back to default`) and use the default prompt. Do not abort.
+- `$ARGUMENTS` may contain a git ref range AND/OR `--focus <mode>` AND/OR a
+  tier-override flag (`--full` / `--skip`).
+- Recognized focus modes: `optimize`, `standards`. Anything else (or absent) = default.
+- Recognized tier-override flags (mutually exclusive; explicit > inferred):
+  - `--full` → force the **full codex** review regardless of the classified tier
+    (escalate a lite diff up to codex).
+  - `--skip` → **explicitly skip** the review entirely. This is the only sanctioned
+    way to run no review — the skill NEVER skips silently on its own. State that the
+    review was skipped by explicit `--skip` and stop.
+- Parse rule: strip the `--focus <mode>` pair AND any `--full` / `--skip` flag from
+  `$ARGUMENTS`; the remaining text is the ref range (passed unchanged to Step 1).
+- Unknown focus mode → print a one-line note (`unknown --focus <mode> — falling back
+  to default`) and use the default prompt. Do not abort.
+- If both `--full` and `--skip` are present → print a one-line note and treat as
+  `--skip` (refusing to review is the safer of two contradictory explicit asks);
+  the user can re-run with `--full` alone.
 
 ## When to Use
 
@@ -32,9 +63,20 @@ Recommended cadence: **after a full plan completes**, not after every task. `/re
 - For debugging a runtime failure — use `/renmark:debug`
 - For implementing fixes — review only; fixes go through orchestrate or direct edit
 
-## How it runs (one pass, codex)
+## How it runs (proportional: cheap `/review` or full codex)
 
-The agent selects one of three prompt blocks below based on the parsed focus, then pipes it to `codex exec --sandbox read-only -`.
+The lane is chosen by the classified tier (see Steps → Determine scope) and any
+tier-override flag:
+
+- **`--skip`** → no review runs (explicit only). State it and stop.
+- **`lite` tier and no `--full`** → run the built-in cheap **`/review`** skill
+  in-context over the same range. Report findings inline, then offer the one-keystroke
+  escalate to the full codex pass (see Hand off).
+- **`standard` / `full` tier, OR `--full` on any tier** → run the full codex pass
+  below.
+
+For the full codex pass, the agent selects one of three prompt blocks below based on
+the parsed focus, then pipes it to `codex exec --sandbox read-only -`.
 
 ```bash
 codex exec --sandbox read-only -
@@ -137,21 +179,71 @@ Codex writes its review to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` directl
 
 **Lifecycle note:** Codereview is orthogonal to stage progression but commonly runs as part of the Review stage. Skill should NOT bump `lifecycle.json.stage` directly — the wrapper `/renmark:feature` handles that after both codereview AND any secure audit complete.
 
-### 1. Determine scope
+### 1. Determine scope & classify the tier
 
 If the user gave a ref range (`HEAD~3..HEAD`, `main..feature`), use that. Otherwise default to `git diff --name-only HEAD` (working tree). Show a `git diff --stat <range>` summary and confirm with the user.
 
-### 2. Run codex
+Then classify the diff to make the review **proportional** to its size/risk:
 
-Shell out via the renmark CLI (or directly) with the prompt above. Streaming output goes to `.renmark/logs/codereview-<run_id>.log` for troubleshooting if codex misbehaves.
+```python
+from renmark.sizing import classify_diff
+# Pass the ACTUAL review range. When the user gave a range (HEAD~3..HEAD,
+# main..feature), hand it through as diff_range so the tier reflects what is
+# actually being reviewed — not a base_ref..HEAD guess. With no range, the
+# base_ref default applies.
+tier = classify_diff(repo, base_ref, diff_range=review_range)  # 'lite' | 'standard' | 'full'
+```
+
+`classify_diff` is deterministic and zero-LLM: it runs `git diff --stat` under the
+hood and degrades to `'standard'` (the safe middle) on no-git / error / an
+**unparseable or unsafe range** — which escalates to the full review, the safe
+direction. Resolve the final lane:
+
+- `--skip` present → skipped (explicit). State it and stop — no engine runs.
+- `--full` present → **full codex**, regardless of `tier`.
+- else `tier == 'lite'` → cheap **`/review`** (in-context).
+- else (`tier ∈ {standard, full}`) → **full codex**.
+
+**State the diff tier and the chosen review BEFORE running anything**, e.g.
+`Diff tier: lite — running cheap /review (escalate to codex with --full).` or
+`Diff tier: standard — running full codex review.` Never start a review without
+surfacing this line.
+
+### 2. Run the chosen review
+
+**Cheap lane (`lite`, no `--full`):** invoke the built-in **`/review`** skill over
+the same range, in-context. Report its findings inline. Do not write a `.review.md`
+artifact — proceed to Hand off, which always offers the escalate.
+
+**Full lane (`standard`/`full`, or `--full`):** shell out via the renmark CLI (or
+directly) with the focus prompt above, piped to `codex exec --sandbox read-only -`.
+Streaming output goes to `.renmark/logs/codereview-<run_id>.log` for troubleshooting
+if codex misbehaves.
 
 ### 3. Capture the review
 
-Codex output is parsed (or written through verbatim) and saved to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md`.
+**Full lane only:** codex output is parsed (or written through verbatim) and saved to
+`.renmark/reviews/YYYY-MM-DD-<sha>.review.md`. The cheap `/review` lane reports
+in-context and writes no artifact — there is no `<path>` to report for it.
 
 ### 4. Hand off
 
-Tell the user — using ONLY the summary, never the diff body. Lead with the codereview-specific actions, then render the shared quality-gate menu so re-testing from a different angle stays one keystroke away:
+Tell the user — using ONLY the summary, never the diff body.
+
+**Cheap-lane hand-off (ran `/review`):** state which review ran and ALWAYS offer the
+escalate. Lead with:
+
+> *"Diff tier: lite — ran cheap `/review` in-context. <N critical, M major, K minor> findings.*
+> *What's next?*
+> *  1. [full] Escalate — re-run as the full codex pass (`/renmark:codereview --full <range>`)*
+> *  2. [fix] Fix — kick off a new /renmark:plan built from the findings"*
+
+The `[full]` escalate is mandatory on the cheap lane — never present the cheap result
+as final without it.
+
+**Full-lane hand-off (ran codex):** lead with the codereview-specific actions, then
+render the shared quality-gate menu so re-testing from a different angle stays one
+keystroke away:
 
 > *"Review at `<path>` (focus: <mode>). <N critical, M major, K minor> findings.*
 > *What's next?*
@@ -194,6 +286,17 @@ Avoid: running codereview after every single task. That creates one review per f
 
 ## Reference
 
+- Proportional classifier:
+  `renmark.sizing.classify_diff(repo, base_ref='main', diff_range=None) -> Tier`
+  where `Tier ∈ {lite, standard, full}` — deterministic, zero-LLM. Pass the
+  explicit review range as `diff_range` (e.g. `HEAD~3..HEAD`, `main..feature`)
+  so the tier matches what's reviewed; with no range the `base_ref..HEAD`
+  default applies. Degrades to `standard` on no-git / error / unsafe-or-
+  unparseable range (which escalates to the full review — the safe direction).
+  Single source of truth for which lane runs.
 - Codex review syntax: `codex review --help`
-- Existing `review` slash command for inspiration
+- Built-in cheap **`/review`** slash command — the lite lane's in-context engine
+  (also good for inspiration on prompt shape).
+- Tier-override flags: `--full` (force codex), `--skip` (explicit skip) — see
+  Argument parsing. These always win over the inferred tier.
 - Focus modes: see Argument parsing above. Adding a new focus = adding a new `### Prompt: <name>` block; nothing else to change.

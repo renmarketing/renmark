@@ -10,6 +10,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — proportional-pipeline: pipeline cost proportional to feature size/risk
+
+**Files:** `renmark/sizing.py`, `tests/test_sizing.py`, `plugin/skills/feature/SKILL.md`, `plugin/skills/codereview/SKILL.md`
+**Spec:** `.renmark/specs/2026-06-08-proportional-pipeline.spec.md`
+**Plan:** `.renmark/plans/2026-06-08-proportional-pipeline.plan.md`
+**Commits:** `451e869..e41bf1d`
+
+New deterministic sizing.classify_plan/classify_diff → lite|standard|full. Feature router adds a size-tier lite lane (tiny features land on main, skip codex/release, keep verify+plan-validate); --lite/--full overrides. codereview is proportional: lite/doc diff → cheap built-in /review default + one-key codex escalate (never silent skip), --full/--skip flags. verify+plan-validation always run (REQ-7). 10 new tests.
+
+---
+
 ### 2026-06-08 — acceptance-criteria: optional per-REQ done-when criteria in the PRD
 
 **Files:** `plugin/templates/PRD.md.template`, `plugin/skills/prd/SKILL.md`
@@ -110,13 +122,15 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 *(init-as-front-door pipeline + setup consolidation — SHIPPED 2026-06-08, see Shipped section above.)*
 
-### acceptance criteria in the PRD (decided 2026-06-08 — ADD)
+*(acceptance criteria in the PRD — SHIPPED 2026-06-08 as v0.7.3, see Shipped above.)*
 
-PRD has Requirements + Success metrics but no per-REQ testable acceptance criteria.
-**Decision:** add OPTIONAL per-REQ "done when…" acceptance criteria under each
-`REQ-n` — a `PRD.md.template` change + `/renmark:prd` skill update (CREATE asks for
-them, UPDATE can add them). Product-level outcome criteria, not task-level (verify's
-goal-backward smoke can lean on them). Build via `/renmark:prd` / `/renmark:feature`.
+*(pipeline cost efficiency C+A / proportional-pipeline — SHIPPED 2026-06-08, see Shipped above.)*
+
+### roadmap-as-pipeline / batch execution — B (DEFERRED, next)
+
+Queue N planned/gap items → ONE plan→orchestrate→verify→codereview→finish run,
+amortizing fixed overhead. ~60% off for backlogs. Deferred (situational; reduces
+per-feature isolation; bigger build). Natural home for the modularity lens below.
 
 ### modularity / scalability health lens (decided 2026-06-08 — BUILD advisory)
 
@@ -128,6 +142,7 @@ like the existing advisory health gaps (never blocking). Build via `/renmark:fea
 
 ### Sequencing (decided 2026-06-08)
 
-Build order: ~~(1) init/setup front-door pipeline~~ ✅ SHIPPED 2026-06-08 →
-**(2) acceptance-criteria-in-PRD** (next) → (3) modularity health lens. Each via
-`/renmark:feature` (or `/renmark:prd` for #2's template part).
+Build order: ~~(1) init/setup front-door pipeline~~ ✅ v0.7.2 →
+~~(2) acceptance-criteria-in-PRD~~ ✅ v0.7.3 →
+~~(3) proportional-pipeline (C+A)~~ ✅ v0.7.4 (this session). **Remaining backlog:**
+**(4) roadmap-batch (B)** → (5) modularity health lens. Each via `/renmark:feature`.
