@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-08] — fix: plan parser accepts the documented `serves` field
+**Request:** Fix the `serves:` parser bug surfaced by gap discovery (Open Q1 / bugs.md).
+**Built:** `renmark/parser.py` now accepts `serves` (parser keys + `Task.serves` field + `_build_task` pass-through), so plans using the documented `serves: REQ-n` traceability field parse instead of aborting with "unknown field serves".
+**Files changed:**
+- `renmark/parser.py` — accept `serves` end-to-end
+- `tests/test_parser.py` — +2 tests (serves parses to Task.serves; absent → None)
+- `.renmark/memory/bugs.md` — moved serves bug Open → Fixed
+**Do not change:**
+- Keep `parser.py` accepted-keys in lockstep with `plan/SKILL.md`'s format example — a documented field is only real if the parser accepts it.
+
 ## v0.7.1 — 2026-06-08 (next-step-engine: guided hand-offs + roadmap gap discovery)
 
 **Release of the next-step-engine feature.** Bumped 0.7.0 → 0.7.1 across all 7

@@ -6,13 +6,6 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 
 
-### 2026-06-05 — plan parser rejects documented serves field
-
-**Severity:** medium
-**Symptom:** renmark-execute --dry-run aborts: "unknown field serves" on any plan written to the documented format (plan SKILL.md lists serves: REQ-n / new as a task field).
-**Root cause:** renmark/parser.py allowed-fields branch (~line 149) was never updated when the v0.6.0 PRD feature added serves traceability to the plan skill + format example. Parser and plan-format docs drifted.
-
----
 
 (Unresolved bugs. Move to `Fixed` once a commit lands.)
 
@@ -41,6 +34,13 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-06-08 — plan parser rejected the documented `serves` field
+
+**Severity:** medium
+**Symptom:** `renmark-execute --dry-run` aborted with "unknown field serves" on any plan using the documented `serves: REQ-n` task field (forced stripping `serves` from the next-step-engine plans).
+**Root cause:** `renmark/parser.py` allowed-fields branch + `Task` dataclass + `_build_task` were never updated when the v0.6.0 PRD feature added `serves` traceability to the plan format docs — parser and docs drifted.
+**Fix:** added `serves` to the parser's accepted keys, the `Task` dataclass, and the `_build_task` constructor (commit on main). +2 parser tests; dry-run repro now parses.
+**Lesson:** a documented plan field is only real if the parser accepts it — keep `parser.py` accepted-keys in lockstep with `plan/SKILL.md`'s format example.
 
 
 

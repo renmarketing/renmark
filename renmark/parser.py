@@ -44,6 +44,7 @@ class Task:
     )
     est_tokens: int | None = None  # planner estimate (informational)
     est_cost_usd: float | None = None  # planner estimate (informational)
+    serves: str | None = None  # optional PRD traceability note, e.g. "REQ-3" or "new"
 
 
 _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
@@ -146,7 +147,7 @@ def parse_plan(path: str | Path) -> list[Task]:
                 current["est_cost_usd"] = float(value)
             except ValueError as e:
                 raise PlanError(f"line {line_no}: est_cost_usd must be float, got {value!r}") from e
-        elif key in ("mode", "target", "model", "verifier", "executor", "complexity"):
+        elif key in ("mode", "target", "model", "verifier", "executor", "complexity", "serves"):
             current[key] = value
         else:
             raise PlanError(f"line {line_no}: unknown field {key!r}")
@@ -230,6 +231,7 @@ def _build_task(d: dict[str, Any]) -> Task:
         est_tokens=d.get("est_tokens"),
         est_cost_usd=d.get("est_cost_usd"),
         executor=executor,
+        serves=(d["serves"].strip() if d.get("serves") else None),
     )
 
 

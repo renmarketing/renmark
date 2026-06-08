@@ -369,3 +369,36 @@ def test_est_tokens_non_int_rejected(tmp_path: Path) -> None:
     )
     with pytest.raises(PlanError, match="est_tokens must be int"):
         parse_plan(plan)
+
+
+def test_serves_field_parses(tmp_path: Path) -> None:
+    """The optional PRD-traceability `serves:` field parses onto Task.serves."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **serves:** REQ-3\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].serves == "REQ-3"
+
+
+def test_serves_defaults_to_none(tmp_path: Path) -> None:
+    """`serves:` is optional — absent means None, never an error."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: x\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert tasks[0].serves is None
