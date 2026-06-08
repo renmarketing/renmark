@@ -175,6 +175,43 @@ _BEGIN_RE = re.compile(r"BEGIN:([a-zA-Z][a-zA-Z0-9_-]*)")
 _END_RE = re.compile(r"END:([a-zA-Z][a-zA-Z0-9_-]*)")
 
 
+def iter_rule_blocks(text: str) -> list[tuple[str, str]]:
+    """Extract well-formed ``BEGIN:<name>``…``END:<name>`` rule blocks from ``text``.
+
+    Returns ``[(name, verbatim_block), …]`` in document order, where
+    ``verbatim_block`` runs from the start of the BEGIN marker's line through
+    the end of the END marker's line (trailing newline included if present).
+
+    Reuses ``_BEGIN_RE`` / ``_END_RE`` so the linter and any consumer (e.g.
+    ``init.merge_rule_blocks``) share one marker source of truth. Malformed
+    blocks — duplicate, unbalanced, or out-of-order — are SKIPPED, never
+    returned, so a caller can safely insert only what it gets back. This is
+    intentionally non-strict (unlike ``lint_template_rule_blocks`` which
+    reports those as issues); it's the merge-safe view of the same data.
+    """
+    begins = [(m.start(), m.group(1)) for m in _BEGIN_RE.finditer(text)]
+    ends = [(m.start(), m.group(1)) for m in _END_RE.finditer(text)]
+
+    begin_names = [name for _, name in begins]
+    end_names = [name for _, name in ends]
+
+    blocks: list[tuple[str, str]] = []
+    for b_pos, name in begins:
+        # Skip names that aren't a clean 1:1 balanced pair.
+        if begin_names.count(name) != 1 or end_names.count(name) != 1:
+            continue
+        e_pos = next(pos for pos, n in ends if n == name)
+        if e_pos < b_pos:
+            continue  # out of order — skip
+        # Expand to whole-line boundaries: line start of BEGIN, line end of END.
+        line_start = text.rfind("\n", 0, b_pos) + 1
+        end_marker = next(m for m in _END_RE.finditer(text) if m.group(1) == name)
+        nl = text.find("\n", end_marker.end())
+        line_end = len(text) if nl < 0 else nl + 1
+        blocks.append((name, text[line_start:line_end]))
+    return blocks
+
+
 def lint_template_rule_blocks(template_path: Path) -> list[str]:
     """Verify every BEGIN:<name> has a matching END:<name>, and order is
     BEGIN then END for each block (no nesting)."""

@@ -18,14 +18,21 @@ CLI:
     python -m renmark.init scan        # print scan summary only, no writes
     python -m renmark.init --full      # include private symbols (leading _)
 
+The CLI self-bootstraps: if CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/ are
+missing, ``run()`` scaffolds them from templates (existence-skip, zero-LLM)
+before scanning, then back-fills any missing canonical ``BEGIN:<name>`` rule
+blocks. ``/renmark:init`` therefore *initializes* a project rather than
+dead-ending — matching Claude Code's native ``/init``.
+
 Exit codes:
     0  success (whether or not anything was written)
-    1  CLAUDE.md missing — run /renmark:setup first
+    1  scaffold failed — CLAUDE.md still absent (should never happen)
     2  bad usage or corrupted markers (multiple BEGIN found)
 
 Stdout (success):
     OK  stub=<created|refreshed|unchanged> map=<created|refreshed|unchanged>
-        modules=<N> commands=<N> langs=<py,ts,...> ref=YYYY-MM-DD@<sha>
+        blocks=<N|unchanged> modules=<N> commands=<N> langs=<py,ts,...>
+        ref=YYYY-MM-DD@<sha>
 """
 
 from __future__ import annotations
@@ -1287,14 +1294,170 @@ def write_standards_md(repo: Path, repo_name: str, today: str, git_sha: str | No
     return "created"
 
 
+# ── Scaffold-if-missing & rule-block back-fill ───────────────────────────────
+
+
+def _scaffold_missing(repo: Path) -> None:
+    """Create CLAUDE.md/AGENTS.md/.gitignore/.renmark/ and CHANGELOG.md if absent.
+
+    Delegates to ``bootstrap(repo, init_git=False)`` for everything it covers
+    (existence-skip = non-destructive) and then creates ``CHANGELOG.md`` from
+    its template — bootstrap does not. Zero-LLM, idempotent.
+    """
+    from . import bootstrap as _bootstrap
+    from . import memory
+
+    _bootstrap.bootstrap(repo, init_git=False)
+
+    changelog = repo / "CHANGELOG.md"
+    if not changelog.exists():
+        tdir = memory.template_dir()
+        if tdir is not None:
+            src = tdir.parent / "CHANGELOG.md.template"
+            if src.is_file():
+                today = date.today().isoformat()
+                changelog.write_text(
+                    src.read_text(encoding="utf-8").replace("{{DATE}}", today),
+                    encoding="utf-8",
+                )
+
+
+def merge_rule_blocks(repo: Path, *, template_dir: Path | None = None) -> dict[str, int]:
+    """Back-fill MISSING canonical ``BEGIN:<name>``…``END:<name>`` rule blocks.
+
+    For each of CLAUDE.md / AGENTS.md that exists, compare the canonical rule
+    blocks defined by its own template (``CLAUDE.md.template`` /
+    ``AGENTS.md.template``) against the blocks already present in the file.
+    Any canonical block whose ``<name>`` is ABSENT from the file is inserted
+    BYTE-VERBATIM at the position implied by template order; blocks already
+    present are left untouched (idempotent + non-destructive — existing block
+    content is never edited or reordered).
+
+    A malformed/unbalanced existing block in the target is skipped (it counts
+    as "present" for its name, so it is never duplicated or corrupted). The
+    marker primitives are shared with ``renmark.lint`` (no pattern redefinition).
+
+    ``template_dir`` overrides the template lookup (mainly for tests); it must
+    point at the directory holding ``CLAUDE.md.template`` / ``AGENTS.md.template``.
+
+    Returns a dict mapping each touched filename to the count of blocks added,
+    e.g. ``{"CLAUDE.md": 2, "AGENTS.md": 0}``. Files that don't exist are
+    omitted from the result.
+    """
+    from . import memory
+    from .lint import iter_rule_blocks
+
+    tdir = template_dir
+    if tdir is None:
+        mem_tdir = memory.template_dir()
+        tdir = mem_tdir.parent if mem_tdir is not None else None
+    if tdir is None:
+        raise RuntimeError("renmark templates directory not found; cannot back-fill rule blocks.")
+
+    result: dict[str, int] = {}
+    for fname in ("CLAUDE.md", "AGENTS.md"):
+        target = repo / fname
+        if not target.exists():
+            continue
+        tmpl = tdir / f"{fname}.template"
+        if not tmpl.is_file():
+            result[fname] = 0
+            continue
+
+        canonical = iter_rule_blocks(tmpl.read_text(encoding="utf-8"))
+        original = target.read_text(encoding="utf-8")
+        present = {name for name, _ in iter_rule_blocks(original)}
+        # Also treat any name with a BEGIN marker present (even malformed) as
+        # present, so a corrupted block is never duplicated.
+        from .lint import _BEGIN_RE
+
+        present |= {m.group(1) for m in _BEGIN_RE.finditer(original)}
+
+        missing = [(name, block) for name, block in canonical if name not in present]
+        if not missing:
+            result[fname] = 0
+            continue
+
+        text = original
+        for name, block in missing:
+            text = _insert_block(text, name, block, canonical)
+        target.write_text(text, encoding="utf-8")
+        result[fname] = len(missing)
+
+    return result
+
+
+def _insert_block(text: str, name: str, block: str, canonical: list[tuple[str, str]]) -> str:
+    """Insert ``block`` (verbatim) into ``text`` at the position implied by
+    ``canonical`` template order.
+
+    Strategy: find the nearest canonical block that PRECEDES ``name`` and is
+    already present in ``text`` — insert right after it. If none precede,
+    find the nearest canonical block that FOLLOWS ``name`` and is present —
+    insert right before it. If neither anchor exists, append at EOF.
+    """
+    from .lint import _BEGIN_RE, _END_RE
+
+    order = [n for n, _ in canonical]
+    idx = order.index(name)
+
+    def _begin_pos(n: str) -> int | None:
+        for m in _BEGIN_RE.finditer(text):
+            if m.group(1) == n:
+                return text.rfind("\n", 0, m.start()) + 1
+        return None
+
+    def _end_line_end(n: str) -> int | None:
+        for m in _END_RE.finditer(text):
+            if m.group(1) == n:
+                nl = text.find("\n", m.end())
+                return len(text) if nl < 0 else nl + 1
+        return None
+
+    # Prefer inserting AFTER the closest preceding present block.
+    for prev in reversed(order[:idx]):
+        pos = _end_line_end(prev)
+        if pos is not None:
+            chunk = block if block.endswith("\n") else block + "\n"
+            return text[:pos] + "\n" + chunk + text[pos:]
+
+    # Else insert BEFORE the closest following present block.
+    for nxt in order[idx + 1 :]:
+        pos = _begin_pos(nxt)
+        if pos is not None:
+            chunk = block if block.endswith("\n") else block + "\n"
+            return text[:pos] + chunk + "\n" + text[pos:]
+
+    # No anchors — append at EOF.
+    suffix = "" if text.endswith("\n") else "\n"
+    chunk = block if block.endswith("\n") else block + "\n"
+    return text + suffix + "\n" + chunk
+
+
 # ── Top-level run ────────────────────────────────────────────────────────────
 
 
 def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[int, str]:
     """Returns (exit_code, summary_line)."""
+    # Scaffold-if-missing FIRST: create CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/
+    # from templates (existence-skip), so init initializes rather than dead-ends.
+    try:
+        _scaffold_missing(repo)
+    except RuntimeError as exc:
+        return 1, f"FAIL  {exc}"
+
     claude_md = repo / "CLAUDE.md"
     if not claude_md.exists():
-        return 1, ("FAIL  CLAUDE.md not found. Run /renmark:setup first to create it, then re-run /renmark:init.")
+        # Should never happen: scaffold ran above. Only fires if templates were
+        # unavailable and bootstrap silently produced nothing.
+        return 1, "FAIL  CLAUDE.md still absent after scaffold — renmark templates unavailable?"
+
+    # Back-fill any missing canonical rule blocks (verbatim, idempotent).
+    try:
+        blocks_added = merge_rule_blocks(repo)
+    except RuntimeError as exc:
+        return 1, f"FAIL  {exc}"
+    n_blocks_added = sum(blocks_added.values())
 
     scan = scan_repo(repo, include_private=include_private)
     # Standards scan runs first so the stub can include the gates line
@@ -1312,9 +1475,10 @@ def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[
     sha = scan.git_sha or "no-git"
     langs_summary = ",".join(sorted(scan.lang_counts.keys())) or "—"
     n_gaps = len(scan.standards.gaps)
+    blocks_field = str(n_blocks_added) if n_blocks_added else "unchanged"
     summary_lines = [
         f"OK  stub={stub_status} agents={agents_status} map={map_status} standards={standards_status} "
-        f"modules={len(scan.files)} commands={len(scan.commands)} "
+        f"blocks={blocks_field} modules={len(scan.files)} commands={len(scan.commands)} "
         f"langs={langs_summary} ref={scan.today}@{sha}"
     ]
     if n_gaps > 0:
