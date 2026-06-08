@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.7.1 — 2026-06-08 (next-step-engine: guided hand-offs + roadmap gap discovery)
+
+**Release of the next-step-engine feature.** Bumped 0.7.0 → 0.7.1 across all 7
+version locations. Shipped on `main` via `--no-ff` merge of
+`feature/next-step-engine` (codereview: 0 critical, 3 major + 1 minor all
+fixed+tested; 401 tests pass, mypy + ruff + lint_all clean).
+
+- **`_shared/next-steps.md`** — umbrella hand-off contract: every skill ends by
+  recommending a state-derived next step (lifecycle.json + pipeline.json), so no
+  interaction dead-ends. References the existing `handoff-menu.md` gate sub-menu.
+- **`lifecycle.next_steps(repo, skill)`** — pure stdlib helper returning the
+  structured next-step set (pipeline/gate/aux classes); reuses NEXT_BY_STAGE /
+  next_recommended; never raises (tolerates malformed input).
+- **All 19 skills** now cite the contract — enforced by a new class-aware
+  `lint_next_steps_citation` (pipeline/aux must cite next-steps.md; gate skills
+  may cite handoff-menu.md) wired into `lint_all`.
+- **`/renmark:roadmap` gap-discovery mode** (ADR-009) — PRD-vs-shipped gap
+  analysis with tiered cost gating (T0 deterministic / T1 local / T2 web research
+  opt-in), advisory + human-gated; never writes PRD. `/renmark:finish` and
+  `/renmark:init` route into it so picking the next feature is guided.
+- 28 new tests (`test_next_steps.py`, `test_lint_next_steps.py`).
+- Pipeline: prd → feature → brainstorm → plan(×2, 21 tasks) → orchestrate →
+  verify (6/6 smoke) → codereview → finish.
+
 ## [2026-06-08] — project scope: next-step-engine
 
 **Request:** Make every renmark interaction guided — each skill recommends a state-derived next step; finishing a feature flows into PRD-vs-shipped gap discovery to suggest what to build next.
