@@ -51,7 +51,9 @@ No `PRD.md` exists yet. Pick a sub-path by project maturity (read `.renmark/memo
 
 Stop asking once you can state the product in 2–3 paragraphs with a confirmed non-goals list.
 
-**Mature project (product already exists implicitly) → synthesize.** Instead of interviewing, synthesize a draft from what's already on disk: `CLAUDE.md` (the "What this project is" section + project-at-a-glance), the specs under `.renmark/specs/`, and `CHANGELOG.md`. Heavy reading of these files is fine — it happens **inside this dedicated invocation**, not in an orchestrator. Distill them into the same product-level fields the interview would gather (what / who / why / capabilities / non-goals / success criteria).
+**Optional acceptance criteria (interview path).** *After* the requirements above are gathered, you MAY — one requirement at a time — offer to attach **1–3 acceptance criteria** to each `REQ-n`. This step is **entirely optional and fully skippable**: tell the user up front they can skip any one requirement or skip the whole pass. For each requirement they opt into, capture the criteria as a single indented bullet in the template's exact format — `- *Acceptance:* done when (outcome); done when (outcome).` (one `- *Acceptance:*` bullet holding 1–3 semicolon-separated `done when…` clauses) — phrased as observable product outcomes, not implementation steps. Leave the line off for any requirement the user skips. Never block the PRD write on this; a PRD with zero acceptance criteria is valid.
+
+**Mature project (product already exists implicitly) → synthesize.** Instead of interviewing, synthesize a draft from what's already on disk: `CLAUDE.md` (the "What this project is" section + project-at-a-glance), the specs under `.renmark/specs/`, and `CHANGELOG.md`. Heavy reading of these files is fine — it happens **inside this dedicated invocation**, not in an orchestrator. Distill them into the same product-level fields the interview would gather (what / who / why / capabilities / non-goals / success criteria). For acceptance criteria, infer an obvious `- *Acceptance:* done when …` bullet for a requirement **only where the existing docs make them clear**; otherwise leave the acceptance line off rather than guessing.
 
 **Then, in both sub-paths:**
 
@@ -74,7 +76,7 @@ Stop asking once you can state the product in 2–3 paragraphs with a confirmed 
 `PRD.md` exists. The PRD is a **living doc** the human owns — never silently rewritten.
 
 1. **Read the current `PRD.md`** (full read — again, legitimate only inside this skill).
-2. **Reconcile against the requested change.** Determine which sections the request touches and what the minimal, faithful edit is. If the request conflicts with an existing non-goal or core capability, call that out explicitly rather than silently overwriting it.
+2. **Reconcile against the requested change.** Determine which sections the request touches and what the minimal, faithful edit is. If the request conflicts with an existing non-goal or core capability, call that out explicitly rather than silently overwriting it. A requirement's acceptance criteria (`*Acceptance:* done when …`) are an editable part of that requirement — adding, changing, or removing them flows through this same reconcile → DIFF → explicit-approval path; they are never silently written or dropped.
 3. **Present a DIFF** of the proposed change in the conversation — old vs. new for each touched section — and ask for explicit approval. Do NOT write until the user approves.
 4. **On approval, write `PRD.md`** with the reconciled content. **Bump `last_reviewed`** in the metadata header to today.
 5. **Append a CHANGELOG entry:**
@@ -87,6 +89,15 @@ Stop asking once you can state the product in 2–3 paragraphs with a confirmed 
    **Do not change:**
    - <any non-goal/invariant the edit reaffirmed or newly pinned>
    ```
+
+### Altitude — what acceptance criteria are (and are NOT)
+
+Acceptance criteria on a requirement are **product-level outcome criteria** — "done when (observable outcome)" — that say *what success looks like for the user*, pitched at the same altitude as the PRD itself. They are deliberately NOT:
+
+- **plan task verifiers** — the shell/`pytest` checks a `/renmark:plan` task carries live at the task level, not here;
+- **the deferred `verify --coverage` capability** (ADR-005) — writing `*Acceptance:* done when …` lines does NOT build coverage reporting and must not be read as committing to it.
+
+`/renmark:verify`'s goal-backward smoke test MAY lean on a requirement's acceptance criteria as hints for what to probe, but that is opportunistic reuse — it does not turn acceptance criteria into a coverage matrix. Keep them at product altitude: outcome statements, never test commands.
 
 ### Human gate (automated-stage proposals)
 

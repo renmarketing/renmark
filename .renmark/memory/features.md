@@ -9,6 +9,17 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — acceptance-criteria: optional per-REQ done-when criteria in the PRD
+
+**Files:** `plugin/templates/PRD.md.template`, `plugin/skills/prd/SKILL.md`
+**Plan:** `.renmark/plans/2026-06-08-acceptance-criteria.plan.md`
+**Commits:** `07f48f0..3010f96`
+
+PRD template + /renmark:prd now support optional product-level acceptance criteria ("done when…" bullets) per REQ-n; CREATE asks (skippable), UPDATE edits via diff, human-gated. Altitude note: not task verifiers, not verify --coverage (ADR-005).
+
+---
+
 ### 2026-06-08 — init-pipeline: /renmark:init as front-door adoption pipeline
 
 **Files:** `renmark/init.py`, `renmark/lint.py`, `plugin/skills/init/SKILL.md`, `plugin/skills/setup/SKILL.md`, `tests/test_init_pipeline.py`

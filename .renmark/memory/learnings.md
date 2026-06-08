@@ -41,6 +41,12 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+
+- (2026-06-08, codereview) model `opus`: **codereview pays off on doc/contract features too** — I recommended skipping codereview for the acceptance-criteria feature (markdown only). User ran it anyway; codex found 2 real cross-file format inconsistencies (skill vs template named different literal shapes) that an executor could misread. Lesson: when a feature spans a template + the skill that emits it, codereview the CONSISTENCY even if there is no Python.
+
+- (2026-06-08, .renmark/reviews/2026-06-08-40f64cb66346dc566e99764ddd360f175c326e41.verification.md) model `verify`: **verify-acceptance-criteria** — 4/4 verified; doc/skill-only feature; codereview skipped as low-value over markdown
+
 - (2026-06-08, codereview) model `opus`: **a test can codify the bug** — The original unclosed-BEGIN test asserted the VULNERABLE behavior (merge proceeds past malformed, back-fills other blocks) and passed — giving false confidence. Codex caught the corruption; the fix replaced the test to assert the safe contract (raise + file unchanged). Audit tests that pass on malformed input: are they asserting safety or codifying the bug?
 
 - (2026-06-08, run) model `opus`: **codereview/verify can mutate the live repo** — Running the MUTATING python -m renmark.init on the working repo (once as a verify smoke, once by codex while verifying findings) back-filled CLAUDE.md + refreshed the map twice. Guard: run mutating CLI smokes in mktemp copies; codex read-only sandbox does not fully prevent cwd writes when it executes code.
