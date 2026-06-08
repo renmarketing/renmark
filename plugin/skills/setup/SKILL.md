@@ -1,155 +1,47 @@
 ---
 name: setup
-description: Use when adding renmark to an existing project — creates missing CLAUDE.md, AGENTS.md, CHANGELOG.md, and .renmark/ structure, or merges missing renmark rule blocks into existing files. Safe to run in any project; never overwrites existing content.
+description: Thin alias — `/renmark:setup` refreshes/back-fills renmark rule blocks in an existing project by delegating to `/renmark:init`'s deterministic rule-block merge. The front-door "initialize renmark into an existing project" pipeline is now `/renmark:init`.
 ---
 
 # setup
 
 ## Overview
 
-Prepares an existing project for the renmark workflow. Reads the current project state, creates missing files, and adds missing renmark rule sections to existing ones. Merge-only — never replaces or removes existing content.
+`/renmark:setup` is now a **thin alias**. Per PRD REQ-8, the single front-door
+for "initialize renmark into an existing project" is **`/renmark:init`** — it
+scans the repo, seeds `.renmark/`, and back-fills the managed renmark rule blocks
+into `CLAUDE.md` / `AGENTS.md`.
+
+`/renmark:setup` exists only as a **rule-block-refresh alias**: instead of
+duplicating any scaffold logic, it delegates to `/renmark:init`'s deterministic
+rule-block back-fill (`merge_rule_blocks`). Running it re-merges any missing
+managed `<!-- BEGIN:x -->` blocks without touching hand-written content — exactly
+what `init` does, scoped to the rule-block step.
 
 ## When to Use
 
-- Starting renmark in a project that already has code or config
-- CLAUDE.md exists but is missing renmark rules
-- CHANGELOG.md doesn't exist yet
-- `.renmark/` directory is missing
+- You typed `/renmark:setup` out of habit → forward to `/renmark:init`.
+- You only want to refresh/back-fill renmark rule blocks in `CLAUDE.md` /
+  `AGENTS.md` → this alias runs `merge_rule_blocks` (the `init` rule-block step).
 
-**Use `/renmark:brainstorm` for empty/new projects** — it bootstraps and brainstorms in one flow.
+For full project initialization (repo scan, `.renmark/` seeding, project map),
+use **`/renmark:init`** directly — it is the canonical pipeline.
 
 ## Steps
 
-**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'setup')`. If it returns a non-None hint, surface as a one-line note.
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'setup')`. If it
+returns a non-None hint, surface it as a one-line note.
 
-**Lifecycle initialization.** As part of setup, if no `.renmark/state/lifecycle.json` exists, leave it that way — `/renmark:start` or `/renmark:feature` will create it when work actually begins. Setup itself does NOT seed a lifecycle (there's no in-flight feature yet).
-
-### 1. Discover project state
-
-```bash
-test -f CLAUDE.md     && echo "CLAUDE.md present"
-test -f AGENTS.md     && echo "AGENTS.md present"
-test -f CHANGELOG.md  && echo "CHANGELOG.md present"
-test -d .renmark      && echo ".renmark/ present"
-git rev-parse --git-dir 2>/dev/null && echo "git repo" || echo "no git repo"
-```
-
-**Detect tech stack** from files present:
-- `package.json` → Node.js; scan `dependencies` for express, react, next, vite, etc.
-- `requirements.txt` / `pyproject.toml` → Python; scan for flask, django, fastapi
-- `go.mod` → Go; `Cargo.toml` → Rust
-- `*.db` files or env references → SQLite / Postgres hint
-- `Dockerfile` → deployment target hint
-
-### 2. Optimize CLAUDE.md
-
-**If missing:** create from the renmark CLAUDE.md template with the detected stack filled in.
-
-**If exists:** check for each `<!-- BEGIN:x -->` marker. Add any missing blocks from the template at the end of the file. Blocks to check in order:
-
-| Block | What it adds |
-|---|---|
-| `changelog-rule` | Read CHANGELOG before tasks, append after |
-| `refactor-safety-rule` | Checkpoint + baseline before >3-file changes |
-| `context-hygiene-rule` | Never read generated files into conversation |
-| `executor-dispatch-rule` | codex → renmark-execute, haiku/sonnet/opus → Agent |
-| `root-cause-rule` | Root cause sentence required before any fix |
-| `verify-before-done-rule` | Re-run verifiers fresh before claiming done |
-| `orchestrator-role-rule` | Orchestrator coordinates; does not accumulate context |
-| `canonical-state-rule` | Truth lives in `.renmark/` and CHANGELOG, not conversation |
-| `summary-boundary-rule` | Orchestrator-visible output ≤ 5 lines or ≤ 300 tokens |
-| `context-contamination-rule` | Cross-domain skill changes recommend `/clear` |
-| `artifact-governance-rule` | Every artifact carries provenance + freshness metadata |
-| `compact-semantics-rule` | `/compact` preserves goals + state, discards stale reasoning |
-| `failure-transparency-rule` | Outputs carry completion_state / confidence / validation_status |
-| `workflow-recovery-rule` | Multi-step workflows resumable via `.renmark/state/pipeline.json` |
-| `task-isolation-rule` | Orchestrate tasks run in isolated subagent contexts |
-| `context-budget-rule` | `/compact` at 60%, `/clear` on cross-domain skill changes |
-| `lifecycle-rule` | Every stage transition writes `.renmark/state/lifecycle.json` (G12) |
-
-If no renmark tooling table is present, append the full `## Tooling — renmark workflow` section.
-
-### 3. Optimize AGENTS.md
-
-Same logic: create if missing, or append missing rule summaries. Mirror every rule added to CLAUDE.md. AGENTS.md stays shorter — one-liner per rule, not the full block.
-
-### 4. Create or update CHANGELOG.md
-
-**If missing:** create with a single setup entry:
-
-```markdown
-# Changelog
-
-## [YYYY-MM-DD] — renmark setup
-
-**Request:** Add renmark workflow to existing project.
-**Built:** CLAUDE.md rules, AGENTS.md rules, .renmark/ structure
-**Do not change:**
-- Changelog format — renmark reads and appends to this file automatically
-- The `## [date] — [title]` heading format is parsed by renmark tooling
-```
-
-**If exists:** leave as-is. The existing changelog is already the project history — don't touch it.
-
-### 5. Set up .renmark/ structure
-
-```bash
-mkdir -p .renmark/{memory,plans,specs,state,debug,logs,reviews}
-```
-
-Create any missing memory seed files from templates:
-- `stack.md` — fill with detected stack from step 1
-- `INDEX.md` — auto-generated index of memory files
-- `features.md`, `bugs.md`, `decisions.md`, `routing.md`, `learnings.md` — empty templates
-
-**Git setup:**
-- If no `.gitignore` exists, create one with `.renmark/state/` and `.renmark/debug/` entries
-- If `.gitignore` exists, check for those entries and add if missing
-- If not a git repo, ask: *"Initialize git repo? [Y/n]"* — on Y run `git init -b main && git add -A`
-
-### 5.5 Seed the project map (first-time only)
-
-If `.renmark/memory/project-map.md` does not yet exist, seed it now:
-
-```bash
-python -m renmark.init
-```
-
-This populates the `<!-- BEGIN:project-stub -->` block in CLAUDE.md (and AGENTS.md if it exists) and writes `.renmark/memory/project-map.md`. The script is deterministic Python — no LLM tokens spent.
-
-**Skip silently if `project-map.md` already exists** — setup is bootstrap-only. Subsequent refreshes happen automatically at the end of `/renmark:finish`, or manually via `/renmark:init`.
-
-If the script exits 1 (CLAUDE.md missing — shouldn't happen since step 2 just created it), note in the report and continue. If it exits 2 (corrupted markers), surface the message and stop; the user has to resolve manually.
-
-Capture the script's stdout line and roll it into step 6's report as `project-map — <stdout>`.
-
-### 6. Report and hand off
-
-```
-renmark setup: <project-name>
-
-CLAUDE.md   — [created | 3 rules added: context-hygiene, executor-dispatch, verify-before-done]
-AGENTS.md   — [created | synced with CLAUDE.md changes]
-CHANGELOG.md — [created | already exists — left as-is]
-.renmark/   — [created | already exists]
-stack.md    — Node.js + Express + SQLite (detected — verify in .renmark/memory/stack.md)
-project-map — [seeded (.renmark/memory/project-map.md) | already existed — skipped]
-```
-
-Then prompt:
-
-> *"Project is ready for renmark.*
-> *  1. [b] Brainstorm — design a new feature into a spec via /renmark:brainstorm*
-> *  2. [p] Plan — I already have a description; go straight to /renmark:plan*
-> *  3. [n] Nothing — setup only, stop here"*
-
-**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Brainstorm [b]`, `Plan [p]`, `Nothing [n]`. **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed.
-
-On **1 / b** → invoke `/renmark:brainstorm`. On **2 / p** → invoke `/renmark:plan`. On **3 / n** → stop.
+**Delegate.** Invoke `/renmark:init`'s deterministic rule-block back-fill
+(`merge_rule_blocks`) — do NOT reimplement scaffold logic here. Mirror every rule
+block added to `CLAUDE.md` into `AGENTS.md` in the same pass (the two files are
+kept in sync). Report which blocks were back-filled, or that all were present.
 
 ## What's next
 
-setup is an **aux / terminal skill** (class 3 in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It sits off the main pipeline line.
+setup is an **aux / terminal skill** (class 3 in
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It sits off the main
+pipeline line.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "setup")` and render per
 > `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
@@ -157,12 +49,6 @@ setup is an **aux / terminal skill** (class 3 in `${CLAUDE_PLUGIN_ROOT}/skills/_
 > add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
 > rules 6–9); require an explicit choice.*
 
-After adding renmark to a project there's no in-flight feature yet, so the
-resume-pipeline option falls through to fresh-start local actions. Surface:
-
-- **`/renmark:prd` `(Recommended)`** — pin product direction first, so plans and
-  features have a source of truth to align to.
-- **`/renmark:start`** — jump straight into building if the direction is already clear.
-- **`/renmark:roadmap`** — survey what to build first when the next move is unclear.
-
-Do not paste the rendering rules or the gate menu — cite `next-steps.md`.
+Since this is a thin alias, the natural local follow-up is **`/renmark:init`**
+(the canonical front-door). Do not paste the rendering rules or the gate menu —
+cite `next-steps.md`.
