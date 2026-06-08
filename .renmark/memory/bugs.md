@@ -34,6 +34,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+
+### 2026-06-08 — merge_rule_blocks corrupted files on malformed markers
+
+**Severity:** major
+**Symptom:** A CLAUDE.md with an orphan END (or unclosed BEGIN) caused merge to insert a block anyway → unbalanced markers (1 BEGIN + 2 END), violating the non-destructive guarantee
+**Root cause:** merge trusted a too-loose substring marker regex and never pre-validated balanced markers before inserting
+**Fix:** tightened regex to full <!-- BEGIN:name --> own-line comments; added validate_rule_markers + MarkerCorruptionError; malformed target is SKIPPED (file unchanged), run()→exit 2
+
+---
+
 ### 2026-06-08 — plan parser rejected the documented `serves` field
 
 **Severity:** medium
