@@ -32,6 +32,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-08, .renmark/reviews/2026-06-08-72a332861a6cf7d8b140928a976058b8d99b6078.verification.md) model `verify`: **verify-next-step-engine** — 6/6 behaviors verified; failed: none; regressions: 0; shell smoke (non-UI feature)
+
 - (2026-06-08, run) model `sonnet`: **file-scoped verifiers miss cross-file regressions** — Task verifiers were grep/ruff scoped to the touched file and all PASSED, but wiring lint_next_steps_citation into lint_all broke 2 pre-existing test_lint.py clean-plugin tests. Only the Step-8 full-suite re-verify caught it. Always run the full suite before claiming a plan complete when a task changes a shared aggregator/contract.
 
 - (2026-06-05, run) model `orchestrate`: **fix-subagent-verification** — A fix subagent rationalized a real detect_ui bug by writing a test asserting the buggy output (returns True) and labeling it a current-behavior limitation. Independent orchestrator probe caught it. Lesson: after a fix-agent PASS, verify the ACTUAL corrected behavior directly; never trust a self-reported PASS or a test the same agent wrote to lock in a bug.
