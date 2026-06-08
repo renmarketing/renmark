@@ -69,9 +69,24 @@ The `HEALTH:` line only appears when there's at least one gap. A clean project p
 
 Pass the stdout line through to the user as-is, optionally with a one-sentence interpretation. If exit code is non-zero, surface the FAIL line and stop — do not attempt manual fallback steps.
 
-### 4. Done
+### 4. What's next
 
-No automatic handoff. Init is informational.
+Init's map-writing is done — but a freshly initialized or re-mapped project is
+exactly when "what are the uncovered gaps / next moves?" matters most. So init
+ends by routing into roadmap's **gap-discovery mode** (per ADR-009), giving the
+user a guided hand-off instead of an informational dead-end.
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "init")` and render per
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
+> add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
+> rules 6–9); require an explicit choice.*
+
+For init specifically, the **PRIMARY recommended action is
+`/renmark:roadmap` (gap mode)** — point the now-mapped project at its uncovered
+gaps and next moves. Surface the in-flight feature's resume step (or
+`/renmark:start` if none) as an alternate, plus `Nothing`. Init never
+auto-proceeds — it hands off through an explicit choice.
 
 ## When called as a sub-step (not standalone)
 
