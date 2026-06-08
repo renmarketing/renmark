@@ -104,15 +104,24 @@ and overlaps (both touch CLAUDE.md/AGENTS.md/.renmark/ + stack detection).
 `/renmark:setup` folds into init (or becomes a thin "refresh rule blocks" alias).
 Scaffold logic lives in ONE place. **Build via `/renmark:feature` after a `/clear`.**
 
-### acceptance criteria in the PRD (open — altitude TBD)
+### acceptance criteria in the PRD (decided 2026-06-08 — ADD)
 
 PRD has Requirements + Success metrics but no per-REQ testable acceptance criteria.
-Decide altitude (product-level per-REQ "done when…" vs spec/verifier level) in a
-`/renmark:prd` pass. Not yet committed.
+**Decision:** add OPTIONAL per-REQ "done when…" acceptance criteria under each
+`REQ-n` — a `PRD.md.template` change + `/renmark:prd` skill update (CREATE asks for
+them, UPDATE can add them). Product-level outcome criteria, not task-level (verify's
+goal-backward smoke can lean on them). Build via `/renmark:prd` / `/renmark:feature`.
 
-### modularity / scalability health lens (open)
+### modularity / scalability health lens (decided 2026-06-08 — BUILD advisory)
 
 Renmark enforces modularity at plan-time (one-file-per-task, no mode C) but never
 MEASURES it on the shipped codebase — no file-size/coupling/god-object health gap.
-Candidate: add an advisory modularity gap to `init`'s standards-health or
-`/renmark:hygiene`. Not yet committed.
+**Decision:** build an ADVISORY modularity health lens — add oversized-file /
+coupling "gaps" to `init`'s standards-health (and/or `/renmark:hygiene`), surfaced
+like the existing advisory health gaps (never blocking). Build via `/renmark:feature`.
+
+### Sequencing (decided 2026-06-08)
+
+`/clear` first (long session), then build in order: **(1) init/setup front-door
+pipeline** → (2) acceptance-criteria-in-PRD → (3) modularity health lens. Each via
+`/renmark:feature` (or `/renmark:prd` for #2's template part).
