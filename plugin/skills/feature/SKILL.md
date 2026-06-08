@@ -9,15 +9,18 @@ description: Use to start a new feature or significant change with branch isolat
 
 Full feature pipeline with branch isolation. Creates a feature branch, runs the renmark wizard end-to-end, and offers PR or merge on finish.
 
-**Pipeline:**
+**Pipeline (proportional — cost tracks size/risk):**
 ```
-git checkout -b feature/<slug>
-  → /renmark:plan          (Scope Contract + decomposition)
-  → /renmark:check-plan    (auto — validates before tokens flow)
-  → /renmark:orchestrate   (wave execution + commits)
-  → /renmark:verify        (goal-backward smoke test)
-  → /renmark:finish        (PR / merge to main)
+/renmark:plan            (Scope Contract + decomposition)
+  → /renmark:check-plan  (auto — validates before tokens flow; ALWAYS)
+  → sizing.classify_plan(tasks) → tier {lite | standard | full}   (deterministic, surfaced in cost preview)
+  → lite lane:           orchestrate → verify (ALWAYS) → proportional codereview (cheap /review + escalate) → land on main
+     standard / full:    branch → orchestrate → verify (ALWAYS) → full codex codereview → finish (PR / merge / release)
 ```
+
+The **lane decision is made AFTER `plan-validated`** — classification needs the
+validated task list. The `--lite` / `--full` overrides always beat the heuristic.
+**plan validation and goal-backward verify (REQ-7) run on every tier, no exceptions.**
 
 ## When to Use
 
@@ -27,6 +30,13 @@ git checkout -b feature/<slug>
 
 **Use plain `/renmark:plan` + `/renmark:orchestrate` on main instead for:**
 - Small edits, config changes, single-file fixes
+
+**Invocation & overrides:**
+- `/renmark:feature <name>` — classify by heuristic (default; see Step 3.5).
+- `/renmark:feature <name> --full` — force the full pipeline (branch → codex review → PR/release), tier heuristic ignored.
+- `/renmark:feature <name> --lite` — force the **lite lane** (land on main, cheap review, no PR/codex/release).
+- Explicit `--lite` / `--full` ALWAYS beats the classifier. Even with an override,
+  **plan validation and goal-backward verify (REQ-7) still run** — those never skip.
 
 ## Steps
 
@@ -86,13 +96,57 @@ owns the **one** dispatch approval (Step 4). This is the mirror of the contract 
 in `plan/SKILL.md` §8b — there must never be two dispatch gates, and orchestrate must
 never be reached without an explicit human approval.
 
+### 3.5. Size-tier classification (lane decision)
+
+After `plan` reaches `plan-validated` (Step 3), classify the validated task list to
+pick the lane. This is a **deterministic, zero-LLM** step — the router calls the
+classifier, it does not reason about size itself:
+
+```python
+from renmark import sizing
+tier = sizing.classify_plan(tasks)   # → 'lite' | 'standard' | 'full'
+```
+
+`sizing.classify_plan` is pure and never raises — it **degrades to `'standard'`
+(the safe middle) on any uncertainty**, so the router never falls into `lite` by
+accident.
+
+**Override resolution (explicit beats the heuristic):**
+
+| Invocation | Effective tier |
+|---|---|
+| `--lite` flag present | `lite` (forced) |
+| `--full` flag present | `full` (forced) |
+| neither | `sizing.classify_plan(tasks)` result |
+
+**Lane routing by tier:**
+
+| Tier | Lane |
+|---|---|
+| `lite` | **Lite lane** (Step 4 → 6, lands on `main`) — orchestrate → verify (ALWAYS) → proportional codereview (cheap `/review`, escalate on demand) → land on `main`. No feature branch ceremony, no codex review, no PR, no release. |
+| `standard` / `full` | **Full lane** (unchanged) — branch → orchestrate → verify → full codex codereview → finish (PR / merge / release). |
+
+**Mechanism note (behavior is what matters; leave exact mechanics to execution):**
+the lane decision happens **after `plan-validated`**, so the branch-vs-main choice is
+made here, not at Step 1. Lite work **lands on `main`** — either by classifying before
+creating the branch, or by branching then fast-forwarding `main` on lite finish. Per the
+**single-branch-rule**, small changes land directly on `main` without a PR. Standard/full
+keep the existing branch → PR/merge → (optional) release flow untouched.
+
+**Always run regardless of tier:** plan validation (Step 3) and goal-backward verify
+(Step 6, REQ-7). The lite lane shrinks the *finish* ceremony and the *review* cost — it
+never skips validation or verification.
+
 ### 4. Execute
 
 **Dispatch gate (the single approval point for the wrapper flow).** Since `plan`
 suppressed its gate in Step 3, `feature` owns the dispatch approval before any tokens
-flow. Present the validated plan's cost summary and require an explicit human approval to
-proceed (orchestrate's own pre-flight cost-preview `Proceed? [y/N]` satisfies this when
-you invoke it — do not bypass it). Never auto-dispatch silently.
+flow. **Surface the classified `tier` (Step 3.5), which stages will run for that tier,
+and the est-token band** as part of this cost preview — never blind, never silent — then
+require an explicit human approval to proceed (orchestrate's own pre-flight cost-preview
+`Proceed? [y/N]` satisfies this when you invoke it — do not bypass it). Never
+auto-dispatch silently. This remains the **single** dispatch gate — adding the tier
+preview does not add a second gate.
 
 On approval, invoke `/renmark:orchestrate` with the produced plan. Orchestrate runs
 check-plan in pre-flight, executes waves, re-verifies on completion, and shows the
@@ -132,11 +186,22 @@ the build — the pipeline continues regardless of the blueprint result.
 
 ### 6. Verify + Finish
 
-From orchestrate's menu:
-- Choose **[v] Verify** → `/renmark:verify` runs goal-backward smoke tests
-- Then **[f] Finish** → `/renmark:finish` shows branch summary and offers PR or merge
+**Verify runs on every tier (REQ-7) — never skipped.**
 
-The branch created in step 1 is the source branch for the PR.
+From orchestrate's menu:
+- Choose **[v] Verify** → `/renmark:verify` runs goal-backward smoke tests (ALWAYS, all tiers)
+- Then route the **review + finish** by the tier resolved in Step 3.5:
+
+**Lite lane (`tier == lite`):**
+- **Proportional codereview** → `/renmark:codereview` runs its cheap built-in `/review`
+  by default and offers a one-keystroke escalate to full codex. Defer the detail to the
+  codereview skill — the router only routes; it does not review. Never silently skipped.
+- **Land on `main`** → no PR, no codex review by default, no release ceremony, per the
+  **single-branch-rule**. `/renmark:finish` closes the work onto `main`.
+
+**Standard / full lane (unchanged):**
+- Full codex codereview → **[f] Finish** → `/renmark:finish` shows branch summary and
+  offers PR / merge / release. The branch created in step 1 is the source branch for the PR.
 
 **Next-step hand-off (pipeline skill, class 1):**
 
