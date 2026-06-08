@@ -16,6 +16,7 @@ cyclomatic sanity check that nesting is weighted.
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from renmark import modularity
@@ -32,7 +33,6 @@ from renmark.modularity import (
     MODULE_LOC_WARN,
     analyze,
 )
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,15 +58,19 @@ def _module_of_code_lines(n: int) -> str:
     return "\n".join(f"v{i} = {i}" for i in range(n)) + "\n"
 
 
-def _func_with_body_code_lines(n: int) -> str:
-    """A module with one function ``f`` whose BODY has exactly ``n`` code lines.
+def _func_with_measured_code_lines(n: int) -> str:
+    """A module with one function ``f`` whose MEASURED code lines equal ``n``.
 
-    The ``def`` signature line is not counted by the analyzer (it spans the
-    function's first body statement onward), so the file is the signature plus
-    ``n`` body assignment statements.
+    The analyzer counts the ``def`` signature line plus each body code line (it
+    spans the function's own start through ``end_lineno``, nested defs excluded),
+    so for a measured total of ``n`` we emit the signature line plus ``n - 1``
+    single-line body assignments. ``n`` must be >= 1.
     """
-    body = "\n".join(f"    s{i} = {i}" for i in range(n))
-    return f"def f():\n{body}\n"
+    assert n >= 1
+    body = "\n".join(f"    s{i} = {i}" for i in range(n - 1))
+    if body:
+        return f"def f():\n{body}\n"
+    return "def f(): pass\n"
 
 
 def _func_with_flat_ifs(n: int) -> str:
@@ -130,17 +134,35 @@ def test_module_loc_just_under_warn_is_clean(tmp_path: Path) -> None:
 # ── Metric 2: function length ──────────────────────────────────────────────────
 
 
-def test_func_loc_just_over_warn_is_warn(tmp_path: Path) -> None:
+def test_func_loc_exactly_warn_is_warn(tmp_path: Path) -> None:
+    """EXACTLY at the warn threshold trips warn (>= boundary, off-by-one guard)."""
     repo = tmp_path / "repo"
-    _write(repo, "src/longfn.py", _func_with_body_code_lines(FUNC_LOC_WARN + 1))
+    _write(repo, "src/warnfn.py", _func_with_measured_code_lines(FUNC_LOC_WARN))
     gaps = _gaps_for(repo, title_contains="Long function")
     assert len(gaps) == 1
     assert gaps[0].severity == "warn"
 
 
+def test_func_loc_just_over_warn_is_warn(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/longfn.py", _func_with_measured_code_lines(FUNC_LOC_WARN + 1))
+    gaps = _gaps_for(repo, title_contains="Long function")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "warn"
+
+
+def test_func_loc_exactly_major_is_danger(tmp_path: Path) -> None:
+    """EXACTLY at the major threshold trips danger (>= boundary, off-by-one guard)."""
+    repo = tmp_path / "repo"
+    _write(repo, "src/majorfn.py", _func_with_measured_code_lines(FUNC_LOC_MAJOR))
+    gaps = _gaps_for(repo, title_contains="Long function")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+
+
 def test_func_loc_just_over_major_is_danger(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
-    _write(repo, "src/hugefn.py", _func_with_body_code_lines(FUNC_LOC_MAJOR + 1))
+    _write(repo, "src/hugefn.py", _func_with_measured_code_lines(FUNC_LOC_MAJOR + 1))
     gaps = _gaps_for(repo, title_contains="Long function")
     assert len(gaps) == 1
     assert gaps[0].severity == "danger"
@@ -148,8 +170,47 @@ def test_func_loc_just_over_major_is_danger(tmp_path: Path) -> None:
 
 def test_func_loc_just_under_warn_is_clean(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
-    _write(repo, "src/okfn.py", _func_with_body_code_lines(FUNC_LOC_WARN - 1))
+    _write(repo, "src/okfn.py", _func_with_measured_code_lines(FUNC_LOC_WARN - 1))
     assert _gaps_for(repo, title_contains="Long function") == []
+
+
+def test_func_loc_signature_counted_and_nested_def_excluded(tmp_path: Path) -> None:
+    """Major1 regression: the signature line is counted; nested defs are NOT.
+
+    The outer function owns its ``def`` line + 1 body statement = 2 lines; the
+    nested ``inner`` def's lines belong to ``inner``, not the outer. With the
+    pre-fix bug the outer would have either dropped its signature or swallowed
+    ``inner``'s body. We assert the measured outer LOC by tuning thresholds via
+    a body sized to sit exactly on FUNC_LOC_WARN once the signature is added and
+    the nested block is excluded.
+    """
+    # outer owns: def line (1) + (WARN-1) body assignments = WARN measured.
+    # A fat nested def whose body is huge must NOT inflate the outer count.
+    outer_body = "\n".join(f"    a{i} = {i}" for i in range(FUNC_LOC_WARN - 1))
+    nested = "\n".join("        " + f"b{i} = {i}" for i in range(FUNC_LOC_MAJOR + 50))
+    src = f"def outer():\n{outer_body}\n    def inner():\n{nested}\n"
+    repo = tmp_path / "repo"
+    _write(repo, "src/nestfn.py", src)
+    gaps = _gaps_for(repo, title_contains="Long function")
+    # outer sits at exactly WARN (warn band); inner is far over MAJOR (danger).
+    outer_gaps = [g for g in gaps if "outer()" in g.title]
+    inner_gaps = [g for g in gaps if "inner()" in g.title]
+    assert len(outer_gaps) == 1
+    assert outer_gaps[0].severity == "warn", "outer must NOT swallow inner's body"
+    assert len(inner_gaps) == 1
+    assert inner_gaps[0].severity == "danger"
+
+
+def test_func_loc_decorator_lines_counted(tmp_path: Path) -> None:
+    """Major1 regression: decorator lines are part of the function's own span."""
+    repo = tmp_path / "repo"
+    # 2 decorator lines + def line + (WARN-3) body = WARN measured → warn band.
+    body = "\n".join(f"    s{i} = {i}" for i in range(FUNC_LOC_WARN - 3))
+    src = f"import functools\n\n@functools.cache\n@staticmethod\ndef f():\n{body}\n"
+    _write(repo, "src/decofn.py", src)
+    gaps = [g for g in _gaps_for(repo, title_contains="Long function") if "f()" in g.title]
+    assert len(gaps) == 1
+    assert gaps[0].severity == "warn"
 
 
 # ── Metric 3: cyclomatic complexity ────────────────────────────────────────────
@@ -327,3 +388,250 @@ def test_analyze_accepts_str_path(tmp_path: Path) -> None:
     _write(repo, "src/big.py", _module_of_code_lines(MODULE_LOC_WARN + 1))
     gaps = analyze(str(repo))
     assert any("Oversized module" in g.title for g in gaps)
+
+
+# ── Exact-boundary (== threshold) off-by-one guards ────────────────────────────
+
+
+def test_module_loc_exactly_warn_is_warn(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/m.py", _module_of_code_lines(MODULE_LOC_WARN))
+    gaps = _gaps_for(repo, title_contains="Oversized module")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "warn"
+
+
+def test_module_loc_exactly_major_is_danger(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/m.py", _module_of_code_lines(MODULE_LOC_MAJOR))
+    gaps = _gaps_for(repo, title_contains="Oversized module")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+
+
+def test_fanout_exactly_warn_is_warn(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/f.py", _module_with_imports(FANOUT_WARN))
+    gaps = _gaps_for(repo, title_contains="import fan-out")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "warn"
+
+
+def test_fanout_exactly_major_is_danger(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/f.py", _module_with_imports(FANOUT_MAJOR))
+    gaps = _gaps_for(repo, title_contains="import fan-out")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+
+
+def test_cyclomatic_exactly_warn_is_warn(tmp_path: Path) -> None:
+    # value = #ifs + 1; value == CYCLO_WARN ⇒ ifs = CYCLO_WARN - 1.
+    repo = tmp_path / "repo"
+    _write(repo, "src/c.py", _func_with_flat_ifs(CYCLO_WARN - 1))
+    gaps = _gaps_for(repo, title_contains="cyclomatic")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "warn"
+
+
+def test_cyclomatic_exactly_major_is_danger(tmp_path: Path) -> None:
+    # value == CYCLO_MAJOR ⇒ ifs = CYCLO_MAJOR - 1.
+    repo = tmp_path / "repo"
+    _write(repo, "src/c.py", _func_with_flat_ifs(CYCLO_MAJOR - 1))
+    gaps = _gaps_for(repo, title_contains="cyclomatic")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+
+
+def test_cognitive_exactly_warn_is_warn(tmp_path: Path) -> None:
+    # flat ifs: cognitive == #ifs; cognitive == COGNITIVE_WARN ⇒ ifs = COGNITIVE_WARN.
+    repo = tmp_path / "repo"
+    _write(repo, "src/cw.py", _func_with_flat_ifs(COGNITIVE_WARN))
+    gaps = _gaps_for(repo, title_contains="cognitive")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "warn"
+
+
+def test_cognitive_exactly_major_is_danger(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/cm.py", _func_with_flat_ifs(COGNITIVE_MAJOR))
+    gaps = _gaps_for(repo, title_contains="cognitive")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+
+
+# ── Major3: comment-only generated markers suppress; docstring mentions do NOT ──
+
+
+def test_docstring_mention_of_generated_is_still_analyzed(tmp_path: Path) -> None:
+    """A hand-written module whose DOCSTRING says 'generated by' is STILL flagged.
+
+    This is the verified false-negative from the review: a real module that
+    merely mentions a generated-marker phrase in prose/docstring must not be
+    suppressed. The long function inside must still produce a Long-function gap.
+    """
+    repo = tmp_path / "repo"
+    long_body = "\n".join(f"    s{i} = {i}" for i in range(FUNC_LOC_MAJOR + 10))
+    src = (
+        '"""This report was generated by hand. Do not edit casually — but it IS\n'
+        'maintained by humans, so the analyzer must still inspect it."""\n'
+        f"def big():\n{long_body}\n"
+    )
+    _write(repo, "src/has_prose.py", src)
+    gaps = _gaps_for(repo, title_contains="Long function")
+    assert len(gaps) == 1, "a docstring mention must NOT suppress the file"
+    assert gaps[0].severity == "danger"
+
+
+def test_comment_header_generated_file_is_suppressed(tmp_path: Path) -> None:
+    """A true ``# Code generated by ...`` comment-header file IS suppressed."""
+    repo = tmp_path / "repo"
+    long_body = "\n".join(f"    s{i} = {i}" for i in range(FUNC_LOC_MAJOR + 10))
+    src = (
+        "# Code generated by protoc. DO NOT EDIT.\n"
+        f"def big():\n{long_body}\n"
+    )
+    _write(repo, "src/pb.py", src)
+    assert analyze(repo) == [], "a comment-header generated file must be suppressed"
+
+
+def test_string_literal_mention_of_generated_is_still_analyzed(tmp_path: Path) -> None:
+    """A marker phrase inside a string assignment (not a comment) does NOT suppress."""
+    repo = tmp_path / "repo"
+    long_body = "\n".join(f"    s{i} = {i}" for i in range(FUNC_LOC_MAJOR + 10))
+    src = 'BANNER = "automatically generated header text"\n' + f"def big():\n{long_body}\n"
+    _write(repo, "src/strlit.py", src)
+    gaps = _gaps_for(repo, title_contains="Long function")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+
+
+# ── Minor1: only 'tests'/'__tests__' dirs suppress, not 'test' (production) ─────
+
+
+def test_src_test_singular_dir_is_analyzed(tmp_path: Path) -> None:
+    """``src/test/foo.py`` is a production package — it must be analyzed, not skipped."""
+    repo = tmp_path / "repo"
+    _write(repo, "src/test/foo.py", _module_of_code_lines(MODULE_LOC_MAJOR + 1))
+    gaps = _gaps_for(repo, title_contains="Oversized module")
+    assert len(gaps) == 1
+    assert gaps[0].severity == "danger"
+    assert "test/foo.py" in gaps[0].title
+
+
+def test_tests_dir_is_suppressed(tmp_path: Path) -> None:
+    """``tests/foo.py`` under a real test tree is suppressed."""
+    repo = tmp_path / "repo"
+    _write(repo, "tests/foo.py", _module_of_code_lines(MODULE_LOC_MAJOR + 1))
+    assert analyze(repo) == []
+
+
+def test_dunder_tests_dir_is_suppressed(tmp_path: Path) -> None:
+    """``__tests__/foo.py`` (JS-style) under a test tree is suppressed."""
+    repo = tmp_path / "repo"
+    _write(repo, "__tests__/foo.py", _module_of_code_lines(MODULE_LOC_MAJOR + 1))
+    assert analyze(repo) == []
+
+
+# ── Never-raise on a walk/read failure (monkeypatched) ─────────────────────────
+
+
+def test_never_raises_on_walk_failure(tmp_path: Path, monkeypatch) -> None:
+    """If the file walk explodes, analyze() degrades to [] rather than raising."""
+    repo = tmp_path / "repo"
+    _write(repo, "src/big.py", _module_of_code_lines(MODULE_LOC_MAJOR + 1))
+
+    def _boom(_repo: Path) -> list:
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setattr(modularity, "_walk_python_files", _boom)
+    assert analyze(repo) == []  # must not raise
+
+
+def test_never_raises_on_per_file_read_failure(tmp_path: Path, monkeypatch) -> None:
+    """A read failure on one file is swallowed; the scan does not raise."""
+    repo = tmp_path / "repo"
+    _write(repo, "src/big.py", _module_of_code_lines(MODULE_LOC_MAJOR + 1))
+
+    def _boom(_path: Path, _repo: Path) -> list:
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(modularity, "_analyze_file", _boom)
+    assert analyze(repo) == []  # the per-file try/except swallows it
+
+
+# ── Branch-math fixtures: BoolOp, comprehension-if, match/case, try/except ──────
+
+
+def _cyclomatic_of(src: str) -> int:
+    """Parse ``src`` (one top-level ``def f``) and return its cyclomatic count."""
+    tree = ast.parse(src)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
+    return modularity._cyclomatic(func)
+
+
+def _cognitive_of(src: str) -> int:
+    tree = ast.parse(src)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
+    return modularity._cognitive(func)
+
+
+def test_boolop_longer_chain_scores_higher_cyclomatic() -> None:
+    """Major2 sanity: a longer ``and`` chain must score strictly higher."""
+    short = _cyclomatic_of("def f(a, b):\n    return a and b\n")
+    long = _cyclomatic_of("def f(a, b, c, d):\n    return a and b and c and d\n")
+    assert long > short, "a longer boolean chain must increase cyclomatic count"
+    # 2 operands → +1 branch (base 1 + 1 = 2); 4 operands → +3 (base 1 + 3 = 4).
+    assert short == 2
+    assert long == 4
+
+
+def test_boolop_longer_chain_scores_higher_cognitive() -> None:
+    """Major2 fix: cognitive must also reward a longer boolean chain."""
+    short = _cognitive_of("def f(a, b):\n    return a and b\n")
+    long = _cognitive_of("def f(a, b, c, d):\n    return a and b and c and d\n")
+    assert long > short, "a longer boolean chain must increase cognitive score"
+    assert short == 1  # 2 operands → 1 branch
+    assert long == 3  # 4 operands → 3 branches
+
+
+def test_comprehension_if_counted() -> None:
+    """A comprehension ``if`` is a decision point for both metrics."""
+    src = "def f(xs):\n    return [x for x in xs if x > 0]\n"
+    assert _cyclomatic_of(src) == 2  # base 1 + one comprehension if
+    assert _cognitive_of(src) == 1
+
+
+def test_match_case_counted() -> None:
+    """Each ``match`` ``case`` clause is a branch (Python 3.10+)."""
+    src = (
+        "def f(x):\n"
+        "    match x:\n"
+        "        case 1:\n"
+        "            return 'a'\n"
+        "        case 2:\n"
+        "            return 'b'\n"
+        "        case _:\n"
+        "            return 'c'\n"
+    )
+    # cyclomatic: base 1 + 3 case clauses = 4.
+    assert _cyclomatic_of(src) == 4
+    # cognitive: each case is a nesting construct at the top level → 1 each = 3.
+    assert _cognitive_of(src) == 3
+
+
+def test_try_except_counted() -> None:
+    """Each ``except`` handler is a branch for both metrics."""
+    src = (
+        "def f():\n"
+        "    try:\n"
+        "        return g()\n"
+        "    except ValueError:\n"
+        "        return 1\n"
+        "    except KeyError:\n"
+        "        return 2\n"
+    )
+    # cyclomatic: base 1 + 2 except handlers = 3.
+    assert _cyclomatic_of(src) == 3
+    # cognitive: 2 except handlers at top level → 1 each = 2.
+    assert _cognitive_of(src) == 2
