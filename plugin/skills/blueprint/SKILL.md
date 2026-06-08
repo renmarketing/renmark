@@ -123,6 +123,26 @@ blueprint: <project>  (source-sha 8b5f07e)
 ✅ PROTOTYPE.html — created from template + mockup body (UI confirmed)
 ```
 
+## What's next
+
+Blueprint is a **touchpoint, not a lifecycle stage** — it must not advance the
+stage. But it must still hand off rather than dead-end. As a class-1 pipeline
+skill (per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`), end the run by
+deriving the next step from durable state so the refresh resumes the in-flight
+feature's next stage:
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "blueprint")` and render the
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
+> 6–9); the state-derived next command is the `(Recommended)` option. Require an
+> explicit choice — never auto-proceed.*
+
+Because the next step is read from `lifecycle.json` (not the conversation), the
+recommendation resumes whatever stage the in-flight feature stopped at. If no
+feature is in flight, `next_steps` falls back to `/renmark:roadmap` gap mode.
+This hand-off does NOT change blueprint's artifact-touchpoint behavior — the
+final step still records artifact pointers with **no `stage=`** argument.
+
 ## Governance compliance
 
 | # | Rule | How this skill complies |
