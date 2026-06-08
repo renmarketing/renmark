@@ -6,6 +6,18 @@
 
 
 
+
+## ADR-013 — Pipeline cost efficiency: build C+A (proportional+tiered) first, defer B (batch)
+
+**Date:** 2026-06-08
+**Status:** Accepted
+
+**Context.** Evidence: a 2-task feature cost ~340k tokens, ~40% of it a 120-130k codex codereview paid once per feature regardless of size. Basis for choosing C+A over higher-raw-reduction B/all: proportionality (cost tracks risk/size), automatic per-feature savings (no behavior change), lowest build cost+risk, preserves per-feature isolation that caught real bugs this session. B is situational (needs batching, reduces isolation, adds latency) — better sequenced second for backlog burndown.
+
+**Decision.** Build proportional codereview (auto-skip/downgrade codex on tiny/doc diffs; opt-in always) + size-tier lite-lane (tiny features bypass heavy stages) FIRST. Defer roadmap-batch execution (B) and modularity health lens to backlog.
+
+---
+
 ## ADR-012 — Finished feature acceptance-criteria
 
 **Date:** 2026-06-08

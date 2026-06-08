@@ -110,13 +110,20 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 *(init-as-front-door pipeline + setup consolidation — SHIPPED 2026-06-08, see Shipped section above.)*
 
-### acceptance criteria in the PRD (decided 2026-06-08 — ADD)
+*(acceptance criteria in the PRD — SHIPPED 2026-06-08 as v0.7.3, see Shipped above.)*
 
-PRD has Requirements + Success metrics but no per-REQ testable acceptance criteria.
-**Decision:** add OPTIONAL per-REQ "done when…" acceptance criteria under each
-`REQ-n` — a `PRD.md.template` change + `/renmark:prd` skill update (CREATE asks for
-them, UPDATE can add them). Product-level outcome criteria, not task-level (verify's
-goal-backward smoke can lean on them). Build via `/renmark:prd` / `/renmark:feature`.
+### pipeline cost efficiency — C+A (IN PROGRESS, feature/proportional-pipeline)
+
+A 2-task feature cost ~340k tokens (~40% a 120–130k codex codereview paid once per
+feature regardless of size). **Building now (C+A):** proportional codereview
+(auto-skip/downgrade codex on tiny/doc diffs; opt-in always) + size-tier lite-lane
+(tiny features bypass heavy stages). Makes cost ∝ risk/size, automatic, low-risk.
+
+### roadmap-as-pipeline / batch execution — B (DEFERRED, next after C+A)
+
+Queue N planned/gap items → ONE plan→orchestrate→verify→codereview→finish run,
+amortizing fixed overhead. ~60% off for backlogs. Deferred (situational; reduces
+per-feature isolation; bigger build). Natural home for the modularity lens below.
 
 ### modularity / scalability health lens (decided 2026-06-08 — BUILD advisory)
 
