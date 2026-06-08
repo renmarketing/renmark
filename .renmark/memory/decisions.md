@@ -3,6 +3,46 @@
 
 
 
+## ADR-009 — Gap discovery extends /renmark:roadmap (supersedes ADR-005 deferral)
+
+**Date:** 2026-06-08
+**Status:** Accepted (design — formalized at plan/execution time)
+
+**Context.** The `next-step-engine` feature makes every interaction guided and
+adds a "what to build next" gap-discovery engine. A codebase survey found only
+3/19 skills cite the shared hand-off contract; 16 lack a consistent next-step,
+5 have none. ADR-005 had *deferred* a "roadmap PRD progress view" as bloat-now.
+
+**Decision.**
+- Gap discovery **extends `/renmark:roadmap`** rather than adding a standalone
+  `/renmark:next` skill — deliberately reactivating ADR-005's deferred item,
+  scoped tightly: **read-only, advisory, human-gated**, reuses the ALIGN subagent
+  pattern (roadmap never reads the PRD body inline), never a second PRD writer.
+- Next-step guidance **generalizes existing machinery**: `NEXT_BY_STAGE` +
+  `next_recommended()` (Tier 0) and `_shared/handoff-menu.md` (verify gates,
+  Tier 1) — a new `_shared/next-steps.md` umbrella references them; no rebuild.
+- State source is **lifecycle.json + pipeline.json** (durable, survives `/clear`).
+- Tier-2 live web research is **opt-in, default off**.
+- `/renmark:finish` (post-release) and **`/renmark:init`** (after mapping) both
+  route into roadmap's gap mode — init gains a guided hand-off (user tweak).
+
+**Alternatives considered.**
+- Standalone `/renmark:next` skill — rejected to avoid a new skill surface
+  overlapping roadmap (ADR-005 anti-bloat).
+- Merge `handoff-menu.md` into one file — rejected; keep the working gate
+  contract, add an umbrella that references it.
+- Web research on by default — rejected (cost/context hygiene).
+
+**Consequences.**
+- Pro: one shared contract + lint guard prevents per-skill menu drift.
+- Pro: reuses proven, unimplemented-skill-safe routing.
+- Con: reverses an ADR-005 deferral — mitigated by the read-only/advisory scoping
+  above. This ADR documents the supersession.
+
+**Spec:** `.renmark/specs/2026-06-08-next-step-engine.spec.md`
+
+---
+
 ## ADR-008 — Finished feature blueprint
 
 **Date:** 2026-06-05
