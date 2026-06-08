@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-08] — project scope: proportional-pipeline (C+A)
+
+**Request:** Pipeline cost should be proportional to feature size/risk, not a fixed per-feature toll (a 2-task feature cost ~340k tokens, ~40% a 120–160k codex codereview run once regardless of size).
+**Tech stack:** Python ≥3.10 stdlib + markdown — **no new deps**. New `renmark/sizing.py` (deterministic, zero-LLM) reuses `parser.Task` signals + git diff stat.
+**Deployment:** Claude Code plugin (unchanged).
+**MVP boundary:** `sizing.classify_plan/classify_diff` → tier (lite/standard/full); feature-router lite lane (lite features land on `main`, skip codex/release, keep verify+plan-validate); proportional codereview (cheap built-in `/review` default on tiny/doc + one-key escalate to codex; `--full`/`--skip`); tier surfaced in cost preview; `--full`/`--lite` overrides; tests.
+**Out of scope:** roadmap-batch execution (B — deferred next); modularity health lens (deferred); not spawning subagents for trivial edits (future micro-lever); new runtime deps.
+
+**Locked decisions:**
+- Cheap built-in `/review` by default on tiny/doc diffs + one-key escalate to full codex — NOT silent-skip (this session a "doc-only" feature had 2 real codex findings)
+- Lite features land straight on `main` (per single-branch-rule); standard/full keep branch→PR/release
+- verify + plan-validation ALWAYS run regardless of tier (REQ-7); classifier degrades to `standard` on uncertainty
+- Build C+A now; B (batch) + modularity lens deferred (ADR this session)
+
 ## v0.7.3 — 2026-06-08 (optional acceptance criteria in the PRD)
 
 **Release of the acceptance-criteria feature.** Bumped 0.7.2 → 0.7.3 across all 7
