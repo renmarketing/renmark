@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-08] — PRD created
+**Request:** Create the project's PRD via `/renmark:prd`.
+**Built:** Created PRD.md as the project's product source of truth (synthesized-from-docs — distilled from CLAUDE.md, .renmark/memory/, specs, and CHANGELOG since renmark is a mature project).
+**Files changed:**
+- `PRD.md` — new product definition (what/who/why/capabilities/non-goals/success criteria)
+**Do not change:**
+- PRD.md is human-owned. Automated stages may PROPOSE edits but never write it without approval.
+- Product-level non-goals (plugin-not-app, no own model, stdlib-only runtime, renmark≠legacy-plugin) live in PRD; a single build's MVP cut belongs in the scope contract, not the PRD (ADR-005).
+
 ## v0.7.0 — 2026-06-05 (blueprint: prototype/schematic step)
 
 **Release of the blueprint milestone.** Bumped 0.6.0 → 0.7.0 across all 7 version
