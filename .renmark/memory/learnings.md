@@ -37,6 +37,12 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+
+- (2026-06-08, run) model `verify`: **verify smoke must not mutate the deliverable** — A regression smoke ran the MUTATING OK  stub=unchanged agents=unchanged map=refreshed standards=unchanged blocks=1 modules=74 commands=19 langs=python ref=2026-06-08@42b332d on the live repo, which back-filled a rule block + refreshed the map + scaffolded .renmark files. Correct behavior, but a verify side-effect. Run mutating CLI smokes in a tmp copy (mktemp), not the working repo. Reverted cleanly.
+
+- (2026-06-08, .renmark/reviews/2026-06-08-42b332dcbcaa9274bcb3b9a436902d77b4400157.verification.md) model `verify`: **verify-init-pipeline** — 5/5 behaviors verified; headline bug (init exit-1 w/o CLAUDE.md) fixed; merge_rule_blocks non-destructive+idempotent confirmed on a real file
+
 - (2026-06-08, run) model `sonnet`: **hardcoded counts in specs go stale** — Spec said 17 rule blocks; the live template has 23. The test subagent asserted dynamically against the template instead of hardcoding — correct. Avoid hardcoded magic counts in specs/tests.
 
 - (2026-06-08, run) model `opus`: **subagent factored a shared helper across files** — Task1 (one-file=init.py) also added iter_rule_blocks() to lint.py to avoid duplicating the BEGIN/END regex — a sensible cross-file refactor the spec invited. It did not collide with parallel wave-1 tasks (disjoint), but note: a 1-file task touching a 2nd shared file is OK only when no parallel task touches that file.
