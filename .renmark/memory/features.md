@@ -11,6 +11,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-08 — modularity-health-lens: advisory ast code-health gaps
+
+**Files:** `renmark/modularity.py`, `renmark/init.py`, `tests/test_modularity.py`, `plugin/skills/init/SKILL.md`
+**Spec:** `.renmark/specs/2026-06-08-modularity-health-lens.spec.md`
+**Plan:** `.renmark/plans/2026-06-08-modularity-health-lens.plan.md`
+**Commits:** `f830f8a..cd274fc`
+
+New renmark/modularity.py: pure-ast, zero-dep, never-raise analyzer — 5 metrics (module LOC, fn length, cyclomatic branch count, import fan-out, nesting-weighted cognitive complexity), two bands, FP suppression (tests/generated/__init__). Merged into init standards-health (HEALTH line stays a bounded summary; dev-standards.md gets a capped Modularity subsection). Advisory/never-blocking. 21 new tests. (renmark self-scan: 111 gaps — 20 major/91 warn.)
+
+---
+
 ### 2026-06-08 — proportional-pipeline: pipeline cost proportional to feature size/risk
 
 **Files:** `renmark/sizing.py`, `tests/test_sizing.py`, `plugin/skills/feature/SKILL.md`, `plugin/skills/codereview/SKILL.md`
