@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-06-09] — backlog-driven loop execution (verified + codereview-hardened)
+
+**Request:** Codereview + fix pass on the backlog feature before finish.
+**Built:** Full codex review (0 Critical / 6 Major / 2 Minor) → all findings fixed on-branch.
+**Files changed:**
+- `renmark/backlog.py` — path-traversal guard (`_is_safe_item_id` `^BL-\d+$`), true never-raise on serialize, id integrity (filename authoritative), branch-name sanitization, atomic `next_id` reservation (O_CREAT|O_EXCL retry). +5 tests (24 total).
+- `plugin/skills/backlog/SKILL.md` — awaiting-merge documented as a tracked resumable interim state (not an orphan); Step 0 resume scans in-progress items + stored `loop_id`; blocked outcome drives `/renmark:debug`.
+**Do not change:**
+- `next_id` now RESERVES atomically (side effect: writes a `needs review` placeholder); intake/split callers must `write_item` to fill it. `read_item`/`write_item` refuse non-canonical ids (return None).
+- A managed branch's disposition is terminal-only; awaiting-merge is interim/resumable, never an orphan.
+- Verified 5/5 behaviors; full suite 575 pass (+5 from new fix tests); mypy + lint_all clean. The 39 `ruff check` errors remain pre-existing (v0.7.6 baseline), zero added.
+
 ## [2026-06-09] — backlog-driven loop execution (orchestrate complete, pre-verify)
 
 **Request:** Add a vibe-coder `/renmark:backlog` intake + approval-buffer that, on "Approve and build", runs bounded Loop Mode (max 5, no flags) on a managed branch with no-orphan-branch lifecycle; reserve a design-only scheduled-QA read-only lane.
