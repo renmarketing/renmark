@@ -50,6 +50,7 @@ from .pause import (
     clear_pause,
     escalation_dir,
     read_pause,
+    usage_limit_pause,
     write_pause,
 )
 from .pipeline import (
@@ -72,7 +73,11 @@ from .usage import (
     append_usage,
     log_agent_call,
     read_usage,
+    tokens_by_feature,
     usage_by_run_id,
+    usage_in_window,
+    usage_last_5h,
+    usage_last_week,
     usage_this_month,
     usage_today,
 )
@@ -127,7 +132,12 @@ __all__ = [
     "record_skill_invocation",
     "rotate_dir",
     "state_dir",
+    "tokens_by_feature",
     "usage_by_run_id",
+    "usage_in_window",
+    "usage_last_5h",
+    "usage_last_week",
+    "usage_limit_pause",
     "usage_this_month",
     "usage_today",
     "write_pause",

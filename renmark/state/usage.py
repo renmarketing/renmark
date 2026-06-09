@@ -23,6 +23,20 @@ class UsageRecord:
     model: str
     prompt_tokens: int
     completion_tokens: int
+    # Optional, keyword-defaulted enrichment fields (REQ-15). All default so
+    # construction from old rows / call sites stays back-compatible, and old
+    # usage.jsonl rows (without these keys) still parse via read_usage().
+    provider: str = ""
+    cached_tokens: int = 0
+    context_window_tokens: int = 0
+    agent_calls: int = 0
+    requests: int = 0
+    feature: str = ""
+    # source: local-observed | configured-local-limit | provider-reported
+    #         | estimated | unknown
+    source: str = "local-observed"
+    # kind: "" | "rate_limit" | "quota"
+    kind: str = ""
 
     def as_jsonl(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))
@@ -138,3 +152,106 @@ def _clamp_tokens(value: Any) -> int:
         return max(0, int(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _parse_ts(ts: str) -> float | None:
+    """Parse an ISO-8601 timestamp to epoch seconds; None on bad/missing input.
+
+    Tolerant: a trailing 'Z' (UTC) is normalised to '+00:00' so the stdlib
+    ``datetime.fromisoformat`` accepts it. Naive timestamps (no offset) are
+    treated as UTC so comparisons against an injected UTC ``now`` are stable.
+    """
+    if not ts or not isinstance(ts, str):
+        return None
+    candidate = ts.strip()
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        parsed = dt.datetime.fromisoformat(candidate)
+    except (ValueError, TypeError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.timestamp()
+
+
+def usage_in_window(repo: str | Path, *, now: str, seconds: int) -> dict[str, int]:
+    """Aggregate ledger rows whose ts falls within ``[now - seconds, now]``.
+
+    ``now`` is injected (ISO-8601) — this reader never calls datetime.now().
+    Non-raising: a missing/corrupt ledger or an unparseable ``now`` yields all
+    zeros. ``total_tokens`` is prompt + completion summed; ``requests`` and
+    ``agent_calls`` are summed from those row fields (0 when absent).
+    """
+    zero = {
+        "total_tokens": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "requests": 0,
+        "agent_calls": 0,
+        "rows": 0,
+    }
+    now_epoch = _parse_ts(now)
+    if now_epoch is None:
+        return zero
+    lower = now_epoch - max(0, int(seconds))
+    prompt = completion = requests = agent_calls = rows = 0
+    for r in read_usage(repo):
+        if not isinstance(r, dict):
+            continue
+        ts_epoch = _parse_ts(r.get("ts", ""))
+        if ts_epoch is None or ts_epoch < lower or ts_epoch > now_epoch:
+            continue
+        prompt += _clamp_tokens(r.get("prompt_tokens", 0))
+        completion += _clamp_tokens(r.get("completion_tokens", 0))
+        requests += _clamp_tokens(r.get("requests", 0))
+        agent_calls += _clamp_tokens(r.get("agent_calls", 0))
+        rows += 1
+    return {
+        "total_tokens": prompt + completion,
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "requests": requests,
+        "agent_calls": agent_calls,
+        "rows": rows,
+    }
+
+
+def usage_last_5h(repo: str | Path, *, now: str) -> dict[str, int]:
+    """Usage aggregated over the trailing 5-hour window ending at ``now``."""
+    return usage_in_window(repo, now=now, seconds=5 * 3600)
+
+
+def usage_last_week(repo: str | Path, *, now: str) -> dict[str, int]:
+    """Usage aggregated over the trailing 7-day window ending at ``now``."""
+    return usage_in_window(repo, now=now, seconds=7 * 24 * 3600)
+
+
+def tokens_by_feature(
+    repo: str | Path, *, now: str, seconds: int, top: int = 5
+) -> list[tuple[str, int]]:
+    """Top-N (feature, tokens) within ``[now - seconds, now]``, desc by tokens.
+
+    Tokens are prompt + completion summed. Rows with an empty/missing feature
+    are skipped. Non-raising: bad ledger or unparseable ``now`` → empty list.
+    """
+    now_epoch = _parse_ts(now)
+    if now_epoch is None:
+        return []
+    lower = now_epoch - max(0, int(seconds))
+    totals: dict[str, int] = {}
+    for r in read_usage(repo):
+        if not isinstance(r, dict):
+            continue
+        feature = r.get("feature", "")
+        if not isinstance(feature, str) or not feature:
+            continue
+        ts_epoch = _parse_ts(r.get("ts", ""))
+        if ts_epoch is None or ts_epoch < lower or ts_epoch > now_epoch:
+            continue
+        tokens = _clamp_tokens(r.get("prompt_tokens", 0)) + _clamp_tokens(
+            r.get("completion_tokens", 0)
+        )
+        totals[feature] = totals.get(feature, 0) + tokens
+    ranked = sorted(totals.items(), key=lambda kv: (-kv[1], kv[0]))
+    return ranked[: max(0, int(top))]
