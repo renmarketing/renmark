@@ -231,3 +231,134 @@ def test_snapshot_file_count_matches_manifest(tmp_path: Path):
     result = release.build_version_snapshot(str(tmp_path), now="2026-06-09T00:00:00")
     manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
     assert str(manifest["file_count"]) == result["file_count"]
+
+
+# ── codereview-finding regression tests ──────────────────────────────────────
+
+
+def test_symlink_outside_repo_not_archived(tmp_path: Path):
+    """FINDING 1: a repo-local symlink pointing OUTSIDE the repo must NOT be
+    dereferenced into the zip or the unpacked snapshot (host-secret leak)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _make_snapshot_repo(repo)
+
+    # A secret living OUTSIDE the repo
+    secret = tmp_path / "host_secret.txt"
+    secret.write_text("SUPER_SECRET_HOST_TOKEN\n")
+
+    # Repo-local symlink that points at the outside secret
+    link = repo / "leak.txt"
+    try:
+        link.symlink_to(secret)
+    except (OSError, NotImplementedError):
+        import pytest
+
+        pytest.skip("symlinks not supported on this platform")
+
+    result = release.build_version_snapshot(str(repo), now="2026-06-09T00:00:00")
+
+    # Not in the unpacked snapshot
+    snap = Path(result["snapshot_dir"])
+    assert not (snap / "leak.txt").exists(), "symlink leaked into unpacked snapshot"
+
+    # Not in the zip, and the secret content is absent
+    zf = zipfile.ZipFile(result["zip"])
+    names = zf.namelist()
+    assert not any("leak.txt" in n for n in names), "symlink leaked into zip"
+    for n in names:
+        if n.endswith("/"):
+            continue
+        assert b"SUPER_SECRET_HOST_TOKEN" not in zf.read(n), f"secret leaked via {n}"
+
+
+def test_changelog_section_exact_version_match(tmp_path: Path):
+    """FINDING 2: requesting 1.2.3 must NOT match a ## v1.2.30 heading, and
+    MUST match the real ## v1.2.3 heading."""
+    _make_snapshot_repo(tmp_path, version="1.2.3")
+    # v1.2.30 appears FIRST so a substring match would wrongly grab it.
+    (tmp_path / "CHANGELOG.md").write_text(
+        "## v1.2.30 — decoy\n\nDECOY_MARKER_30\n\n"
+        "## v1.2.3 — real\n\nCORRECT_MARKER_3\n\n"
+        "## v1.0.0 — older\n\nOld.\n"
+    )
+    release.build_version_snapshot(str(tmp_path), now="2026-06-09T00:00:00")
+    snap = tmp_path / ".renmark" / "version" / "v1.2.3"
+    text = (snap / "release.md").read_text(encoding="utf-8")
+    assert "CORRECT_MARKER_3" in text, "did not select the real ## v1.2.3 section"
+    assert "DECOY_MARKER_30" not in text, "wrongly matched ## v1.2.30"
+
+
+def test_verification_artifact_matches_head_sha(tmp_path: Path):
+    """FINDING 3: with two *.verification.md artifacts, the one whose filename
+    contains the current HEAD sha must be chosen."""
+    _make_snapshot_repo(tmp_path)
+    head = subprocess.run(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        capture_output=True, text=True,
+    )
+    if head.returncode != 0 or not head.stdout.strip():
+        import pytest
+
+        pytest.skip("git unavailable — cannot resolve HEAD sha")
+    sha = head.stdout.strip()
+
+    reviews = tmp_path / ".renmark" / "reviews"
+    # Remove the seeded artifact; create two: one matching HEAD, one not.
+    for f in reviews.glob("*.verification.md"):
+        f.unlink()
+    # Lexicographically LAST is the decoy, to prove sha-match beats sort order.
+    (reviews / f"2026-01-01-{sha}.verification.md").write_text("HEAD_MATCH_MARKER\n")
+    (reviews / "2099-12-31-deadbeef.verification.md").write_text("DECOY_MARKER\n")
+
+    release.build_version_snapshot(str(tmp_path), now="2026-06-09T00:00:00")
+    snap = tmp_path / ".renmark" / "version" / "v1.2.3"
+    text = (snap / "verification.md").read_text(encoding="utf-8")
+    assert "HEAD_MATCH_MARKER" in text, "did not select the HEAD-sha artifact"
+    assert "DECOY_MARKER" not in text, "wrongly selected the lexicographically-last artifact"
+
+
+def test_snapshot_dest_dir_and_archive_stem(tmp_path: Path):
+    """FINDING 4: dest_dir + archive_stem write the zip AND the unpacked dir
+    under the given dest, named by the stem."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _make_snapshot_repo(repo)
+    out = tmp_path / "out"
+
+    result = release.build_version_snapshot(
+        str(repo),
+        now="2026-06-09T00:00:00",
+        dest_dir=str(out),
+        archive_stem="custom",
+    )
+
+    zip_path = out / "custom.zip"
+    snap_dir = out / "custom"
+    assert zip_path.exists(), f"zip not written under dest_dir: {zip_path}"
+    assert snap_dir.is_dir(), f"unpacked dir not written under dest_dir: {snap_dir}"
+    assert result["zip"] == str(zip_path)
+    assert result["snapshot_dir"] == str(snap_dir)
+    assert (snap_dir / "manifest.json").exists()
+    # Default location must NOT have been used
+    assert not (repo / ".renmark" / "version" / "v1.2.3").exists()
+
+
+def test_snapshot_stale_symlink_target_no_raise(tmp_path: Path):
+    """FINDING 5: when the target unpacked dir is a stale (dangling) symlink,
+    rebuilding the snapshot must not raise."""
+    _make_snapshot_repo(tmp_path)
+    version_dir = tmp_path / ".renmark" / "version"
+    version_dir.mkdir(parents=True, exist_ok=True)
+    snap = version_dir / "v1.2.3"
+    try:
+        snap.symlink_to(tmp_path / "does_not_exist")
+    except (OSError, NotImplementedError):
+        import pytest
+
+        pytest.skip("symlinks not supported on this platform")
+
+    # Must not raise even though snap is a dangling symlink.
+    result = release.build_version_snapshot(str(tmp_path), now="2026-06-09T00:00:00")
+    assert Path(result["snapshot_dir"]).is_dir()
+    assert not Path(result["snapshot_dir"]).is_symlink()
