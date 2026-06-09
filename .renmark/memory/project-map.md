@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-09 @ 968fa02 -->
+<!-- Last refreshed: 2026-06-09 @ 2e38678 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=83
+**Languages:** python=89
 
 ## Directory tree
 
@@ -24,6 +24,7 @@ ai-system/
 |---|---|---|
 | `renmark/init.py` | Scans the repo for file structure, modules, and public symbols, then writes: | `FileInfo`, `Standard`, `Gap`, `StandardsScan`, `RepoScan`, `scan_repo` |
 | `renmark/memory.py` | Files act as living documentation — features shipped, bugs fixed, decisions | `memory_dir`, `template_dir`, `ensure_memory`, `read_index`, `read_file`, `log_feature` |
+| `renmark/analytics.py` | Append-only JSONL ledgers under ``.renmark/analytics/`` capture the events | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `record_loop_run` |
 | `renmark/lifecycle.py` | and the seven-stage workflow: Brainstorm → Plan → Create → Test → Review → | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `renmark/loop.py` | verified, resumable agentic loop (REQ-9/10/11; spec | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
 | `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `build_version_snapshot`, `current_version`, `check_drift` |
@@ -31,23 +32,23 @@ ai-system/
 | `tests/test_loop.py` | Hermetic: every test runs under pytest's ``tmp_path`` and seeds the usage | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `renmark/doctor.py` | Checks that renmark is properly registered with Claude Code and surfaces | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
+| `renmark/schemas.py` | payloads. Zero external dependencies — validation is structural, not full | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `validate_limits`, `validate_analytics_summary` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `renmark/backlog.py` | renmark surfaces for human review, approval, and disposition. | `BacklogItem`, `backlog_dir`, `next_id`, `read_item`, `write_item`, `list_items` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/lint.py` | CLAUDE.md.template rule blocks are well-formed. | `parse_frontmatter`, `lint_skill_files`, `lint_next_steps_citation`, `lint_command_shims`, `validate_rule_markers`, `iter_rule_blocks` |
 | `renmark/dispatch.py` | Groups tasks by parallel_group, validates that tasks sharing a group write | `TaskResult`, `WaveResult`, `group_tasks_by_wave`, `validate_wave`, `dispatch_wave`, `estimate_wave_cost` |
-| `tests/test_release_snapshot.py` | Tests for renmark.release.build_version_snapshot. | `test_snapshot_zip_exists`, `test_snapshot_dir_and_metadata_files_exist`, `test_snapshot_unpacked_contains_app_files`, `test_snapshot_excludes_junk_dirs`, `test_snapshot_manifest_fields`, `test_snapshot_release_md_contains_changelog_marker` |
-| `renmark/shadow.py` | subsystems. | `register`, `registered_subsystems`, `ShadowDiff`, `list_cases`, `run_subsystem`, `run_all` |
-| `renmark/hygiene.py` | Single source of truth for renmark's diagnostic hygiene operations. Walks the | `ScanReport`, `PruneReport`, `scan_artifacts`, `prune_memory`, `main` |
+| `renmark/usage.py` | Bounded, non-raising views over the local usage ledger plus a fallback-rule | `read_limits`, `percent_used`, `build_usage_view`, `classify_usage_pause`, `render_usage_md` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/sizing.py` | This is the **single source of truth** for "how big/risky is this change?" used | `classify_plan`, `classify_diff`, `resolve_override` |
 | `renmark/modularity.py` | renmark enforces modularity at *plan time* (one-file-per-task) but never | `analyze` |
-| `tests/test_sizing.py` | Hermetic: no network, no real git history dependence (we init throwaway repos | — |
+| `tests/test_release_snapshot.py` | Tests for renmark.release.build_version_snapshot. | — |
 
 ## Commands (user-facing)
 
 | Command | Purpose |
 |---|---|
+| `/renmark:analytics` | Use when you need a bounded project build-health summary — typed as /renmark:analytics. |
 | `/renmark:backlog` | Use to triage and approve backlog items — `/renmark:backlog` opens an interactive list, then a per-item detail view; 'Ap |
 | `/renmark:blueprint` | Use to create or update the project's blueprint — the technical architecture and implementation guide that plans and fea |
 | `/renmark:brainstorm` | Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's  |
@@ -68,4 +69,5 @@ ai-system/
 | `/renmark:roadmap` | Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, "show the |
 | `/renmark:setup` | Use when adding renmark to an existing project — creates missing CLAUDE.md, AGENTS.md, CHANGELOG.md, and .renmark/ struc |
 | `/renmark:start` | Use when a vibe coder wants to build something and doesn't know where to begin — the plain-English entry point for the f |
+| `/renmark:usage` | Use when the user wants observed local usage status — typed as /renmark:usage, "show usage", "rolling 5h", "weekly limit |
 | `/renmark:verify` | Use after `/renmark:orchestrate` completes — three modes selected by flag. |
