@@ -72,6 +72,51 @@ if any(i['severity'] == 'BLOCK' for i in issues):
 
 Each WARN prints as `⚠ <kind>: <artifact> @ <path>`; each BLOCK prints as `❌ BLOCK <kind>: <artifact> @ <path>`. On any BLOCK the skill exits non-zero (code 2) so the user investigates before continuing.
 
+### 1.75 Surface any in-flight loop
+
+A `/renmark:loop` run persists its runtime state to `.renmark/loops/<id>/loop.json`
+(the outer-loop sibling of `pipeline.json` — never `lifecycle.json`). On resume,
+if any loop directory holds a `loop.json` whose `status` is `running` or
+`awaiting-approval`, surface it so a `/clear` mid-loop is recoverable. Still
+**zero LLM calls** — pure file IO: glob the loop dirs, read each `loop.json` via
+`renmark.loop.read_loop`, no source reads, no analysis.
+
+```bash
+python3 -c "
+from pathlib import Path
+from renmark.loop import read_loop, budget_remaining, estimate_usd, LOOPS_SUBDIR
+from renmark.state import RENMARK_DIR_NAME
+loops_root = Path('.') / RENMARK_DIR_NAME / LOOPS_SUBDIR
+for d in sorted(loops_root.glob('loop-*')) if loops_root.is_dir() else []:
+    st = read_loop('.', d.name)
+    if st is None or st.status not in ('running', 'awaiting-approval'):
+        continue
+    remaining = budget_remaining(st)
+    print(f'⟳  Loop in flight: {d.name}  [{st.status}]')
+    print(f'   Iteration: {st.iteration}/{st.max_iterations}')
+    print(f'   Budget:    {remaining} tokens left ({estimate_usd(remaining)} of {estimate_usd(st.budget_tokens)})')
+    if st.pending_step:
+        print(f'   Pending:   {st.pending_step}')
+    print(f'   Resume:    /renmark:loop --resume {d.name}')
+"
+```
+
+Output, when a loop is in flight (one block per active loop, ≤5 lines each):
+
+```
+⟳  Loop in flight: <loop-id>  [running|awaiting-approval]
+   Iteration: <iteration>/<max_iterations>
+   Budget:    <remaining> tokens left (<$remaining> of <$budget>)
+   Pending:   <pending_step>            # only if a REQ-12 gate is awaiting approval
+   Resume:    /renmark:loop --resume <loop-id>
+```
+
+If **no** loop is in flight, this step prints nothing and resume behaves exactly
+as it does today — the lifecycle recovery below is unchanged. A loop in
+`awaiting-approval` is a pending gate: the lifecycle path (Step 2) still drives
+the `/renmark:approve` recommendation; this block only adds the `--resume` hint
+so the user knows which loop to re-enter after approving.
+
 ### 2. Surface pending approval gates
 
 If `human_review_required` is true and `human_review_completed` is false, the user MUST be told about the pending gate before any other recommendation. The next action is always `/renmark:approve` until the gate is cleared.
@@ -119,6 +164,6 @@ Resume is a **class 3 (aux / terminal) skill** in the next-step contract. It alr
 
 ## Governance compliance
 
-Resume IS the G7/G10/G12 recovery surface — it reads `lifecycle.json` (+ `pipeline.json` for `--resume` hints) and recommends the next step in ≤5 lines (G3), zero LLM calls, writing no workflow state. Other G-rules are N/A (it dispatches nothing and emits no artifact). See `CLAUDE.md` governance rules for definitions.
+Resume IS the G7/G10/G12 recovery surface — it reads `lifecycle.json` (+ `pipeline.json` for `--resume` hints, + each `.renmark/loops/<id>/loop.json` for in-flight loop recovery) and recommends the next step in ≤5 lines per surface (G3), zero LLM calls, writing no workflow state. Other G-rules are N/A (it dispatches nothing and emits no artifact). See `CLAUDE.md` governance rules for definitions.
 
 - Step 1.5 reads frontmatter from each referenced artifact (`spec`, `plan`, …) to cross-check `source_sha` + `stale_after`. Still zero LLM calls; bounded output (one line per issue, at most a few issues per healthy lifecycle).
