@@ -51,6 +51,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-09, .renmark/reviews/2026-06-09-a685228.verification.md) model `verify`: **verify-reporting-and-usage-analytics** — 9/9 behaviors verified; failed: none; regressions: 1; full gate green (608 passed, ruff+mypy clean)
+
 - (2026-06-09, .renmark/reviews/2026-06-09-619db95586c61627963cce188edf398806a18958.verification.md) model `verify`: **verify-release-version-snapshot** — 7/7 behaviors verified; failed: none; real CLI snapshot 212 files; full suite 588 pass
 
 - (2026-06-09, .renmark/reviews/2026-06-09-be1f4111cb1b5ec39842bac258349fc1be8cb5f2.verification.md) model `verify`: **verify-backlog-driven-loop-execution** — 5/5 behaviors verified; failed: none; regressions: full suite 570 pass; codex sandbox read-only -> task2 tests fell back to sonnet
