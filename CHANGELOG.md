@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.7.8 — 2026-06-09 (Release version snapshot — `.renmark/version/`)
+
+**Release of the canonical local version-snapshot protocol.** Bumped 0.7.7 → 0.7.8 across
+all 7 version locations. Shipped on `main` via `--no-ff` merge of
+`feature/release-version-snapshot` (verified 7/7; full codex codereview 1 Critical /
+3 Major / 2 Minor / 1 Nit — all fixed on-branch + independently re-probed; 593 tests +
+mypy + lint_all clean). **This release dogfoods itself** — packaged via the new
+`python -m renmark.release snapshot`.
+
+- **`renmark/release.py`** — new `build_version_snapshot()` writes BOTH a portable zip
+  (`<basename>-v<VERSION>.zip`) AND an unpacked, browsable `v<VERSION>/` snapshot
+  (`manifest.json` + `release.md` + `verification.md` + `files-changed.txt`) under the new
+  canonical home `.renmark/version/`. `build_package` default home baks→version (`.renmark/baks/`
+  retained, legacy-readable). New `snapshot` CLI subcommand (`--dest`/`--name` supported).
+  Reuses `PACKAGE_EXCLUDES`/`_is_excluded` (self-excludes `.renmark` → no recursion).
+- **Security:** release packaging now SKIPS symlinks (closes a host-secret-leak vector
+  where a repo-local symlink would be dereferenced into the zip/snapshot — also fixed in
+  the pre-existing `build_package`).
+- `verification.md` is matched to the release's HEAD sha; CHANGELOG section matched by
+  exact version token (`1.2.3` ≠ `v1.2.30`).
+- `renmark/init.py` scaffolds `.renmark/version/` into the gitignore set; `/renmark:finish`
+  §4 documents the new protocol + timing contract (snapshot is the last LOCAL step, before
+  remote publish). 44 release tests.
+
 ## [2026-06-09] — release-version-snapshot (verified + codereview-hardened)
 
 **Request:** Codereview + fix pass on the release-version-snapshot feature before finish.
