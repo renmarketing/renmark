@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-06-09] — delta audit (Fable 5 re-run) + P0 fix wave
+**Request:** Re-run the Opus audit adversarially, find what it missed, and fix the confirmed problems.
+**Built:** 19-agent delta workflow: 10 verifiers (told to REFUTE each original top finding, with empirical repro), 7 novel sweeps (inline-python contracts, unexamined engine modules, plugin-spec, memory staleness, security, prose drift), live dev-gates run, PRD-alignment check. Verdicts: 8 confirmed / 2 partial / 0 refuted, plus **66 novel findings** — 3 critical (loop decision engine never receives summary_lines → every failed verify stalled the loop; execute_plan false-success on budget exhaustion; parallel codex wave rollback can destroy sibling work), 2 security (release zips packaged `.env.production`/`*.pem`/etc. and finish uploads them to GitHub releases; cmd_task ran codex with no --sandbox flag). Gates ground truth: pytest green, but ruff/mypy NOT INSTALLED in .venv and failing when run (39 test-file lint errors, 2 mypy errors in dead providers). Fix wave landed 8 commits (see below); full suite 625 passed / 28 skipped.
+**Files changed:**
+- `renmark/lifecycle.py`, `renmark/state/skills.py`, `renmark/dispatch.py` — resume-killer reader hardening + G9 confidence downgrade (0a4efcb, 7b2fef1, 618624c)
+- `renmark/state/{usage,pipeline,logs}.py`, `renmark/roadmap.py` — remaining fragile readers (cf3a442)
+- `renmark/analytics.py`, `renmark/memory.py` — idempotent record_feature_run + append_routing (41eddd8)
+- `renmark/release.py`, `renmark/cli/commands.py` — secret-file package excludes (with .env.example allowlist); explicit codex sandbox (294a54e)
+- `renmark/summary.py` — new `read_summary_lines` (body-bullet reader); loop/finish SKILLs rewired (29bb737)
+- `plugin/skills/{orchestrate,verify,backlog,feature,prd}/SKILL.md`, `.renmark/memory/routing.md` + template — inline-python contract repairs, dead-route removals, nim→haiku (b3e37d0)
+- `.renmark/audits/audit-delta-2026-06-09.md` — full delta report incl. revised P0 queue and /renmark:audit design input
+**Do not change:**
+- `read_summary_lines` strips the leading `- ` bullet — `loop._FAILED_RE`/`_SYMPTOM_RE` anchor on unprefixed lines; reintroducing the prefix silently re-stalls loops.
+- `record_feature_run` dedup key is (feature, sha, status, branch_disposition) — a re-release with a new sha is intentionally a new row.
+- `.env.example/.env.sample/.env.template` are allowlisted in PACKAGE_ALLOW; don't "simplify" the `.env*` exclude by removing the allowlist.
+- Remaining P0s (engine false-success, parallel-wave rollback, registry/docs/template mega-sync, /renmark:approve + PRD addendum) are queued in audit-delta-2026-06-09.md §7 — approve needs the human-gated PRD scope update first.
+
 ## [2026-06-09] — skill-feature inventory & modularity audit (read-only)
 **Request:** Run the read-only skill/feature inventory + modularity audit per the committed spec (`.renmark/audits/skill-feature-inventory-spec.md`, 9a050a8); audit artifacts only, no refactors.
 **Built:** Full 23-command inventory + 13-dimension audit via 8 parallel read-only subagents, synthesized into 6 dated artifacts (+ JSON mirror) under `.renmark/audits/`. Pre-findings confirmed (hygiene is GC not inventory; DOMAIN_BY_SKILL ghosts). Top findings: (1) `lifecycle.read_lifecycle` + `state.skills.last_skill_invocation` raise on corrupt valid-JSON state — resume-killers; (2) `/renmark:approve` is cited by backlog/resume/loop/CLAUDE.md but does not exist; (3) 0/8 `schemas.py` validators have production call sites (2 fully dead); (4) `lifecycle.py` registries drifted (8 ghost skills, 5 missing real ones incl. usage/analytics; IMPLEMENTED_SKILLS missing 9); (5) finish re-run double-counts feature analytics (blind-append). 7 of 9 overlap hotspots clean; storage-layer single-source-of-truth holds everywhere; version parity healthy at 0.7.8. 24-item prioritized cleanup backlog proposed (NOT implemented).
