@@ -32,6 +32,7 @@ Design contract (mirrors ``renmark/sizing.py`` + ``renmark/lifecycle.py``):
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -163,21 +164,116 @@ def read_loop(repo: str | Path, loop_id_value: str) -> LoopState | None:
         return None
     if not isinstance(data, dict):
         return None
-    known = set(LoopState.__dataclass_fields__)
-    filtered = {k: v for k, v in data.items() if k in known}
     try:
-        return LoopState(**filtered)
+        return _coerce_loop_state(data)
     except (TypeError, ValueError):
         return None
 
 
-def write_loop(repo: str | Path, loop_id_value: str, state: LoopState) -> Path | None:
-    """Persist ``state`` to ``.renmark/loops/<id>/loop.json`` (atomic-ish).
+#: Defaults for the int fields, used when a persisted value is missing or
+#: non-coercible (a corrupt ledger must degrade, never raise).
+_INT_DEFAULTS: dict[str, int] = {
+    "budget_tokens": DEFAULT_BUDGET_TOKENS,
+    "spent_tokens": 0,
+    "max_iterations": DEFAULT_MAX_ITERATIONS,
+    "iteration": 0,
+}
 
-    Writes to a sibling ``.tmp`` file then ``os.replace``-style renames it over
-    the target, so a crash mid-write never leaves a half-written ``loop.json``
-    (the loop stays resumable from the last good state). Returns the written
-    path, or ``None`` on any IO failure — never raises into the caller.
+
+def _coerce_int(value: object, default: int) -> int:
+    """Coerce ``value`` to int; bad/garbage/non-finite → ``default``. No raise."""
+    if isinstance(value, bool):  # bool is an int subclass — treat as absent.
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return default
+        try:
+            return int(value)
+        except (ValueError, OverflowError):
+            return default
+    if isinstance(value, str):
+        raw = value.strip().replace("_", "").replace(",", "")
+        if not raw:
+            return default
+        try:
+            f = float(raw)
+        except (ValueError, OverflowError):
+            return default
+        if not math.isfinite(f):
+            return default
+        try:
+            return int(f)
+        except (ValueError, OverflowError):
+            return default
+    return default
+
+
+def _coerce_str(value: object) -> str:
+    """Coerce ``value`` to a string field value; non-str → ``str(...)`` or ''."""
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return ""
+    try:
+        return str(value)
+    except Exception:  # pragma: no cover - str() on a pathological object
+        return ""
+
+
+def _coerce_status(data: dict[str, object]) -> str:
+    """Coerce a persisted ``status`` to a known value. Unknown / non-str →
+    ``stalled`` (terminal) so a malformed state stops the loop, not runs it."""
+    status = data.get("status", "running")
+    if isinstance(status, str) and status in ("running", *TERMINAL_STATUSES):
+        return status
+    return "stalled"
+
+
+def _coerce_loop_state(data: dict[str, object]) -> LoopState:
+    """Build a :class:`LoopState` from arbitrary JSON, coercing every field to
+    its expected type. Unknown keys are dropped; bad types degrade to defaults;
+    an unknown ``status`` is treated as terminal (``stalled``) so a malformed
+    state stops the loop rather than running it unbounded. Never raises."""
+    state = LoopState()
+    if "goal" in data:
+        state.goal = _coerce_str(data["goal"])
+    if "verify_cmd" in data:
+        state.verify_cmd = _coerce_str(data["verify_cmd"])
+    if "budget_usd_estimate" in data:
+        state.budget_usd_estimate = _coerce_str(data["budget_usd_estimate"])
+    if "run_id" in data:
+        state.run_id = _coerce_str(data["run_id"])
+    if "pending_step" in data:
+        state.pending_step = _coerce_str(data["pending_step"])
+    if "budget_tokens" in data:
+        state.budget_tokens = _coerce_int(data["budget_tokens"], _INT_DEFAULTS["budget_tokens"])
+    if "spent_tokens" in data:
+        state.spent_tokens = _coerce_int(data["spent_tokens"], _INT_DEFAULTS["spent_tokens"])
+    if "max_iterations" in data:
+        state.max_iterations = _coerce_int(
+            data["max_iterations"], _INT_DEFAULTS["max_iterations"]
+        )
+    if "iteration" in data:
+        state.iteration = _coerce_int(data["iteration"], _INT_DEFAULTS["iteration"])
+    if "status" in data:
+        state.status = _coerce_status(data)
+    return state
+
+
+def write_loop(repo: str | Path, loop_id_value: str, state: LoopState) -> Path | None:
+    """Persist ``state`` to ``.renmark/loops/<id>/loop.json``.
+
+    Best-effort atomic replace (NO fsync): writes a sibling ``.tmp`` file then
+    ``Path.replace`` (``os.replace`` semantics — atomic on the same filesystem)
+    over the target, so a crash *between* writes never leaves a half-written
+    ``loop.json`` and the loop stays resumable from the last good state.
+    Because there is no ``fsync`` on the temp file or the parent directory, a
+    power-loss / OS crash in the narrow window before the OS flushes the rename
+    could still lose the most recent write — durability against a hard crash is
+    NOT guaranteed, only crash-*consistency* of the file content. Returns the
+    written path, or ``None`` on any IO failure — never raises into the caller.
     """
     path = _loop_json_path(repo, loop_id_value)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -264,17 +360,26 @@ def _coerce_budget_tokens(value: str | int) -> int:
 
     try:
         amount = float(cleaned)
-    except ValueError:
+    except (ValueError, OverflowError):
+        return 0
+    # Reject nan / inf / -inf (and "1e309" → inf): they are non-finite and would
+    # raise on the int/round conversion below. Degrade to 0 → caller defaults.
+    if not math.isfinite(amount):
         return 0
     if amount <= 0:
         return 0
 
-    if is_dollar:
-        if COST_PER_KTOKEN_USD <= 0:
-            return 0
-        return round((amount / COST_PER_KTOKEN_USD) * 1000.0)
-    # Bare number → token count (truncate any fractional tokens).
-    return int(amount)
+    try:
+        if is_dollar:
+            if COST_PER_KTOKEN_USD <= 0:
+                return 0
+            return round((amount / COST_PER_KTOKEN_USD) * 1000.0)
+        # Bare number → token count (truncate any fractional tokens).
+        return int(amount)
+    except (ValueError, OverflowError, TypeError):
+        # Any residual overflow / conversion failure → 0 (caller substitutes
+        # the bounded default). parse_budget must NEVER raise.
+        return 0
 
 
 # ── Decision object ─────────────────────────────────────────────────────────
@@ -311,10 +416,18 @@ def build_decision(verification_meta: dict[str, object], spent_delta: int) -> di
 
     evidence = _evidence_lines(meta)
 
-    # When the goal is reached there is no next action; otherwise carry whatever
-    # actionable next step the verify metadata recorded. A blank next_action is
-    # the signal for the stalled stop condition.
-    next_action = "" if goal_reached else _meta_str(meta, "next_action")
+    # When the goal is reached there is no next action. Otherwise: prefer an
+    # explicit ``next_action`` in the metadata, but the verify skill does NOT
+    # record one for a failed smoke run — it records the failure in
+    # ``summary_lines`` (a ``failed: <names>`` line and/or a
+    # ``run /renmark:debug ... symptom: <...>`` line). So when no explicit
+    # next_action exists, DERIVE a best-effort one from the failure lines, so a
+    # failing verify CONTINUES (within budget/max-iter) instead of stalling on
+    # the first failure. Only when there is genuinely no actionable failure does
+    # next_action stay blank → the driver maps that to ``stalled``.
+    next_action = (
+        "" if goal_reached else _meta_str(meta, "next_action") or _derive_next_action(meta, evidence)
+    )
 
     model_recommendation = _meta_str(meta, "model_recommendation") or "sonnet"
 
@@ -363,6 +476,62 @@ def _meta_str(meta: dict[str, object], key: str) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+#: Match the verify skill's failure lines and capture the actionable symptom:
+#:   "failed: search entries"                          → "search entries"
+#:   'run /renmark:debug with symptom: "X exits 1: ..."' → "X exits 1: ..."
+#:   "Failed: run /renmark:debug — \"checkout: ...\""    → "checkout: ..."
+_SYMPTOM_RE = re.compile(r'symptom:\s*"?(?P<sym>[^"]+?)"?\s*$', re.IGNORECASE)
+_FAILED_RE = re.compile(r"^\s*failed:\s*(?P<names>.+?)\s*$", re.IGNORECASE)
+
+
+def _derive_next_action(meta: dict[str, object], evidence: list[str]) -> str:
+    """Best-effort ``next_action`` derived from a FAILED verification's summary.
+
+    The verify skill records failures in ``summary_lines`` rather than an
+    explicit ``next_action`` field, e.g. ``failed: search entries`` and/or
+    ``run /renmark:debug with symptom: "search exits 1: no such table"``. This
+    extracts the most actionable symptom and turns it into ``address: <symptom>``
+    so the loop can iterate on the failure.
+
+    Returns ``""`` ONLY when there is no actionable failure — i.e. the
+    verification reports ``failed: none`` (or has no failure signal at all). A
+    blank result is the driver's ``stalled`` signal (a genuine no-op), NOT the
+    response to every failed verify. Never raises.
+    """
+    # Search all candidate lines: explicit summary_lines first, then evidence.
+    raw = meta.get("summary_lines")
+    candidates: list[str] = []
+    if isinstance(raw, list):
+        candidates.extend(str(item).strip() for item in raw)
+    candidates.extend(evidence)
+    single = meta.get("summary")
+    if isinstance(single, str):
+        candidates.append(single.strip())
+
+    # 1. Prefer an explicit debug symptom — the richest actionable signal.
+    for line in candidates:
+        if not line:
+            continue
+        m = _SYMPTOM_RE.search(line)
+        if m:
+            sym = m.group("sym").strip()
+            if sym:
+                return f"address: {sym}"
+
+    # 2. Fall back to the ``failed: <names>`` line — unless it reports none.
+    for line in candidates:
+        m = _FAILED_RE.match(line)
+        if m:
+            names = m.group("names").strip()
+            if names and names.lower() not in ("none", "(none)", "n/a"):
+                return f"address: {names}"
+            # An explicit ``failed: none`` is a genuine no-op → stay blank.
+            return ""
+
+    # 3. No failure signal at all → no actionable next step → blank (stalled).
+    return ""
+
+
 # ── Stop logic ───────────────────────────────────────────────────────────────
 
 
@@ -398,7 +567,8 @@ def stop_reason(state: LoopState) -> str | None:
         budget = int(getattr(state, "budget_tokens", 0) or 0)
         iteration = int(getattr(state, "iteration", 0) or 0)
         max_iter = int(getattr(state, "max_iterations", 0) or 0)
-        pending = (getattr(state, "pending_step", "") or "").strip()
+        raw_pending = getattr(state, "pending_step", "") or ""
+        pending = raw_pending.strip() if isinstance(raw_pending, str) else str(raw_pending).strip()
 
         # Budget ceiling is checked first — never exceed the approved spend.
         if budget > 0 and spent >= budget:
@@ -408,7 +578,7 @@ def stop_reason(state: LoopState) -> str | None:
         if pending:
             return "awaiting-approval"
         return None
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, AttributeError):
         # A malformed state must stop the loop, not run it unbounded.
         return "stalled"
 
@@ -424,9 +594,15 @@ def refresh_spent(repo: str | Path, state: LoopState) -> LoopState:
     raises → 0). Mutates and returns ``state`` for caller convenience. A blank
     ``run_id`` leaves ``spent_tokens`` untouched (nothing to attribute yet).
     """
-    run_id = (getattr(state, "run_id", "") or "").strip()
-    if run_id:
-        state.spent_tokens = usage_by_run_id(repo, run_id)
+    try:
+        raw_run_id = getattr(state, "run_id", "") or ""
+        run_id = raw_run_id.strip() if isinstance(raw_run_id, str) else str(raw_run_id).strip()
+        if run_id:
+            state.spent_tokens = usage_by_run_id(repo, run_id)
+    except (TypeError, ValueError, AttributeError, OSError):
+        # A malformed run_id / ledger read failure leaves spend untouched rather
+        # than raising — the budget gate then errs toward the last known spend.
+        return state
     return state
 
 
@@ -439,7 +615,31 @@ def budget_remaining(state: LoopState) -> int:
     return max(0, remaining)
 
 
+#: Minimum remaining tokens worth starting another orchestrate+verify cycle. The
+#: budget PREFLIGHT refuses to dispatch when fewer than this remain, so the loop
+#: stops at ``budget-hit`` BEFORE spending (REQ-9: never exceed the approved
+#: budget). Below this floor an iteration cannot make meaningful progress.
+BUDGET_FLOOR_TOKENS: int = 1
+
+
+def should_continue_budget(state: LoopState) -> bool:
+    """Budget PREFLIGHT — may the driver dispatch ANOTHER iteration?
+
+    Called BEFORE each iteration's orchestrate dispatch (not after), so the
+    approved budget is never overshot by a full cycle's spend. Returns ``True``
+    only when at least :data:`BUDGET_FLOOR_TOKENS` remain. A malformed state
+    degrades to ``False`` (stop), never to running unbounded. Never raises.
+    """
+    try:
+        if budget_remaining(state) < BUDGET_FLOOR_TOKENS:
+            return False
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 __all__ = [
+    "BUDGET_FLOOR_TOKENS",
     "COST_PER_KTOKEN_USD",
     "DEFAULT_BUDGET_TOKENS",
     "DEFAULT_MAX_ITERATIONS",
@@ -456,6 +656,7 @@ __all__ = [
     "parse_budget",
     "read_loop",
     "refresh_spent",
+    "should_continue_budget",
     "stop_reason",
     "write_loop",
 ]

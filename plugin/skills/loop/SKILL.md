@@ -91,37 +91,65 @@ Also write sibling `goal.md` for provenance. `loop.json` is the runtime sibling 
 
 ### 3. Drive the loop (autonomous, no prompts)
 
+Per-iteration order is **check budget+max-iter → dispatch → verify → refresh_spent → decide**.
+The budget gate is a **PREFLIGHT** — it runs BEFORE the orchestrate dispatch so an approved
+budget is never overshot by a full cycle's spend (REQ-9).
+
 While `stop_reason(state)` is `None`:
 
+0. **Budget preflight (BEFORE dispatch).** Check the budget AND the iteration ceiling
+   *before* spending anything this iteration:
+   ```python
+   if not loop.should_continue_budget(state):   # budget_remaining < BUDGET_FLOOR_TOKENS
+       state.status = "budget-hit"
+       loop.write_loop(repo, lid, state)
+       break                                     # STOP before dispatch — never overshoot
+   if stop_reason(state) is not None:            # max-iter / awaiting-approval / terminal
+       break
+   ```
+   This is the load-bearing fix for REQ-9: the budget is gated *before* orchestrate, not
+   after `refresh_spent`. Stopping after spending would overshoot by one full iteration.
 1. **Orchestrate** — invoke `/renmark:orchestrate` on the current plan / `next_action`. It
    plans + dispatches, **commits passing work to the feature branch**, and ledgers spend
    under the loop's `run_id`.
 2. **Verify** — invoke `/renmark:verify` (goal-backward + the `--verify` cmd). It writes a
    `.verification.md` with machine-readable metadata.
-3. **Decide** — read ONLY that metadata (`renmark.summary.read_metadata`) and the ledger
-   spend delta; build the decision:
+3. **refresh_spent** — recompute measured spend from the ledger:
    ```python
    state = loop.refresh_spent(repo, state)     # spent_tokens from usage.jsonl (real spend)
+   ```
+4. **Decide** — read ONLY the verify metadata (`renmark.summary.read_metadata`) and the
+   ledger spend delta; build the decision:
+   ```python
    decision = loop.build_decision(verification_meta, spent_delta)
    ```
-4. **Record** — write `iterations/NNN-summary.md` (bounded) and update `loop.json`:
+   **The driver supplies/refines `next_action`.** On a failed verify, `build_decision`
+   DERIVES a best-effort `next_action` from the verification `summary_lines` (the
+   `failed: <names>` line and/or the `run /renmark:debug ... symptom: "<...>"` line →
+   `address: <symptom>`). A failing verify with an actionable symptom **CONTINUES** the
+   loop (within budget/max-iter) — it is NOT stalled. The driver reads that bounded
+   failure and may further refine `next_action` for the next iteration's orchestrate.
+5. **Record** — write `iterations/NNN-summary.md` (bounded) and update `loop.json`:
    ```python
    state.iteration += 1
    if decision["goal_reached"]:
        state.status = "done"
    elif not decision["next_action"].strip():
-       state.status = "stalled"     # IMPORTANT: the driver derives 'stalled' from an
-                                     # empty next_action BEFORE calling stop_reason —
-                                     # loop.py delegates that derivation to the driver.
+       # 'stalled' ONLY when there is genuinely NO actionable next step — e.g. the verify
+       # reported NO failed behaviors (failed: none) and the goal was not reached. A failed
+       # verify that DID yield an actionable symptom has a non-blank next_action and so
+       # does NOT stall — it iterates. Never set 'stalled' on every failed verify.
+       state.status = "stalled"
    loop.write_loop(repo, lid, state)           # written before the iteration returns → resumable
    ```
-5. **Check** — `stop_reason(state)`. If non-None, the loop is terminal; break.
-6. **Progress line** — emit **ONE bounded line** per iteration (≤ summary cap), e.g.
+6. **Check** — `stop_reason(state)`. If non-None, the loop is terminal; break.
+7. **Progress line** — emit **ONE bounded line** per iteration (≤ summary cap), e.g.
    `iter 2/5 · verify FAIL · spent 80k/300k (~$0.80) · next: add null-guard`.
    **No per-iteration prompt.**
 
-The budget ceiling is checked first among live stop conditions — an approved budget is
-never exceeded; raising it requires a *new* upfront approval.
+The budget ceiling is preflighted before each dispatch AND checked first among `stop_reason`'s
+live stop conditions — an approved budget is never exceeded; raising it requires a *new*
+upfront approval.
 
 ### 4. Terminal status → bounded verdict → hand off
 
@@ -133,7 +161,7 @@ Stop conditions (all terminal):
 | `budget-hit` | ledger spend ≥ approved budget |
 | `max-iter` | iteration ≥ `--max-iterations` |
 | `awaiting-approval` | a REQ-12 gate (merge/release/PR/destructive/budget-escalation) is pending |
-| `stalled` | verify FAIL with no actionable `next_action` / no fresh evidence |
+| `stalled` | verify reported NO failed behaviors yet goal not reached, OR a failed verify yielded no actionable symptom (blank derived `next_action`) — NOT set on a failed verify that produced an actionable symptom (that one iterates) |
 
 Report a bounded ≤5-line verdict (status, iterations used, spend vs budget, last evidence),
 then hand off to `/renmark:finish` — which carries the **REQ-12 merge/release approval gate**.

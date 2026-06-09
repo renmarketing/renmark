@@ -15,6 +15,7 @@ import pytest
 
 from renmark import loop
 from renmark.loop import (
+    BUDGET_FLOOR_TOKENS,
     COST_PER_KTOKEN_USD,
     DEFAULT_BUDGET_TOKENS,
     DEFAULT_MAX_ITERATIONS,
@@ -26,10 +27,11 @@ from renmark.loop import (
     parse_budget,
     read_loop,
     refresh_spent,
+    should_continue_budget,
     stop_reason,
     write_loop,
 )
-from renmark.state import UsageRecord, append_usage
+from renmark.state import UsageRecord, append_usage, usage_by_run_id
 
 
 # ── write_loop / read_loop round-trip ──────────────────────────────────────
@@ -358,3 +360,246 @@ def test_module_constants_have_expected_defaults() -> None:
     assert DEFAULT_MAX_ITERATIONS == 5
     assert DEFAULT_BUDGET_TOKENS == 300_000
     assert COST_PER_KTOKEN_USD == pytest.approx(0.01)
+
+
+# ── Major #1: failed verify must DERIVE next_action and CONTINUE ─────────────
+
+
+def test_build_decision_failed_verify_derives_next_action_from_symptom() -> None:
+    """A FAILED verify with no explicit next_action but a debug-symptom line in
+    summary_lines → build_decision derives an actionable next_action (loop
+    CONTINUES instead of stalling on the first failure)."""
+    meta = {
+        "completion_state": "partial",
+        "validation_status": "validated",
+        # verify records the failure in summary_lines, NOT in next_action.
+        "summary_lines": [
+            "1/2 behaviors verified",
+            "failed: search entries",
+            'run /renmark:debug with symptom: "search exits 1: no such table: entries"',
+        ],
+    }
+    decision = build_decision(meta, spent_delta=10_000)
+    assert decision["goal_reached"] is False
+    next_action = decision["next_action"]
+    assert isinstance(next_action, str)
+    assert next_action.strip() != ""  # derived → loop has an actionable step
+    assert "search exits 1" in next_action  # carries the symptom
+
+    # And the loop would CONTINUE: a running state with budget + iterations left
+    # and a non-blank next_action is NOT terminal.
+    state = LoopState(
+        status="running",
+        spent_tokens=10_000,
+        budget_tokens=DEFAULT_BUDGET_TOKENS,
+        iteration=1,
+        max_iterations=DEFAULT_MAX_ITERATIONS,
+        pending_step="",
+    )
+    assert stop_reason(state) is None
+
+
+def test_build_decision_failed_verify_derives_from_failed_names_line() -> None:
+    """No symptom line, but a 'failed: <names>' line → still derives an action."""
+    meta = {
+        "completion_state": "partial",
+        "validation_status": "validated",
+        "summary_lines": ["failed: search entries, list entries"],
+    }
+    decision = build_decision(meta, spent_delta=0)
+    assert decision["goal_reached"] is False
+    assert "search entries" in str(decision["next_action"])
+
+
+def test_build_decision_failed_verify_no_actionable_step_stalls() -> None:
+    """A failed verify reporting NO failed behaviors (failed: none) → blank
+    next_action → the driver maps that to 'stalled' (a genuine no-op)."""
+    meta = {
+        "completion_state": "partial",
+        "validation_status": "failed",
+        "summary_lines": ["0/0 behaviors verified", "failed: none"],
+    }
+    decision = build_decision(meta, spent_delta=0)
+    assert decision["goal_reached"] is False
+    assert decision["next_action"] == ""  # nothing actionable → stalled signal
+
+
+def test_build_decision_explicit_next_action_wins_over_derivation() -> None:
+    """An explicit next_action in metadata is used verbatim (derivation is only
+    the fallback for the failed-smoke case that records no next_action)."""
+    meta = {
+        "completion_state": "partial",
+        "validation_status": "validated",
+        "next_action": "fix the failing import",
+        "summary_lines": ['run /renmark:debug with symptom: "other thing"'],
+    }
+    decision = build_decision(meta, spent_delta=0)
+    assert decision["next_action"] == "fix the failing import"
+
+
+# ── Major #2: budget PREFLIGHT stops BEFORE another dispatch ─────────────────
+
+
+def test_should_continue_budget_true_with_room() -> None:
+    state = LoopState(budget_tokens=DEFAULT_BUDGET_TOKENS, spent_tokens=100_000)
+    assert should_continue_budget(state) is True
+
+
+def test_should_continue_budget_false_at_budget() -> None:
+    """At/over budget → preflight returns False BEFORE another dispatch."""
+    state = LoopState(budget_tokens=DEFAULT_BUDGET_TOKENS, spent_tokens=DEFAULT_BUDGET_TOKENS)
+    assert should_continue_budget(state) is False
+    assert budget_remaining(state) < BUDGET_FLOOR_TOKENS
+
+
+def test_should_continue_budget_false_over_budget() -> None:
+    state = LoopState(budget_tokens=100, spent_tokens=500)
+    assert should_continue_budget(state) is False
+
+
+def test_budget_preflight_then_stop_reason_budget_hit() -> None:
+    """Preflight scenario: a state at budget → should_continue_budget False AND
+    stop_reason reports 'budget-hit' (the driver stops before spending more)."""
+    state = LoopState(
+        status="running",
+        budget_tokens=DEFAULT_BUDGET_TOKENS,
+        spent_tokens=DEFAULT_BUDGET_TOKENS,
+        iteration=1,
+        max_iterations=DEFAULT_MAX_ITERATIONS,
+    )
+    assert should_continue_budget(state) is False
+    assert stop_reason(state) == "budget-hit"
+
+
+def test_should_continue_budget_malformed_state_stops() -> None:
+    """A malformed state degrades to False (stop), never raises / runs unbounded."""
+    state = LoopState()
+    state.budget_tokens = "garbage"  # type: ignore[assignment]
+    assert should_continue_budget(state) is False
+
+
+# ── Major #3: parse_budget never raises on nan/inf/overflow ──────────────────
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["nan", "$nan", "inf", "$inf", "-inf", "1e309", "$1e309", "1e400", "NaN", "Infinity"],
+)
+def test_parse_budget_non_finite_degrades_to_default(bad: str) -> None:
+    """nan / inf / 1e309 (→ inf) must NOT raise — degrade to the bounded default."""
+    tokens, usd = parse_budget(bad)
+    assert tokens == DEFAULT_BUDGET_TOKENS
+    assert usd == estimate_usd(DEFAULT_BUDGET_TOKENS)
+
+
+@pytest.mark.parametrize("bad", ["-5", "$-3", "0", "$0", "not-a-number", "", "   "])
+def test_parse_budget_negative_zero_garbage_default(bad: str) -> None:
+    tokens, _ = parse_budget(bad)
+    assert tokens == DEFAULT_BUDGET_TOKENS
+
+
+def test_parse_budget_never_raises_on_extreme_float() -> None:
+    """A direct float overflow path stays bounded (no OverflowError escapes)."""
+    tokens, _ = parse_budget("9" * 400)  # parses to inf as a float
+    assert tokens == DEFAULT_BUDGET_TOKENS
+
+
+# ── Major #4: read_loop degrades on malformed loop.json, never raises ────────
+
+
+def test_read_loop_wrong_field_types_coerced(tmp_path: Path) -> None:
+    """Wrong JSON types for fields are coerced, not crashed: int fields from
+    strings, str fields from numbers — no raise."""
+    lid = "loop-2026-06-09-types"
+    path = loop.loop_dir(tmp_path, lid) / loop.LOOP_JSON
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        '{"goal": 123, "budget_tokens": "250000", "spent_tokens": "bad", '
+        '"iteration": 2.0, "run_id": 456, "pending_step": 789, "status": "running"}',
+        encoding="utf-8",
+    )
+    loaded = read_loop(tmp_path, lid)
+    assert loaded is not None
+    assert loaded.goal == "123"  # number coerced to str
+    assert loaded.budget_tokens == 250_000  # numeric string coerced to int
+    assert loaded.spent_tokens == 0  # garbage int → default 0
+    assert loaded.iteration == 2  # float coerced to int
+    assert loaded.run_id == "456"
+    assert loaded.pending_step == "789"
+    assert loaded.status == "running"
+
+
+def test_read_loop_unknown_status_treated_as_terminal(tmp_path: Path) -> None:
+    """An unknown status must NOT keep the loop running — it degrades to a
+    terminal status so a malformed state stops rather than loops unbounded."""
+    lid = "loop-2026-06-09-badstatus"
+    path = loop.loop_dir(tmp_path, lid) / loop.LOOP_JSON
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"goal": "g", "status": "totally-bogus"}', encoding="utf-8")
+    loaded = read_loop(tmp_path, lid)
+    assert loaded is not None
+    assert loaded.status in loop.TERMINAL_STATUSES  # terminal → stops
+    assert stop_reason(loaded) is not None
+
+
+def test_read_loop_non_str_pending_step_does_not_crash_stop_reason(tmp_path: Path) -> None:
+    """The original bug: a non-str pending_step would raise on .strip() in
+    stop_reason. After coercion (and the broadened guard) it must not raise."""
+    lid = "loop-2026-06-09-pending"
+    path = loop.loop_dir(tmp_path, lid) / loop.LOOP_JSON
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"goal": "g", "pending_step": 5, "status": "running"}', encoding="utf-8")
+    loaded = read_loop(tmp_path, lid)
+    assert loaded is not None
+    # pending_step coerced to "5" (truthy) → awaiting-approval, but crucially no raise.
+    assert stop_reason(loaded) is not None
+
+
+def test_stop_reason_never_raises_on_raw_bad_state() -> None:
+    """Even a directly-constructed bad state (bypassing read coercion) must
+    degrade to a terminal stop, never raise."""
+    state = LoopState()
+    state.pending_step = 42  # type: ignore[assignment]
+    state.spent_tokens = "x"  # type: ignore[assignment]
+    assert stop_reason(state) is not None  # degrades to 'stalled', no raise
+
+
+# ── Major #5: usage_by_run_id skips corrupt lines + clamps negatives ─────────
+
+
+def test_usage_by_run_id_clamps_negative_tokens(tmp_path: Path) -> None:
+    """Negative token fields are clamped to 0 — never under-count real spend
+    (which would let the loop overshoot its budget)."""
+    _seed_usage(tmp_path, "run-neg", [(-200, -200), (1000, 500)])
+    total = usage_by_run_id(tmp_path, "run-neg")
+    # The negative record contributes 0; only the valid 1500 counts.
+    assert total == 1500
+    assert total >= 0
+
+
+def test_usage_by_run_id_skips_corrupt_line_no_raise(tmp_path: Path) -> None:
+    """A corrupt / non-JSON line in usage.jsonl is skipped; valid lines still
+    sum; the call never raises."""
+    from renmark.state._core import USAGE_LEDGER, state_dir
+
+    _seed_usage(tmp_path, "run-mix", [(1000, 500)])
+    ledger = state_dir(tmp_path) / USAGE_LEDGER
+    # Append a corrupt-byte line + a non-JSON line.
+    with ledger.open("ab") as fh:
+        fh.write(b"\xff\xfe not valid json bytes\n")
+    with ledger.open("a", encoding="utf-8") as fh:
+        fh.write("{ broken json\n")
+    total = usage_by_run_id(tmp_path, "run-mix")
+    assert total == 1500  # only the valid record counted, no crash
+
+
+def test_usage_by_run_id_garbage_token_field_counts_zero(tmp_path: Path) -> None:
+    from renmark.state._core import USAGE_LEDGER, state_dir
+
+    ledger = state_dir(tmp_path) / USAGE_LEDGER
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(
+        '{"run_id": "run-g", "prompt_tokens": "abc", "completion_tokens": null}\n',
+        encoding="utf-8",
+    )
+    assert usage_by_run_id(tmp_path, "run-g") == 0
