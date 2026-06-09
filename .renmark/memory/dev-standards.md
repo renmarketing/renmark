@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-09 @ 3003b01 -->
+<!-- Last refreshed: 2026-06-09 @ 968fa02 -->
 
 # Dev standards — ai-system
 
@@ -21,10 +21,11 @@ What this project enforces about itself, detected from configuration files. Read
 ✅ **No gaps detected.** Linter, type checker, tests, and CI are all wired up.
 ## Modularity
 
-**128 modularity gaps** (20 major, 108 warn) — file-level size/complexity breaches. Advisory: these never block init.
+**133 modularity gaps** (21 major, 112 warn) — file-level size/complexity breaches. Advisory: these never block init.
 
 - 🚨 **High cognitive complexity: `renmark/memory.py` → `_parse_learning_entries()` (score 32)** — `_parse_learning_entries()` in `renmark/memory.py` has a nesting-weighted cognitive-complexity score of 32 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `_parse_learning_entries()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
-- 🚨 **High cognitive complexity: `renmark/release.py` → `main()` (score 31)** — `main()` in `renmark/release.py` has a nesting-weighted cognitive-complexity score of 31 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `main()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
+- 🚨 **High cyclomatic complexity: `renmark/release.py` → `main()` (26 branches)** — `main()` in `renmark/release.py` has a cyclomatic branch count of 26 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `main()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
+- 🚨 **High cognitive complexity: `renmark/release.py` → `main()` (score 48)** — `main()` in `renmark/release.py` has a nesting-weighted cognitive-complexity score of 48 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `main()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **Long function: `renmark/bootstrap.py` → `bootstrap()` (108 code lines)** — `bootstrap()` in `renmark/bootstrap.py` spans 108 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `bootstrap()` into well-named helpers. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/bootstrap.py` → `bootstrap()` (22 branches)** — `bootstrap()` in `renmark/bootstrap.py` has a cyclomatic branch count of 22 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `bootstrap()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High cognitive complexity: `renmark/shadow.py` → `main()` (score 31)** — `main()` in `renmark/shadow.py` has a nesting-weighted cognitive-complexity score of 31 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `main()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
@@ -42,8 +43,7 @@ What this project enforces about itself, detected from configuration files. Read
 - 🚨 **Long function: `renmark/cli/_engine.py` → `_execute_task_codex()` (195 code lines)** — `_execute_task_codex()` in `renmark/cli/_engine.py` spans 195 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `_execute_task_codex()` into well-named helpers. Advisory._
 - 🚨 **Long function: `renmark/cli/commands.py` → `cmd_task()` (104 code lines)** — `cmd_task()` in `renmark/cli/commands.py` spans 104 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `cmd_task()` into well-named helpers. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/providers/nim.py` → `complete()` (21 branches)** — `complete()` in `renmark/providers/nim.py` has a cyclomatic branch count of 21 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `complete()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
-- 🚨 **High cognitive complexity: `renmark/providers/nim.py` → `complete()` (score 60)** — `complete()` in `renmark/providers/nim.py` has a nesting-weighted cognitive-complexity score of 60 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `complete()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
-- _… +108 more (re-run for the full list)_
+- _… +113 more (re-run for the full list)_
 
 
 _Run `python -m renmark.init --deep` for deeper checks (commit-message style, etc.)._

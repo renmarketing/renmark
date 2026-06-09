@@ -13,6 +13,18 @@
 
 
 
+
+## ADR-020 — Finished feature release-version-snapshot
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch feature/release-version-snapshot reached stage ready-to-release
+
+---
+
 ## ADR-019 — Released renmark v0.7.7
 
 **Date:** 2026-06-09

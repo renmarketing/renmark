@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-09 @ 6a8a204 -->
+<!-- Last refreshed: 2026-06-09 @ 968fa02 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=82
+**Languages:** python=83
 
 ## Directory tree
 
@@ -26,6 +26,7 @@ ai-system/
 | `renmark/memory.py` | Files act as living documentation — features shipped, bugs fixed, decisions | `memory_dir`, `template_dir`, `ensure_memory`, `read_index`, `read_file`, `log_feature` |
 | `renmark/lifecycle.py` | and the seven-stage workflow: Brainstorm → Plan → Create → Test → Review → | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `renmark/loop.py` | verified, resumable agentic loop (REQ-9/10/11; spec | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
+| `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `build_version_snapshot`, `current_version`, `check_drift` |
 | `tests/test_modularity.py` | Hermetic: every test writes tiny synthetic ``.py`` files into ``tmp_path`` and | `test_module_loc_just_over_warn_is_warn`, `test_module_loc_just_over_major_is_danger`, `test_module_loc_just_under_warn_is_clean`, `test_func_loc_exactly_warn_is_warn`, `test_func_loc_just_over_warn_is_warn`, `test_func_loc_exactly_major_is_danger` |
 | `tests/test_loop.py` | Hermetic: every test runs under pytest's ``tmp_path`` and seeds the usage | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
@@ -35,14 +36,13 @@ ai-system/
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/lint.py` | CLAUDE.md.template rule blocks are well-formed. | `parse_frontmatter`, `lint_skill_files`, `lint_next_steps_citation`, `lint_command_shims`, `validate_rule_markers`, `iter_rule_blocks` |
 | `renmark/dispatch.py` | Groups tasks by parallel_group, validates that tasks sharing a group write | `TaskResult`, `WaveResult`, `group_tasks_by_wave`, `validate_wave`, `dispatch_wave`, `estimate_wave_cost` |
+| `tests/test_release_snapshot.py` | Tests for renmark.release.build_version_snapshot. | `test_snapshot_zip_exists`, `test_snapshot_dir_and_metadata_files_exist`, `test_snapshot_unpacked_contains_app_files`, `test_snapshot_excludes_junk_dirs`, `test_snapshot_manifest_fields`, `test_snapshot_release_md_contains_changelog_marker` |
 | `renmark/shadow.py` | subsystems. | `register`, `registered_subsystems`, `ShadowDiff`, `list_cases`, `run_subsystem`, `run_all` |
-| `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `current_version`, `check_drift`, `drift_report` |
-| `tests/test_sizing.py` | Hermetic: no network, no real git history dependence (we init throwaway repos | `test_all_doc_small_set_is_lite`, `test_any_hard_task_is_never_lite`, `test_core_module_target_is_at_least_standard`, `test_many_tasks_is_full`, `test_empty_list_degrades_to_standard`, `test_classify_plan_never_raises_on_malformed_input` |
 | `renmark/hygiene.py` | Single source of truth for renmark's diagnostic hygiene operations. Walks the | `ScanReport`, `PruneReport`, `scan_artifacts`, `prune_memory`, `main` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/sizing.py` | This is the **single source of truth** for "how big/risky is this change?" used | `classify_plan`, `classify_diff`, `resolve_override` |
 | `renmark/modularity.py` | renmark enforces modularity at *plan time* (one-file-per-task) but never | `analyze` |
-| `tests/test_init_pipeline.py` | Covers the behavior added in this feature: | — |
+| `tests/test_sizing.py` | Hermetic: no network, no real git history dependence (we init throwaway repos | — |
 
 ## Commands (user-facing)
 

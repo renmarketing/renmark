@@ -67,11 +67,11 @@ EXCLUDE_DIRS = {
     ".mypy_cache",
     ".idea",
     ".vscode",
-    # renmark runtime — keep memory/, exclude state/debug/logs/baks
+    # renmark runtime — keep memory/, exclude state/debug/logs/baks/version
 }
 
 # .renmark subdirs that are runtime-only (do not scan into the map)
-EXCLUDE_RENMARK_RUNTIME = {".renmark/state", ".renmark/debug", ".renmark/logs", ".renmark/baks"}
+EXCLUDE_RENMARK_RUNTIME = {".renmark/state", ".renmark/debug", ".renmark/logs", ".renmark/baks", ".renmark/version"}
 
 LANG_BY_EXT = {
     ".py": "python",

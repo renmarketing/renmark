@@ -1,5 +1,32 @@
 # Changelog
 
+## [2026-06-09] — release-version-snapshot (verified + codereview-hardened)
+
+**Request:** Codereview + fix pass on the release-version-snapshot feature before finish.
+**Built:** Full codex review (1 Critical / 3 Major / 2 Minor / 1 Nit) → all findings fixed on-branch.
+**Files changed:**
+- `renmark/release.py` — CRITICAL: skip symlinks in `build_package` + snapshot copy (no host-secret leak via a repo-local symlink); changelog section matched by exact version token (`1.2.3` ≠ `v1.2.30`); `verification.md` selected by current HEAD sha; `build_version_snapshot` gained `dest_dir`/`archive_stem`/`verification_path`; `snapshot` CLI parses `--dest`/`--name`; robust snapshot-dir cleanup. +5 tests (44 in file).
+- `plugin/skills/finish/SKILL.md` — `[r]` menu + override note baks→version; `--dest`/`--name` documented accurately; timing reworded to "last LOCAL artifact step (before remote publish 4d)".
+**Do not change:**
+- Release packaging MUST skip symlinks (never dereference a repo-local symlink into the zip/snapshot) — this was a real secret-leak vector.
+- `verification.md` in a snapshot is matched to the release's HEAD sha, not the lexicographically-last artifact.
+- Verified 7/7; full suite 593 pass (+5 fix tests); mypy + lint_all clean.
+
+## [2026-06-09] — release version snapshot (.renmark/version) — orchestrate complete, pre-verify
+
+**Request:** On finish/release, version the app and create a local snapshot under `.renmark/version/` as part of the release protocol.
+**Built:** 7 tasks across 2 waves, all PASS (588 tests, +13; mypy + lint_all clean).
+**Files changed:**
+- `renmark/release.py` — `VERSION_SUBDIR=".renmark/version"`; `build_package` default home baks→version (baks retained, legacy-readable); new `build_version_snapshot(repo,*,version,now)` writes a zip + unpacked `v<VER>/` (manifest.json, release.md, verification.md, files-changed.txt), reusing `build_package`/`PACKAGE_EXCLUDES`/`_is_excluded` (self-excludes `.renmark` → no recursion); new `snapshot` CLI subcommand.
+- `tests/test_release_snapshot.py` (13 tests) + `tests/test_release_drift.py` (baks→version expectation).
+- `renmark/init.py` — `.renmark/version` added to the gitignore-scaffold set.
+- `plugin/skills/finish/SKILL.md` + `plugin/commands/finish.md` — §4 release protocol → `release snapshot`; timing contract (snapshot only after merge approval → merge → verify → tag).
+- `.gitignore` — ignore `.renmark/version/`.
+**Do not change:**
+- `.renmark/version/` is the canonical release home; `.renmark/baks/` is legacy (readable, never written by new releases). No artifact duplication across the two.
+- The snapshot self-excludes `.renmark` (incl. version/ and baks/), `.git`, `node_modules`, caches — reuse `_is_excluded`, never hand-roll a second exclude set.
+- The snapshot is the LAST release step — only after merge approval → merge to main → final verify passes → version/tag known.
+
 ## v0.7.7 — 2026-06-09 (Backlog-driven loop execution — `/renmark:backlog`)
 
 **Release of the backlog intake + approval-buffer feature (REQ-13/REQ-14).** Bumped
