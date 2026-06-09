@@ -73,7 +73,7 @@ state.write_pipeline_state(repo, current_phase="orchestrate", current_plan=<plan
 
 ### 3. Dispatch tasks in waves (G11 isolation)
 
-For each wave in `dispatch.group_tasks_by_wave(plan.tasks)`:
+For each wave in `dispatch.group_tasks_by_wave(tasks)` — where `tasks = parser.parse_plan(Path(plan_path))`, a plain `list[Task]` (`parse_plan` returns no object with a `.tasks` attribute):
 
 **3a. Build dependency context for this wave**
 
@@ -87,7 +87,7 @@ if prior:
     for task_output in prior["task_outputs"]:
         if task_output.get("dependency_notes"):
             dependency_summaries.append(
-                f"task {task_output['task_id']}: {task_output['dependency_notes']}"
+                f"task {task_output.get('task_id', '?')}: {task_output['dependency_notes']}"
             )
 ```
 
@@ -163,7 +163,7 @@ Codex tasks are ledgered by `renmark-execute` directly — do NOT call `log_agen
 
 **3c. Run verifier per task**
 
-For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, tail_lines=3)`. Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
+For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, cwd=repo, tail_lines=3)` (`cwd` is a required keyword-only argument). Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
 
 **3d. Escalation decision log**
 
@@ -174,7 +174,11 @@ When a task is escalated to a higher-tier executor, an ADR is appended to `.renm
 After all tasks in the wave finish:
 
 ```python
-state.write_wave_summary(repo, wave_index, task_outputs=[out.to_dict() for out in outputs])
+state.write_wave_summary(repo, wave_index, task_outputs=[
+    # to_dict() carries no task_id — stamp it here so step 3a can attribute notes
+    {"task_id": task.index, **out.to_dict()}
+    for out, task in zip(outputs, wave_tasks)
+])
 state.write_pipeline_state(repo, wave_index=wave_index,
                            add_completed_task=..., add_failed_task=...)
 ```
@@ -281,7 +285,7 @@ Report the orchestrate completion line first, then let verify take over:
 
 ## Governance compliance
 
-Upholds G2/G3/G5/G6/G7/G8/G9/G10/G11/G12 — see `CLAUDE.md` governance rules for definitions. The load-bearing caps are enforced in code, not prose: `dispatch.parse_subagent_response` refuses transcripts/diffs/code (G11), `SubagentOutput` caps summaries at 5 lines × 1200 chars (G3), and `summary.verifier_tail(tail_lines=3)` bounds verifier output (G3). State separation (lifecycle.json vs pipeline.json) and codex-subprocess isolation (G5) are described in the Steps above.
+Upholds G2/G3/G5/G6/G7/G8/G9/G10/G11/G12 — see `CLAUDE.md` governance rules for definitions. The load-bearing caps are enforced in code, not prose: `dispatch.parse_subagent_response` refuses transcripts/diffs/code (G11), `SubagentOutput` caps summaries at 5 lines × 1200 chars (G3), and `summary.verifier_tail(cmd, cwd=repo, tail_lines=3)` bounds verifier output (G3). State separation (lifecycle.json vs pipeline.json) and codex-subprocess isolation (G5) are described in the Steps above.
 
 ## Reference
 

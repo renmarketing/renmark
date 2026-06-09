@@ -113,7 +113,7 @@ When a PRD write is **proposed by an automated stage** rather than typed by the 
   )
   ```
 - **Never write `PRD.md` while `human_review_required and not human_review_completed`.** Present the draft/diff and stop until the human approves. (`/renmark:approve` is the *planned* skill to flip `human_review_completed`; until it ships, `lifecycle.next_recommended()` surfaces a manual gate message and the human clears it by approving the draft/diff here.)
-- After the human approves and the write lands, clear the gate (`human_review_required=False, human_review_completed=False, human_review_for=None`) so it doesn't leak into the next stage.
+- After the human approves and the write lands, clear the gate (`human_review_required=False, human_review_completed=False, human_review_for=""`) so it doesn't leak into the next stage. (Pass `""`, not `None` — `write_lifecycle` treats `None` as "leave unchanged", so `None` would strand the stale gate text in lifecycle.json.)
 - A user typing `/renmark:prd` directly **is** the human in the loop — the explicit draft/diff approval above satisfies the gate; you don't additionally block on the lifecycle bit unless an automated stage set it.
 
 ### Context hygiene (load-bearing)

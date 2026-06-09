@@ -168,7 +168,7 @@ The skill MUST NOT return while a managed branch exists without a recorded dispo
 
 | Option | Action |
 |---|---|
-| **Research more** | Route to `/renmark:research` (or `/renmark:brainstorm` for a raw idea). Leave `item.status = "needs review"` — it stays in the queue for re-triage after research lands. |
+| **Research more** | Route to `/renmark:brainstorm` (its research step covers prior-art/best-practice digging; a dedicated `/renmark:research` skill does not exist). Leave `item.status = "needs review"` — it stays in the queue for re-triage after research lands. |
 | **Split into smaller items** | Guidance: create child items (one per sub-scope) at `status = "needs approval"` via `backlog.next_id` + `backlog.write_item`, each pointing back at the parent in its `summary`. MVP MAY stub the decomposition mechanics, but MUST persist the split intent (at minimum the parent re-tagged + a note of the requested children) so the decision survives a `/clear`. |
 | **Reject** | Set `item.status = "rejected"`, `backlog.write_item`. No branch is created. |
 | **Back** | Return to the List view (Step 1) — no state change. |

@@ -207,8 +207,8 @@ the build — the pipeline continues regardless of the blueprint result.
 
 **Verify runs on every tier (REQ-7) — never skipped.**
 
-From orchestrate's menu:
-- Choose **[v] Verify** → `/renmark:verify` runs goal-backward smoke tests (ALWAYS, all tiers)
+After orchestrate completes a clean run it **auto-invokes** `/renmark:verify` (goal-backward
+smoke tests — ALWAYS, all tiers; there is no menu choice for this since v0.3.3).
 - Then route the **review + finish** by the tier resolved in Step 3.5:
 
 **Lite lane (`tier == lite`):**

@@ -8,9 +8,9 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 
 ## Defaults (until experience accumulates)
 
-- (target=`.gitignore`, complexity=simple) → nim
-- (target=`*.css`, complexity=simple) → nim
-- (target=`*.json`, complexity=simple) → nim
+- (target=`.gitignore`, complexity=simple) → haiku
+- (target=`*.css`, complexity=simple) → haiku
+- (target=`*.json`, complexity=simple) → haiku
 - (target=`tests/**`) → codex
 - (signal=canvas|DOM|state-machine|coord-math|threading) → opus
 - (complexity=medium, refactor) → sonnet

@@ -71,9 +71,11 @@ Verify the lifecycle stage is `created` or later. If `stage == "init"` or `"plan
 from renmark import parser, lifecycle
 from pathlib import Path
 plan_path = lifecycle.read_lifecycle(repo).artifacts.get("plan")
-plan = parser.parse_plan(Path(plan_path))
-goal_paragraph = plan.context  # the intent block at the top
-target_files = {t.target for t in plan.tasks}
+tasks = parser.parse_plan(Path(plan_path))  # plain list[Task] — there is no Plan object
+target_files = {t.target for t in tasks}
+# The intent block is the prose ABOVE the first task header; parse_plan drops it,
+# so read it from the plan file directly:
+goal_paragraph = Path(plan_path).read_text(encoding="utf-8").split("### Task", 1)[0].strip()
 ```
 
 Extract N user-visible behaviors from `goal_paragraph` — what the feature is supposed to do, not how it was decomposed.
