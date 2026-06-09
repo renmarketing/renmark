@@ -106,6 +106,24 @@ Present a summary before building:
 
 Wait for explicit confirmation before continuing. If the user redirects, adjust the summary and confirm again. Do not proceed on silence.
 
+**Implementation note (internal — never shown to the user):** the vibe-coder
+build path MAY run as a bounded **Loop Mode** under the hood — the
+iterate-until-verified engine that keeps refining until the smoke test passes or
+a budget is hit. This is an implementation detail of how `start` drives the
+build; it does NOT add a third question. Fold the loop's two knobs into the
+single Step-5 confirmation already shown above:
+
+- **Budget** — a sensible default effort ceiling for the iterate cycle.
+- **Max iterations** — a sensible default cap on refinement passes.
+
+Pick sensible defaults silently and state them plainly inside the existing
+summary (e.g. *"I'll keep refining until the tests pass, within a sensible
+effort budget"*). Confirm goal + budget + max-iterations in that ONE plain-English
+confirmation — do NOT add a fourth bullet that reads like a new interrogation,
+and do NOT surface the word "loop", "iteration budget", or any engine jargon to
+the user. Once confirmed, drive the bounded loop and route normally (Step 7).
+The word "loop" stays inside these internal notes only.
+
 ---
 
 ### 5a. Offer PRD creation (new projects only)
