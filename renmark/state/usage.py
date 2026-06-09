@@ -197,8 +197,6 @@ def usage_in_window(repo: str | Path, *, now: str, seconds: int) -> dict[str, in
     lower = now_epoch - max(0, int(seconds))
     prompt = completion = requests = agent_calls = rows = 0
     for r in read_usage(repo):
-        if not isinstance(r, dict):
-            continue
         ts_epoch = _parse_ts(r.get("ts", ""))
         if ts_epoch is None or ts_epoch < lower or ts_epoch > now_epoch:
             continue
@@ -241,8 +239,6 @@ def tokens_by_feature(
     lower = now_epoch - max(0, int(seconds))
     totals: dict[str, int] = {}
     for r in read_usage(repo):
-        if not isinstance(r, dict):
-            continue
         feature = r.get("feature", "")
         if not isinstance(feature, str) or not feature:
             continue
