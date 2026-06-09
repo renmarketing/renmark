@@ -98,7 +98,8 @@ verification = ""
 vpath = s.artifacts.get("verification") if s and s.artifacts else None
 if vpath:
     meta = summary.read_metadata(vpath)  # frontmatter only — no body read
-    sl = (meta or {}).get("summary_lines") or []
+    # summary_lines live in the BODY's '## Summary' section, never the frontmatter:
+    sl = summary.read_summary_lines(vpath)  # bounded bullets, G3-capped
     verification = sl[0] if sl else (meta or {}).get("completion_state", "")
 # Codereview artifact — check for most recent review file
 review_files = sorted(glob.glob(".renmark/reviews/*.review.md"))

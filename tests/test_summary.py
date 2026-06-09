@@ -208,3 +208,39 @@ def test_artifact_metadata_default_created_at_is_recent() -> None:
     now = datetime.now(timezone.utc)
     parsed = datetime.fromisoformat(meta.created_at)
     assert abs((now - parsed).total_seconds()) < 5
+
+
+def test_read_summary_lines_strips_bullets(tmp_path: Path) -> None:
+    path = tmp_path / "v.md"
+    summary.write_artifact(
+        path,
+        artifact_type="verification",
+        body="body the orchestrator never reads",
+        summary_lines=["passed: 3/5", "failed: search entries"],
+    )
+    assert summary.read_summary_lines(path) == ["passed: 3/5", "failed: search entries"]
+    assert summary.read_summary_lines(tmp_path / "missing.md") == []
+
+
+def test_summary_lines_feed_loop_decision(tmp_path: Path) -> None:
+    """Integration: write_artifact -> read_metadata + read_summary_lines ->
+    loop.build_decision must yield a non-blank next_action for a failed verify
+    (frontmatter alone never carries summary_lines — the loop was stalling)."""
+    from renmark import loop
+
+    path = tmp_path / "v.md"
+    summary.write_artifact(
+        path,
+        artifact_type="verification",
+        body="b",
+        summary_lines=[
+            "failed: search entries",
+            'run /renmark:debug with symptom: "search exits 1: no such table"',
+        ],
+        completion_state="partial",
+    )
+    meta = summary.read_metadata(path)
+    meta["summary_lines"] = summary.read_summary_lines(path)
+    decision = loop.build_decision(meta, 0)
+    assert decision["next_action"]
+    assert decision["goal_reached"] is False

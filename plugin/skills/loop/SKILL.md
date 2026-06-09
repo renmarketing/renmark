@@ -145,9 +145,13 @@ While `stop_reason(state)` is `None`:
    ```python
    state = loop.refresh_spent(repo, state)     # spent_tokens from usage.jsonl (real spend)
    ```
-4. **Decide** — read ONLY the verify metadata (`renmark.summary.read_metadata`) and the
-   ledger spend delta; build the decision:
+4. **Decide** — read ONLY the verify metadata (`renmark.summary.read_metadata`) plus the
+   bounded `## Summary` bullets (`renmark.summary.read_summary_lines` — the frontmatter
+   NEVER carries `summary_lines`; they live in the artifact body) and the ledger spend
+   delta; build the decision:
    ```python
+   verification_meta = summary.read_metadata(vpath)
+   verification_meta["summary_lines"] = summary.read_summary_lines(vpath)  # body bullets, G3-capped
    decision = loop.build_decision(verification_meta, spent_delta)
    ```
    **The driver supplies/refines `next_action`.** On a failed verify, `build_decision`

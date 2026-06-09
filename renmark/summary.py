@@ -182,6 +182,41 @@ def emit_pointer(path: Path | str, label: str, *, n_lines: int = MAX_SUMMARY_LIN
     return "\n".join([header, *bullets])
 
 
+def read_summary_lines(path: Path | str, *, n_lines: int = MAX_SUMMARY_LINES) -> list[str]:
+    """Return the bounded ``## Summary`` bullet lines from an artifact body.
+
+    Companion to ``read_metadata``: summary lines live in the artifact BODY
+    (``write_artifact`` renders them under ``## Summary``), never in the
+    frontmatter — so consumers like ``loop.build_decision`` that need
+    ``summary_lines`` must merge this in. Leading ``- `` bullets are stripped
+    so lines match what the writer was given (and what loop's ``failed:`` /
+    ``symptom:`` regexes anchor on). Never raises; missing file/section → [].
+    """
+    p = Path(path)
+    if not p.exists():
+        return []
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    idx = text.find("## Summary")
+    if idx == -1:
+        return []
+    bullets: list[str] = []
+    for line in text[idx:].splitlines()[1:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("##"):
+            break
+        if stripped.startswith("- "):
+            stripped = stripped[2:].strip()
+        bullets.append(stripped)
+        if len(bullets) >= n_lines:
+            break
+    return bullets
+
+
 def read_metadata(path: Path | str) -> dict[str, Any]:
     """Parse the YAML frontmatter block at the top of an artifact.
 
