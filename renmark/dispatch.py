@@ -318,6 +318,10 @@ def parse_subagent_response(response: dict[str, Any] | str) -> SubagentOutput:
     # Only pass through known fields (defensive — extra_fields check should
     # have caught everything, but guard against future refactors).
     filtered = {k: v for k, v in payload.items() if k in SUBAGENT_OUTPUT_FIELDS}
+    # G9: a response that omits confidence is treated as low-confidence —
+    # never silently promoted to the optimistic dataclass default.
+    if "confidence" not in filtered:
+        filtered["confidence"] = "low"
     return SubagentOutput(**filtered)
 
 

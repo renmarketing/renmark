@@ -148,6 +148,17 @@ def test_parse_response_json_string() -> None:
     assert out.status == "PASS"
 
 
+def test_parse_response_missing_confidence_downgrades_to_low() -> None:
+    """G9: a response that omits confidence is treated as low — the parser
+    must not silently promote it to the optimistic dataclass default."""
+    out = parse_subagent_response({"status": "PASS", "artifact_path": "x"})
+    assert out.confidence == "low"
+    explicit = parse_subagent_response(
+        {"status": "PASS", "artifact_path": "x", "confidence": "high"}
+    )
+    assert explicit.confidence == "high"
+
+
 def test_parse_response_rejects_inline_transcript() -> None:
     """The core G11 enforcement — transcripts must NOT cross the boundary."""
     payload = {
