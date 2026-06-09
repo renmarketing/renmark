@@ -150,37 +150,14 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 *(pipeline cost efficiency C+A / proportional-pipeline — SHIPPED 2026-06-08, see Shipped above.)*
 
-### Loop Mode (IN PROGRESS, feature/loop-mode — PRD approved 2026-06-09, lifecycle=init → brainstorm next)
+*(Loop Mode MVP — SHIPPED 2026-06-09, see Shipped section above.)*
 
-**Product spec is in PRD.md** (REQ-9..12 + `## Loop Mode` section). This note holds the
-DESIGN DETAIL for the brainstorm (from the user's ChatGPT context):
-
-- **MVP scope (build now):** (1) loop state files under `.renmark/loops/<id>/`; (2)
-  `/renmark:loop "<goal>"` wrapper around plan → orchestrate → verify; (3) max-iterations
-  + budget limits; (4) `/renmark:resume` support for loop state; (5) goal-backward
-  verification before each continuation. **Defer:** indefinite autonomous loops;
-  scheduled / PR-triggered loops.
-- **State layout:** `.renmark/loops/loop-<date>-<slug>/` → `loop.json`, `state.json`,
-  `goal.md`, `plan.md`, `verification.md`, `iterations/NNN-summary.md`, `evidence/`.
-- **Per-iteration decision object** (the thing that makes it a loop, not an automation):
-  `{goal_reached: bool, evidence: [..], next_action: str, model_recommendation: str,
-  estimated_next_cost: str}`. Loop continues only while: goal not verified AND budget
-  not exceeded AND max-iterations not reached AND no approval gate pending AND fresh
-  evidence supports next action.
-- **Surfaces:** experts `/renmark:loop` (--goal/--verify/--budget/--max-iterations);
-  vibe coders via `/renmark:start` (never see "loop"). Context hygiene: orchestrator
-  reads only summaries/paths/metadata/verification status (REQ-5/REQ-11).
-- **Open brainstorm questions:** budget tracking integration (reuse `.renmark/state/`
-  usage ledger + the `budget` concept?); how `/renmark:loop` composes the existing
-  feature dispatch gate (one approval, not per-iteration nags) vs per-iteration
-  continue gate; resume contract for a mid-iteration loop; default max-iterations +
-  default budget ceiling; first-commit approval. Start SAFE (no indefinite loops).
-
-### roadmap-as-pipeline / batch execution — B (DEFERRED, after loop-mode)
+### roadmap-as-pipeline / batch execution — B (DEFERRED, the last remaining item)
 
 Queue N planned/gap items → ONE plan→orchestrate→verify→codereview→finish run,
 amortizing fixed overhead. ~60% off for backlogs. Deferred (situational; reduces
-per-feature isolation; bigger build). Natural home for the modularity lens below.
+per-feature isolation; bigger build). NOTE: Loop Mode (shipped) is the per-feature
+iterate-until-verified engine; B is the cross-feature batch amortizer — distinct.
 
 *(modularity / scalability health lens — SHIPPED 2026-06-08, see Shipped section above.)*
 
