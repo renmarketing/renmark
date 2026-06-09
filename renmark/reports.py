@@ -20,10 +20,29 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import tempfile
 from pathlib import Path
 
 # Generic run-report kinds (per-feature reports use write_feature_report).
-RUN_REPORT_KINDS: frozenset[str] = frozenset({"tasks", "loops", "backlog", "releases"})
+RUN_REPORT_KINDS: frozenset[str] = frozenset(
+    {"tasks", "loops", "backlog", "releases", "features"}
+)
+
+
+def _safe_component(value: str) -> str:
+    """Coerce ``value`` into a single safe path component (no traversal).
+
+    Strips path separators (``/`` and ``\\``), normalizes/rejects ``..``,
+    drops leading dots/slashes, and falls back to ``"unnamed"`` if the result
+    is empty. The output can never escape its parent directory.
+    """
+    # Take only the final path segment; this discards any directory prefix and
+    # neutralizes absolute paths and ``../`` sequences.
+    name = str(value).replace("\\", "/").split("/")[-1].strip()
+    # Reject pure-dot names ("", ".", "..") which would resolve to a parent/self.
+    if not name or set(name) <= {"."}:
+        return "unnamed"
+    return name
 
 # Ordered metrics keys assembled by build_feature_report (REQ-15).
 FEATURE_REPORT_KEYS: tuple[str, ...] = (
@@ -58,8 +77,12 @@ def reports_dir(repo: Path | str) -> Path:
 
 
 def feature_reports_dir(repo: Path | str, slug: str) -> Path:
-    """Return ``.renmark/reports/features/<slug>/`` (no mkdir)."""
-    return reports_dir(repo) / "features" / slug
+    """Return ``.renmark/reports/features/<slug>/`` (no mkdir).
+
+    ``slug`` is sanitized to a single safe path component so an absolute or
+    ``..``-bearing slug cannot escape the features dir.
+    """
+    return reports_dir(repo) / "features" / _safe_component(slug)
 
 
 def _version_dir(repo: Path | str) -> Path:
@@ -201,22 +224,23 @@ def render_report_md(report: dict[str, object]) -> str:
 
 
 def _atomic_write(path: Path, text: str) -> Path | None:
-    """Write ``text`` to ``path`` via a ``.tmp`` sibling + ``os.replace``.
+    """Write ``text`` to ``path`` via a UNIQUE ``.tmp`` sibling + ``os.replace``.
 
-    Crash-consistent (no fsync). Returns the path, or ``None`` on IO failure —
-    never raises into the caller.
+    A per-write temp file (``tempfile.mkstemp``) prevents concurrent writers
+    from racing on a shared sibling. Crash-consistent (no fsync). Returns the
+    path, or ``None`` on IO failure — never raises into the caller.
     """
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp_path: str | None = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
+        fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp_path, path)
     except OSError:
-        try:
-            if tmp.exists():
-                tmp.unlink()
-        except OSError:
-            pass
+        if tmp_path is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
         return None
     return path
 
@@ -244,12 +268,18 @@ def write_run_report(
 ) -> Path:
     """Atomically write a generic run report to ``.renmark/reports/<kind>/<run_id>.json``.
 
-    ``kind`` should be one of ``RUN_REPORT_KINDS`` (tasks/loops/backlog/releases).
+    ``kind`` MUST be one of ``RUN_REPORT_KINDS`` (callers are internal; an
+    unknown kind is a programmer error and raises ``ValueError``). ``run_id`` is
+    sanitized to a single safe path component so it cannot escape the kind dir.
     Returns the intended path (mkdir is non-raising).
     """
+    if kind not in RUN_REPORT_KINDS:
+        raise ValueError(
+            f"invalid run-report kind {kind!r}; expected one of {sorted(RUN_REPORT_KINDS)}"
+        )
     out_dir = reports_dir(repo) / kind
     with contextlib.suppress(OSError):
         out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{run_id}.json"
+    path = out_dir / f"{_safe_component(run_id)}.json"
     _atomic_write(path, json.dumps(report, indent=2))
     return path

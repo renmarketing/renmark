@@ -25,8 +25,10 @@ Design contract (mirrors ``renmark/lifecycle.py`` + ``renmark/loop.py``):
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import tempfile
 from collections import Counter
 from pathlib import Path
 
@@ -43,6 +45,18 @@ TOP_FAILURE_REASONS: int = 5
 
 #: Cap on the length of name lists in the bounded health report.
 HEALTH_LIST_CAP: int = 10
+
+#: Cap on the number of keys retained in each per-key breakdown map returned by
+#: :func:`aggregate` (top-N by count) so the summary stays bounded.
+MAP_CAP: int = 10
+
+#: Status strings (case-insensitive) that mean a task/feature/loop succeeded.
+SUCCESS_STATUSES: frozenset[str] = frozenset(
+    {"completed", "complete", "pass", "passed", "shipped"}
+)
+
+#: Status strings (case-insensitive) that mean a task/feature/loop was blocked.
+BLOCKED_STATUSES: frozenset[str] = frozenset({"blocked", "failed", "fail"})
 
 #: Ledger filenames under ``.renmark/analytics/``.
 EVENTS_LEDGER: str = "events.jsonl"
@@ -275,6 +289,26 @@ def _as_bool(value: object) -> bool:
     return bool(value)
 
 
+def _is_success_status(status: str) -> bool:
+    """True if ``status`` (any case) names a successful/shipped run."""
+    return status.strip().lower() in SUCCESS_STATUSES
+
+
+def _is_blocked_status(status: str) -> bool:
+    """True if ``status`` (any case) names a blocked/failed run."""
+    return status.strip().lower() in BLOCKED_STATUSES
+
+
+def _cap_map(counter: dict[str, int]) -> dict[str, int]:
+    """Return the top ``MAP_CAP`` keys of ``counter`` by count (ties: key asc).
+
+    Caps the per-key breakdown only; scalar totals are computed separately and
+    stay accurate. Keeps the returned summary bounded (G3 boundary).
+    """
+    items = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
+    return dict(items[:MAP_CAP])
+
+
 # ── Aggregation ────────────────────────────────────────────────────────────────
 
 
@@ -284,6 +318,8 @@ def _agg_features(rows: list[dict[str, object]]) -> dict[str, object]:
     disposition_c: Counter[str] = Counter()
     shipped: list[str] = []
     blocked: list[str] = []
+    completed_count = 0
+    blocked_count = 0
     for r in rows:
         status = _as_str(r.get("status")).lower()
         status_c[status or "unknown"] += 1
@@ -291,16 +327,20 @@ def _agg_features(rows: list[dict[str, object]]) -> dict[str, object]:
         if disp:
             disposition_c[disp] += 1
         name = _as_str(r.get("feature"))
-        if status == "completed" and name:
-            shipped.append(name)
-        elif status == "blocked" and name:
-            blocked.append(name)
+        if _is_success_status(status):
+            completed_count += 1
+            if name:
+                shipped.append(name)
+        elif _is_blocked_status(status):
+            blocked_count += 1
+            if name:
+                blocked.append(name)
     return {
         "started": len(rows),
-        "completed": status_c.get("completed", 0),
-        "blocked": status_c.get("blocked", 0),
+        "completed": completed_count,
+        "blocked": blocked_count,
         "by_status": dict(status_c),
-        "branch_dispositions": dict(disposition_c),
+        "branch_dispositions": _cap_map(dict(disposition_c)),
         "shipped_names": shipped[:HEALTH_LIST_CAP],
         "blocked_names": blocked[:HEALTH_LIST_CAP],
     }
@@ -314,9 +354,17 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
     tokens_by_executor: Counter[str] = Counter()
     tokens_by_model: Counter[str] = Counter()
     tokens_by_provider: Counter[str] = Counter()
+    passed = failed = skipped = 0
     for r in rows:
-        status = _as_str(r.get("status")).upper()
+        raw_status = _as_str(r.get("status"))
+        status = raw_status.upper()
         status_c[status or "UNKNOWN"] += 1
+        if _is_success_status(raw_status):
+            passed += 1
+        elif _is_blocked_status(raw_status):
+            failed += 1
+        elif status == "SKIP" or raw_status.strip().lower() == "skipped":
+            skipped += 1
         verdict = _as_str(r.get("verifier_result")).lower()
         if verdict:
             verifier_c[verdict] += 1
@@ -332,15 +380,15 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
             tokens_by_provider[_as_str(r.get("provider")) or "unknown"] += tokens
     return {
         "total": len(rows),
-        "passed": status_c.get("PASS", 0),
-        "failed": status_c.get("FAIL", 0),
-        "skipped": status_c.get("SKIP", 0),
+        "passed": passed,
+        "failed": failed,
+        "skipped": skipped,
         "verification_pass": verifier_c.get("pass", 0),
         "verification_fail": verifier_c.get("fail", 0),
         "common_failure_reasons": failure_c.most_common(TOP_FAILURE_REASONS),
-        "tokens_by_executor": dict(tokens_by_executor),
-        "tokens_by_model": dict(tokens_by_model),
-        "tokens_by_provider": dict(tokens_by_provider),
+        "tokens_by_executor": _cap_map(dict(tokens_by_executor)),
+        "tokens_by_model": _cap_map(dict(tokens_by_model)),
+        "tokens_by_provider": _cap_map(dict(tokens_by_provider)),
     }
 
 
@@ -366,8 +414,8 @@ def _agg_loops(rows: list[dict[str, object]]) -> dict[str, object]:
         "success": success,
         "failure": total - success,
         "avg_iterations": round(iterations_total / total, 2) if total else 0.0,
-        "by_stop_reason": dict(stop_c),
-        "branch_dispositions": dict(disposition_c),
+        "by_stop_reason": _cap_map(dict(stop_c)),
+        "branch_dispositions": _cap_map(dict(disposition_c)),
     }
 
 
@@ -379,7 +427,7 @@ def _agg_events(rows: list[dict[str, object]]) -> dict[str, object]:
         if kind:
             kind_c[kind] += 1
     return {
-        "by_kind": dict(kind_c),
+        "by_kind": _cap_map(dict(kind_c)),
         "backlog_completed": kind_c.get("backlog_completed", 0),
         "backlog_blocked": kind_c.get("backlog_blocked", 0),
         "backlog_rejected": kind_c.get("backlog_rejected", 0),
@@ -419,8 +467,8 @@ def _agg_usage(repo: str | Path) -> dict[str, object]:
             quota += 1
     return {
         "total_tokens": total_tokens,
-        "by_provider": dict(by_provider),
-        "by_model": dict(by_model),
+        "by_provider": _cap_map(dict(by_provider)),
+        "by_model": _cap_map(dict(by_model)),
         "by_feature": dict(sorted(by_feature.items(), key=lambda kv: (-kv[1], kv[0]))[:HEALTH_LIST_CAP]),
         "requests": requests,
         "agent_calls": agent_calls,
@@ -430,19 +478,27 @@ def _agg_usage(repo: str | Path) -> dict[str, object]:
 
 
 def _write_summary_atomic(repo: str | Path, summary: dict[str, object]) -> None:
-    """Write ``summary.json`` atomically (.tmp + os.replace). Never raises."""
+    """Write ``summary.json`` atomically. Never raises.
+
+    Serializes to a UNIQUE per-call temp file (``tempfile.mkstemp``) in the same
+    directory, then ``os.replace``s it onto ``summary.json``. The unique temp
+    name means concurrent :func:`aggregate` calls never share a temp path, so
+    one writer can't truncate another's in-flight file.
+    """
     path = analytics_dir(repo) / SUMMARY_JSON
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp_path: str | None = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(json.dumps(summary, indent=2, sort_keys=False), encoding="utf-8")
-        os.replace(tmp, path)
+        payload = json.dumps(summary, indent=2, sort_keys=False)
+        fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp_path, path)
+        tmp_path = None
     except (OSError, TypeError, ValueError):
-        try:
-            if tmp.exists():
-                tmp.unlink()
-        except OSError:
-            pass
+        if tmp_path is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
 
 
 def aggregate(repo: str | Path, *, now: str) -> dict[str, object]:
@@ -614,10 +670,14 @@ def _pair_count(item: object) -> int:
 
 
 __all__ = [
+    "BLOCKED_STATUSES",
     "DEFAULT_SOURCE",
     "EVENTS_LEDGER",
     "FEATURE_RUNS_LEDGER",
+    "HEALTH_LIST_CAP",
     "LOOP_RUNS_LEDGER",
+    "MAP_CAP",
+    "SUCCESS_STATUSES",
     "SUMMARY_JSON",
     "TASK_RUNS_LEDGER",
     "TOP_FAILURE_REASONS",

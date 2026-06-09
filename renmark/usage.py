@@ -144,29 +144,27 @@ def build_usage_view(repo: str | Path, *, now: str) -> dict[str, Any]:
     rolling_5h = state.usage_last_5h(repo, now=now)
     weekly = state.usage_last_week(repo, now=now)
     limits = read_limits(repo)
+    # Per-provider percentages MUST use that provider's own filtered window
+    # totals — using the combined total overstates every provider on a mixed
+    # Claude/Codex ledger.
+    percent: dict[str, dict[str, Any]] = {}
+    for provider in ("claude", "codex"):
+        p_5h = state.usage_last_5h(repo, now=now, provider=provider)
+        p_week = state.usage_last_week(repo, now=now, provider=provider)
+        percent[provider] = {
+            "rolling_5h_tokens": _provider_percent(
+                limits, provider, "rolling_5h_tokens",
+                p_5h.get("total_tokens", 0)),
+            "weekly_tokens": _provider_percent(
+                limits, provider, "weekly_tokens",
+                p_week.get("total_tokens", 0)),
+        }
     view: dict[str, Any] = {
         "now": now,
         "rolling_5h": rolling_5h,
         "weekly": weekly,
         "limits": limits,
-        "percent": {
-            "claude": {
-                "rolling_5h_tokens": _provider_percent(
-                    limits, "claude", "rolling_5h_tokens",
-                    rolling_5h.get("total_tokens", 0)),
-                "weekly_tokens": _provider_percent(
-                    limits, "claude", "weekly_tokens",
-                    weekly.get("total_tokens", 0)),
-            },
-            "codex": {
-                "rolling_5h_tokens": _provider_percent(
-                    limits, "codex", "rolling_5h_tokens",
-                    rolling_5h.get("total_tokens", 0)),
-                "weekly_tokens": _provider_percent(
-                    limits, "codex", "weekly_tokens",
-                    weekly.get("total_tokens", 0)),
-            },
-        },
+        "percent": percent,
         "top_features": state.tokens_by_feature(
             repo, now=now, seconds=_ONE_WEEK, top=5),
         "recent_limit_events": _recent_limit_events(repo),
@@ -201,18 +199,85 @@ def _has_rolling_5h_window(limits: dict[str, Any], provider: str) -> bool:
             or _provider_limit(limits, provider, "rolling_5h_requests") is not None)
 
 
+def _earliest_in_window_ts(repo: str | Path, *, base: dt.datetime,
+                           provider: str, seconds: int) -> dt.datetime | None:
+    """Earliest parseable ts for ``provider`` within ``[base - seconds, base]``.
+
+    Bounded + non-raising: scans the ledger, returns the oldest contributing
+    row's aware timestamp, or None when there are no in-window rows.
+    """
+    lower = base - dt.timedelta(seconds=max(0, int(seconds)))
+    earliest: dt.datetime | None = None
+    for r in state.read_usage(repo):
+        if r.get("provider") != provider:
+            continue
+        ts = _parse_iso(str(r.get("ts", "")))
+        if ts is None or ts < lower or ts > base:
+            continue
+        if earliest is None or ts < earliest:
+            earliest = ts
+    return earliest
+
+
+def _fallback_reference(repo: str | Path | None, provider: str) -> dt.datetime:
+    """Best-effort aware reference when ``now`` is unparseable (never raises).
+
+    Prefers the latest parseable ledger ts (any provider, biased to the matching
+    one); otherwise the UNIX epoch. Always timezone-aware.
+    """
+    latest: dt.datetime | None = None
+    if repo is not None:
+        for r in state.read_usage(repo):
+            ts = _parse_iso(str(r.get("ts", "")))
+            if ts is None:
+                continue
+            if latest is None or ts > latest:
+                latest = ts
+    if latest is not None:
+        return latest
+    return dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
+
+
 def _compute_resume_after(*, now: str, provider: str,
                           provider_reset_at: str,
-                          limits: dict[str, Any]) -> str:
-    """Fallback rule for resume_after: provider reset > local 5h window > +60m."""
-    if provider_reset_at:
-        return provider_reset_at
+                          limits: dict[str, Any],
+                          repo: str | Path | None = None,
+                          fallback_minutes: int = 60) -> str:
+    """Resume_after rule — ALWAYS a non-empty, timezone-aware ISO timestamp.
+
+    Order: provider reset (clamped to the future if stale) > earliest-in-window
+    row + 5h when a rolling-5h limit is configured > now + 5h > now + fallback.
+    When ``now`` is unparseable, a best-effort aware reference is synthesized so
+    the result is never empty/naive.
+    """
     base = _parse_iso(now)
+    fallback = dt.timedelta(minutes=max(1, int(fallback_minutes)))
+    reset = _parse_iso(provider_reset_at)
+
     if base is None:
-        return provider_reset_at  # cannot compute; echo (possibly empty) input
+        ref = _fallback_reference(repo, provider)
+        if reset is not None and reset > ref:
+            return provider_reset_at  # future reset; preserve verbatim input
+        return (ref + fallback).isoformat()
+
+    if reset is not None:
+        # Future reset → preserve the verbatim input string (back-compat); a
+        # stale reset is clamped to a future retry (aware ISO).
+        if reset > base:
+            return provider_reset_at
+        return (base + fallback).isoformat()
+
     if _has_rolling_5h_window(limits, provider):
+        if repo is not None:
+            earliest = _earliest_in_window_ts(
+                repo, base=base, provider=provider, seconds=_FIVE_HOURS)
+            if earliest is not None:
+                resume = earliest + dt.timedelta(seconds=_FIVE_HOURS)
+                # Stay conservative — never hand back a past time.
+                return (resume if resume > base else
+                        base + dt.timedelta(seconds=_FIVE_HOURS)).isoformat()
         return (base + dt.timedelta(seconds=_FIVE_HOURS)).isoformat()
-    return (base + dt.timedelta(minutes=60)).isoformat()
+    return (base + fallback).isoformat()
 
 
 def classify_usage_pause(*, run_id: str, plan_path: str, last_task_index: int,
@@ -220,17 +285,18 @@ def classify_usage_pause(*, run_id: str, plan_path: str, last_task_index: int,
                          observed_usage: str = "", provider_reset_at: str = "",
                          limits: dict[str, Any] | None = None,
                          feature: str = "", loop_id: str = "",
-                         iteration: int = 0,
-                         max_iterations: int = 0) -> state.PauseState:
+                         iteration: int = 0, max_iterations: int = 0,
+                         repo: str | Path | None = None) -> state.PauseState:
     """Build a usage-limit PauseState with resume_after by the fallback rule.
 
     No polling, no retry scheduling — purely computes resume_after and delegates
-    to ``state.usage_limit_pause``. ``ts`` is the injected ``now``.
+    to ``state.usage_limit_pause``. ``ts`` is the injected ``now``. Pass ``repo``
+    so the rolling-5h fallback can anchor on the oldest in-window row.
     """
     resolved_limits = limits if isinstance(limits, dict) else {}
     resume_after = _compute_resume_after(
         now=now, provider=provider, provider_reset_at=provider_reset_at,
-        limits=resolved_limits)
+        limits=resolved_limits, repo=repo, fallback_minutes=60)
     return state.usage_limit_pause(
         run_id=run_id, plan_path=plan_path, last_task_index=last_task_index,
         ts=now, provider=provider, model=model, observed_usage=observed_usage,

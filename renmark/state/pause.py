@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
+from typing import Any
 
 from . import _core
 from ._core import (
@@ -75,11 +76,27 @@ def write_pause(repo_root: str | Path, state: PauseState) -> None:
 
 
 def read_pause(repo_root: str | Path) -> PauseState | None:
+    """Read the PAUSED file, or return None if it is absent/unreadable.
+
+    Non-raising by contract (callers invoke this unguarded): a missing,
+    corrupt, or schema-incompatible file degrades to None. Unknown extra keys
+    are filtered out (forward-compat); missing-required keys yield None.
+    """
     path = state_dir(repo_root) / PAUSED_FILE
     if not path.exists():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return PauseState(**data)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    known = {f.name for f in fields(PauseState)}
+    filtered: dict[str, Any] = {k: v for k, v in data.items() if k in known}
+    try:
+        return PauseState(**filtered)
+    except (TypeError, ValueError):
+        return None
 
 
 def clear_pause(repo_root: str | Path) -> None:

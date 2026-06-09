@@ -175,13 +175,18 @@ def _parse_ts(ts: str) -> float | None:
     return parsed.timestamp()
 
 
-def usage_in_window(repo: str | Path, *, now: str, seconds: int) -> dict[str, int]:
+def usage_in_window(
+    repo: str | Path, *, now: str, seconds: int, provider: str | None = None
+) -> dict[str, int]:
     """Aggregate ledger rows whose ts falls within ``[now - seconds, now]``.
 
     ``now`` is injected (ISO-8601) — this reader never calls datetime.now().
     Non-raising: a missing/corrupt ledger or an unparseable ``now`` yields all
     zeros. ``total_tokens`` is prompt + completion summed; ``requests`` and
     ``agent_calls`` are summed from those row fields (0 when absent).
+
+    When ``provider`` is given, only rows whose ``provider`` field equals it are
+    summed; ``provider=None`` (default) sums every row (back-compatible).
     """
     zero = {
         "total_tokens": 0,
@@ -197,6 +202,8 @@ def usage_in_window(repo: str | Path, *, now: str, seconds: int) -> dict[str, in
     lower = now_epoch - max(0, int(seconds))
     prompt = completion = requests = agent_calls = rows = 0
     for r in read_usage(repo):
+        if provider is not None and r.get("provider") != provider:
+            continue
         ts_epoch = _parse_ts(r.get("ts", ""))
         if ts_epoch is None or ts_epoch < lower or ts_epoch > now_epoch:
             continue
@@ -215,14 +222,24 @@ def usage_in_window(repo: str | Path, *, now: str, seconds: int) -> dict[str, in
     }
 
 
-def usage_last_5h(repo: str | Path, *, now: str) -> dict[str, int]:
-    """Usage aggregated over the trailing 5-hour window ending at ``now``."""
-    return usage_in_window(repo, now=now, seconds=5 * 3600)
+def usage_last_5h(
+    repo: str | Path, *, now: str, provider: str | None = None
+) -> dict[str, int]:
+    """Usage aggregated over the trailing 5-hour window ending at ``now``.
+
+    Pass ``provider`` to restrict the sum to one provider's rows.
+    """
+    return usage_in_window(repo, now=now, seconds=5 * 3600, provider=provider)
 
 
-def usage_last_week(repo: str | Path, *, now: str) -> dict[str, int]:
-    """Usage aggregated over the trailing 7-day window ending at ``now``."""
-    return usage_in_window(repo, now=now, seconds=7 * 24 * 3600)
+def usage_last_week(
+    repo: str | Path, *, now: str, provider: str | None = None
+) -> dict[str, int]:
+    """Usage aggregated over the trailing 7-day window ending at ``now``.
+
+    Pass ``provider`` to restrict the sum to one provider's rows.
+    """
+    return usage_in_window(repo, now=now, seconds=7 * 24 * 3600, provider=provider)
 
 
 def tokens_by_feature(
