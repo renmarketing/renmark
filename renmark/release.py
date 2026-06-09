@@ -139,9 +139,13 @@ VERSION_FILES: list[VersionFile] = [
 # project-write-boundary rule: writes only inside the project.
 
 import fnmatch
+import shutil
+import subprocess
 import zipfile
+from datetime import datetime
 
-BAKS_SUBDIR = ".renmark/baks"
+BAKS_SUBDIR = ".renmark/baks"  # legacy release home — still readable, no longer the default
+VERSION_SUBDIR = ".renmark/version"
 
 # Anything matching these (by path segment or glob) is left out of the package.
 PACKAGE_EXCLUDES: tuple[str, ...] = (
@@ -195,14 +199,15 @@ def build_package(
 ) -> Path:
     """Build a versioned distribution zip.
 
-    Default (consumer project): writes to `<repo>/.renmark/baks/<basename>-v<version>.zip`,
+    Default (consumer project): writes to `<repo>/.renmark/version/<basename>-v<version>.zip`,
     version-anchored so it matches the git tag `v<version>` and the GitHub
     release of the same version. The zip's top-level folder equals the archive
-    stem (clean extraction). Returns the zip path.
+    stem (clean extraction). Returns the zip path. (`.renmark/baks/` was the
+    previous default and remains readable as a legacy location.)
 
     Overrides (maintainer escape hatch — e.g. packaging renmark's OWN release
     to a sibling directory rather than into a managed project):
-    - `dest_dir`   — write the zip here instead of `<repo>/.renmark/baks/`.
+    - `dest_dir`   — write the zip here instead of `<repo>/.renmark/version/`.
     - `archive_stem` — full archive name without extension (also the zip's
       top-level folder). Lets callers match an existing naming convention such
       as `ai-system-renmark-v0.3.3-20260527`.
@@ -215,7 +220,7 @@ def build_package(
     ver = version or current_version(repo)
     stem = archive_stem or f"{package_basename(repo)}-v{ver}"
 
-    out_dir = Path(dest_dir).expanduser() if dest_dir is not None else repo / BAKS_SUBDIR
+    out_dir = Path(dest_dir).expanduser() if dest_dir is not None else repo / VERSION_SUBDIR
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{stem}.zip"
     if out.exists():
@@ -235,6 +240,178 @@ def build_package(
             rel = p.relative_to(repo)
             zf.write(p, f"{stem}/{rel.as_posix()}")
     return out
+
+
+def _git_stdout(repo: Path, args: list[str]) -> str | None:
+    """Run a git command under ``repo`` and return stripped stdout, or None on failure.
+
+    Never raises — any subprocess/OS error degrades to None so callers can fall
+    back gracefully (git-unavailable, not-a-repo, command error all → None).
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, ValueError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()
+
+
+def _changelog_section(repo: Path, ver: str) -> str:
+    """Extract the CHANGELOG.md section for ``ver``.
+
+    Finds the first ``## `` heading line containing ``v{ver}`` (covers
+    ``## [date]`` blocks naming the version and ``## v{ver}`` headings), then
+    includes lines until the next ``## `` heading. Falls back to a stub if the
+    file or section is missing.
+    """
+    fallback = f"# Release v{ver}\n\nSee CHANGELOG.md."
+    changelog = repo / "CHANGELOG.md"
+    try:
+        text = changelog.read_text(encoding="utf-8")
+    except OSError:
+        return fallback
+
+    lines = text.splitlines()
+    start: int | None = None
+    needle = f"v{ver}"
+    for idx, line in enumerate(lines):
+        if line.startswith("## ") and needle in line:
+            start = idx
+            break
+    if start is None:
+        return fallback
+
+    section = [lines[start]]
+    for line in lines[start + 1 :]:
+        if line.startswith("## "):
+            break
+        section.append(line)
+    return "\n".join(section).strip() + "\n"
+
+
+def _latest_verification(repo: Path, ver: str) -> str:
+    """Return the text of the most recent ``.renmark/reviews/*.verification.md``.
+
+    "Most recent" = last by sorted filename. Falls back to a stub if none exist
+    or the file can't be read.
+    """
+    fallback = f"No verification artifact found for v{ver}."
+    reviews = repo / ".renmark" / "reviews"
+    if not reviews.is_dir():
+        return fallback
+    candidates = sorted(reviews.glob("*.verification.md"))
+    if not candidates:
+        return fallback
+    try:
+        return candidates[-1].read_text(encoding="utf-8")
+    except OSError:
+        return fallback
+
+
+def _files_changed(repo: Path, ver: str) -> str:
+    """Return ``git diff --name-only <prev>..HEAD`` text, or a degraded fallback.
+
+    ``<prev>`` is the previous ``v*`` tag (newest-first, skipping the current
+    ``v{ver}``). With no prior tag, falls back to ``git ls-files``. Any git
+    failure yields the single line ``# (git unavailable)``. Never raises.
+    """
+    unavailable = "# (git unavailable)\n"
+    tags_out = _git_stdout(repo, ["tag", "--list", "v*", "--sort=-v:refname"])
+    if tags_out is None:
+        return unavailable
+
+    cur = f"v{ver}"
+    prev: str | None = None
+    for tag in (t for t in tags_out.splitlines() if t.strip()):
+        if tag == cur:
+            continue
+        prev = tag
+        break
+
+    if prev is None:
+        listing = _git_stdout(repo, ["ls-files"])
+        if listing is None:
+            return unavailable
+        return listing + "\n" if listing else ""
+
+    diff = _git_stdout(repo, ["diff", "--name-only", f"{prev}..HEAD"])
+    if diff is None:
+        return unavailable
+    return diff + "\n" if diff else ""
+
+
+def build_version_snapshot(
+    repo: Path | str = ".",
+    *,
+    version: str | None = None,
+    now: str | None = None,
+) -> dict[str, str]:
+    """Build a full version snapshot under ``<repo>/.renmark/version/``.
+
+    Produces, for version ``ver`` (``version`` arg or ``current_version(repo)``):
+    - a distribution zip ``<basename>-v<ver>.zip`` (via ``build_package``), and
+    - an unpacked copy ``v<ver>/`` mirroring the packaged file set (same
+      ``_is_excluded`` filter — so ``.git``, ``node_modules``, ``__pycache__``,
+      ``.venv`` and ALL of ``.renmark`` are skipped, no recursion into the
+      snapshot itself), plus four metadata files written INTO ``v<ver>/``:
+      ``manifest.json``, ``release.md``, ``verification.md``, ``files-changed.txt``.
+
+    Reuses ``build_package`` / ``package_basename`` / ``current_version`` /
+    ``PACKAGE_EXCLUDES`` / ``_is_excluded``. Never raises on git/verification/
+    changelog absence — each degrades to a documented fallback.
+    """
+    repo = Path(repo)
+    ver = version or current_version(repo)
+    base = repo / VERSION_SUBDIR
+    base.mkdir(parents=True, exist_ok=True)
+
+    zip_path = build_package(repo, version=ver, dest_dir=base)
+
+    snap = base / f"v{ver}"
+    if snap.exists():
+        shutil.rmtree(snap)
+    snap.mkdir(parents=True, exist_ok=True)
+
+    file_count = 0
+    for p in sorted(repo.rglob("*")):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(repo)
+        if _is_excluded(rel.parts):
+            continue
+        dest = snap / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(p, dest)
+        file_count += 1
+
+    source_sha = _git_stdout(repo, ["rev-parse", "HEAD"]) or ""
+    created_at = now if now is not None else datetime.now().isoformat()
+    manifest = {
+        "version": ver,
+        "tag": f"v{ver}",
+        "source_sha": source_sha,
+        "created_at": created_at,
+        "file_count": file_count,
+        "basename": package_basename(repo),
+        "excludes": list(PACKAGE_EXCLUDES),
+    }
+    (snap / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (snap / "release.md").write_text(_changelog_section(repo, ver), encoding="utf-8")
+    (snap / "verification.md").write_text(_latest_verification(repo, ver), encoding="utf-8")
+    (snap / "files-changed.txt").write_text(_files_changed(repo, ver), encoding="utf-8")
+
+    return {
+        "version": ver,
+        "zip": str(zip_path),
+        "snapshot_dir": str(snap),
+        "manifest": str(snap / "manifest.json"),
+        "file_count": str(file_count),
+    }
 
 
 # ── API ──────────────────────────────────────────────────────────────────────
@@ -287,7 +464,10 @@ def drift_report(repo: Path | str = ".") -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
-        sys.stderr.write("usage: python -m renmark.release {check|current|scan PATH|package [PATH]}\n")
+        sys.stderr.write(
+            "usage: python -m renmark.release "
+            "{check|current|scan PATH|package [PATH]|snapshot [PATH]}\n"
+        )
         return 2
 
     cmd = argv[0]
@@ -321,6 +501,19 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         out = build_package(repo, dest_dir=dest, archive_stem=name)
         sys.stdout.write(f"OK  built {out}  (v{current_version(repo)})\n")
+        return 0
+
+    if cmd == "snapshot":
+        repo = Path(argv[1]) if len(argv) > 1 else Path(".")
+        issues = drift_report(repo)
+        if issues:
+            sys.stderr.write("refusing to snapshot — version drift:\n")
+            for issue in issues:
+                sys.stderr.write(f"  - {issue}\n")
+            return 1
+        result = build_version_snapshot(repo)
+        sys.stdout.write(f"OK  snapshot v{result['version']} → {result['snapshot_dir']}\n")
+        sys.stdout.write(f"    zip: {result['zip']}\n")
         return 0
 
     if cmd == "check":
