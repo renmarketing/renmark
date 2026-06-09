@@ -144,8 +144,10 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     import subprocess
 
     try:
+        # Explicit sandbox: never ride the codex CLI default — this is the G5
+        # heavy-work path and must match providers/codex.py's constraint.
         proc = subprocess.run(
-            ["codex", "exec", "-"],
+            ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "-"],
             input=wrapper,
             text=True,
             capture_output=True,

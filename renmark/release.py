@@ -157,20 +157,35 @@ PACKAGE_EXCLUDES: tuple[str, ...] = (
     "__pycache__",
     "*.pyc",
     "*.egg-info",
-    ".env",
-    ".env.local",
-    ".env - Copy*",
+    ".env*",
     "*Zone.Identifier*",
     ".claude",
     ".renmark",
     "PLAN.md",
     "node_modules",
+    # Secret-bearing files must never reach a zip that finish can upload to a
+    # (potentially public) GitHub release.
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "id_rsa*",
+    "id_ed25519*",
+    "credentials*.json",
+    "service-account*.json",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
 )
+
+# Non-secret env documentation files stay packageable despite ".env*".
+PACKAGE_ALLOW: tuple[str, ...] = (".env.example", ".env.sample", ".env.template")
 
 
 def _is_excluded(rel_parts: tuple[str, ...]) -> bool:
     """True if any path segment matches a PACKAGE_EXCLUDES pattern."""
     for seg in rel_parts:
+        if seg in PACKAGE_ALLOW:
+            continue
         for pat in PACKAGE_EXCLUDES:
             if fnmatch.fnmatch(seg, pat):
                 return True

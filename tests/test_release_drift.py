@@ -252,3 +252,21 @@ def test_build_package_dest_and_name_overrides(tmp_path: Path):
     # top-level folder matches the custom stem, contents still excluded properly
     assert all(n.startswith("ai-system-renmark-v0.3.3-20260527/") for n in names)
     assert any(n.endswith("/VERSION") for n in names)
+
+
+def test_build_package_excludes_secret_files(tmp_path: Path):
+    """Secret-bearing files must never reach a zip finish can upload to a
+    GitHub release; .env.example stays packageable."""
+    repo = _make_repo(tmp_path, version="0.3.3")
+    (repo / ".env.production").write_text("SECRET=1")
+    (repo / "deploy.pem").write_text("---KEY---")
+    (repo / "id_rsa").write_text("---KEY---")
+    (repo / "credentials.json").write_text("{}")
+    (repo / ".env.example").write_text("SECRET=fill-me")
+    out = release.build_package(repo)
+    joined = "\n".join(zipfile.ZipFile(out).namelist())
+    assert ".env.production" not in joined
+    assert "deploy.pem" not in joined
+    assert "id_rsa" not in joined
+    assert "credentials.json" not in joined
+    assert ".env.example" in joined
