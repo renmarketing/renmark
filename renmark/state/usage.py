@@ -97,3 +97,26 @@ def usage_this_month(repo_root: str | Path) -> int:
         if r.get("ts", "").startswith(prefix):
             total += int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
     return total
+
+
+def usage_by_run_id(repo: str | Path, run_id: str) -> int:
+    """Total tokens (prompt + completion) ledgered under one run_id.
+
+    The spend-measurement primitive behind the loop budget gate. Pure and
+    defensive: a missing, empty, or corrupt ledger — or any unreadable line —
+    yields 0 rather than raising. Bad lines are skipped (`read_usage` already
+    drops JSON-undecodable rows); malformed token fields are coerced to 0.
+    """
+    total = 0
+    try:
+        records = read_usage(repo)
+    except OSError:
+        return 0
+    for r in records:
+        if r.get("run_id") != run_id:
+            continue
+        try:
+            total += int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
+        except (TypeError, ValueError):
+            continue
+    return total
