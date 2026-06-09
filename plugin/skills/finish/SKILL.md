@@ -1,6 +1,6 @@
 ---
 name: finish
-description: Use when implementation is complete — re-runs verifiers, shows commit summary, then offers PR / merge / release / nothing. Release builds a version-anchored distribution zip into .renmark/baks/ (always, offline) and a matching git tag, plus a GitHub release when a remote + gh are available. Thin branch-close wrapper around gh and git.
+description: Use when implementation is complete — re-runs verifiers, shows commit summary, then offers PR / merge / release / nothing. Release builds a version-anchored distribution zip into .renmark/version/ (always, offline) and a matching git tag, plus a GitHub release when a remote + gh are available. Thin branch-close wrapper around gh and git.
 ---
 
 # finish
@@ -130,57 +130,74 @@ the PRD.
 ### 4. Release (package + version parity)
 
 Produce a versioned distribution that matches the committed/tagged version, with
-a **local copy always** in `.renmark/baks/` and a GitHub release **when available**.
-The local bak is the offline fallback — "if I don't want to pull from GitHub, it's
-in `.renmark/baks/`."
+a **local copy always** in `.renmark/version/` and a GitHub release **when available**.
+`.renmark/baks/` remains readable for old artifacts but **new releases write ONLY
+to `.renmark/version/`**.
 
 > **Maintainer note (packaging renmark itself, not a managed project):** the
-> default writes inside the project's `.renmark/baks/`. To package a release to a
+> default writes inside the project's `.renmark/version/`. To package a release to a
 > sibling/parent directory with a custom name (e.g. renmark's own repo, whose
 > releases live in `~/projects/ai-system-renmark-vX-DATE.zip`), use the override:
-> `python -m renmark.release package --dest ~/projects --name ai-system-renmark-v<VERSION>-<DATE>`.
+> `python -m renmark.release snapshot --dest ~/projects --name ai-system-renmark-v<VERSION>-<DATE>`.
 > `--dest` is an explicit opt-out of the project-write-boundary for maintainer
-> release builds only — managed-project releases always default to `.renmark/baks/`.
+> release builds only — managed-project releases always default to `.renmark/version/`.
+
+**Timing contract — preconditions (in order). The snapshot is the LAST release
+step. It MUST NOT run until ALL of the following are true:**
+
+1. Human merge approval has been given explicitly.
+2. The branch has been merged into `main`.
+3. Final verifiers pass on `main` (not the feature branch).
+4. The version string and tag name are known and confirmed.
+
+Never snapshot a pre-merge or unverified tree.
 
 **4a. Drift gate (free).** `python -m renmark.release check` — refuse to release
 if the 7 version locations disagree. Fix drift first.
 
-**4b. Build the local package (always, offline, no deps).**
-```bash
-python -m renmark.release package
-# → .renmark/baks/<plugin-name>-v<VERSION>.zip   (gitignored; pure-Python zip)
-```
-This is the same artifact a GitHub release would attach. `build_package` writes
-**only inside the project** (`project-write-boundary-rule`) and excludes
-`.git`, `.venv`, `__pycache__`, `.env`, `.renmark/`, `PLAN.md`, etc.
-
-**4c. Tag the version (local; the parity anchor).** The tag name MUST equal
-`v<VERSION>` so the local bak, the tag, and any GitHub release all carry the
+**4b. Tag the version (local; the parity anchor).** The tag name MUST equal
+`v<VERSION>` so the snapshot, the tag, and any GitHub release all carry the
 same version.
 ```bash
 git tag -a "v$(cat VERSION)" -m "renmark v$(cat VERSION)"
 ```
 Confirm with the user before tagging — tags are cheap but shared once pushed.
 
+**4c. Snapshot (always, offline, no deps — runs AFTER merge + verification).**
+```bash
+python -m renmark.release snapshot
+```
+This single command writes **both**:
+- `.renmark/version/<basename>-v<VERSION>.zip` — portable zip (the distributable artifact)
+- `.renmark/version/v<VERSION>/` — unpacked, browsable snapshot directory containing:
+  - `manifest.json` — version metadata, file inventory, timestamps
+  - `release.md` — human-readable release notes
+  - `verification.md` — verifier pass/fail record from step 4 precondition check
+  - `files-changed.txt` — diff stat vs previous release tag
+
+Both outputs write **only inside the project** (`project-write-boundary-rule`) and
+exclude `.git`, `.venv`, `__pycache__`, `.env`, `.renmark/`, `PLAN.md`, etc.
+This is the same zip a GitHub release would attach.
+
 **4d. GitHub release — only if a remote + `gh` both exist.** Detect first:
 ```bash
 git remote -v        # is there an 'origin'?
 command -v gh        # is the GitHub CLI installed + authed?
 ```
-- **Both present** → offer to push the tag and create the release with the bak attached:
+- **Both present** → offer to push the tag and create the release with the zip attached:
   ```bash
   git push origin "v$(cat VERSION)"
-  gh release create "v$(cat VERSION)" ".renmark/baks/$(python -m renmark.release current | sed 's/^/<name>-v/').zip" \
+  gh release create "v$(cat VERSION)" ".renmark/version/$(python -m renmark.release current | sed 's/^/<name>-v/').zip" \
       --title "v$(cat VERSION)" --notes-from-tag
   ```
   (Pushing + publishing a release are shared/remote actions — get explicit user
   approval before running, per the careful-action rule.)
 - **No remote or no `gh`** → do NOT fail. Report: *"No GitHub remote/gh detected —
-  built local release at `.renmark/baks/<name>-v<VERSION>.zip` and tagged
+  built local release at `.renmark/version/<name>-v<VERSION>.zip` and tagged
   `v<VERSION>` locally. Add a remote + gh later and re-run [r] to publish."* The
-  local bak + local tag are a complete release on their own.
+  local snapshot + local tag are a complete release on their own.
 
-**Versioning rule:** bak filename, git tag, and GitHub release tag are all
+**Versioning rule:** snapshot filename, git tag, and GitHub release tag are all
 `v<VERSION>` — one version string, three places, never drifting. The same
 discipline `renmark.release check` already enforces for the in-repo version files.
 
