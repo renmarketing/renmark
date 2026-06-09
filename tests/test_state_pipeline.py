@@ -130,3 +130,15 @@ def test_context_budget_check_cross_domain(tmp_path: Path) -> None:
 def test_context_budget_check_audit_to_build(tmp_path: Path) -> None:
     state.record_skill_invocation(tmp_path, "secure", "audit")
     assert state.context_budget_check(tmp_path, "orchestrate", "build") == "clear"
+
+
+def test_last_skill_invocation_non_dict_json(tmp_path: Path) -> None:
+    """Valid JSON that is not an object must return None, never raise —
+    a corrupt last-skill.json would otherwise wedge every skill's Step 0
+    (skill_preamble crashes before record_skill_invocation can overwrite it)."""
+    path = tmp_path / ".renmark" / "state" / "last-skill.json"
+    path.parent.mkdir(parents=True)
+    for payload in ("[1, 2, 3]", '"plan"', "42"):
+        path.write_text(payload)
+        assert state.last_skill_invocation(tmp_path) is None
+        assert state.context_budget_check(tmp_path, "orchestrate", "build") is None

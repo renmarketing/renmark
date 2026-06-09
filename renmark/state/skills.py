@@ -37,9 +37,14 @@ def last_skill_invocation(repo_root: str | Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+    if not isinstance(data, dict):
+        # Valid JSON but not an object — treat like corruption, never raise:
+        # this runs inside every skill's Step 0 preamble.
+        return None
+    return cast(dict[str, Any], data)
 
 
 def context_budget_check(repo_root: str | Path, new_skill: str, new_domain: str) -> str | None:
