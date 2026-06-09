@@ -52,6 +52,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-09, .renmark/reviews/2026-06-09-f2aaf16.review.md) model `codereview`: **codereview-integration-contract-drift** — Part-2 subagents writing skill-doc integration prose invented engine contracts that don't exist: a view['limit_exceeded'] field, a LifecycleState.verification_result attr, free-text verifier_result vs analytics' pass/fail vocab, status=raw-stage vs SUCCESS/BLOCKED_STATUSES, per-iteration record_loop_run vs one-row-per-loop aggregation. Gate (pytest/ruff/mypy) PASSED because the prose is markdown, not executed — only codex review + field/attr existence probes caught it. Lesson: for doc tasks that reference real APIs, verify every referenced field/attr/vocab against the engine, not just that function names exist.
+
 - (2026-06-09, .renmark/reviews/2026-06-09-a685228.verification.md) model `verify`: **verify-reporting-and-usage-analytics** — 9/9 behaviors verified; failed: none; regressions: 1; full gate green (608 passed, ruff+mypy clean)
 
 - (2026-06-09, .renmark/reviews/2026-06-09-619db95586c61627963cce188edf398806a18958.verification.md) model `verify`: **verify-release-version-snapshot** — 7/7 behaviors verified; failed: none; real CLI snapshot 212 files; full suite 588 pass
