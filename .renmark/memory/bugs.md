@@ -140,3 +140,14 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 **Root cause:** `MetricsCollector.flush()` shared a non-thread-safe buffer; concurrent requests corrupted it.
 **Fix:** wrap buffer access in `threading.Lock()`. Commit `<sha>`. Files: `src/metrics.py`.
 **Lesson:** Anything mutated by a request handler in a multi-threaded server must be either thread-local or lock-guarded. Added to `learnings.md` as a general pattern.
+
+## Known
+
+### 2026-06-09 — classify_usage_pause: unparseable now yields 1970 resume_after
+
+**Severity:** nit
+**Symptom:** When now is not valid ISO, _compute_resume_after falls back to epoch+60min (1970), a past resume_after.
+**Root cause:** Unparseable now has no time reference; fallback anchors on epoch. Unreachable via real callers (they pass now_iso()).
+**Fix:** Low priority: anchor fallback on a sentinel or skip pause when now invalid. Real callers always pass valid now.
+
+---

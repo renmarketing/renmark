@@ -7,70 +7,43 @@ orchestrator's shared git globals, so they live apart from the execution engine.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from ..state import now_iso, read_usage
 
 
 def cmd_usage(repo: Path) -> int:
-    rows = read_usage(repo)
-    if not rows:
-        print(f"No usage recorded yet at {repo}/.renmark/state/usage.jsonl")
+    from .. import usage as _usage
+
+    # Always render the bounded view — even with no recorded usage. The renderer
+    # shows zero windows AND the mandatory disclaimer; an early return on an empty
+    # ledger would drop the disclaimer (and hide paused-run / local-limit state).
+    if not read_usage(repo):
+        print(f"No usage recorded yet at {repo}/.renmark/state/usage.jsonl\n")
+
+    view = _usage.build_usage_view(repo, now=now_iso())
+    print(_usage.render_usage_md(view))
+    return 0
+
+
+def cmd_analytics(repo: Path) -> int:
+    from .. import analytics as _analytics
+
+    try:
+        _analytics.aggregate(repo, now=now_iso())
+        report = _analytics.build_health_report(repo, now=now_iso())
+        md = _analytics.render_health_md(report)
+    except Exception:
+        print("No analytics yet — run some features or tasks to populate the ledgers.")
         return 0
 
-    def tok(r: dict[str, Any]) -> int:
-        return int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
+    print(md)
 
-    today_prefix = now_iso()[:10]
-    month_prefix = now_iso()[:7]
-    today_rows = [r for r in rows if r.get("ts", "").startswith(today_prefix)]
-    month_rows = [r for r in rows if r.get("ts", "").startswith(month_prefix)]
-
-    print(f"Today ({today_prefix}):  {sum(tok(r) for r in today_rows):>7} tokens over {len(today_rows)} calls")
-    print(f"This month:          {sum(tok(r) for r in month_rows):>7} tokens over {len(month_rows)} calls")
-    print(f"All time:            {sum(tok(r) for r in rows):>7} tokens over {len(rows)} calls")
-
-    # Per-model breakdown this month.
-    by_model: dict[str, dict[str, int]] = {}
-    for r in month_rows:
-        m = r.get("model", "?").split("/")[-1]
-        d = by_model.setdefault(m, {"calls": 0, "prompt": 0, "completion": 0})
-        d["calls"] += 1
-        d["prompt"] += int(r.get("prompt_tokens", 0))
-        d["completion"] += int(r.get("completion_tokens", 0))
-    if by_model:
-        print("\nBy model (this month):")
-        print(f"  {'model':<40} {'calls':>6} {'prompt':>8} {'compl':>8} {'total':>8}")
-        for m, d in sorted(by_model.items(), key=lambda kv: -(kv[1]["prompt"] + kv[1]["completion"])):
-            total = d["prompt"] + d["completion"]
-            print(f"  {m:<40} {d['calls']:>6} {d['prompt']:>8} {d['completion']:>8} {total:>8}")
-
-    # Per-run breakdown (today only, to keep it readable).
-    by_run: dict[str, dict[str, Any]] = {}
-    for r in today_rows:
-        rid = r.get("run_id", "?")
-        d = by_run.setdefault(rid, {"calls": 0, "tokens": 0, "first": r.get("ts", "")})
-        d["calls"] += 1
-        d["tokens"] += tok(r)
-    if by_run:
-        print("\nRuns today:")
-        print(f"  {'run_id':<28} {'calls':>6} {'tokens':>8}  started")
-        for rid, d in sorted(by_run.items(), key=lambda kv: kv[1]["first"]):
-            print(f"  {rid:<28} {d['calls']:>6} {d['tokens']:>8}  {d['first']}")
-
-    # Top tasks this month (catch tasks that ate tokens via retries).
-    by_task: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for r in month_rows:
-        key = (r.get("task_id"), r.get("model", "?").split("/")[-1])
-        d = by_task.setdefault(key, {"calls": 0, "tokens": 0})
-        d["calls"] += 1
-        d["tokens"] += tok(r)
-    retries = [(k, v) for k, v in by_task.items() if v["calls"] > 1]
-    if retries:
-        print("\nTasks that retried this month (eating tokens):")
-        for (tid, m), d in sorted(retries, key=lambda kv: -kv[1]["calls"]):
-            print(f"  task {tid} ({m}): {d['calls']} calls, {d['tokens']} tokens")
-
+    # Write committed memory snapshot (mirrors how cmd_roadmap writes roadmap.md).
+    memory_dir = Path(repo) / ".renmark" / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    analytics_path = memory_dir / "analytics.md"
+    analytics_path.write_text(md, encoding="utf-8")
+    print(f"\n(Snapshot written to {repo}/.renmark/memory/analytics.md)")
     return 0
 
 

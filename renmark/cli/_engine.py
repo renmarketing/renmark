@@ -38,7 +38,7 @@ from ..state import (
     write_pause,
 )
 from ..verifier import run_verifier
-from .commands import cmd_logs, cmd_roadmap, cmd_task, cmd_usage
+from .commands import cmd_analytics, cmd_logs, cmd_roadmap, cmd_task, cmd_usage
 
 
 @dataclass
@@ -793,6 +793,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--resume", action="store_true", help="resume a paused run")
     ap.add_argument("--dry-run", action="store_true", help="parse plan, list tasks, exit")
     ap.add_argument("--usage", action="store_true", help="show usage and exit")
+    ap.add_argument("--analytics", action="store_true", help="show build-health analytics and exit")
     ap.add_argument(
         "--roadmap",
         action="store_true",
@@ -822,6 +823,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.usage:
         return cmd_usage(repo)
+    if args.analytics:
+        return cmd_analytics(repo)
     if args.roadmap:
         return cmd_roadmap(repo)
     if args.logs:
@@ -832,7 +835,7 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_task(args.task, args.output, repo=repo)
 
     if not args.plan:
-        ap.error("plan path is required unless --usage / --roadmap / --logs / --task")
+        ap.error("plan path is required unless --usage / --analytics / --roadmap / --logs / --task")
     return execute_plan(
         args.plan,
         repo=repo,

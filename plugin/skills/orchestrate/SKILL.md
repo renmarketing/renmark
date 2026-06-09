@@ -93,6 +93,24 @@ if prior:
 
 **The orchestrator does NOT load any wave's full output.** Only the `dependency_notes` field crosses the boundary.
 
+**3a-bis. Usage preflight (Tier-1, free) — pause before spending if a local limit is already exceeded**
+
+Before dispatching any task in this wave, compute the bounded usage view and check it against the configured local limits in `.renmark/analytics/limits.json`. This is a deterministic file-IO check — **never read raw usage logs into conversation**; `build_usage_view` returns the bounded summary dict only.
+
+```python
+from renmark import usage, state
+view = usage.build_usage_view(repo, now=state.now_iso())
+if view.get("limit_exceeded"):  # a configured local limit is already over budget
+    pause = usage.classify_usage_pause(
+        run_id=<run_id>, plan_path=<plan>, last_task_index=wave_first_task_index,
+        now=state.now_iso(), feature=<feature or "">, repo=repo,
+    )
+    state.write_pause(repo, pause)
+    # Surface the resume command and STOP — do NOT dispatch this wave.
+```
+
+The PauseState carries `pause_kind="usage_limit"` and a `resume_after` timestamp (provider reset if known, else the next local rolling-window boundary, else now+60min). Surface: *"Local usage limit reached — orchestrate paused before wave N. Resume with `/renmark:orchestrate --resume` after `resume_after`."* Then stop; do not enter 3b. MVP: no polling, no auto-retry — the user (or `/renmark:resume`) re-enters later.
+
 **3b. Dispatch each task in this wave (parallel)**
 
 For `executor: codex` tasks:
@@ -161,6 +179,24 @@ state.write_pipeline_state(repo, wave_index=wave_index,
                            add_completed_task=..., add_failed_task=...)
 ```
 
+**Record one analytics event per task (bounded — from the WaveResult summary, NEVER transcripts).** After the wave summary is persisted, emit a structured run event for each task so usage/limits stay current. Source every field from the parsed `SubagentOutput` / verifier result already in hand — do not re-read artifacts, diffs, or raw logs.
+
+```python
+from renmark import analytics, state
+for out, task in zip(outputs, wave_tasks):
+    analytics.record_task_run(
+        repo, ts=state.now_iso(), task_id=task.index, title=task.title,
+        executor=task.executor, model=task.executor, provider="",
+        status=out.status,
+        # verifier_result MUST be a normalized verdict token ("pass"/"fail") —
+        # analytics._agg_tasks classifies on these, NOT on a free-text exit summary.
+        verifier_result=("pass" if out.status == "PASS" else "fail"),
+        retry_count=out.retry_count,
+        failure_reason=<one-line reason if FAIL else "">,  # human-readable tail lives here
+        total_tokens=out.token_count, sha=(out.sha or ""),
+    )
+```
+
 Then commit PASSing tasks serially in task-index order. For each commit, append to `CHANGELOG.md`:
 
 ```markdown
@@ -180,9 +216,25 @@ Use the task's `summary_lines` and `touched_files` from `SubagentOutput` to fill
 | Outcome | Action |
 |---|---|
 | All tasks PASS | Continue to next wave or finalize |
-| Any FAIL in wave | Pause via `state.write_pause(...)`; show resume command; stop |
+| Task failed on a **provider usage signal** (rate-limit / quota / retry-later / usage-exceeded) | Classify as **PAUSED, not FAIL** — see Tier-2 below; STOP the wave so `/renmark:resume` continues later |
+| Any other FAIL in wave | Pause via `state.write_pause(...)`; show resume command; stop |
 | `IsolationViolation` raised | Mark task FAIL; aggregate summary anyway; alert user to skill-side bug |
 | Plan parse error | Route to `/renmark:plan` |
+
+**Tier-2 — provider-error classification (usage_limit, not failure).** When a task's failure signal is a provider rate-limit / quota / `retry-later` / usage-exceeded error (from `renmark-execute` output or an Agent error), do NOT record it as `status: FAIL`. Reclassify the run as paused for usage and stop the wave — this is a transient quota event, not a broken task. MVP: no polling, no auto-retry; `/renmark:resume` re-enters once the window clears.
+
+```python
+from renmark import usage, state
+pause = usage.classify_usage_pause(
+    run_id=<run_id>, plan_path=<plan>, last_task_index=task.index,
+    now=state.now_iso(), provider=<provider>, model=<model>,
+    observed_usage=<bounded error signal>, provider_reset_at=<reset ts if surfaced>,
+    feature=<feature or "">, repo=repo,
+)
+state.write_pause(repo, pause)  # pause_reason="usage_limit", pause_kind="usage_limit"
+```
+
+Surface: *"Provider usage limit hit at task <index> — paused (not failed). Resume with `/renmark:orchestrate --resume` after `resume_after`."* The PauseState's `resume_after` follows the same fallback rule as the preflight pause (provider reset → next local window → now+60min).
 
 ### 6. Update memory
 

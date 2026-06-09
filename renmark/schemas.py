@@ -230,6 +230,139 @@ def validate_artifact_metadata(data: Any) -> list[str]:
     return issues
 
 
+# ── Analytics artifacts (REQ-15) ─────────────────────────────────────────────
+
+LIMITS_PROVIDERS = ("claude", "codex")
+
+
+def validate_limits(data: object) -> list[str]:
+    """Validate a limits payload: optional top-level provider objects
+    (``claude``/``codex``), each an object whose ceiling values are ints.
+    Flags negative or zero ceilings. Unknown provider keys and unknown inner
+    keys are allowed. ``{}`` is valid.
+    """
+    issues: list[str] = []
+    if not isinstance(data, dict):
+        return [f"limits: expected object, got {type(data).__name__}"]
+
+    for provider, ceilings in data.items():
+        if not isinstance(ceilings, dict):
+            issues.append(f"limits.{provider} expected object, got {type(ceilings).__name__}")
+            continue
+        for key, value in ceilings.items():
+            if not _isinstance(value, int):
+                issues.append(f"limits.{provider}.{key} expected int, got {type(value).__name__}")
+            elif value <= 0:
+                issues.append(f"limits.{provider}.{key}={value} — ceiling must be positive")
+
+    return issues
+
+
+# Known keys in aggregate() output and their expected types. Forward-compatible:
+# only present keys are type-checked; missing keys are never flagged.
+ANALYTICS_SUMMARY_TYPES: dict[str, Any] = {
+    "features_completed": int,
+    "features_failed": int,
+    "tasks_completed": int,
+    "tasks_failed": int,
+    "loop_iterations": int,
+    "files_changed": int,
+    "total_tokens": int,
+    "failure_reasons": list,
+    "shipped": list,
+    "deferred": list,
+    "next_backlog": list,
+    "success_rate": (int, float),
+    "pass_rate": (int, float),
+    "failure_rate": (int, float),
+    "avg_iterations": (int, float),
+}
+
+
+def validate_analytics_summary(data: object) -> list[str]:
+    """Validate the aggregate() output. Lenient about which keys exist
+    (forward-compatible) — flags only wrong TYPES on present known keys.
+    Counts are ints, lists are lists, rates are numbers.
+    """
+    issues: list[str] = []
+    if not isinstance(data, dict):
+        return [f"analytics_summary: expected object, got {type(data).__name__}"]
+
+    for key, expected_type in ANALYTICS_SUMMARY_TYPES.items():
+        if key in data and not _isinstance(data[key], expected_type):
+            issues.append(
+                f"analytics_summary.{key} expected {_typename(expected_type)}, got {type(data[key]).__name__}"
+            )
+
+    return issues
+
+
+REPORT_METRICS_INT_FIELDS = ("files_changed", "loop_iterations")
+REPORT_METRICS_LIST_FIELDS = ("shipped", "deferred", "next_backlog")
+
+
+def validate_report_metrics(data: object) -> list[str]:
+    """Validate a feature-report metrics.json: a dict with a non-empty
+    ``feature`` string. If present, ``files_changed``/``loop_iterations`` are
+    ints and ``shipped``/``deferred``/``next_backlog`` are lists.
+    """
+    issues: list[str] = []
+    if not isinstance(data, dict):
+        return [f"report_metrics: expected object, got {type(data).__name__}"]
+
+    feature = data.get("feature")
+    if not isinstance(feature, str):
+        issues.append(
+            f"report_metrics.feature expected str, got {type(feature).__name__}"
+        )
+    elif not feature.strip():
+        issues.append("report_metrics.feature is empty")
+
+    for field in REPORT_METRICS_INT_FIELDS:
+        if field in data and not _isinstance(data[field], int):
+            issues.append(f"report_metrics.{field} expected int, got {type(data[field]).__name__}")
+
+    for field in REPORT_METRICS_LIST_FIELDS:
+        if field in data and not isinstance(data[field], list):
+            issues.append(f"report_metrics.{field} expected list, got {type(data[field]).__name__}")
+
+    return issues
+
+
+def validate_usage_pause(data: object) -> list[str]:
+    """Validate a PauseState dict. Only enforced when
+    ``pause_kind == "usage_limit"``: requires a non-empty ``resume_after``
+    string, a ``fallback_retry_minutes`` int, and a string ``provider``.
+    """
+    issues: list[str] = []
+    if not isinstance(data, dict):
+        return [f"usage_pause: expected object, got {type(data).__name__}"]
+
+    if data.get("pause_kind") != "usage_limit":
+        return issues
+
+    resume_after = data.get("resume_after")
+    if not isinstance(resume_after, str):
+        issues.append(
+            f"usage_pause.resume_after expected str, got {type(resume_after).__name__}"
+        )
+    elif not resume_after.strip():
+        issues.append("usage_pause.resume_after is empty")
+
+    retry = data.get("fallback_retry_minutes")
+    if not _isinstance(retry, int):
+        issues.append(
+            f"usage_pause.fallback_retry_minutes expected int, got {type(retry).__name__}"
+        )
+
+    if "provider" in data and not isinstance(data["provider"], str):
+        issues.append(
+            f"usage_pause.provider expected str, got {type(data['provider']).__name__}"
+        )
+
+    return issues
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 

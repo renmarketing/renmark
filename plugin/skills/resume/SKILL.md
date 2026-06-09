@@ -117,6 +117,53 @@ as it does today — the lifecycle recovery below is unchanged. A loop in
 the `/renmark:approve` recommendation; this block only adds the `--resume` hint
 so the user knows which loop to re-enter after approving.
 
+### 1.8 Surface usage-limit paused runs
+
+A `/renmark:loop` or continuous run may be paused by a local usage-limit guard.
+When `renmark.state.read_pause(repo)` returns a `PauseState` with
+`pause_kind == "usage_limit"`, surface it so the user knows the run is
+**persisted and resumable**. Still **zero LLM calls** — one extra file read
+(`read_pause` reads a single file).
+
+```bash
+python3 -c "
+from pathlib import Path
+from renmark.state import read_pause
+ps = read_pause(Path('.'))
+if ps is not None and ps.pause_kind == 'usage_limit':
+    resume_hint = str(ps.resume_after) if ps.resume_after else 'unknown'
+    feature_hint = f'  Feature:  {ps.feature}' if ps.feature else ''
+    loop_hint = f'  Loop:     {ps.loop_id}  (iteration {ps.iteration}/{ps.max_iterations})' if ps.loop_id else ''
+    print('⏸  Loop/run paused because a usage limit was reached.')
+    if feature_hint:
+        print(feature_hint)
+    if loop_hint:
+        print(loop_hint)
+    print(f'   Suggested resume time: {resume_hint}')
+    print('   Observed local usage only. Provider-side account limits may differ.')
+    print('   You can resume now (state is persisted) or wait until the suggested time.')
+    print()
+    print('   Resume now: /renmark:loop --resume  (or re-invoke the paused command)')
+"
+```
+
+Output when a usage-limit pause is active (≤8 lines, then blank line):
+
+```
+⏸  Loop/run paused because a usage limit was reached.
+   Feature:  <feature>          # only if available
+   Loop:     <loop-id>  (iteration <N>/<max>)   # only if available
+   Suggested resume time: <resume_after>
+   Observed local usage only. Provider-side account limits may differ.
+   You can resume now (state is persisted) or wait until the suggested time.
+
+   Resume now: /renmark:loop --resume  (or re-invoke the paused command)
+```
+
+If `read_pause` returns `None` or `pause_kind != "usage_limit"`, this step
+prints nothing. The existing lifecycle-based resume (Steps 1–1.75 and Step 2
+onward) is **unchanged** — this is an additive surfacing branch only.
+
 ### 2. Surface pending approval gates
 
 If `human_review_required` is true and `human_review_completed` is false, the user MUST be told about the pending gate before any other recommendation. The next action is always `/renmark:approve` until the gate is cleared.

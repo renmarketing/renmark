@@ -1,5 +1,58 @@
 # Changelog
 
+## [2026-06-09] — reporting-and-usage-analytics Part 2 codereview fixes (6 Major + 2 Minor)
+**Request:** Fix all codex-review findings on the Part-2 surfaces+integration diff before finish.
+**Built:** Codex flagged 8 integration-contract bugs (the opus-written prose referenced fields/attrs/vocab absent from the Part-1 engine); all confirmed real and fixed. Code: (F1) `cmd_usage` no longer early-returns on an empty ledger — always renders the bounded view so the mandatory disclaimer + paused/limit state always show; (F2) `build_usage_view` now returns a `limit_exceeded` boolean (True when any real per-provider percent ≥ 100) so orchestrate's Tier-1 preflight has a working signal. Skill prose: (F3) orchestrate `record_task_run` passes a normalized `verifier_result="pass"/"fail"` (analytics classifies on these, not free text); (F4) finish reads the verification result from the verify artifact's bounded metadata via `summary.read_metadata` (LifecycleState has no `verification_result` attr); (F5) finish maps the lifecycle stage to analytics vocab (`shipped`/`completed`/`blocked`) instead of passing the raw stage; (F6) loop records per-iteration metrics via `record_event(kind="loop_iteration")` and calls `record_loop_run` exactly once at the terminal break (per-iteration `record_loop_run` inflated `_agg_loops` totals); (F7) loop's `classify_usage_pause` now passes `repo=` so the local rolling-window fallback works; (F8) finish snippet imports `subprocess`. Gate: 608 passed / 28 skipped, ruff + mypy clean. Each fix independently re-probed (empty-repo disclaimer, limit_exceeded over-limit flip to True at 250%, API existence).
+**Files changed:**
+- `renmark/cli/commands.py` — F1: always render usage view
+- `renmark/usage.py` — F2: `limit_exceeded` field in `build_usage_view`
+- `plugin/skills/orchestrate/SKILL.md` — F3: normalized `verifier_result`
+- `plugin/skills/finish/SKILL.md` — F4/F5/F8: artifact-metadata verification, stage→vocab map, `import subprocess`
+- `plugin/skills/loop/SKILL.md` — F6/F7: per-iteration event vs terminal loop-run, `repo=` on pause classify
+**Do not change:**
+- `verifier_result` recorded to analytics MUST be a normalized `pass`/`fail` token; feature-run `status` MUST be analytics vocab (`shipped`/`completed`/`blocked`), NOT a raw lifecycle stage. `record_loop_run` is one-row-per-loop (terminal only) — per-iteration data goes through `record_event`.
+- `build_usage_view` returns `limit_exceeded` (bool); Tier-1 preflight depends on it. The empty-ledger path of `cmd_usage` MUST still render the disclaimer.
+
+## [2026-06-09] — reporting-and-usage-analytics Part 2 (surfaces + integration) orchestrated
+**Request:** Surface the Part-1 engine to users and wire it into the live pipeline (REQ-15/REQ-16).
+**Built:** 12 atomic tasks across 6 waves on `feature/reporting-and-usage-analytics` (haiku×4, sonnet×6, opus×2). CLI: `cmd_usage` now delegates to `usage.build_usage_view`/`render_usage_md`; new `cmd_analytics` (aggregate + build-health, writes `.renmark/memory/analytics.md`); `--analytics` flag wired in `_engine.py`; re-exported from `cli/__init__.py`. New command shims `plugin/commands/{usage,analytics}.md` + zero-LLM skills `plugin/skills/{usage,analytics}/SKILL.md` (invoke `renmark-execute --usage/--analytics`, display bounded output only). Integration: `finish` writes the feature report + `record_feature_run` + `[a] Analytics` menu; `orchestrate` gained Tier-1 usage preflight + per-task `record_task_run` + Tier-2 `usage_limit` pause-not-fail; `loop` records per-iteration `record_loop_run` + usage-limit pause hook; `resume` surfaces `pause_kind==usage_limit` runs with suggested resume time + disclaimer. `.gitignore` ignores raw `.renmark/analytics/*.jsonl` while keeping `summary.json`/`limits.json`/`reports/`. Full gate: 608 passed / 28 skipped, ruff + mypy clean.
+**Files changed:**
+- `renmark/cli/commands.py`, `renmark/cli/_engine.py`, `renmark/cli/__init__.py` — usage/analytics handlers + flag + re-export
+- `plugin/commands/usage.md`, `plugin/commands/analytics.md` — command shims (new)
+- `plugin/skills/usage/SKILL.md`, `plugin/skills/analytics/SKILL.md` — zero-LLM skills (new)
+- `plugin/skills/finish/SKILL.md`, `plugin/skills/orchestrate/SKILL.md`, `plugin/skills/loop/SKILL.md`, `plugin/skills/resume/SKILL.md` — integration touchpoints
+- `.gitignore` — raw analytics JSONL ignored, durable summary/limits/reports kept
+**Do not change:**
+- Skills NEVER read `.renmark/analytics/*.jsonl` or `.renmark/state/usage.jsonl` into context — they run `renmark-execute --usage/--analytics` and display only the bounded rendered output (REQ-5).
+- The `*.jsonl` gitignore rule is followed by explicit `!summary.json` / `!limits.json` un-ignores — do not reorder so the wildcard shadows them; `.renmark/reports/` stays committed.
+- `now`/`ts` injected everywhere via `state.now_iso()` — no `datetime.now()` in the new integration prose. Usage pause is an ADDITIONAL loop stop condition, not a replacement for REQ-9/REQ-11 budget/max-iter/goal-backward bounds.
+- No AGENTS.md mirror was made: these tasks add skill behavior under existing bounded-output/context-hygiene governance rules; no governance *rule* changed.
+
+## [2026-06-09] — reporting-and-usage-analytics Part 1 (engine) orchestrated
+**Request:** Build the deterministic Python engine for local reporting/analytics/usage (REQ-15) + usage-aware pause/resume (REQ-16).
+**Built:** 9 atomic tasks across 5 waves on `feature/reporting-and-usage-analytics`. New modules `renmark/usage.py` (windowed usage view, limits + percent-used, `classify_usage_pause` fallback rule, `render_usage_md` w/ mandatory disclaimer), `renmark/reports.py` (feature/run report builders → `.renmark/reports/`), `renmark/analytics.py` (append-only JSONL event ledgers under `.renmark/analytics/` + `aggregate()`→summary.json + `build_health_report`). Extended `renmark/state/pause.py` (usage-limit `PauseState` fields + `usage_limit_pause`, back-compatible) and `renmark/state/usage.py` (enriched `UsageRecord` + now-injected window helpers). Added 4 `schemas.py` validators. 15 new tests; full suite 608 passed; mypy clean.
+**Files changed:**
+- `renmark/usage.py`, `renmark/reports.py`, `renmark/analytics.py` — new engine modules
+- `renmark/state/pause.py`, `renmark/state/usage.py`, `renmark/state/__init__.py` — back-compatible extensions
+- `renmark/schemas.py` — 4 non-raising validators
+- `tests/test_state_pause_usage.py`, `tests/test_usage.py`, `tests/test_reports_analytics.py` — new
+**Do not change:**
+- The existing `.renmark/state/usage.jsonl` ledger stays the token source of truth — analytics windows READ it; do NOT create a second token ledger. The new `.renmark/analytics/` tree holds only the new event streams + summary.json + limits.json.
+- `PauseState` / `UsageRecord` extensions are additive + keyword-defaulted — old PAUSED files and usage.jsonl rows must keep loading. No `datetime.now()` in these modules — `now`/`ts` is always injected.
+- `render_usage_md` output MUST always end with "Observed local usage only. Provider-side account limits may differ."
+- Part 2 (CLI `--analytics`, `/renmark:usage` + `/renmark:analytics` commands+skills, orchestrate/loop/finish/resume integration, gitignore) is NOT built yet — feature-level verify runs after Part 2.
+- Pre-existing 39 ruff errors in other `tests/` files were untouched (not introduced by this feature).
+
+## [2026-06-09] — PRD updated (REQ-15 / REQ-16: local reporting, analytics, usage status + usage-aware pause/resume)
+**Request:** `/renmark:feature reporting-and-usage-analytics` flagged PRD drift; reconcile the new local observability surface into the PRD before planning.
+**Built:** Reconciled Requirements, Scope boundaries, and Open questions of `PRD.md`. Added `REQ-15` (local-only reporting/analytics/usage status — on-disk JSON/JSONL, `/renmark:usage` + `/renmark:analytics`, no external telemetry/DB) and `REQ-16` (usage-aware safe pause/resume on rate/quota limits — extends REQ-3/10/12). Registered `usage` + `analytics` in the in-scope skill list and added the reporting/analytics/usage layer to the in-scope clause. Resolved the long-standing "minimum viable telemetry" open question. `last_reviewed` already 2026-06-09.
+**Files changed:**
+- `PRD.md` — added REQ-15 + REQ-16; in-scope skills/layer; resolved telemetry open question
+**Do not change:**
+- Reporting/analytics is **observed-local only** — no external telemetry, no database, stdlib JSON/JSONL only; account-limit output must carry "Observed local usage only. Provider-side account limits may differ." unless a provider source is explicitly available.
+- Orchestrator never reads raw JSONL into context (REQ-5); all renmark writes stay under `.renmark/` (REQ-6).
+- MVP must NOT poll for quota or auto-schedule retries; usage limits pause-not-fail for later `/renmark:resume`.
+
 ## v0.7.8 — 2026-06-09 (Release version snapshot — `.renmark/version/`)
 
 **Release of the canonical local version-snapshot protocol.** Bumped 0.7.7 → 0.7.8 across
