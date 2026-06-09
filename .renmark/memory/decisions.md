@@ -14,6 +14,18 @@
 
 
 
+
+## ADR-021 — Released renmark v0.7.8
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** release-version-snapshot feature; merged to main, branch deleted
+
+**Decision.** Tagged v0.7.8; snapshot .renmark/version/v0.7.8 (dogfood) + ~/projects/ai-system-renmark-v0.7.8-2026-06-09.zip
+
+---
+
 ## ADR-020 — Finished feature release-version-snapshot
 
 **Date:** 2026-06-09
