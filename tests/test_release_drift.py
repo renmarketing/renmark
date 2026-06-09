@@ -186,10 +186,10 @@ def test_check_drift_on_real_repo():
 import zipfile
 
 
-def test_build_package_writes_versioned_zip_to_baks(tmp_path: Path):
+def test_build_package_writes_versioned_zip_to_version(tmp_path: Path):
     repo = _make_repo(tmp_path, version="0.3.3")
     out = release.build_package(repo)
-    assert out == repo / ".renmark" / "baks" / "renmark-v0.3.3.zip"
+    assert out == repo / ".renmark" / "version" / "renmark-v0.3.3.zip"
     assert out.exists()
     # top-level folder inside the zip is the version-anchored stem
     names = zipfile.ZipFile(out).namelist()
