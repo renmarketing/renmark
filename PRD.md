@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-06-08
+last_reviewed: 2026-06-09
 status: draft
 ---
 
@@ -93,6 +93,18 @@ it never accumulates, and durable state lives on disk, not in the conversation.
    `CHANGELOG.md` / `.renmark/` and merges missing rule blocks without
    overwriting — and a broken install is diagnosable (`/renmark:doctor`).
    `/renmark:setup` remains as a thin rule-block-refresh alias.
+9. `REQ-9` Loops (Loop Mode) are bounded by an explicit budget AND a
+   max-iterations cap — never unbounded — and always surface a cost preview
+   before spend (extends REQ-2).
+10. `REQ-10` Loop state persists under `.renmark/loops/<id>/` so a loop survives
+    `/clear`, `/compact`, crash, and new sessions; `/renmark:resume` recovers it
+    (extends REQ-3 / REQ-6).
+11. `REQ-11` Each loop iteration decides continue-or-stop **goal-backward from
+    fresh verification evidence** (extends REQ-7); the orchestrator reads only
+    bounded summaries, paths, metadata, and verification status — never code,
+    diffs, or full bodies (REQ-5).
+12. `REQ-12` Human approval is required before a loop edits `PRD.md`, merges,
+    releases, escalates its budget, or makes destructive changes (extends REQ-4).
 
 ## Success metrics
 
@@ -113,13 +125,31 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   blueprint, plan, check-plan, orchestrate, verify, finish, feature, debug,
   codereview, secure, doctor, resume, roadmap, help, hygiene, and `init` — the
   front-door adoption pipeline, with `setup` as its rule-block-refresh alias);
-  the Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
+  the bounded loop execution engine (`loop`) + `.renmark/loops/` state; the
+  Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
   `.renmark/` state and memory; cross-platform install.
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
   bloat now — see ADR-005); first-class requirement-coverage reporting in
-  verify (coverage flows implicitly via plan → tasks → verify traceability).
+  verify (coverage flows implicitly via plan → tasks → verify traceability);
+  **indefinite autonomous loops** and **scheduled / PR-triggered loops** (Loop
+  Mode ships bounded + human-gated first).
+
+## Loop Mode
+
+renmark's execution engine for guided builds is a **bounded, verified,
+cost-aware, resumable agentic loop** — trigger + goal + verifier + budget +
+persisted state + stop condition. It wraps the existing plan → orchestrate →
+verify pipeline and iterates (run → verify evidence → decide → repeat) until the
+goal is verified, the budget is hit, max-iterations is hit, an approval gate is
+pending, or no fresh evidence supports continuing. This is the realization of
+the guided pipeline (REQ-1), not a separate product or standalone mode.
+
+- **Experts:** `/renmark:loop "<goal>"` (with `--goal` / `--verify` / `--budget`
+  / `--max-iterations`).
+- **Vibe coders:** loop behavior is hidden behind `/renmark:start` — they never
+  see the word "loop."
 
 ## Open questions
 

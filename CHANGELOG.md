@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-09] — PRD updated: Loop Mode
+**Request:** Feature `loop-mode`'s drift gate proposed adding Loop Mode (bounded, verified, cost-aware, resumable agentic loops as the execution engine; new `/renmark:loop`, hidden behind `/renmark:start`). Human-approved with one wording edit.
+**Built:** Added REQ-9..12, a new `## Loop Mode` section, and Loop Mode entries to Scope boundaries (in-scope: `loop` + `.renmark/loops/`; deferred: indefinite autonomous + scheduled/PR-triggered loops). Bumped last_reviewed → 2026-06-09. Phrase reworded per user: "not a separate product or standalone mode."
+**Files changed:**
+- `PRD.md` — Loop Mode requirements + section + scope (human-gated, approved via /renmark:prd)
+**Do not change:**
+- Loop Mode MVP is bounded + human-gated; indefinite/scheduled/PR-triggered loops are explicitly deferred. Loops never run unbounded; human approval before PRD edit/merge/release/budget-escalation/destructive change (REQ-12).
+
 ## v0.7.5 — 2026-06-08 (modularity / scalability health lens)
 
 **Release of the modularity-health-lens feature.** Bumped 0.7.4 → 0.7.5 across all 7
