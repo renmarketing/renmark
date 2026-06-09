@@ -109,6 +109,32 @@ While `stop_reason(state)` is `None`:
    ```
    This is the load-bearing fix for REQ-9: the budget is gated *before* orchestrate, not
    after `refresh_spent`. Stopping after spending would overshoot by one full iteration.
+
+   **Usage-limit preflight (ADDITIONAL stop condition — REQ-15/16, NOT a replacement for
+   the budget/max-iter/goal-backward bounds above).** Between iterations, if a provider
+   rate/quota signal was observed on the previous cycle OR a configured local-limit
+   preflight fails, classify a usage pause and STOP in a resumable state — do NOT poll or
+   auto-retry (no retry loop in MVP):
+   ```python
+   from renmark import usage, state as rstate
+   if provider_rate_signal or local_limit_preflight_failed:   # observed between iterations
+       pause = usage.classify_usage_pause(
+           run_id=state.run_id, plan_path=<plan_path>,
+           last_task_index=state.iteration, now=rstate.now_iso(),
+           provider=<provider>, model=<model>,
+           observed_usage=<observed_usage>, provider_reset_at=<provider_reset_at>,
+           feature=state.goal, loop_id=lid,
+           iteration=state.iteration, max_iterations=state.max_iterations,
+       )                                                       # pause.pause_kind == "usage_limit"
+       rstate.write_pause(repo, pause)
+       state.status = "awaiting-approval"
+       state.pending_step = "usage-limit"
+       loop.write_loop(repo, lid, state)
+       break              # STOP before dispatch — resumable; /renmark:resume continues
+   ```
+   The usage pause is layered ON TOP of the budget/max-iter/goal-backward stop conditions
+   (REQ-9/11) — those still gate every iteration exactly as before. There is no polling and
+   no automatic resume in the MVP: the loop simply stops and `/renmark:resume` picks it up.
 1. **Orchestrate** — invoke `/renmark:orchestrate` on the current plan / `next_action`. It
    plans + dispatches, **commits passing work to the feature branch**, and ledgers spend
    under the loop's `run_id`.
@@ -142,6 +168,24 @@ While `stop_reason(state)` is `None`:
        state.status = "stalled"
    loop.write_loop(repo, lid, state)           # written before the iteration returns → resumable
    ```
+   **Per-iteration metrics (REQ-15).** Record this iteration's run from the BOUNDED loop
+   state — never from transcripts:
+   ```python
+   from renmark import analytics, state as rstate
+   analytics.record_loop_run(
+       repo, ts=rstate.now_iso(),
+       loop_id=lid, goal=state.goal,
+       backlog_item_id=<backlog_item_id or "">,
+       max_iterations=state.max_iterations,
+       iterations_used=state.iteration,
+       stop_reason=(state.status if loop.stop_reason(state) is not None else ""),
+       goal_reached=bool(decision["goal_reached"]),
+       total_tokens=state.spent_tokens,
+       branch_disposition=<branch_disposition or "">,
+   )
+   ```
+   Every field is read from `state` / `decision` (the bounded loop state + verify metadata),
+   honoring context hygiene — no diffs, code, or transcripts feed the metrics.
 6. **Check** — `stop_reason(state)`. If non-None, the loop is terminal; break.
 7. **Progress line** — emit **ONE bounded line** per iteration (≤ summary cap), e.g.
    `iter 2/5 · verify FAIL · spent 80k/300k (~$0.80) · next: add null-guard`.
@@ -160,7 +204,7 @@ Stop conditions (all terminal):
 | `done` | verify PASS — goal verified backward |
 | `budget-hit` | ledger spend ≥ approved budget |
 | `max-iter` | iteration ≥ `--max-iterations` |
-| `awaiting-approval` | a REQ-12 gate (merge/release/PR/destructive/budget-escalation) is pending |
+| `awaiting-approval` | a REQ-12 gate (merge/release/PR/destructive/budget-escalation) is pending, OR a REQ-16 usage-limit pause was written (`pending_step = "usage-limit"`) — provider rate/quota signal or local-limit preflight failure; `/renmark:resume` continues, no auto-retry |
 | `stalled` | verify reported NO failed behaviors yet goal not reached, OR a failed verify yielded no actionable symptom (blank derived `next_action`) — NOT set on a failed verify that produced an actionable symptom (that one iterates) |
 
 Report a bounded ≤5-line verdict (status, iterations used, spend vs budget, last evidence),
@@ -185,7 +229,10 @@ a crash.
 
 ## Governance compliance
 
-Upholds G3/G5/G11/G12 and REQ-5/9/10/11/12. The load-bearing invariants are enforced in
+Upholds G3/G5/G11/G12 and REQ-5/9/10/11/12/15/16. The usage-limit pause (REQ-16) is an
+ADDITIONAL terminal stop layered on top of the budget/max-iter/goal-backward bounds
+(REQ-9/11), never a replacement; per-iteration metrics (REQ-15) are recorded from bounded
+loop state via `analytics.record_loop_run`, never from transcripts. The load-bearing invariants are enforced in
 `renmark/loop.py`: stop logic degrades toward stopping (never unbounded), `build_decision`
 consumes only metadata + the ledger (never code/diffs), `refresh_spent` enforces the budget
 against measured spend, and `loop.json` carries runtime state only (not `lifecycle.json`).

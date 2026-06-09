@@ -71,6 +71,71 @@ git diff --stat <base>..HEAD
 
 Present: N commits, M files changed, brief note on each commit.
 
+### 2.5 Build and record the feature report
+
+After the branch summary and before presenting the next-steps menu, build the feature report and record the analytics run. This step is **non-blocking** — if any call fails, log the error and continue to step 3 without aborting finish.
+
+```python
+from renmark import reports, analytics, state, lifecycle
+from pathlib import Path
+
+repo = Path('.')
+s = lifecycle.read_lifecycle(repo)
+
+# Gather what finish already knows
+feature_name = s.feature if s else ""
+branch = s.branch if s else ""
+sha = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+# Files changed against base (main/master)
+diff_stat = subprocess.check_output(
+    ["git", "diff", "--stat", "main..HEAD"]).decode()
+files_changed = sum(1 for line in diff_stat.splitlines()
+                    if "|" in line)  # each changed file has a "|" in --stat output
+verification = s.verification_result if hasattr(s, 'verification_result') else ""
+# Codereview artifact — check for most recent review file
+import glob
+review_files = sorted(glob.glob(".renmark/reviews/*.review.md"))
+codereview = review_files[-1] if review_files else ""
+# Version path — check for a release snapshot matching current stage
+import os
+version_dirs = sorted(glob.glob(".renmark/version/v*/"))
+version_path = version_dirs[-1] if version_dirs else ""
+branch_disposition = "merged" if s and s.stage == "released" else "open"
+now = state.now_iso()
+
+# 1. Build + write the feature report
+report = reports.build_feature_report(
+    repo,
+    feature=feature_name,
+    branch=branch,
+    sha=sha,
+    version_path=version_path,
+    verification=verification,
+    codereview=codereview,
+    files_changed=files_changed,
+    branch_disposition=branch_disposition,
+    now=now,
+)
+md_path, json_path = reports.write_feature_report(repo, feature_name, report)
+
+# 2. Record the analytics run
+analytics.record_feature_run(
+    repo,
+    ts=now,
+    feature=feature_name,
+    branch=branch,
+    status=s.stage if s else "",
+    sha=sha,
+    files_changed=files_changed,
+    verification=verification,
+    branch_disposition=branch_disposition,
+)
+```
+
+**CRITICAL context hygiene:** surface ONLY the report path and a ≤5-line summary to the orchestrator — **never read or paste the report body** into the conversation.
+
+Report written to: `<md_path>` (JSON: `<json_path>`)
+
 ### 3. Offer next steps
 
 > *"All verifiers pass. N commits, M files changed.*
@@ -78,9 +143,12 @@ Present: N commits, M files changed, brief note on each commit.
 > *  1. [p] Pull request — open a PR with gh, using the CHANGELOG summary as the body*
 > *  2. [m] Merge — merge the branch into main locally and push*
 > *  3. [r] Release — package this version to .renmark/version/ (zip + unpacked snapshot) + tag it (+ GitHub release if available)*
-> *  4. [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
+> *  4. [a] Analytics — open the feature analytics dashboard with `/renmark:analytics`*
+> *  5. [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
 
-**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Pull request [p]`, `Merge [m]`, `Release [r]`, `Nothing [n]` (all 4 fit the option cap). **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed. (Merge / release are outward, irreversible actions — only run on the user's explicit selection.)
+**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Pull request [p]`, `Merge [m]`, `Release [r]`, `Analytics [a]`, `Nothing [n]`. **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed. (Merge / release are outward, irreversible actions — only run on the user's explicit selection.)
+
+**[a] Analytics:** Run `/renmark:analytics` to open the feature analytics dashboard for this run.
 
 **[p] PR:**
 Pull the `**Built:**` lines from CHANGELOG.md entries written during this run and use them as bullet points in the PR body.
