@@ -15,6 +15,18 @@
 
 
 
+
+## ADR-022 — Finished feature reporting-and-usage-analytics
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created
+
+**Decision.** Branch feature/reporting-and-usage-analytics reached stage ready-to-release
+
+---
+
 ## ADR-021 — Released renmark v0.7.8
 
 **Date:** 2026-06-09
