@@ -48,6 +48,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-09, codereview) model `opus`: **a loop is only a loop if it can iterate on failure** — Loop Mode codereview caught that the driver stalled on the FIRST failed verify (blank next_action) — it was an automation, not a loop. The decision object MUST derive a next_action from verification evidence, and the budget gate MUST preflight (not post-check) or it overshoots. For any iterate-until-goal feature, adversarially test the FAILURE-then-continue path and the boundary (budget/iter) BEFORE shipping — the happy path hides both.
+
 - (2026-06-09, .renmark/reviews/2026-06-09-41121c499925debfe185b1c240cae49ec3a70328.verification.md) model `verify`: **verify-loop-mode** — 6/6 verified; loop state machine bounded+resumable; new loop skill+command pair lint-clean; core code → keep full codereview
 
 - (2026-06-08, codereview) model `opus`: **advisory metrics still need accuracy review** — Even an ADVISORY lens must be accurate or it misleads: codereview found the modularity analyzer both under-reported (span/branch math) and over-suppressed (substring match hid real files). A health lens that silently drops real findings is worse than none. Adversarially review the metric math + the SUPPRESSION rules, not just the happy path.

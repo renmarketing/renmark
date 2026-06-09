@@ -47,6 +47,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 
 
+
+### 2026-06-09 — loop driver stalled on first failed verify + could overshoot budget + raised on bad input
+
+**Severity:** major
+**Symptom:** build_decision left next_action blank on any failed verify → loop marked stalled on iteration 1 (never iterated); budget checked AFTER spend (one-iteration overshoot); parse_budget raised on nan/inf/1e309; read_loop/usage raised/undercounted on corrupt input
+**Root cause:** next_action never derived from verify evidence; budget gate sequenced post-dispatch; budget/state/ledger inputs not defensively coerced
+**Fix:** build_decision derives next_action from verify symptom lines (loop iterates); should_continue_budget preflights before dispatch; isfinite/try-except budget coerce; read_loop field coercion; usage clamp+decode-tolerant. +tests
+
+---
+
 ### 2026-06-08 — modularity analyzer under-reported gaps + over-suppressed real files
 
 **Severity:** major
