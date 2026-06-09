@@ -45,10 +45,14 @@ contents into conversation — only summaries, paths, status, and verification v
 a non-None hint, surface it as a one-line note. Then detect in-flight work and offer to
 resume rather than starting fresh:
 
-- A `running` / `awaiting-approval` `loop.json` (`renmark.loop.read_loop`) → an
-  Approve-and-build is mid-flight. Surface the resume command + iteration / budget-remaining.
-- A backlog item with `status == "in progress"` (`backlog.list_items`) → its managed branch
-  is open. Surface "resume <id>" instead of opening the list cold.
+- Scan backlog items for `status == "in progress"` via `backlog.list_items(repo)`. For each
+  such item, read its stored `loop_id` and call `renmark.loop.read_loop(repo, item.loop_id)`
+  to fetch current loop state — backlog items are the index into loops, there is no separate
+  loop-enumeration API. A `running` / `awaiting-approval` loop state → an Approve-and-build
+  is mid-flight. Surface the resume command + iteration / budget-remaining.
+- If any backlog item has `status == "in progress"` (even if its loop has already reached a
+  terminal state awaiting human merge approval), surface "resume <id>" instead of opening
+  the list cold.
 
 If either is in flight, **offer resume first** — do not start a second build (see Human
 gates & hygiene: only one code-writing loop per working tree).
@@ -134,9 +138,18 @@ skill returns. Route on the loop's terminal verify result:
 **Final verify PASS** (loop reached `done`):
 - **STOP for human merge approval (REQ-12 — never auto-merge).** Surface the gate; only
   `/renmark:approve` flips the human bit.
+- **INTERIM state — awaiting-merge (NOT a disposition, NOT an orphan):** while the human
+  has not yet approved the merge, the item remains `status = "in progress"` with its
+  `branch` and `loop_id` recorded on the item. The branch is intentionally retained and
+  the item is resumable. This is NOT an orphan branch — the branch is tracked on the item,
+  and re-entering `/renmark:backlog` (Step 0) detects it and resumes to the merge gate.
+  A disposition is **terminal** and is set **only at a terminal outcome** — the
+  awaiting-merge interim is a tracked, resumable state, not a disposition.
 - On approval: merge the branch into `main` → **RE-RUN `/renmark:verify` on `main`** (the
   goal must still hold post-merge) → delete the branch → set
   `item.status = "completed"`, `item.disposition = "merged-deleted"`, `backlog.write_item`.
+  This is the terminal outcome; `merged-deleted` is recorded only after merge + delete
+  complete.
 
 **Final verify FAIL, or loop hit `5/5` without success** (`max-iter` / `stalled` / failing
 `done`):
@@ -183,11 +196,24 @@ skill; `/renmark:backlog` only triages items that already exist in the ledger.
 
 *End by calling `renmark.lifecycle.next_steps(repo, "backlog")` and render the
 result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 —
-resume-pipeline + 1–2 local actions). The in-flight feature's next command is
-`(Recommended)` (e.g. `/renmark:finish` after a PASS-and-approved build, or
-`/renmark:debug` after a blocked one); add the backlog's local follow-ups
-(re-open the list, triage the next item). Present via `AskUserQuestion`
-(handoff-menu.md rules 6–9); require an explicit choice — never auto-proceed.*
+resume-pipeline + 1–2 local actions). The generic aux router for `backlog`
+produces `/renmark:backlog (refresh the list)` and `/renmark:finish` — those
+are the non-blocked fallbacks. The skill drives its own hand-off menu directly
+and MUST diverge from the generic aux for the blocked path:*
+
+- *PASS-and-approved build exit → `/renmark:finish` `(Recommended)`, then
+  `/renmark:backlog (refresh the list)`.*
+- *Blocked build exit (loop hit max-iter / stalled / failing done) → the skill
+  MUST explicitly offer `/renmark:debug` `(Recommended)` in this hand-off menu,
+  followed by `/renmark:backlog (refresh the list)`. The generic aux router does
+  not surface debug; the skill owns this routing decision and must present it
+  directly.*
+- *All other exits (Research more, Split, Reject, Back) → `/renmark:backlog
+  (refresh the list)` `(Recommended)`, then `/renmark:finish` as secondary.*
+
+*Add the backlog's local follow-ups (re-open the list, triage the next item).
+Present via `AskUserQuestion` (handoff-menu.md rules 6–9); require an explicit
+choice — never auto-proceed.*
 
 Do not paste the rendering rules — cite the file.
 
