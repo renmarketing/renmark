@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-06-09] — project scope: loop-mode (MVP)
+
+**Request:** Implement Loop Mode — bounded, verified, cost-aware, resumable agentic loops as the execution engine (per ChatGPT design + approved PRD REQ-9..12).
+**Tech stack:** Python ≥3.10 stdlib + markdown — **no new deps**. New `renmark/loop.py` driver + a `usage_by_run_id` ledger helper; reuses `state.py` (usage.jsonl), verify/orchestrate/resume skills, the plan cost model.
+**Deployment:** Claude Code plugin (unchanged).
+**MVP boundary:** loop.json state under `.renmark/loops/<id>/`; `/renmark:loop` wrapper (orchestrate→verify→decision per iteration); budget + max-iterations bounds; `/renmark:resume` recovery; goal-backward verify each iteration; `/renmark:start` vibe-coder wiring. **Out of scope:** indefinite autonomous loops; scheduled/PR-triggered loops; per-iteration prompting; loop state in lifecycle.json.
+**Decisions (locked):**
+- Budget accepts BOTH a token count and a `$` amount; tracked in tokens (the measurable ledger unit) with a `$` estimate shown.
+- SINGLE upfront approval (goal+budget+max-iter+verify cmd+cost preview), then autonomous to a terminal state — no per-iteration prompts (single-dispatch-gate doctrine).
+- Loop commits each passing iteration to the branch (safe/revertable); STOPS for approval before merge/release/PR/budget-escalation/destructive (REQ-12).
+- Loop runtime state in `loop.json` (NOT lifecycle.json — G12); spend enforced against `usage.jsonl` by run_id. Defaults: max-iterations 5, budget 300k tokens (tunable).
+
+## [2026-06-09] — PRD updated: Loop Mode
+**Request:** Feature `loop-mode`'s drift gate proposed adding Loop Mode (bounded, verified, cost-aware, resumable agentic loops as the execution engine; new `/renmark:loop`, hidden behind `/renmark:start`). Human-approved with one wording edit.
+**Built:** Added REQ-9..12, a new `## Loop Mode` section, and Loop Mode entries to Scope boundaries (in-scope: `loop` + `.renmark/loops/`; deferred: indefinite autonomous + scheduled/PR-triggered loops). Bumped last_reviewed → 2026-06-09. Phrase reworded per user: "not a separate product or standalone mode."
+**Files changed:**
+- `PRD.md` — Loop Mode requirements + section + scope (human-gated, approved via /renmark:prd)
+**Do not change:**
+- Loop Mode MVP is bounded + human-gated; indefinite/scheduled/PR-triggered loops are explicitly deferred. Loops never run unbounded; human approval before PRD edit/merge/release/budget-escalation/destructive change (REQ-12).
+
 ## v0.7.5 — 2026-06-08 (modularity / scalability health lens)
 
 **Release of the modularity-health-lens feature.** Bumped 0.7.4 → 0.7.5 across all 7

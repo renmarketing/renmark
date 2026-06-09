@@ -9,6 +9,18 @@
 
 
 
+
+## ADR-016 — Finished feature loop-mode
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified; new core renmark/loop.py + state/usage.py + /renmark:loop; codereview full codex 5 Major + 2 Minor + 1 Nit (stall-on-failure, budget overshoot, never-raise) all fixed+re-verified
+
+**Decision.** Branch feature/loop-mode reached stage ready-to-release
+
+---
+
 ## ADR-015 — Finished feature modularity-health-lens
 
 **Date:** 2026-06-08

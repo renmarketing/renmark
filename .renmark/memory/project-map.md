@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-08 @ cf1c09a -->
+<!-- Last refreshed: 2026-06-09 @ 3003b01 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=78
+**Languages:** python=80
 
 ## Directory tree
 
@@ -25,7 +25,9 @@ ai-system/
 | `renmark/init.py` | Scans the repo for file structure, modules, and public symbols, then writes: | `FileInfo`, `Standard`, `Gap`, `StandardsScan`, `RepoScan`, `scan_repo` |
 | `renmark/memory.py` | Files act as living documentation — features shipped, bugs fixed, decisions | `memory_dir`, `template_dir`, `ensure_memory`, `read_index`, `read_file`, `log_feature` |
 | `renmark/lifecycle.py` | and the seven-stage workflow: Brainstorm → Plan → Create → Test → Review → | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
+| `renmark/loop.py` | verified, resumable agentic loop (REQ-9/10/11; spec | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
 | `tests/test_modularity.py` | Hermetic: every test writes tiny synthetic ``.py`` files into ``tmp_path`` and | `test_module_loc_just_over_warn_is_warn`, `test_module_loc_just_over_major_is_danger`, `test_module_loc_just_under_warn_is_clean`, `test_func_loc_exactly_warn_is_warn`, `test_func_loc_just_over_warn_is_warn`, `test_func_loc_exactly_major_is_danger` |
+| `tests/test_loop.py` | Hermetic: every test runs under pytest's ``tmp_path`` and seeds the usage | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `renmark/doctor.py` | Checks that renmark is properly registered with Claude Code and surfaces | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
@@ -36,13 +38,11 @@ ai-system/
 | `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `current_version`, `check_drift`, `drift_report` |
 | `tests/test_sizing.py` | Hermetic: no network, no real git history dependence (we init throwaway repos | `test_all_doc_small_set_is_lite`, `test_any_hard_task_is_never_lite`, `test_core_module_target_is_at_least_standard`, `test_many_tasks_is_full`, `test_empty_list_degrades_to_standard`, `test_classify_plan_never_raises_on_malformed_input` |
 | `tests/test_init_pipeline.py` | Covers the behavior added in this feature: | `test_run_scaffolds_when_claude_md_absent`, `test_run_does_not_overwrite_existing_custom_claude_md`, `test_run_is_idempotent`, `test_scaffold_missing_preserves_user_changelog`, `test_merge_rule_blocks_backfills_only_missing_verbatim`, `test_merge_rule_blocks_agents_always_zero` |
-| `renmark/summary.py` | governance metadata), G9 (failure transparency). | `SummaryBoundaryError`, `ArtifactMetadata`, `write_artifact`, `emit_pointer`, `read_metadata`, `is_stale` |
 | `renmark/hygiene.py` | Single source of truth for renmark's diagnostic hygiene operations. Walks the | `ScanReport`, `PruneReport`, `scan_artifacts`, `prune_memory`, `main` |
-| `renmark/schemas.py` | payloads. Zero external dependencies — validation is structural, not full | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `main` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/sizing.py` | This is the **single source of truth** for "how big/risky is this change?" used | `classify_plan`, `classify_diff`, `resolve_override` |
 | `renmark/modularity.py` | renmark enforces modularity at *plan time* (one-file-per-task) but never | `analyze` |
-| `tests/test_next_steps.py` | These cover the next-steps.md contract: the structured "what next?" set every | — |
+| `renmark/summary.py` | governance metadata), G9 (failure transparency). | — |
 
 ## Commands (user-facing)
 
@@ -59,6 +59,7 @@ ai-system/
 | `/renmark:help` | Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". |
 | `/renmark:hygiene` | Use to garbage-collect stale renmark artifacts and prune append-only memory logs. |
 | `/renmark:init` | Use when the user wants renmark to document the project itself — scans the repo for file structure, modules, and public  |
+| `/renmark:loop` | Use to run a bounded agentic loop — `/renmark:loop` or "loop on this until it passes", "keep iterating until the verifie |
 | `/renmark:orchestrate` | Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "build it", "run the plan". |
 | `/renmark:plan` | Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases li |
 | `/renmark:prd` | Use to create or update the project's PRD (Product Requirements Document) — the per-project source of truth that plans a |

@@ -12,6 +12,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 
 
+
+### 2026-06-09 — loop-mode (MVP): bounded resumable agentic loop
+
+**Files:** `renmark/state/usage.py`, `renmark/loop.py`, `tests/test_loop.py`, `plugin/skills/loop/SKILL.md`, `plugin/commands/loop.md`, `plugin/skills/resume/SKILL.md`, `plugin/skills/start/SKILL.md`
+**Spec:** `.renmark/specs/2026-06-09-loop-mode.spec.md`
+**Plan:** `.renmark/plans/2026-06-09-loop-mode.plan.md`
+**Commits:** `e711d15..a13fb5d`
+
+Loop Mode MVP: renmark/loop.py state machine (loop.json under .renmark/loops/<id>/, budget [tokens|$], build_decision from verify metadata + ledger, stop conditions) + state.usage_by_run_id. /renmark:loop skill (single upfront gate, autonomous orchestrate→verify→decide loop, commit-per-iteration, gate at finish/REQ-12); /renmark:start vibe-coder wiring; /renmark:resume recovers loop state. 34 tests. Defaults: max-iter 5, budget 300k tokens.
+
+---
+
 ### 2026-06-08 — modularity-health-lens: advisory ast code-health gaps
 
 **Files:** `renmark/modularity.py`, `renmark/init.py`, `tests/test_modularity.py`, `plugin/skills/init/SKILL.md`
@@ -138,11 +150,14 @@ Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from proje
 
 *(pipeline cost efficiency C+A / proportional-pipeline — SHIPPED 2026-06-08, see Shipped above.)*
 
-### roadmap-as-pipeline / batch execution — B (DEFERRED, next)
+*(Loop Mode MVP — SHIPPED 2026-06-09, see Shipped section above.)*
+
+### roadmap-as-pipeline / batch execution — B (DEFERRED, the last remaining item)
 
 Queue N planned/gap items → ONE plan→orchestrate→verify→codereview→finish run,
 amortizing fixed overhead. ~60% off for backlogs. Deferred (situational; reduces
-per-feature isolation; bigger build). Natural home for the modularity lens below.
+per-feature isolation; bigger build). NOTE: Loop Mode (shipped) is the per-feature
+iterate-until-verified engine; B is the cross-feature batch amortizer — distinct.
 
 *(modularity / scalability health lens — SHIPPED 2026-06-08, see Shipped section above.)*
 

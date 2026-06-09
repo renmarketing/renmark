@@ -57,3 +57,7 @@ only, no prototype, for renmark itself.
 - 2026-06-08 (`modularity-health-lens` brainstorm): no stack change. **No new deps**
   — new `renmark/modularity.py` uses stdlib `ast` only (no radon/pylint); feeds
   init's existing standards-health pipeline; advisory, zero-LLM, never raises.
+- 2026-06-09 (`loop-mode` brainstorm): no stack change. **No new deps** — new
+  `renmark/loop.py` driver + `usage_by_run_id` helper are stdlib; reuses
+  `state.py` (usage.jsonl), verify/orchestrate/resume skills, plan cost model.
+  Loop runtime state in `.renmark/loops/<id>/loop.json` (not lifecycle.json).

@@ -69,15 +69,24 @@ def read_usage(repo_root: str | Path) -> list[dict[str, Any]]:
     path = state_dir(repo_root) / USAGE_LEDGER
     if not path.exists():
         return []
+    # Tolerate invalid UTF-8 bytes in the ledger: decode with ``errors="replace"``
+    # so a corrupt byte mangles only its own line (which then fails JSON parse and
+    # is skipped) rather than raising a UnicodeDecodeError for the whole file.
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
     out: list[dict[str, Any]] = []
-    for raw in path.read_text(encoding="utf-8").splitlines():
+    for raw in text.splitlines():
         raw = raw.strip()
         if not raw:
             continue
         try:
-            out.append(json.loads(raw))
-        except json.JSONDecodeError:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
             continue
+        if isinstance(parsed, dict):
+            out.append(parsed)
     return out
 
 
@@ -97,3 +106,35 @@ def usage_this_month(repo_root: str | Path) -> int:
         if r.get("ts", "").startswith(prefix):
             total += int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
     return total
+
+
+def usage_by_run_id(repo: str | Path, run_id: str) -> int:
+    """Total tokens (prompt + completion) ledgered under one run_id.
+
+    The spend-measurement primitive behind the loop budget gate. Pure and
+    defensive: a missing, empty, or corrupt ledger — or any unreadable line —
+    yields 0 rather than raising. Bad lines are skipped (`read_usage` already
+    drops JSON-undecodable rows); malformed token fields are coerced to 0.
+    """
+    total = 0
+    try:
+        records = read_usage(repo)
+    except OSError:
+        return 0
+    for r in records:
+        if not isinstance(r, dict) or r.get("run_id") != run_id:
+            continue
+        # Clamp each token field to >= 0 so a negative / garbage value counts as
+        # 0 rather than under-counting real spend (which would let the loop run
+        # past its approved budget). A non-coercible field is skipped (→ 0).
+        total += _clamp_tokens(r.get("prompt_tokens", 0))
+        total += _clamp_tokens(r.get("completion_tokens", 0))
+    return total
+
+
+def _clamp_tokens(value: Any) -> int:
+    """Coerce a ledger token field to ``max(0, int(value))``; bad input → 0."""
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0

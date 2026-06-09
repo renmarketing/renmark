@@ -72,6 +72,7 @@ from .usage import (
     append_usage,
     log_agent_call,
     read_usage,
+    usage_by_run_id,
     usage_this_month,
     usage_today,
 )
@@ -126,6 +127,7 @@ __all__ = [
     "record_skill_invocation",
     "rotate_dir",
     "state_dir",
+    "usage_by_run_id",
     "usage_this_month",
     "usage_today",
     "write_pause",
