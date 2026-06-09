@@ -2,7 +2,6 @@ import json
 
 from renmark import analytics, reports, schemas
 
-
 NOW = "2026-06-09T12:00:00Z"
 
 

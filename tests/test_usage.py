@@ -1,9 +1,8 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import renmark.state as state
 import renmark.usage as usage
-
 
 NOW = "2026-06-09T12:00:00Z"
 

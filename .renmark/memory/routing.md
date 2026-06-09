@@ -30,6 +30,9 @@ Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
 
 
 
+
+- (2026-06-09) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260609-190829-757f)
+
 - (2026-06-09) `target=renmark/loop.py (state machine, complexity=hard, mode=A)` → **opus** (passed (1-shot, thorough API; no codereview findings yet), run=loop-mode)
 
 - (2026-06-08) `target=renmark/modularity.py (ast metric analyzer, complexity=hard, mode=A)` → **opus** (passed (1-shot, thorough; 21 tests green; no codereview findings yet), run=modularity-health-lens)
