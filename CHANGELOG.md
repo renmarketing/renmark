@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.7.6 — 2026-06-09 (Loop Mode MVP — bounded resumable agentic loops)
+
+**Release of Loop Mode (MVP).** Bumped 0.7.5 → 0.7.6 across all 7 version locations.
+Shipped on `main` via `--no-ff` merge of `feature/loop-mode` (codereview: full codex
+— 5 Major + 2 Minor + 1 Nit, all fixed + independently re-verified + regression tests;
+551 tests + mypy + lint_all clean). Realizes PRD REQ-9..12 + the Loop Mode section.
+
+- **`renmark/loop.py`** — deterministic, never-raise loop state machine: `loop.json`
+  under `.renmark/loops/<id>/`, `parse_budget` (tokens **or** `$`), `build_decision`
+  (derives `next_action` from verify evidence so the loop ITERATES on failure),
+  `stop_reason` (done / budget-hit / max-iter / awaiting-approval / stalled),
+  `should_continue_budget` (preflights budget BEFORE each dispatch — never overshoots),
+  `refresh_spent`. Defaults: max-iterations 5, budget 300k tokens.
+- **`state.usage_by_run_id`** — aggregates ledger token spend per run (decode-tolerant,
+  clamps negatives) — the budget-gate primitive.
+- **`/renmark:loop "<goal>"`** (`--goal/--verify/--budget/--max-iterations`) — single
+  upfront approval gate, then autonomous orchestrate→verify→decide iterations with a
+  bounded per-iteration progress line; commits each passing iteration to the branch,
+  STOPS for approval before merge/release (REQ-12). Vibe coders reach it via
+  `/renmark:start` (never see "loop"); `/renmark:resume` recovers an in-flight loop.
+- Codereview caught the loop's worst bug pre-merge: it would have **stalled on the
+  first failed verify** (an automation, not a loop) — fixed.
+
 ## [2026-06-09] — project scope: loop-mode (MVP)
 
 **Request:** Implement Loop Mode — bounded, verified, cost-aware, resumable agentic loops as the execution engine (per ChatGPT design + approved PRD REQ-9..12).
