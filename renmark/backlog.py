@@ -24,6 +24,7 @@ Design contract (mirrors ``renmark/loop.py``):
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -116,27 +117,38 @@ def backlog_dir(repo: str | Path) -> Path:
     return state_dir(repo) / "backlog"
 
 
+def _is_safe_item_id(item_id: object) -> bool:
+    """Return ``True`` iff ``item_id`` is a canonical ``BL-<digits>`` id.
+
+    The sole gate against path traversal: only validated ids ever reach
+    :func:`_item_json_path`, so an id like ``"../foo"`` or ``"BL-1/../../x"``
+    can never escape :func:`backlog_dir`. Non-str / malformed ids return
+    ``False``. Never raises.
+    """
+    return isinstance(item_id, str) and _ID_NUM_RE.match(item_id) is not None
+
+
 def _item_json_path(repo: str | Path, item_id: str) -> Path:
+    """Path for a *validated* ``BL-<digits>`` id. Callers MUST gate ``item_id``
+    through :func:`_is_safe_item_id` first — this never re-sanitises."""
     return backlog_dir(repo) / f"{item_id}.json"
 
 
 # ── ID allocation ──────────────────────────────────────────────────────────────
 
 
-def next_id(repo: str | Path) -> str:
-    """Return the next free ``BL-NNNN`` id (zero-padded to 4 digits).
+#: Bounded retries when racing another producer for the same reserved id.
+_RESERVE_MAX_RETRIES: int = 100
 
-    Scans existing ``BL-*.json`` files in :func:`backlog_dir`, finds the highest
-    numeric suffix, and returns one past it (starting at ``"BL-0001"`` when the
-    directory is empty or absent). A filename that does not match ``BL-<digits>``
-    is skipped rather than raising. Never raises.
-    """
+
+def _highest_existing_num(directory: Path) -> int:
+    """Highest ``BL-<num>`` suffix among existing item files, or ``0`` if none /
+    unreadable. Never raises."""
     highest = 0
-    directory = backlog_dir(repo)
     try:
         names = [p.stem for p in directory.glob(_ITEM_GLOB)] if directory.exists() else []
     except OSError:
-        names = []
+        return 0
     for stem in names:
         match = _ID_NUM_RE.match(stem)
         if not match:
@@ -147,7 +159,60 @@ def next_id(repo: str | Path) -> str:
             continue
         if value > highest:
             highest = value
-    return f"BL-{highest + 1:04d}"
+    return highest
+
+
+def next_id(repo: str | Path) -> str:
+    """Atomically reserve and return the next free ``BL-NNNN`` id (zero-padded to
+    4 digits).
+
+    **Reservation semantics (collision-safe).** Unlike a bare scan-and-increment,
+    this reserves the id by *creating its item file* with ``O_CREAT | O_EXCL``
+    (via :func:`os.open`) so two concurrent producers can never mint the same id:
+    the loser of the race sees ``FileExistsError`` and retries with the next
+    number (bounded by :data:`_RESERVE_MAX_RETRIES`). The reserved file is written
+    with a minimal placeholder :class:`BacklogItem` JSON (``id`` + default
+    ``status``); a later :func:`write_item` overwrites it with the full item.
+
+    Side effect: calling ``next_id`` **creates a file on disk** (the reservation).
+    A reserved-but-never-completed id will surface in :func:`list_items` as a
+    placeholder item in ``"needs review"`` — that is intentional (it keeps the id
+    permanently allocated).
+
+    Never raises: if the directory can't be created or every candidate fails to
+    reserve (disk full, permission denied, retries exhausted), it degrades to the
+    pure scan-and-increment value without creating a file.
+    """
+    directory = backlog_dir(repo)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Can't even create the dir — degrade to a best-effort computed id.
+        return f"BL-{_highest_existing_num(directory) + 1:04d}"
+
+    candidate = _highest_existing_num(directory) + 1
+    for _ in range(_RESERVE_MAX_RETRIES):
+        item_id = f"BL-{candidate:04d}"
+        path = directory / f"{item_id}.json"
+        placeholder = BacklogItem(id=item_id, title="").to_json()
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            # Lost the race (or a stale reservation) — try the next number.
+            candidate += 1
+            continue
+        except OSError:
+            # Disk full / permission denied — degrade without reserving.
+            return item_id
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(placeholder)
+        except OSError:
+            # Wrote the inode but couldn't fill it; the id is still reserved.
+            pass
+        return item_id
+    # Retries exhausted — degrade to a computed id without reserving.
+    return f"BL-{candidate:04d}"
 
 
 # ── Read / write ───────────────────────────────────────────────────────────────
@@ -215,8 +280,14 @@ def read_item(repo: str | Path, item_id: str) -> BacklogItem | None:
     Never raises: a missing file, unreadable bytes, invalid JSON, or a non-dict
     payload all yield ``None``. An unknown ``status`` is coerced to
     ``"needs review"`` and unknown fields are dropped so schema drift can't crash
-    the constructor.
+    the constructor. An unsafe / non-canonical ``item_id`` (anything not matching
+    ``BL-<digits>``) yields ``None`` without touching disk (path-traversal guard).
+    The requested ``item_id`` (the filename / path) is authoritative: the returned
+    item's ``id`` is forced to ``item_id`` even when the JSON body disagrees, so a
+    corrupt body can't surface under — or later be rewritten to — a different id.
     """
+    if not _is_safe_item_id(item_id):
+        return None
     path = _item_json_path(repo, item_id)
     try:
         if not path.exists():
@@ -227,9 +298,12 @@ def read_item(repo: str | Path, item_id: str) -> BacklogItem | None:
     if not isinstance(data, dict):
         return None
     try:
-        return _coerce_item(data)
+        item = _coerce_item(data)
     except (TypeError, ValueError):
         return None
+    # The path/filename is the source of truth for identity — never the body.
+    item.id = item_id
+    return item
 
 
 def write_item(repo: str | Path, item: BacklogItem) -> Path | None:
@@ -238,14 +312,27 @@ def write_item(repo: str | Path, item: BacklogItem) -> Path | None:
     Best-effort atomic replace (NO fsync): writes a sibling ``.tmp`` then
     ``Path.replace`` over the target, so a crash between writes never leaves a
     half-written file (mirrors :func:`renmark.loop.write_loop`). Creates the
-    backlog directory if needed. Returns the written path, or ``None`` on any IO
+    backlog directory if needed. Returns the written path, or ``None`` on any
     failure — never raises into the caller.
+
+    Returns ``None`` without touching disk when ``item.id`` is unsafe / not
+    ``BL-<digits>`` (path-traversal guard). Returns ``None`` (not raise) when
+    ``item.to_json()`` fails to serialise — e.g. a field holds a non-JSON value
+    (``TypeError`` / ``ValueError``) — as well as on any IO failure.
     """
+    if not _is_safe_item_id(item.id):
+        return None
+    # Serialise first so a non-JSON-serialisable field degrades to None before we
+    # ever create the temp file or touch the target.
+    try:
+        payload = item.to_json()
+    except (TypeError, ValueError):
+        return None
     path = _item_json_path(repo, item.id)
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(item.to_json(), encoding="utf-8")
+        tmp.write_text(payload, encoding="utf-8")
         tmp.replace(path)  # atomic on the same filesystem
     except OSError:
         try:
@@ -283,13 +370,16 @@ def list_items(repo: str | Path) -> list[BacklogItem]:
 
 
 def managed_branch_name(item_id: str, slug: str) -> str:
-    """Build the managed branch name ``feature/backlog-<item_id>-<safe-slug>``.
+    """Build the managed branch name ``feature/backlog-<safe-id>-<safe-slug>``.
 
-    ``item_id`` is lowercased; ``slug`` is sanitised to a safe path component the
-    same way as :func:`renmark.loop.loop_id` (lowercased, non-alphanumerics
-    collapsed to ``-``, trimmed). A blank slug degrades to ``item``. Never raises.
+    BOTH ``item_id`` and ``slug`` are sanitised to safe git-ref path components
+    the same way as :func:`renmark.loop.loop_id` (lowercased, non-alphanumerics
+    collapsed to ``-``, trimmed) so a malformed id can't inject ``/`` or git-ref
+    syntax into the branch name. A blank slug degrades to ``item``; a blank id
+    degrades to ``item``. Never raises.
     """
-    safe_id = str(item_id).strip().lower()
+    safe_id = re.sub(r"[^a-z0-9]+", "-", str(item_id).strip().lower()).strip("-")
+    safe_id = safe_id or "item"
     safe_slug = re.sub(r"[^a-z0-9]+", "-", str(slug).strip().lower()).strip("-")
     safe_slug = safe_slug or "item"
     return f"feature/backlog-{safe_id}-{safe_slug}"

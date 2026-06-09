@@ -56,6 +56,19 @@ def test_next_id_skips_malformed_filename(tmp_path: Path) -> None:
     assert next_id(tmp_path) == "BL-0003"
 
 
+def test_next_id_reserves_so_two_allocations_differ(tmp_path: Path) -> None:
+    """FINDING 5: next_id atomically reserves — two consecutive allocations never
+    collide, even with no write_item in between (the reservation file holds the
+    id)."""
+    first = next_id(tmp_path)
+    second = next_id(tmp_path)
+    assert first == "BL-0001"
+    assert second == "BL-0002"
+    assert first != second
+    # The reservation created the placeholder file on disk.
+    assert (backlog_dir(tmp_path) / f"{first}.json").exists()
+
+
 # ── write_item / read_item round-trip ─────────────────────────────────────────
 
 
@@ -133,6 +146,52 @@ def test_read_item_unknown_status_coerces_to_needs_review(tmp_path: Path) -> Non
     assert item.status == "needs review"
 
 
+def test_read_write_reject_traversal_id_without_touching_disk(tmp_path: Path) -> None:
+    """FINDING 1: a '../traversal' id degrades to None and never writes a file
+    outside backlog_dir."""
+    # read_item with an unsafe id returns None, no disk access.
+    assert read_item(tmp_path, "../../etc/passwd") is None
+    assert read_item(tmp_path, "BL-1/../../escape") is None
+    assert read_item(tmp_path, "not-an-id") is None
+
+    # write_item with an unsafe id returns None and writes nothing anywhere.
+    evil = BacklogItem(id="../escape", title="malicious")
+    assert write_item(tmp_path, evil) is None
+    # Nothing leaked above the backlog dir / repo root.
+    assert not (tmp_path.parent / "escape.json").exists()
+    assert not (tmp_path / "escape.json").exists()
+    # The backlog dir holds no escape artifacts.
+    bdir = backlog_dir(tmp_path)
+    if bdir.exists():
+        assert list(bdir.glob("*escape*")) == []
+
+
+def test_write_item_non_serializable_field_returns_none(tmp_path: Path) -> None:
+    """FINDING 2: a non-JSON-serializable field value makes write_item return None
+    (not raise)."""
+    item = BacklogItem(id="BL-0001", title="bad")
+    # Sabotage a field with a value json.dumps can't serialize.
+    item.summary = object()  # type: ignore[assignment]
+    result = write_item(tmp_path, item)
+    assert result is None
+    # No target file was created.
+    assert not (backlog_dir(tmp_path) / "BL-0001.json").exists()
+
+
+def test_read_item_forces_requested_id_over_body(tmp_path: Path) -> None:
+    """FINDING 3: the requested/filename id is authoritative — a body claiming a
+    different id is overridden."""
+    bdir = backlog_dir(tmp_path)
+    bdir.mkdir(parents=True, exist_ok=True)
+    # File BL-0001.json whose body lies and says id == BL-9999.
+    data = {"id": "BL-9999", "title": "Liar"}
+    (bdir / "BL-0001.json").write_text(json.dumps(data), encoding="utf-8")
+    item = read_item(tmp_path, "BL-0001")
+    assert item is not None
+    assert item.id == "BL-0001"
+    assert item.title == "Liar"
+
+
 # ── list_items ────────────────────────────────────────────────────────────────
 
 
@@ -207,6 +266,22 @@ def test_managed_branch_name_blank_slug_degrades_gracefully() -> None:
     name = managed_branch_name("BL-0007", "")
     assert name.startswith("feature/backlog-bl-0007-")
     assert name.endswith("-item")
+
+
+def test_managed_branch_name_malformed_id_is_ref_safe() -> None:
+    """FINDING 4: a malformed id can't inject '/' or git-ref syntax — the id is
+    sanitised the same way as the slug."""
+    name = managed_branch_name("../../evil~id^{}", "My Feature")
+    # The single intentional prefix slash is the only slash allowed.
+    assert name.count("/") == 1
+    assert name.startswith("feature/")
+    # No git-ref-hostile characters survive in the suffix.
+    suffix = name[len("feature/") :]
+    for bad in ("/", "~", "^", "{", "}", "..", ":", "?", "*", "[", "\\"):
+        assert bad not in suffix
+    # Still deterministic and lowercase.
+    assert name == name.lower()
+    assert managed_branch_name("../../evil~id^{}", "My Feature") == name
 
 
 # ── DISPOSITIONS / is_terminal_disposition ───────────────────────────────────
