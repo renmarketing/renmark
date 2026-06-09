@@ -280,6 +280,10 @@ def append_routing(
     if run_id:
         line += f", run={run_id}"
     line += ")"
+    if line in text:
+        # Idempotent on the exact entry: routing.md is curated (hygiene refuses
+        # to dedupe it), so a replayed append must not duplicate the signal.
+        return
     if "## Learned overrides" in text:
         path.write_text(_insert_after_section(text, "## Learned overrides", line), encoding="utf-8")
     else:

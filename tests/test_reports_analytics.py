@@ -282,3 +282,22 @@ def test_aggregate_and_health_report_cover_seeded_and_empty_projects(tmp_path):
     assert empty_health["total_tokens"] == 0
     assert empty_health["loop_avg_iterations"] == 0.0
     assert empty_health["loop_success_rate"] == 0.0
+
+
+def test_record_feature_run_idempotent_on_rerun(tmp_path):
+    """Re-running /renmark:finish for the same closed feature must not
+    double-count it in the health report."""
+    repo = tmp_path
+    for _ in range(2):
+        analytics.record_feature_run(
+            repo, ts=NOW, feature="feat-x", status="shipped", sha="abc",
+            branch_disposition="merged",
+        )
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    assert len(analytics.read_jsonl(ledger)) == 1
+    # A genuinely different run (new sha) still appends.
+    analytics.record_feature_run(
+        repo, ts=NOW, feature="feat-x", status="shipped", sha="def",
+        branch_disposition="merged",
+    )
+    assert len(analytics.read_jsonl(ledger)) == 2

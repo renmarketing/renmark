@@ -194,7 +194,20 @@ def record_feature_run(
     token_cost: dict[str, int] | None = None,
     branch_disposition: str = "",
 ) -> None:
-    """Append one feature-run record (``feature-runs.jsonl``)."""
+    """Append one feature-run record (``feature-runs.jsonl``).
+
+    Idempotent on (feature, sha, status, branch_disposition): re-running
+    /renmark:finish for the same closed feature must not double-count it in
+    summary.json / the health report.
+    """
+    for row in read_jsonl(analytics_dir(repo) / FEATURE_RUNS_LEDGER):
+        if (
+            row.get("feature") == feature
+            and row.get("sha") == sha
+            and row.get("status") == status
+            and row.get("branch_disposition") == branch_disposition
+        ):
+            return
     _append(
         repo,
         FEATURE_RUNS_LEDGER,

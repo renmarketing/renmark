@@ -528,3 +528,19 @@ def test_age_out_preserves_section_header(tmp_path: Path) -> None:
     assert moved == 1
     assert "## Open" in archived
     assert archived.index("## Open") < archived.index("Archive this bug entry")
+
+
+def test_append_routing_idempotent_on_exact_entry(tmp_path: Path) -> None:
+    """routing.md is curated (hygiene refuses to dedupe) — a replayed append
+    must not duplicate the signal."""
+    for _ in range(2):
+        memory.append_routing(
+            tmp_path,
+            signature="target=tests/**, complexity=medium",
+            executor="codex",
+            outcome="passed",
+            run_id="r1",
+            date="2026-06-09",
+        )
+    text = (memory.memory_dir(tmp_path) / "routing.md").read_text(encoding="utf-8")
+    assert text.count("run=r1") == 1
