@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.7.7 — 2026-06-09 (Backlog-driven loop execution — `/renmark:backlog`)
+
+**Release of the backlog intake + approval-buffer feature (REQ-13/REQ-14).** Bumped
+0.7.6 → 0.7.7 across all 7 version locations. Shipped on `main` via `--no-ff` merge of
+`feature/backlog-driven-loop-execution` (verified 5/5; full codex codereview 0 Critical /
+6 Major / 2 Minor — all fixed on-branch + independently re-probed; 575 tests + mypy +
+lint_all clean).
+
+- **`/renmark:backlog`** — interactive intake + approval buffer: a list view
+  (title/status/source/risk/pending decision) → per-item detail (summary/source/evidence/
+  recommended action/risk/status/served reqs) → actions (Approve and build / Research more /
+  Split / Reject / Back). "Approve and build" launches **bounded Loop Mode internally**
+  (max 5 iterations hardcoded, no user-facing budget/iteration/ID flags) on a managed
+  branch, gates on human merge approval, and guarantees every managed branch ends
+  merged-deleted / abandoned-deleted / kept (no orphans).
+- **`renmark/backlog.py`** — never-raise `BacklogItem` ledger under `.renmark/state/backlog/`:
+  `BL-NNNN` ids (atomic `O_EXCL` reservation), path-traversal-safe read/write, id integrity
+  (filename authoritative), `managed_branch_name` (ref-safe), exact `completion_report`
+  ("N/5") wording, `DISPOSITIONS`, `status_for_outcome`. 24 tests.
+- **`plugin/skills/backlog/SCHEDULED-QA.md`** — design-only read-only scheduled-QA proposer
+  lane (REQ-14); may inspect/check/research/report/propose, never executes.
+- Registered `backlog` in lifecycle (build domain / aux class); tooling row mirrored to
+  CLAUDE.md + AGENTS.md; project map refreshed.
+
 ## [2026-06-09] — backlog-driven loop execution (verified + codereview-hardened)
 
 **Request:** Codereview + fix pass on the backlog feature before finish.
