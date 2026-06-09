@@ -108,8 +108,9 @@ def usage_today(repo_root: str | Path) -> int:
     today = dt.datetime.now(dt.timezone.utc).date().isoformat()
     total = 0
     for r in read_usage(repo_root):
-        if r.get("ts", "").startswith(today):
-            total += int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
+        ts = r.get("ts", "")
+        if isinstance(ts, str) and ts.startswith(today):
+            total += _clamp_tokens(r.get("prompt_tokens", 0)) + _clamp_tokens(r.get("completion_tokens", 0))
     return total
 
 
@@ -117,8 +118,9 @@ def usage_this_month(repo_root: str | Path) -> int:
     prefix = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m")
     total = 0
     for r in read_usage(repo_root):
-        if r.get("ts", "").startswith(prefix):
-            total += int(r.get("prompt_tokens", 0)) + int(r.get("completion_tokens", 0))
+        ts = r.get("ts", "")
+        if isinstance(ts, str) and ts.startswith(prefix):
+            total += _clamp_tokens(r.get("prompt_tokens", 0)) + _clamp_tokens(r.get("completion_tokens", 0))
     return total
 
 

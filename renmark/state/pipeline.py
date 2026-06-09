@@ -62,6 +62,15 @@ def read_pipeline_state(repo_root: str | Path) -> PipelineState | None:
     for list_field in ("completed_tasks", "failed_tasks"):
         if filtered.get(list_field) is None:
             filtered.pop(list_field, None)
+    # Coerce wave counters: string values would make pipeline_is_resumable
+    # compare lexicographically ("10" < "9" → True) — silently wrong; mixed
+    # types would raise. Uncoercible values drop to dataclass defaults.
+    for int_field in ("wave_index", "wave_total"):
+        if int_field in filtered:
+            try:
+                filtered[int_field] = int(filtered[int_field])
+            except (TypeError, ValueError):
+                filtered.pop(int_field, None)
     return PipelineState(**filtered)
 
 
@@ -153,9 +162,13 @@ def read_wave_summary(repo_root: str | Path, wave_index: int) -> dict[str, Any] 
     if not path.exists():
         return None
     try:
-        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+    if not isinstance(data, dict):
+        # Valid JSON but not an object — same contract as corruption.
+        return None
+    return cast(dict[str, Any], data)
 
 
 def list_wave_summaries(repo_root: str | Path) -> list[int]:

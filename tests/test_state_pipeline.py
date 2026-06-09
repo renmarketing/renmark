@@ -142,3 +142,31 @@ def test_last_skill_invocation_non_dict_json(tmp_path: Path) -> None:
         path.write_text(payload)
         assert state.last_skill_invocation(tmp_path) is None
         assert state.context_budget_check(tmp_path, "orchestrate", "build") is None
+
+
+def test_pipeline_wave_counters_coerced_from_strings(tmp_path: Path) -> None:
+    """String wave counters previously compared lexicographically ("9" < "10" is
+    False) — coercion makes pipeline_is_resumable arithmetically correct."""
+    p = tmp_path / ".renmark" / "state"
+    p.mkdir(parents=True)
+    (p / "pipeline.json").write_text(
+        '{"current_phase": "orchestrate", "wave_index": "9", "wave_total": "10"}'
+    )
+    assert state.pipeline_is_resumable(tmp_path) is True
+
+
+def test_pipeline_uncoercible_wave_counters_degrade(tmp_path: Path) -> None:
+    p = tmp_path / ".renmark" / "state"
+    p.mkdir(parents=True)
+    (p / "pipeline.json").write_text(
+        '{"current_phase": "orchestrate", "wave_index": null, "wave_total": 3}'
+    )
+    # null wave_index drops to the dataclass default — no TypeError.
+    assert state.pipeline_is_resumable(tmp_path) in (True, False)
+
+
+def test_read_wave_summary_non_dict_returns_none(tmp_path: Path) -> None:
+    d = tmp_path / ".renmark" / "state" / "wave-summaries"
+    d.mkdir(parents=True)
+    (d / "wave-2.json").write_text("[1, 2, 3]")
+    assert state.read_wave_summary(tmp_path, 2) is None

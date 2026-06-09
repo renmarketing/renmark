@@ -65,7 +65,11 @@ def recent_logs(repo_root: str | Path, n: int = 10) -> list[dict[str, Any]]:
     d = logs_dir(repo_root)
     items: list[dict[str, Any]] = []
     for f in d.glob("*.log"):
-        st = f.stat()
+        try:
+            st = f.stat()
+        except OSError:
+            # Log rotated/deleted mid-glob — skip rather than crash the listing.
+            continue
         items.append(
             {
                 "name": f.name,

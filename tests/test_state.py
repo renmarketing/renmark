@@ -191,3 +191,20 @@ def test_commit_pattern_variants_all_recognized(tmp_path: Path) -> None:
 
     completed = state.completed_task_indices(tmp_path)
     assert completed == {1, 2, 3, 4, 5, 6, 7, 8, 9}, completed
+
+
+def test_usage_today_and_month_tolerate_malformed_rows(tmp_path: Path) -> None:
+    """Type-malformed (valid-JSON) ledger rows must not crash the rolling sums."""
+    import datetime as dt
+
+    led = tmp_path / ".renmark" / "state"
+    led.mkdir(parents=True)
+    today = dt.datetime.now(dt.timezone.utc).date().isoformat()
+    rows = [
+        {"ts": today + "T01:00:00+00:00", "prompt_tokens": 100, "completion_tokens": 50},
+        {"ts": 12345, "prompt_tokens": 100, "completion_tokens": 50},
+        {"ts": today + "T02:00:00+00:00", "prompt_tokens": "oops", "completion_tokens": None},
+    ]
+    (led / "usage.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    assert state.usage_today(tmp_path) == 150
+    assert state.usage_this_month(tmp_path) == 150

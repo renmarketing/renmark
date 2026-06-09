@@ -100,3 +100,21 @@ def test_cost_estimate_zero_for_nim(tmp_path: Path) -> None:
     _log_usage(tmp_path, 1, "meta/llama-3.2-3b-instruct", 1000, 500)
     rows = roadmap.build_rows(tmp_path)
     assert rows[0].cost_usd == 0.0
+
+
+def test_aggregate_usage_tolerates_malformed_rows(tmp_path: Path) -> None:
+    """One type-malformed ledger row must not kill /renmark:roadmap."""
+    led = tmp_path / ".renmark" / "state"
+    led.mkdir(parents=True)
+    rows = [
+        {"task_id": 1, "prompt_tokens": 10, "completion_tokens": 5, "model": "codex",
+         "ts": "2026-06-09T00:00:00+00:00"},
+        {"task_id": "bogus", "prompt_tokens": 10},
+        {"task_id": 1, "prompt_tokens": "oops", "completion_tokens": [1], "model": 7, "ts": 99},
+    ]
+    (led / "usage.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    agg = roadmap._aggregate_usage(tmp_path)
+    assert agg[1]["tokens_in"] == 10
+    assert agg[1]["tokens_out"] == 5
+    assert agg[1]["calls"] == 2
+    assert "bogus" not in agg

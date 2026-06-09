@@ -80,7 +80,12 @@ def _aggregate_usage(repo: str | Path) -> dict[int, dict[str, Any]]:
     rows = read_usage(repo)
     by_task: dict[int, dict[str, Any]] = {}
     for r in rows:
-        tid = int(r.get("task_id", 0))
+        # Tolerate type-malformed ledger rows: one bad row must not kill the
+        # whole roadmap (same contract as state.usage's defensive readers).
+        try:
+            tid = int(r.get("task_id", 0))
+        except (TypeError, ValueError):
+            continue
         d = by_task.setdefault(
             tid,
             {
@@ -91,14 +96,24 @@ def _aggregate_usage(repo: str | Path) -> dict[int, dict[str, Any]]:
                 "last_ts": "",
             },
         )
-        d["tokens_in"] += int(r.get("prompt_tokens", 0))
-        d["tokens_out"] += int(r.get("completion_tokens", 0))
+        d["tokens_in"] += _safe_int(r.get("prompt_tokens", 0))
+        d["tokens_out"] += _safe_int(r.get("completion_tokens", 0))
         d["calls"] += 1
         m = r.get("model", "")
-        if m and m not in d["models"]:
+        if isinstance(m, str) and m and m not in d["models"]:
             d["models"].append(m)
-        d["last_ts"] = max(d["last_ts"], r.get("ts", ""))
+        ts = r.get("ts", "")
+        if isinstance(ts, str):
+            d["last_ts"] = max(d["last_ts"], ts)
     return by_task
+
+
+def _safe_int(value: Any) -> int:
+    """Coerce a ledger field to ``int``; bad input → 0."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def build_rows(repo: str | Path) -> list[RoadmapRow]:
