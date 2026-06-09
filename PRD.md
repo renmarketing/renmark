@@ -122,6 +122,31 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     write reports, and propose backlog items, but MUST NOT edit code, commit,
     merge, release, edit `PRD.md`, escalate budget, or auto-execute (extends
     REQ-12). Autonomous scheduled *execution* remains out of scope.
+15. `REQ-15` renmark provides **local-only reporting, analytics, and usage
+    status** entirely on disk — no external telemetry, no database, stdlib
+    JSON/JSONL only. It writes task/loop/backlog/feature/release reports under
+    `.renmark/reports/`, rolling analytics under `.renmark/analytics/`, and
+    exposes bounded status views such as `/renmark:usage` and
+    `/renmark:analytics`. Reports summarize what happened after tasks/features
+    complete. Analytics track usage over time — observed tokens, requests, agent
+    calls, model/executor usage, verification outcomes, loop iterations, branch
+    dispositions, backlog throughput, failures, and release/version links.
+    `/renmark:usage` shows rolling 5-hour / weekly observed usage, optional
+    user-configured local limits with percent used, top token-heavy features,
+    recent quota/rate-limit events, and provider-reported limit/reset data only
+    when a reliable provider source exposes it. Python aggregates logs into
+    bounded summaries; the orchestrator never reads raw JSONL into context
+    (REQ-5) and every write stays in `.renmark/` (REQ-6). All account-limit
+    output is labeled "Observed local usage only. Provider-side account limits
+    may differ." unless provider-reported data is explicitly available and
+    sourced (extends REQ-5 / REQ-6).
+16. `REQ-16` When Loop Mode, orchestrate, or a subagent hits a provider
+    rate/quota limit or a configured local usage ceiling, renmark **pauses
+    safely instead of failing**: it persists state, records
+    `pause_reason="usage_limit"` plus provider/reset data when reliable,
+    otherwise records a conservative `resume_after` fallback such as 60 minutes,
+    and lets `/renmark:resume` continue later. It must NOT poll repeatedly or
+    auto-schedule retries in the MVP (extends REQ-3 / REQ-10 / REQ-12).
 
 ## Success metrics
 
@@ -140,12 +165,16 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 
 - **In scope:** the `/renmark:*` skill pipeline (start, brainstorm, prd,
   blueprint, plan, check-plan, orchestrate, verify, finish, feature, debug,
-  codereview, secure, doctor, resume, roadmap, help, hygiene, and `init` — the
-  front-door adoption pipeline, with `setup` as its rule-block-refresh alias);
-  the bounded loop execution engine (`loop`) + `.renmark/loops/` state; the
-  `/renmark:backlog` intake + approval-buffer layer + `.renmark/state/` item
-  storage; the Python runtime (CLI dispatch, verifier, lifecycle, memory);
-  persistent `.renmark/` state and memory; cross-platform install.
+  codereview, secure, doctor, resume, roadmap, help, hygiene, usage, analytics,
+  and `init` — the front-door adoption pipeline, with `setup` as its
+  rule-block-refresh alias); the bounded loop execution engine (`loop`) +
+  `.renmark/loops/` state; the `/renmark:backlog` intake + approval-buffer layer
+  + `.renmark/state/` item storage; the local reporting/analytics/usage layer
+  (`/renmark:usage`, `/renmark:analytics`, `.renmark/reports/`,
+  `.renmark/analytics/`, observed-local by default, with usage-aware pause/resume
+  for loops and orchestrated runs); the Python runtime (CLI dispatch, verifier,
+  lifecycle, memory); persistent `.renmark/` state and memory; cross-platform
+  install.
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
@@ -200,5 +229,12 @@ per working tree**.
   optional `serves:` traceability field for every plan, or remain opt-in?
 - How should renmark and `legacy-plugin` stay conceptually in sync without
   dual-writing features — is a shared-core extraction ever worth it?
-- What is the minimum viable telemetry (if any) to validate the success metrics
-  above without violating the "writes stay in the project" / no-secrets doctrine?
+- ~~What is the minimum viable telemetry to validate the success metrics above
+  without violating the "writes stay in the project" / no-secrets doctrine?~~
+  **Resolved (2026-06-09, REQ-15 / REQ-16):** local-only reporting and
+  observed-usage analytics — on-disk JSON/JSONL under `.renmark/`, no external
+  telemetry, no database, no account-level claims unless a provider exposes
+  reliable limit/reset data. Python aggregates raw logs into bounded summaries
+  so reporting never bloats orchestrator context. Usage/rate/quota limits pause
+  loops and orchestrated runs safely for later `/renmark:resume`; MVP does not
+  poll or auto-schedule retries.

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-09] — PRD updated (REQ-15 / REQ-16: local reporting, analytics, usage status + usage-aware pause/resume)
+**Request:** `/renmark:feature reporting-and-usage-analytics` flagged PRD drift; reconcile the new local observability surface into the PRD before planning.
+**Built:** Reconciled Requirements, Scope boundaries, and Open questions of `PRD.md`. Added `REQ-15` (local-only reporting/analytics/usage status — on-disk JSON/JSONL, `/renmark:usage` + `/renmark:analytics`, no external telemetry/DB) and `REQ-16` (usage-aware safe pause/resume on rate/quota limits — extends REQ-3/10/12). Registered `usage` + `analytics` in the in-scope skill list and added the reporting/analytics/usage layer to the in-scope clause. Resolved the long-standing "minimum viable telemetry" open question. `last_reviewed` already 2026-06-09.
+**Files changed:**
+- `PRD.md` — added REQ-15 + REQ-16; in-scope skills/layer; resolved telemetry open question
+**Do not change:**
+- Reporting/analytics is **observed-local only** — no external telemetry, no database, stdlib JSON/JSONL only; account-limit output must carry "Observed local usage only. Provider-side account limits may differ." unless a provider source is explicitly available.
+- Orchestrator never reads raw JSONL into context (REQ-5); all renmark writes stay under `.renmark/` (REQ-6).
+- MVP must NOT poll for quota or auto-schedule retries; usage limits pause-not-fail for later `/renmark:resume`.
+
 ## v0.7.8 — 2026-06-09 (Release version snapshot — `.renmark/version/`)
 
 **Release of the canonical local version-snapshot protocol.** Bumped 0.7.7 → 0.7.8 across
