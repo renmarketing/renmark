@@ -10,6 +10,26 @@
 
 
 
+
+## ADR-017 — Escalated task 2 from codex to sonnet
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** codex CLI sandbox read-only this session; could not write tests/test_backlog.py — reassigned to writable sonnet Agent (plan: .renmark/plans/2026-06-09-backlog-driven-loop-execution.plan.md)
+
+**Decision.** Re-route to sonnet
+
+**Alternatives considered.**
+- Retry codex
+- Fail the task
+
+**Consequences.**
+- Higher cost
+- Higher capability
+
+---
+
 ## ADR-016 — Finished feature loop-mode
 
 **Date:** 2026-06-09

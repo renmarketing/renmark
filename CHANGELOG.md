@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-06-09] — backlog-driven loop execution (orchestrate complete, pre-verify)
+
+**Request:** Add a vibe-coder `/renmark:backlog` intake + approval-buffer that, on "Approve and build", runs bounded Loop Mode (max 5, no flags) on a managed branch with no-orphan-branch lifecycle; reserve a design-only scheduled-QA read-only lane.
+**Built:** 8 tasks across 3 waves, all PASS (570 tests pass, +19 new; mypy + lint_all clean).
+**Files changed:**
+- `renmark/backlog.py` — never-raise BacklogItem ledger (`.renmark/state/backlog/`), BL-NNNN ids, `managed_branch_name`, `completion_report` (exact "N/5" wording), `DISPOSITIONS` no-orphan invariant, `status_for_outcome`. (REQ-13)
+- `tests/test_backlog.py` — 19 tests (round-trip, never-raise on corrupt, id increment, exact wording, dispositions).
+- `plugin/skills/backlog/SKILL.md` + `plugin/commands/backlog.md` — interactive list+detail skill; Approve-and-build → bounded Loop Mode (max 5 hardcoded) → human merge gate → merge/re-verify/delete OR blocked+keep/abandon. (REQ-13)
+- `plugin/skills/backlog/SCHEDULED-QA.md` — design-only read-only proposer lane seam. (REQ-14)
+- `renmark/lifecycle.py` — registered `backlog` (build domain, aux class).
+- `CLAUDE.md` / `AGENTS.md` — `/renmark:backlog` tooling row (mirrored).
+**Do not change:**
+- Backlog is a thin intake/decision layer — does NOT replace feature/plan/orchestrate/verify/finish.
+- Approve-and-build hardcodes max 5 iterations; NO user-facing budget/iteration/ID flags; budget escalation + merge stay human-gated.
+- Every managed branch ends in exactly one disposition (merged-deleted / abandoned-deleted / kept) — no orphans.
+- Scheduled QA lane is read-only/design-only: never edits code/commits/merges/releases/edits PRD/escalates budget/auto-executes.
+- The 39 repo-wide `ruff check` errors are PRE-EXISTING (present at v0.7.6 baseline ebcd009); this feature adds zero new ruff errors.
+
 ## [2026-06-09] — PRD updated
 
 **Request:** PRD-alignment for the `backlog-driven-loop-execution` feature returned DRIFT — reconcile the backlog/intake + scheduled-QA concepts into the PRD before planning.
