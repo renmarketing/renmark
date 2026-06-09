@@ -15,4 +15,7 @@ node_modules/
 .renmark/logs/
 .renmark/baks/
 .renmark/version/
+.renmark/analytics/*.jsonl
+!.renmark/analytics/summary.json
+!.renmark/analytics/limits.json
 .env - Copy.example:Zone.Identifier
