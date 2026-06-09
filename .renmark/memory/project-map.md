@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-09 @ 3003b01 -->
+<!-- Last refreshed: 2026-06-09 @ 6a8a204 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=80
+**Languages:** python=82
 
 ## Directory tree
 
@@ -31,23 +31,24 @@ ai-system/
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `renmark/doctor.py` | Checks that renmark is properly registered with Claude Code and surfaces | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
+| `renmark/backlog.py` | renmark surfaces for human review, approval, and disposition. | `BacklogItem`, `backlog_dir`, `next_id`, `read_item`, `write_item`, `list_items` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/lint.py` | CLAUDE.md.template rule blocks are well-formed. | `parse_frontmatter`, `lint_skill_files`, `lint_next_steps_citation`, `lint_command_shims`, `validate_rule_markers`, `iter_rule_blocks` |
 | `renmark/dispatch.py` | Groups tasks by parallel_group, validates that tasks sharing a group write | `TaskResult`, `WaveResult`, `group_tasks_by_wave`, `validate_wave`, `dispatch_wave`, `estimate_wave_cost` |
 | `renmark/shadow.py` | subsystems. | `register`, `registered_subsystems`, `ShadowDiff`, `list_cases`, `run_subsystem`, `run_all` |
 | `renmark/release.py` | Pulled forward from the v0.4.0 release skill: the full `/renmark:release` | `VersionFile`, `package_basename`, `build_package`, `current_version`, `check_drift`, `drift_report` |
 | `tests/test_sizing.py` | Hermetic: no network, no real git history dependence (we init throwaway repos | `test_all_doc_small_set_is_lite`, `test_any_hard_task_is_never_lite`, `test_core_module_target_is_at_least_standard`, `test_many_tasks_is_full`, `test_empty_list_degrades_to_standard`, `test_classify_plan_never_raises_on_malformed_input` |
-| `tests/test_init_pipeline.py` | Covers the behavior added in this feature: | `test_run_scaffolds_when_claude_md_absent`, `test_run_does_not_overwrite_existing_custom_claude_md`, `test_run_is_idempotent`, `test_scaffold_missing_preserves_user_changelog`, `test_merge_rule_blocks_backfills_only_missing_verbatim`, `test_merge_rule_blocks_agents_always_zero` |
 | `renmark/hygiene.py` | Single source of truth for renmark's diagnostic hygiene operations. Walks the | `ScanReport`, `PruneReport`, `scan_artifacts`, `prune_memory`, `main` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/sizing.py` | This is the **single source of truth** for "how big/risky is this change?" used | `classify_plan`, `classify_diff`, `resolve_override` |
 | `renmark/modularity.py` | renmark enforces modularity at *plan time* (one-file-per-task) but never | `analyze` |
-| `renmark/summary.py` | governance metadata), G9 (failure transparency). | — |
+| `tests/test_init_pipeline.py` | Covers the behavior added in this feature: | — |
 
 ## Commands (user-facing)
 
 | Command | Purpose |
 |---|---|
+| `/renmark:backlog` | Use to triage and approve backlog items — `/renmark:backlog` opens an interactive list, then a per-item detail view; 'Ap |
 | `/renmark:blueprint` | Use to create or update the project's blueprint — the technical architecture and implementation guide that plans and fea |
 | `/renmark:brainstorm` | Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's  |
 | `/renmark:check-plan` | Use before executing a renmark plan — validates task count, verifier presence, and parallel group safety. |

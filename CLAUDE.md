@@ -370,6 +370,7 @@ flip the bit. AI may generate code; the human owns merges and releases.
 | `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
 | `/renmark:finish` | Close branch — create PR, merge, or clean up |
+| `/renmark:backlog` | Triage & approve backlog items; "Approve and build" launches bounded Loop Mode on a managed branch (max 5 iterations, no orphan branches) |
 | `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
 | `/renmark:codereview <ref>` | Multi-pass diff review (adversarial + quality + architecture) |
 

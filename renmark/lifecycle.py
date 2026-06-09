@@ -110,6 +110,7 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "feature": "build",
     "prd": "build",
     "blueprint": "build",
+    "backlog": "build",
     "secure": "audit",
     "document": "audit",
     "map": "audit",
@@ -165,6 +166,7 @@ AUX_SKILLS: frozenset[str] = frozenset(
         "setup",
         "help",
         "resume",
+        "backlog",
     }
 )
 
@@ -179,6 +181,7 @@ AUX_LOCAL_ACTIONS: dict[str, list[str]] = {
     "setup": ["/renmark:start", "/renmark:brainstorm"],
     "help": ["/renmark:start", "/renmark:resume"],
     "resume": ["/renmark:start"],
+    "backlog": ["/renmark:backlog (refresh the list)", "/renmark:finish"],
 }
 
 

@@ -1,5 +1,46 @@
 # Changelog
 
+## [2026-06-09] — backlog-driven loop execution (verified + codereview-hardened)
+
+**Request:** Codereview + fix pass on the backlog feature before finish.
+**Built:** Full codex review (0 Critical / 6 Major / 2 Minor) → all findings fixed on-branch.
+**Files changed:**
+- `renmark/backlog.py` — path-traversal guard (`_is_safe_item_id` `^BL-\d+$`), true never-raise on serialize, id integrity (filename authoritative), branch-name sanitization, atomic `next_id` reservation (O_CREAT|O_EXCL retry). +5 tests (24 total).
+- `plugin/skills/backlog/SKILL.md` — awaiting-merge documented as a tracked resumable interim state (not an orphan); Step 0 resume scans in-progress items + stored `loop_id`; blocked outcome drives `/renmark:debug`.
+**Do not change:**
+- `next_id` now RESERVES atomically (side effect: writes a `needs review` placeholder); intake/split callers must `write_item` to fill it. `read_item`/`write_item` refuse non-canonical ids (return None).
+- A managed branch's disposition is terminal-only; awaiting-merge is interim/resumable, never an orphan.
+- Verified 5/5 behaviors; full suite 575 pass (+5 from new fix tests); mypy + lint_all clean. The 39 `ruff check` errors remain pre-existing (v0.7.6 baseline), zero added.
+
+## [2026-06-09] — backlog-driven loop execution (orchestrate complete, pre-verify)
+
+**Request:** Add a vibe-coder `/renmark:backlog` intake + approval-buffer that, on "Approve and build", runs bounded Loop Mode (max 5, no flags) on a managed branch with no-orphan-branch lifecycle; reserve a design-only scheduled-QA read-only lane.
+**Built:** 8 tasks across 3 waves, all PASS (570 tests pass, +19 new; mypy + lint_all clean).
+**Files changed:**
+- `renmark/backlog.py` — never-raise BacklogItem ledger (`.renmark/state/backlog/`), BL-NNNN ids, `managed_branch_name`, `completion_report` (exact "N/5" wording), `DISPOSITIONS` no-orphan invariant, `status_for_outcome`. (REQ-13)
+- `tests/test_backlog.py` — 19 tests (round-trip, never-raise on corrupt, id increment, exact wording, dispositions).
+- `plugin/skills/backlog/SKILL.md` + `plugin/commands/backlog.md` — interactive list+detail skill; Approve-and-build → bounded Loop Mode (max 5 hardcoded) → human merge gate → merge/re-verify/delete OR blocked+keep/abandon. (REQ-13)
+- `plugin/skills/backlog/SCHEDULED-QA.md` — design-only read-only proposer lane seam. (REQ-14)
+- `renmark/lifecycle.py` — registered `backlog` (build domain, aux class).
+- `CLAUDE.md` / `AGENTS.md` — `/renmark:backlog` tooling row (mirrored).
+**Do not change:**
+- Backlog is a thin intake/decision layer — does NOT replace feature/plan/orchestrate/verify/finish.
+- Approve-and-build hardcodes max 5 iterations; NO user-facing budget/iteration/ID flags; budget escalation + merge stay human-gated.
+- Every managed branch ends in exactly one disposition (merged-deleted / abandoned-deleted / kept) — no orphans.
+- Scheduled QA lane is read-only/design-only: never edits code/commits/merges/releases/edits PRD/escalates budget/auto-executes.
+- The 39 repo-wide `ruff check` errors are PRE-EXISTING (present at v0.7.6 baseline ebcd009); this feature adds zero new ruff errors.
+
+## [2026-06-09] — PRD updated
+
+**Request:** PRD-alignment for the `backlog-driven-loop-execution` feature returned DRIFT — reconcile the backlog/intake + scheduled-QA concepts into the PRD before planning.
+**Built:** Reconciled the Requirements, a new "Backlog & lanes" section, and Scope boundaries of PRD.md; bumped last_reviewed.
+**Files changed:**
+- `PRD.md` — added `REQ-13` (`/renmark:backlog` interactive intake + approval buffer; bounded Loop Mode on a managed branch, default 5 iterations, no orphan branches, human-gated merge) and `REQ-14` (scheduled QA/Deep-QA reserved as a read-only proposer lane — design only, never executes); added the "Backlog & lanes" section (four-lane model + one-code-writing-loop-per-tree parallelism rule); added `/renmark:backlog` to in-scope and narrowed the Deferred "scheduled loops" line to autonomous scheduled *execution* only.
+**Do not change:**
+- Backlog is a thin intake/decision layer — it must NOT replace `/renmark:feature`, `/renmark:plan`, `/renmark:orchestrate`, `/renmark:verify`, or `/renmark:finish`.
+- The scheduled QA lane is read-only: it may inspect/research/check/report/propose, but MUST NOT edit code, commit, merge, release, edit `PRD.md`, escalate budget, or auto-execute.
+- Only one code-writing loop may run per working tree; default backlog Loop Mode is capped at 5 iterations; budget escalation stays human-gated.
+
 ## v0.7.6 — 2026-06-09 (Loop Mode MVP — bounded resumable agentic loops)
 
 **Release of Loop Mode (MVP).** Bumped 0.7.5 → 0.7.6 across all 7 version locations.
