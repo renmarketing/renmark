@@ -159,12 +159,21 @@ def build_usage_view(repo: str | Path, *, now: str) -> dict[str, Any]:
                 limits, provider, "weekly_tokens",
                 p_week.get("total_tokens", 0)),
         }
+    # A configured local limit is breached when any real (non-sentinel) percent
+    # is at or over 100. This is the signal Tier-1 preflight reads to pause
+    # before spend; it is False whenever no local limit is configured.
+    limit_exceeded = any(
+        isinstance(v, (int, float)) and v >= 100.0
+        for cells in percent.values()
+        for v in cells.values()
+    )
     view: dict[str, Any] = {
         "now": now,
         "rolling_5h": rolling_5h,
         "weekly": weekly,
         "limits": limits,
         "percent": percent,
+        "limit_exceeded": limit_exceeded,
         "top_features": state.tokens_by_feature(
             repo, now=now, seconds=_ONE_WEEK, top=5),
         "recent_limit_events": _recent_limit_events(repo),

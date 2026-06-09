@@ -187,8 +187,12 @@ for out, task in zip(outputs, wave_tasks):
     analytics.record_task_run(
         repo, ts=state.now_iso(), task_id=task.index, title=task.title,
         executor=task.executor, model=task.executor, provider="",
-        status=out.status, verifier_result=<exit-code summary>, retry_count=out.retry_count,
-        failure_reason=<one-line reason if FAIL else "">,
+        status=out.status,
+        # verifier_result MUST be a normalized verdict token ("pass"/"fail") —
+        # analytics._agg_tasks classifies on these, NOT on a free-text exit summary.
+        verifier_result=("pass" if out.status == "PASS" else "fail"),
+        retry_count=out.retry_count,
+        failure_reason=<one-line reason if FAIL else "">,  # human-readable tail lives here
         total_tokens=out.token_count, sha=(out.sha or ""),
     )
 ```

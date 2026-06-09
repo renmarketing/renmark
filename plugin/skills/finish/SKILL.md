@@ -76,7 +76,8 @@ Present: N commits, M files changed, brief note on each commit.
 After the branch summary and before presenting the next-steps menu, build the feature report and record the analytics run. This step is **non-blocking** — if any call fails, log the error and continue to step 3 without aborting finish.
 
 ```python
-from renmark import reports, analytics, state, lifecycle
+import subprocess, glob
+from renmark import reports, analytics, state, lifecycle, summary
 from pathlib import Path
 
 repo = Path('.')
@@ -91,16 +92,30 @@ diff_stat = subprocess.check_output(
     ["git", "diff", "--stat", "main..HEAD"]).decode()
 files_changed = sum(1 for line in diff_stat.splitlines()
                     if "|" in line)  # each changed file has a "|" in --stat output
-verification = s.verification_result if hasattr(s, 'verification_result') else ""
+# Verification result comes from the verify artifact pointer (LifecycleState has
+# NO `verification_result` attr) — read the artifact's bounded metadata, never its body.
+verification = ""
+vpath = s.artifacts.get("verification") if s and s.artifacts else None
+if vpath:
+    meta = summary.read_metadata(vpath)  # frontmatter only — no body read
+    sl = (meta or {}).get("summary_lines") or []
+    verification = sl[0] if sl else (meta or {}).get("completion_state", "")
 # Codereview artifact — check for most recent review file
-import glob
 review_files = sorted(glob.glob(".renmark/reviews/*.review.md"))
 codereview = review_files[-1] if review_files else ""
 # Version path — check for a release snapshot matching current stage
-import os
 version_dirs = sorted(glob.glob(".renmark/version/v*/"))
 version_path = version_dirs[-1] if version_dirs else ""
 branch_disposition = "merged" if s and s.stage == "released" else "open"
+# Map the lifecycle STAGE to an analytics status vocab term — analytics classifies
+# success/blocked on SUCCESS_STATUSES/BLOCKED_STATUSES, NOT on raw stage names.
+stage = s.stage if s else ""
+if stage == "released":
+    feature_status = "shipped"
+elif stage in {"verified", "reviewed", "documented", "ready-to-release"}:
+    feature_status = "completed"
+else:
+    feature_status = "blocked"
 now = state.now_iso()
 
 # 1. Build + write the feature report
@@ -124,7 +139,7 @@ analytics.record_feature_run(
     ts=now,
     feature=feature_name,
     branch=branch,
-    status=s.stage if s else "",
+    status=feature_status,  # mapped to analytics vocab (shipped/completed/blocked), NOT raw stage
     sha=sha,
     files_changed=files_changed,
     verification=verification,

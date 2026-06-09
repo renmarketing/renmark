@@ -12,12 +12,13 @@ from ..state import now_iso, read_usage
 
 
 def cmd_usage(repo: Path) -> int:
-    rows = read_usage(repo)
-    if not rows:
-        print(f"No usage recorded yet at {repo}/.renmark/state/usage.jsonl")
-        return 0
-
     from .. import usage as _usage
+
+    # Always render the bounded view — even with no recorded usage. The renderer
+    # shows zero windows AND the mandatory disclaimer; an early return on an empty
+    # ledger would drop the disclaimer (and hide paused-run / local-limit state).
+    if not read_usage(repo):
+        print(f"No usage recorded yet at {repo}/.renmark/state/usage.jsonl\n")
 
     view = _usage.build_usage_view(repo, now=now_iso())
     print(_usage.render_usage_md(view))

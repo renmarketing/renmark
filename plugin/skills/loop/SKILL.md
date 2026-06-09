@@ -125,7 +125,8 @@ While `stop_reason(state)` is `None`:
            observed_usage=<observed_usage>, provider_reset_at=<provider_reset_at>,
            feature=state.goal, loop_id=lid,
            iteration=state.iteration, max_iterations=state.max_iterations,
-       )                                                       # pause.pause_kind == "usage_limit"
+           repo=repo,   # REQUIRED for the local rolling-window fallback; without it
+       )                # resume_after degrades to the flat 60-min retry. pause_kind=="usage_limit"
        rstate.write_pause(repo, pause)
        state.status = "awaiting-approval"
        state.pending_step = "usage-limit"
@@ -168,25 +169,41 @@ While `stop_reason(state)` is `None`:
        state.status = "stalled"
    loop.write_loop(repo, lid, state)           # written before the iteration returns → resumable
    ```
-   **Per-iteration metrics (REQ-15).** Record this iteration's run from the BOUNDED loop
-   state — never from transcripts:
+   **Per-iteration metrics (REQ-15).** Record this iteration as a lightweight EVENT from the
+   BOUNDED loop state — never from transcripts, and **NOT** via `record_loop_run` (that ledger
+   is one-row-per-loop; writing it per iteration inflates loop totals + distorts success-rate
+   and avg-iterations in `_agg_loops`). Use the generic event stream instead:
    ```python
    from renmark import analytics, state as rstate
-   analytics.record_loop_run(
-       repo, ts=rstate.now_iso(),
-       loop_id=lid, goal=state.goal,
-       backlog_item_id=<backlog_item_id or "">,
-       max_iterations=state.max_iterations,
-       iterations_used=state.iteration,
-       stop_reason=(state.status if loop.stop_reason(state) is not None else ""),
+   analytics.record_event(
+       repo, ts=rstate.now_iso(), kind="loop_iteration",
+       loop_id=lid, iteration=state.iteration,
        goal_reached=bool(decision["goal_reached"]),
        total_tokens=state.spent_tokens,
-       branch_disposition=<branch_disposition or "">,
    )
    ```
    Every field is read from `state` / `decision` (the bounded loop state + verify metadata),
    honoring context hygiene — no diffs, code, or transcripts feed the metrics.
-6. **Check** — `stop_reason(state)`. If non-None, the loop is terminal; break.
+6. **Check** — `stop_reason(state)`. If non-None, the loop is terminal; break — and at that
+   terminal point record the loop run **exactly once** (one row per loop, so `_agg_loops`
+   counts and averages are correct):
+   ```python
+   if loop.stop_reason(state) is not None:        # terminal — record once, then break
+       analytics.record_loop_run(
+           repo, ts=rstate.now_iso(),
+           loop_id=lid, goal=state.goal,
+           backlog_item_id=<backlog_item_id or "">,
+           max_iterations=state.max_iterations,
+           iterations_used=state.iteration,
+           stop_reason=state.status,
+           goal_reached=bool(decision["goal_reached"]),
+           total_tokens=state.spent_tokens,
+           branch_disposition=<branch_disposition or "">,
+       )
+       break
+   ```
+   The usage-limit pause path above also terminates the loop — record the same one-per-loop
+   `record_loop_run` (with `stop_reason="awaiting-approval"`) before that `break` too.
 7. **Progress line** — emit **ONE bounded line** per iteration (≤ summary cap), e.g.
    `iter 2/5 · verify FAIL · spent 80k/300k (~$0.80) · next: add null-guard`.
    **No per-iteration prompt.**
