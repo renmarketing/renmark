@@ -105,6 +105,23 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     diffs, or full bodies (REQ-5).
 12. `REQ-12` Human approval is required before a loop edits `PRD.md`, merges,
     releases, escalates its budget, or makes destructive changes (extends REQ-4).
+13. `REQ-13` renmark provides a `/renmark:backlog` interactive intake layer — the
+    human-gated **approval buffer between autonomous discovery and autonomous
+    execution**. It lists candidate work items (title / status / source / risk /
+    evidence); "Approve and build" launches bounded Loop Mode on a managed
+    feature branch, gating on human merge approval. Default Loop Mode execution
+    for backlog items is capped at 5 iterations unless an expert/internal flow
+    explicitly overrides it, with no user-facing backlog IDs, budget flags, or
+    iteration flags in the default vibe-coder flow; budget escalation remains
+    human-gated. On merge the branch is deleted and the item completed; on
+    failure the item is marked blocked with a keep/delete-branch choice — no
+    orphan branches. Item state persists under `.renmark/state/` (extends
+    REQ-3 / REQ-6).
+14. `REQ-14` A scheduled QA / Deep-QA lane is reserved as a **read-only proposer**
+    (design only, not MVP): scheduled subagents MAY inspect, research, run checks,
+    write reports, and propose backlog items, but MUST NOT edit code, commit,
+    merge, release, edit `PRD.md`, escalate budget, or auto-execute (extends
+    REQ-12). Autonomous scheduled *execution* remains out of scope.
 
 ## Success metrics
 
@@ -126,15 +143,17 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   codereview, secure, doctor, resume, roadmap, help, hygiene, and `init` — the
   front-door adoption pipeline, with `setup` as its rule-block-refresh alias);
   the bounded loop execution engine (`loop`) + `.renmark/loops/` state; the
-  Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
-  `.renmark/` state and memory; cross-platform install.
+  `/renmark:backlog` intake + approval-buffer layer + `.renmark/state/` item
+  storage; the Python runtime (CLI dispatch, verifier, lifecycle, memory);
+  persistent `.renmark/` state and memory; cross-platform install.
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
   bloat now — see ADR-005); first-class requirement-coverage reporting in
   verify (coverage flows implicitly via plan → tasks → verify traceability);
-  **indefinite autonomous loops** and **scheduled / PR-triggered loops** (Loop
-  Mode ships bounded + human-gated first).
+  **indefinite autonomous loops** and **autonomous scheduled / PR-triggered loop
+  *execution*** (Loop Mode ships bounded + human-gated first; the scheduled lane
+  is reserved as a read-only proposer only, per REQ-14 — it never executes).
 
 ## Loop Mode
 
@@ -150,6 +169,30 @@ the guided pipeline (REQ-1), not a separate product or standalone mode.
   / `--max-iterations`).
 - **Vibe coders:** loop behavior is hidden behind `/renmark:start` — they never
   see the word "loop."
+
+## Backlog & lanes
+
+Backlog is a **thin intake + decision layer** over the existing pipeline — it
+does not replace `/renmark:feature`, `/renmark:plan`, `/renmark:orchestrate`,
+`/renmark:verify`, or `/renmark:finish`. It is the approval buffer where ideas,
+bugs, research findings, and QA findings wait for a human "Approve and build"
+before any code is written. Approved items are consumed by Loop Mode internally
+— vibe coders never type backlog IDs, budgets, or iteration flags.
+
+`/renmark:backlog` is interactive: it first shows a selectable list of backlog
+items with status / source / risk / pending decision, then opens a detail view
+for the selected item with actions such as Approve and build, Research more,
+Split, Reject, and Back.
+
+renmark separates work into **four lanes**:
+1. **Foreground feature** — the user actively builds with `/renmark:feature` / Loop Mode.
+2. **Backlog intake** — candidate work collected from any source, awaiting approval.
+3. **Scheduled QA** — read-only proposer lane (REQ-14); inspects and proposes, never executes.
+4. **Execution** — approved items built one at a time.
+
+**Parallelism rule:** parallel *read-only* work is allowed; parallel
+*code-writing* work requires isolation — **only one code-writing loop may run
+per working tree**.
 
 ## Open questions
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-09] — PRD updated
+
+**Request:** PRD-alignment for the `backlog-driven-loop-execution` feature returned DRIFT — reconcile the backlog/intake + scheduled-QA concepts into the PRD before planning.
+**Built:** Reconciled the Requirements, a new "Backlog & lanes" section, and Scope boundaries of PRD.md; bumped last_reviewed.
+**Files changed:**
+- `PRD.md` — added `REQ-13` (`/renmark:backlog` interactive intake + approval buffer; bounded Loop Mode on a managed branch, default 5 iterations, no orphan branches, human-gated merge) and `REQ-14` (scheduled QA/Deep-QA reserved as a read-only proposer lane — design only, never executes); added the "Backlog & lanes" section (four-lane model + one-code-writing-loop-per-tree parallelism rule); added `/renmark:backlog` to in-scope and narrowed the Deferred "scheduled loops" line to autonomous scheduled *execution* only.
+**Do not change:**
+- Backlog is a thin intake/decision layer — it must NOT replace `/renmark:feature`, `/renmark:plan`, `/renmark:orchestrate`, `/renmark:verify`, or `/renmark:finish`.
+- The scheduled QA lane is read-only: it may inspect/research/check/report/propose, but MUST NOT edit code, commit, merge, release, edit `PRD.md`, escalate budget, or auto-execute.
+- Only one code-writing loop may run per working tree; default backlog Loop Mode is capped at 5 iterations; budget escalation stays human-gated.
+
 ## v0.7.6 — 2026-06-09 (Loop Mode MVP — bounded resumable agentic loops)
 
 **Release of Loop Mode (MVP).** Bumped 0.7.5 → 0.7.6 across all 7 version locations.
