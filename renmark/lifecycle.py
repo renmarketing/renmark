@@ -256,6 +256,24 @@ def _lifecycle_path(repo: Path | str) -> Path:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+# Accepted JSON types per LifecycleState field. Values of any other type are
+# dropped at read time so corrupt or hand-edited state degrades to defaults
+# instead of raising mid-recovery (a reader that raises is a resume-killer).
+_LIFECYCLE_FIELD_TYPES: dict[str, type | tuple[type, ...]] = {
+    "feature": str,
+    "branch": str,
+    "github_issue": (int, type(None)),
+    "stage": str,
+    "stages_completed": list,
+    "artifacts": dict,
+    "human_review_required": bool,
+    "human_review_completed": bool,
+    "human_review_for": (str, type(None)),
+    "next_recommended": str,
+    "last_updated": str,
+}
+
+
 def read_lifecycle(repo: Path | str) -> LifecycleState | None:
     """Return the current LifecycleState, or None if no lifecycle exists."""
     path = _lifecycle_path(repo)
@@ -265,9 +283,16 @@ def read_lifecycle(repo: Path | str) -> LifecycleState | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
-    # Tolerate unknown fields — drop them rather than crashing on schema drift.
-    known = {f for f in LifecycleState.__dataclass_fields__}
-    filtered = {k: v for k, v in data.items() if k in known}
+    if not isinstance(data, dict):
+        # Valid JSON but not an object — same contract as malformed: None.
+        return None
+    # Tolerate unknown fields and wrong-typed values — drop them rather than
+    # crashing on schema drift.
+    filtered = {
+        k: v
+        for k, v in data.items()
+        if k in _LIFECYCLE_FIELD_TYPES and isinstance(v, _LIFECYCLE_FIELD_TYPES[k])
+    }
     return LifecycleState(**filtered)
 
 
@@ -572,11 +597,17 @@ def validate_artifact_refs(
     if state is None:
         return []
 
+    if not isinstance(state.artifacts, dict):
+        # Hand-built or corrupt state — nothing to validate.
+        return []
+
     repo_path = Path(repo)
     block_issues: list[dict[str, str]] = []
     warn_issues: list[dict[str, str]] = []
 
     for key, path_str in state.artifacts.items():
+        if not isinstance(path_str, str):
+            continue
         raw = Path(path_str)
         try:
             resolved = raw.resolve() if raw.is_absolute() else (repo_path / raw).resolve()

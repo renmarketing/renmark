@@ -232,6 +232,53 @@ def test_corrupt_lifecycle_returns_none(tmp_path: Path) -> None:
     assert lifecycle.read_lifecycle(tmp_path) is None
 
 
+def test_non_dict_lifecycle_returns_none(tmp_path: Path) -> None:
+    """Valid JSON whose top level is not an object must degrade to None,
+    never raise — a corrupt file must not kill cold-start recovery."""
+    state_dir = tmp_path / ".renmark" / "state"
+    state_dir.mkdir(parents=True)
+    for payload in ("[]", '"x"', "42"):
+        (state_dir / "lifecycle.json").write_text(payload)
+        assert lifecycle.read_lifecycle(tmp_path) is None
+
+
+def test_wrong_typed_fields_dropped(tmp_path: Path) -> None:
+    """Wrong-typed values degrade to dataclass defaults instead of raising."""
+    state_dir = tmp_path / ".renmark" / "state"
+    state_dir.mkdir(parents=True)
+    (state_dir / "lifecycle.json").write_text(
+        json.dumps({"stage": ["a"], "artifacts": ["a"], "feature": 7})
+    )
+    state = lifecycle.read_lifecycle(tmp_path)
+    assert state is not None
+    assert state.stage == "init"
+    assert state.artifacts == {}
+    assert state.feature == ""
+
+
+def test_non_dict_lifecycle_does_not_break_writes(tmp_path: Path) -> None:
+    """write_lifecycle resets from a corrupt file instead of raising."""
+    state_dir = tmp_path / ".renmark" / "state"
+    state_dir.mkdir(parents=True)
+    (state_dir / "lifecycle.json").write_text("[]")
+    state = lifecycle.write_lifecycle(tmp_path, stage="brainstorm-complete")
+    assert state.stage == "brainstorm-complete"
+
+
+def test_field_type_map_matches_dataclass() -> None:
+    """Drift guard: the read-time type filter must cover every dataclass field."""
+    assert set(lifecycle._LIFECYCLE_FIELD_TYPES) == set(
+        lifecycle.LifecycleState.__dataclass_fields__
+    )
+
+
+def test_validate_artifact_refs_survives_corrupt_state(tmp_path: Path) -> None:
+    state_dir = tmp_path / ".renmark" / "state"
+    state_dir.mkdir(parents=True)
+    (state_dir / "lifecycle.json").write_text('{"stage": "init", "artifacts": ["a"]}')
+    assert lifecycle.validate_artifact_refs(tmp_path) == []
+
+
 def test_unknown_fields_in_lifecycle_tolerated(tmp_path: Path) -> None:
     """Forward-compat: extra fields shouldn't crash the loader."""
     state_dir = tmp_path / ".renmark" / "state"
