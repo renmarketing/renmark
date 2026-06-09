@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-06-09] — reporting-and-usage-analytics Part 2 (surfaces + integration) orchestrated
+**Request:** Surface the Part-1 engine to users and wire it into the live pipeline (REQ-15/REQ-16).
+**Built:** 12 atomic tasks across 6 waves on `feature/reporting-and-usage-analytics` (haiku×4, sonnet×6, opus×2). CLI: `cmd_usage` now delegates to `usage.build_usage_view`/`render_usage_md`; new `cmd_analytics` (aggregate + build-health, writes `.renmark/memory/analytics.md`); `--analytics` flag wired in `_engine.py`; re-exported from `cli/__init__.py`. New command shims `plugin/commands/{usage,analytics}.md` + zero-LLM skills `plugin/skills/{usage,analytics}/SKILL.md` (invoke `renmark-execute --usage/--analytics`, display bounded output only). Integration: `finish` writes the feature report + `record_feature_run` + `[a] Analytics` menu; `orchestrate` gained Tier-1 usage preflight + per-task `record_task_run` + Tier-2 `usage_limit` pause-not-fail; `loop` records per-iteration `record_loop_run` + usage-limit pause hook; `resume` surfaces `pause_kind==usage_limit` runs with suggested resume time + disclaimer. `.gitignore` ignores raw `.renmark/analytics/*.jsonl` while keeping `summary.json`/`limits.json`/`reports/`. Full gate: 608 passed / 28 skipped, ruff + mypy clean.
+**Files changed:**
+- `renmark/cli/commands.py`, `renmark/cli/_engine.py`, `renmark/cli/__init__.py` — usage/analytics handlers + flag + re-export
+- `plugin/commands/usage.md`, `plugin/commands/analytics.md` — command shims (new)
+- `plugin/skills/usage/SKILL.md`, `plugin/skills/analytics/SKILL.md` — zero-LLM skills (new)
+- `plugin/skills/finish/SKILL.md`, `plugin/skills/orchestrate/SKILL.md`, `plugin/skills/loop/SKILL.md`, `plugin/skills/resume/SKILL.md` — integration touchpoints
+- `.gitignore` — raw analytics JSONL ignored, durable summary/limits/reports kept
+**Do not change:**
+- Skills NEVER read `.renmark/analytics/*.jsonl` or `.renmark/state/usage.jsonl` into context — they run `renmark-execute --usage/--analytics` and display only the bounded rendered output (REQ-5).
+- The `*.jsonl` gitignore rule is followed by explicit `!summary.json` / `!limits.json` un-ignores — do not reorder so the wildcard shadows them; `.renmark/reports/` stays committed.
+- `now`/`ts` injected everywhere via `state.now_iso()` — no `datetime.now()` in the new integration prose. Usage pause is an ADDITIONAL loop stop condition, not a replacement for REQ-9/REQ-11 budget/max-iter/goal-backward bounds.
+- No AGENTS.md mirror was made: these tasks add skill behavior under existing bounded-output/context-hygiene governance rules; no governance *rule* changed.
+
 ## [2026-06-09] — reporting-and-usage-analytics Part 1 (engine) orchestrated
 **Request:** Build the deterministic Python engine for local reporting/analytics/usage (REQ-15) + usage-aware pause/resume (REQ-16).
 **Built:** 9 atomic tasks across 5 waves on `feature/reporting-and-usage-analytics`. New modules `renmark/usage.py` (windowed usage view, limits + percent-used, `classify_usage_pause` fallback rule, `render_usage_md` w/ mandatory disclaimer), `renmark/reports.py` (feature/run report builders → `.renmark/reports/`), `renmark/analytics.py` (append-only JSONL event ledgers under `.renmark/analytics/` + `aggregate()`→summary.json + `build_health_report`). Extended `renmark/state/pause.py` (usage-limit `PauseState` fields + `usage_limit_pause`, back-compatible) and `renmark/state/usage.py` (enriched `UsageRecord` + now-injected window helpers). Added 4 `schemas.py` validators. 15 new tests; full suite 608 passed; mypy clean.
