@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-09] — skill-feature inventory & modularity audit (read-only)
+**Request:** Run the read-only skill/feature inventory + modularity audit per the committed spec (`.renmark/audits/skill-feature-inventory-spec.md`, 9a050a8); audit artifacts only, no refactors.
+**Built:** Full 23-command inventory + 13-dimension audit via 8 parallel read-only subagents, synthesized into 6 dated artifacts (+ JSON mirror) under `.renmark/audits/`. Pre-findings confirmed (hygiene is GC not inventory; DOMAIN_BY_SKILL ghosts). Top findings: (1) `lifecycle.read_lifecycle` + `state.skills.last_skill_invocation` raise on corrupt valid-JSON state — resume-killers; (2) `/renmark:approve` is cited by backlog/resume/loop/CLAUDE.md but does not exist; (3) 0/8 `schemas.py` validators have production call sites (2 fully dead); (4) `lifecycle.py` registries drifted (8 ghost skills, 5 missing real ones incl. usage/analytics; IMPLEMENTED_SKILLS missing 9); (5) finish re-run double-counts feature analytics (blind-append). 7 of 9 overlap hotspots clean; storage-layer single-source-of-truth holds everywhere; version parity healthy at 0.7.8. 24-item prioritized cleanup backlog proposed (NOT implemented).
+**Files changed:**
+- `.renmark/audits/skill-feature-inventory-2026-06-09.md` + `.json` — 23-row inventory matrix + machine mirror
+- `.renmark/audits/ownership-source-of-truth-map-2026-06-09.md` — canonical home per concept, violators ranked
+- `.renmark/audits/overlap-findings-2026-06-09.md` — 9 spec hotspots + 3 discovered
+- `.renmark/audits/modularity-scorecard-2026-06-09.md` — layering grades, _shared dedup, G1–G12 matrix, dead code, version parity
+- `.renmark/audits/context-hygiene-and-safety-risks-2026-06-09.md` — resume-killers, gate holes, idempotency, test gaps
+- `.renmark/audits/recommended-cleanup-backlog-2026-06-09.md` — P0/P1/P2 backlog (proposed only)
+**Do not change:**
+- Audit pass is read-only by contract — cleanup goes through a separate follow-up feature, never retrofitted into these artifacts.
+- plugin/commands ↔ plugin/skills 1:1 parity (23/23) is the only fully-correct registration surface — keep it that way when adding skills.
+
 ## [2026-06-09] — reporting-and-usage-analytics Part 2 codereview fixes (6 Major + 2 Minor)
 **Request:** Fix all codex-review findings on the Part-2 surfaces+integration diff before finish.
 **Built:** Codex flagged 8 integration-contract bugs (the opus-written prose referenced fields/attrs/vocab absent from the Part-1 engine); all confirmed real and fixed. Code: (F1) `cmd_usage` no longer early-returns on an empty ledger — always renders the bounded view so the mandatory disclaimer + paused/limit state always show; (F2) `build_usage_view` now returns a `limit_exceeded` boolean (True when any real per-provider percent ≥ 100) so orchestrate's Tier-1 preflight has a working signal. Skill prose: (F3) orchestrate `record_task_run` passes a normalized `verifier_result="pass"/"fail"` (analytics classifies on these, not free text); (F4) finish reads the verification result from the verify artifact's bounded metadata via `summary.read_metadata` (LifecycleState has no `verification_result` attr); (F5) finish maps the lifecycle stage to analytics vocab (`shipped`/`completed`/`blocked`) instead of passing the raw stage; (F6) loop records per-iteration metrics via `record_event(kind="loop_iteration")` and calls `record_loop_run` exactly once at the terminal break (per-iteration `record_loop_run` inflated `_agg_loops` totals); (F7) loop's `classify_usage_pause` now passes `repo=` so the local rolling-window fallback works; (F8) finish snippet imports `subprocess`. Gate: 608 passed / 28 skipped, ruff + mypy clean. Each fix independently re-probed (empty-repo disclaimer, limit_exceeded over-limit flip to True at 250%, API existence).
