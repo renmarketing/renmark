@@ -11,6 +11,18 @@
 
 
 
+
+## ADR-018 — Finished feature backlog-driven-loop-execution
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch feature/backlog-driven-loop-execution reached stage ready-to-release
+
+---
+
 ## ADR-017 — Escalated task 2 from codex to sonnet
 
 **Date:** 2026-06-09
