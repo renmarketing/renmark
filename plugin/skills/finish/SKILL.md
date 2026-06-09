@@ -77,7 +77,7 @@ Present: N commits, M files changed, brief note on each commit.
 > *What's next?*
 > *  1. [p] Pull request — open a PR with gh, using the CHANGELOG summary as the body*
 > *  2. [m] Merge — merge the branch into main locally and push*
-> *  3. [r] Release — package this version to .renmark/baks/ + tag it (+ GitHub release if available)*
+> *  3. [r] Release — package this version to .renmark/version/ (zip + unpacked snapshot) + tag it (+ GitHub release if available)*
 > *  4. [n] Nothing — stop here; leave the branch as-is to PR or merge later"*
 
 **Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Pull request [p]`, `Merge [m]`, `Release [r]`, `Nothing [n]` (all 4 fit the option cap). **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed. (Merge / release are outward, irreversible actions — only run on the user's explicit selection.)
@@ -134,16 +134,21 @@ a **local copy always** in `.renmark/version/` and a GitHub release **when avail
 `.renmark/baks/` remains readable for old artifacts but **new releases write ONLY
 to `.renmark/version/`**.
 
-> **Maintainer note (packaging renmark itself, not a managed project):** the
-> default writes inside the project's `.renmark/version/`. To package a release to a
-> sibling/parent directory with a custom name (e.g. renmark's own repo, whose
-> releases live in `~/projects/ai-system-renmark-vX-DATE.zip`), use the override:
+> **Maintainer note (packaging renmark itself, not a managed project):** by
+> default, `python -m renmark.release snapshot` writes both the zip
+> (`<name>-v<VERSION>.zip`) and the unpacked snapshot directory (`v<VERSION>/`)
+> inside the project's `.renmark/version/`. To write those same two outputs to a
+> sibling/parent directory with a custom name stem — e.g. renmark's own releases,
+> which land at `~/projects/ai-system-renmark-v<VERSION>-<DATE>.zip` and
+> `~/projects/ai-system-renmark-v<VERSION>-<DATE>/` — use the override flags:
 > `python -m renmark.release snapshot --dest ~/projects --name ai-system-renmark-v<VERSION>-<DATE>`.
-> `--dest` is an explicit opt-out of the project-write-boundary for maintainer
-> release builds only — managed-project releases always default to `.renmark/version/`.
+> Both `--dest` and `--name` apply to the zip AND the unpacked directory. `--dest`
+> is an explicit opt-out of the project-write-boundary for maintainer release builds
+> only — managed-project releases always default to `.renmark/version/`.
 
-**Timing contract — preconditions (in order). The snapshot is the LAST release
-step. It MUST NOT run until ALL of the following are true:**
+**Timing contract — preconditions (in order). The snapshot is the last LOCAL
+artifact-generation step (it runs before any remote publish in 4d). It MUST NOT
+run until ALL of the following are true:**
 
 1. Human merge approval has been given explicitly.
 2. The branch has been merged into `main`.
