@@ -12,6 +12,18 @@
 
 
 
+
+## ADR-019 — Released renmark v0.7.7
+
+**Date:** 2026-06-09
+**Status:** Accepted
+
+**Context.** Backlog-driven loop execution (REQ-13/14); merged feature/backlog-driven-loop-execution into main
+
+**Decision.** Tagged v0.7.7 + packaged ~/projects/ai-system-renmark-v0.7.7-2026-06-09.zip (local; no remote)
+
+---
+
 ## ADR-018 — Finished feature backlog-driven-loop-execution
 
 **Date:** 2026-06-09
