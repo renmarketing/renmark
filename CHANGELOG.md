@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-06-09] — reporting-and-usage-analytics Part 1 (engine) orchestrated
+**Request:** Build the deterministic Python engine for local reporting/analytics/usage (REQ-15) + usage-aware pause/resume (REQ-16).
+**Built:** 9 atomic tasks across 5 waves on `feature/reporting-and-usage-analytics`. New modules `renmark/usage.py` (windowed usage view, limits + percent-used, `classify_usage_pause` fallback rule, `render_usage_md` w/ mandatory disclaimer), `renmark/reports.py` (feature/run report builders → `.renmark/reports/`), `renmark/analytics.py` (append-only JSONL event ledgers under `.renmark/analytics/` + `aggregate()`→summary.json + `build_health_report`). Extended `renmark/state/pause.py` (usage-limit `PauseState` fields + `usage_limit_pause`, back-compatible) and `renmark/state/usage.py` (enriched `UsageRecord` + now-injected window helpers). Added 4 `schemas.py` validators. 15 new tests; full suite 608 passed; mypy clean.
+**Files changed:**
+- `renmark/usage.py`, `renmark/reports.py`, `renmark/analytics.py` — new engine modules
+- `renmark/state/pause.py`, `renmark/state/usage.py`, `renmark/state/__init__.py` — back-compatible extensions
+- `renmark/schemas.py` — 4 non-raising validators
+- `tests/test_state_pause_usage.py`, `tests/test_usage.py`, `tests/test_reports_analytics.py` — new
+**Do not change:**
+- The existing `.renmark/state/usage.jsonl` ledger stays the token source of truth — analytics windows READ it; do NOT create a second token ledger. The new `.renmark/analytics/` tree holds only the new event streams + summary.json + limits.json.
+- `PauseState` / `UsageRecord` extensions are additive + keyword-defaulted — old PAUSED files and usage.jsonl rows must keep loading. No `datetime.now()` in these modules — `now`/`ts` is always injected.
+- `render_usage_md` output MUST always end with "Observed local usage only. Provider-side account limits may differ."
+- Part 2 (CLI `--analytics`, `/renmark:usage` + `/renmark:analytics` commands+skills, orchestrate/loop/finish/resume integration, gitignore) is NOT built yet — feature-level verify runs after Part 2.
+- Pre-existing 39 ruff errors in other `tests/` files were untouched (not introduced by this feature).
+
 ## [2026-06-09] — PRD updated (REQ-15 / REQ-16: local reporting, analytics, usage status + usage-aware pause/resume)
 **Request:** `/renmark:feature reporting-and-usage-analytics` flagged PRD drift; reconcile the new local observability surface into the PRD before planning.
 **Built:** Reconciled Requirements, Scope boundaries, and Open questions of `PRD.md`. Added `REQ-15` (local-only reporting/analytics/usage status — on-disk JSON/JSONL, `/renmark:usage` + `/renmark:analytics`, no external telemetry/DB) and `REQ-16` (usage-aware safe pause/resume on rate/quota limits — extends REQ-3/10/12). Registered `usage` + `analytics` in the in-scope skill list and added the reporting/analytics/usage layer to the in-scope clause. Resolved the long-standing "minimum viable telemetry" open question. `last_reviewed` already 2026-06-09.
