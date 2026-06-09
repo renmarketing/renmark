@@ -47,6 +47,9 @@ Each entry: signal, observation, model that caught it, date.
 
 
 
+
+- (2026-06-09, .renmark/reviews/2026-06-09-41121c499925debfe185b1c240cae49ec3a70328.verification.md) model `verify`: **verify-loop-mode** — 6/6 verified; loop state machine bounded+resumable; new loop skill+command pair lint-clean; core code → keep full codereview
+
 - (2026-06-08, codereview) model `opus`: **advisory metrics still need accuracy review** — Even an ADVISORY lens must be accurate or it misleads: codereview found the modularity analyzer both under-reported (span/branch math) and over-suppressed (substring match hid real files). A health lens that silently drops real findings is worse than none. Adversarially review the metric math + the SUPPRESSION rules, not just the happy path.
 
 - (2026-06-08, .renmark/reviews/2026-06-08-25e2ee93f8b830c2ef62c79059c8a05cf6062096.verification.md) model `verify`: **verify-modularity-health-lens** — 6/6 verified; advisory ast lens; HEALTH line bounded; renmark self-scan flagged 111 gaps (its own code has oversized files/functions). core ast code → keep full codereview.
