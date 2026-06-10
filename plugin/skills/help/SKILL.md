@@ -68,9 +68,10 @@ spends tokens without your approval. /renmark:debug runs ad-hoc, anytime.
 
 ── Quality gates ─────────────────────────────────────────────────────────
   /renmark:check-plan <plan>
-      Validate a plan before spending tokens: task count, verifier
-      presence, parallel-group safety, isolation hygiene. Returns PASS,
-      WARN, or BLOCK. Invoked automatically by plan and orchestrate.
+      Validate a plan deterministically (renmark.plan_lint — shared with
+      orchestrate pre-flight): task count, verifier presence, parallel-
+      group safety, isolation hygiene. Returns PASS, WARN, or BLOCK.
+      Invoked automatically by plan and orchestrate.
 
   /renmark:codereview [ref]
       Diff-proportional review: scope and model tier scale with the size
