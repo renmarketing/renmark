@@ -92,8 +92,16 @@ _DEP_FULL_OUTPUT_RE = re.compile(
 
 # Verifier-output-bound patterns (G3) — WARN triggers.
 # We check for the presence of these tokens WITHOUT a downstream cap keyword.
+# Shapes per check-plan SKILL §2.5 (refined at v0.10.0 codereview): `find`
+# only without -name; `git log` accepts -n N / -nN / -N / --max-count as caps;
+# node/python verifiers that print arbitrary computed output WARN unless
+# capped — `py_compile` is the SKILL's sanctioned bounded form and is exempt.
 _UNBOUNDED_VERIFIER_TOKENS = re.compile(
-    r"\b(cat|find)\b|git\s+diff(?!\s+--stat)(?!\s+\S+\s+\S+)|git\s+log(?!\s+-n\s+\d)"
+    r"\bcat\b"
+    r"|\bfind\b(?!.*\s-name\b)"
+    r"|git\s+diff(?!\s+--stat)(?!\s+\S+\s+\S+)"
+    r"|git\s+log(?!\s+(?:-n\s*\d|-\d|--max-count))"
+    r"|\b(?:node|python3?)\b(?!.*py_compile)"
 )
 _BOUND_CAPS = re.compile(r"\|\s*(head|tail|grep|wc|awk\s+['\"]NR|tee)\b|>\s*/dev/null")
 

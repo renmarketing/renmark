@@ -499,3 +499,44 @@ def test_orchestrate_skill_references_engine() -> None:
         f"{_ORCHESTRATE_SKILL} does not contain `{_ENGINE_INVOCATION}`. "
         "Task 4 in the plan must add this reference."
     )
+
+
+# ── v0.10.0 codereview refinements (verifier-bound shapes) ─────────────────────
+
+
+def _one_task_plan(tmp_path, verifier: str):
+    return _write(
+        tmp_path,
+        "# P\n\n### Task 1: t\n- **mode:** A\n- **target:** a.py\n"
+        f"- **verifier:** {verifier}\n- **spec:**\n  x\n",
+    )
+
+
+def _warns_of(report):
+    return [i for i in report.issues if i.startswith("WARN")]
+
+
+def test_find_with_name_is_bounded(tmp_path):
+    from renmark.plan_lint import lint_plan
+
+    assert not _warns_of(lint_plan(_one_task_plan(tmp_path, "find . -name foo.py | head -3")))
+    assert _warns_of(lint_plan(_one_task_plan(tmp_path, "find .")))
+
+
+def test_git_log_cap_variants_are_bounded(tmp_path):
+    from renmark.plan_lint import lint_plan
+
+    for v in ("git log -n 1", "git log -n1", "git log -5", "git log --max-count=1"):
+        assert not _warns_of(lint_plan(_one_task_plan(tmp_path, v))), v
+    assert _warns_of(lint_plan(_one_task_plan(tmp_path, "git log")))
+
+
+def test_python_verifier_bound_shapes(tmp_path):
+    """SKILL §2.5: node/python printing arbitrary output WARNs unless capped;
+    py_compile is the sanctioned bounded form (v0.10.0 codereview fix)."""
+    from renmark.plan_lint import lint_plan
+
+    assert _warns_of(lint_plan(_one_task_plan(tmp_path, "python compute_stuff.py")))
+    assert _warns_of(lint_plan(_one_task_plan(tmp_path, "node check.js")))
+    assert not _warns_of(lint_plan(_one_task_plan(tmp_path, "python3 -m py_compile a.py")))
+    assert not _warns_of(lint_plan(_one_task_plan(tmp_path, "python -m pytest -q 2>&1 | tail -1")))
