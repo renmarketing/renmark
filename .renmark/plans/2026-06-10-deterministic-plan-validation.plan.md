@@ -20,7 +20,7 @@ Related: PRD REQ-5 / REQ-7 / REQ-3 (alignment verdict: aligned). Picks up the
 ### Task 1: renmark/plan_lint.py — deterministic plan validation engine
 - **mode:** A
 - **target:** renmark/plan_lint.py
-- **context_files:** [renmark/parser.py, plugin/skills/check-plan/SKILL.md, renmark/lint.py]
+- **context_files:** [plugin/skills/check-plan/SKILL.md]
 - **verifier:** python -m mypy renmark/plan_lint.py 2>&1 | tail -1
 - **executor:** sonnet
 - **complexity:** medium
@@ -53,7 +53,7 @@ Related: PRD REQ-5 / REQ-7 / REQ-3 (alignment verdict: aligned). Picks up the
 ### Task 2: tests/test_plan_lint.py — pin every check
 - **mode:** A
 - **target:** tests/test_plan_lint.py
-- **context_files:** [renmark/plan_lint.py, tests/test_parser.py]
+- **context_files:** [plugin/skills/check-plan/SKILL.md]
 - **verifier:** python -m pytest tests/test_plan_lint.py -q 2>&1 | tail -1
 - **executor:** sonnet
 - **complexity:** medium
@@ -78,7 +78,7 @@ Related: PRD REQ-5 / REQ-7 / REQ-3 (alignment verdict: aligned). Picks up the
 ### Task 3: rewire check-plan SKILL onto the engine
 - **mode:** B
 - **target:** plugin/skills/check-plan/SKILL.md
-- **context_files:** [renmark/plan_lint.py, plugin/skills/hygiene/SKILL.md]
+- **context_files:** [plugin/skills/hygiene/SKILL.md]
 - **verifier:** python -m pytest tests/test_lint.py tests/test_lint_next_steps.py -q 2>&1 | tail -1
 - **executor:** sonnet
 - **complexity:** simple
@@ -98,7 +98,7 @@ Related: PRD REQ-5 / REQ-7 / REQ-3 (alignment verdict: aligned). Picks up the
 ### Task 4: orchestrate pre-flight uses the same engine
 - **mode:** B
 - **target:** plugin/skills/orchestrate/SKILL.md
-- **context_files:** [renmark/plan_lint.py]
+- **context_files:** []
 - **verifier:** grep -c "renmark.plan_lint" plugin/skills/orchestrate/SKILL.md | tail -1
 - **executor:** sonnet
 - **complexity:** simple
