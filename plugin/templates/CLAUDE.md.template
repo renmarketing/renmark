@@ -353,8 +353,9 @@ this at write time.
 **Human approval gates:** lifecycle.json carries `human_review_required`,
 `human_review_completed`, `human_review_for` fields. Release, merge, and
 security overrides MUST set these before destructive operations and MUST
-check them on re-entry. `/renmark:approve` is the sole surface for flipping
-`human_review_completed` (since 0.9.0). AI may generate code; the human
+check them on re-entry. `/renmark:approve` is the sole surface for granting approval — setting
+`human_review_completed=True` (since 0.9.0); the consuming skill clears the
+gate after acting (REQ-18). AI may generate code; the human
 owns merges and releases.
 <!-- END:lifecycle-rule -->
 
