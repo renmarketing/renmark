@@ -72,7 +72,11 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
         if not skill_md.exists():
             issues.append(f"skills/{skill_path.name}/: missing SKILL.md")
             continue
-        text = skill_md.read_text(encoding="utf-8")
+        try:
+            text = skill_md.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            issues.append(f"skills/{skill_path.name}/SKILL.md: file unreadable")
+            continue
         fm = parse_frontmatter(text)
         if fm is None:
             issues.append(f"skills/{skill_path.name}/SKILL.md: missing YAML frontmatter")
@@ -119,7 +123,11 @@ def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
         skill_md = skill_path / "SKILL.md"
         if not skill_md.exists():
             continue
-        text = skill_md.read_text(encoding="utf-8")
+        try:
+            text = skill_md.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            issues.append(f"skills/{skill_path.name}/SKILL.md: file unreadable")
+            continue
         cites_umbrella = "next-steps.md" in text
         cites_gate = "handoff-menu.md" in text
         if skill_class(skill_path.name) == "gate":
@@ -159,7 +167,11 @@ def lint_command_shims(plugin_dir: Path) -> list[str]:
 
     # Each command shim must reference its skill path.
     for cmd_path in sorted(commands_dir.glob("*.md")):
-        text = cmd_path.read_text(encoding="utf-8")
+        try:
+            text = cmd_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            issues.append(f"commands/{cmd_path.name}: file unreadable")
+            continue
         expected = f"skills/{cmd_path.stem}/SKILL.md"
         if expected not in text:
             issues.append(f"commands/{cmd_path.name}: doesn't reference {expected}")
@@ -264,7 +276,10 @@ def lint_template_rule_blocks(template_path: Path) -> list[str]:
     issues: list[str] = []
     if not template_path.exists():
         return [f"template: not found at {template_path}"]
-    text = template_path.read_text(encoding="utf-8")
+    try:
+        text = template_path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return [f"template: file unreadable at {template_path}"]
 
     begins = [(m.start(), m.group(1)) for m in _BEGIN_RE.finditer(text)]
     ends = [(m.start(), m.group(1)) for m in _END_RE.finditer(text)]
@@ -313,14 +328,96 @@ def lint_plugin_json(plugin_dir: Path) -> list[str]:
     return issues
 
 
+# ── Strict frontmatter-value pass ────────────────────────────────────────────
+
+# Matches a frontmatter line whose plain-scalar value contains an unquoted
+# ": " (colon-space).  Example: `description: foo: bar baz` where the value
+# after the key is NOT wrapped in quotes.  We detect this by finding lines
+# where (a) the value doesn't start with ' or ", and (b) ": " appears inside
+# the value portion.
+_FM_UNQUOTED_COLON_RE = re.compile(
+    r'^([a-zA-Z][a-zA-Z0-9_-]*):\s+'   # key:
+    r'(?![\'"])'                          # value does NOT start with a quote
+    r'.*:\s',                             # contains ": " somewhere
+)
+
+# Matches a frontmatter line whose quoted value has unbalanced quotes.
+# We check single-quoted values that contain an unescaped ' inside, or
+# double-quoted values that contain an unescaped " inside the value body.
+_FM_UNBALANCED_QUOTE_RE = re.compile(
+    r'^[a-zA-Z][a-zA-Z0-9_-]*:\s+'      # key: space
+    r'(?:'
+    r"'[^']*'[^']*'"                      # single-quoted with extra '
+    r'|"[^"]*"[^"]*"'                     # double-quoted with extra "
+    r')',
+)
+
+
+def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
+    """Detect frontmatter lines with invalid strict-YAML scalar values.
+
+    Flags:
+    - An unquoted plain-scalar value that contains ``": "`` (colon-space) —
+      strict YAML parsers reject these as mapping indicators.
+    - A quoted scalar with unbalanced / extra quotes.
+
+    This pass is gated behind ``include_frontmatter_strict=True`` in
+    ``lint_all`` (default ``False``) because 8 current plugin .md files
+    fail it and a wave-2 agent owns those fixes.  Run in CI after wave-2
+    lands by passing ``--strict-frontmatter`` on the CLI.
+
+    Returns a list of issue strings (empty = clean).
+    """
+    issues: list[str] = []
+    md_files: list[Path] = []
+    for sub in (plugin_dir / "commands", plugin_dir / "skills"):
+        if sub.is_dir():
+            md_files.extend(sub.rglob("*.md"))
+
+    for md_path in sorted(md_files):
+        try:
+            text = md_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        m = _FRONTMATTER_RE.match(text)
+        if not m:
+            continue
+        try:
+            rel = md_path.relative_to(plugin_dir)
+        except ValueError:
+            rel = md_path.name  # type: ignore[assignment]
+        for raw_line in m.group(1).splitlines():
+            line = raw_line.rstrip()
+            if not line or line.startswith("#"):
+                continue
+            if _FM_UNQUOTED_COLON_RE.match(line):
+                issues.append(
+                    f"{rel}: frontmatter value contains unquoted ': ' — "
+                    f"quote the value to fix strict-YAML: {line!r}"
+                )
+            elif _FM_UNBALANCED_QUOTE_RE.match(line):
+                issues.append(
+                    f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
+                )
+    return issues
+
+
 # ── Orchestration ────────────────────────────────────────────────────────────
 
 
 def lint_all(
     plugin_dir: Path,
     template_path: Path | None = None,
+    *,
+    include_frontmatter_strict: bool = False,
 ) -> list[str]:
-    """Run every linter and return the combined issue list."""
+    """Run every linter and return the combined issue list.
+
+    ``include_frontmatter_strict`` (default ``False``) enables the strict
+    frontmatter-value pass (``lint_frontmatter_values``).  Gate it behind
+    ``True`` / ``--strict-frontmatter`` only after the wave-2 agent fixes the
+    8 plugin .md files that currently fail it.
+    """
     issues: list[str] = []
     issues.extend(lint_plugin_json(plugin_dir))
     issues.extend(lint_skill_files(plugin_dir))
@@ -329,6 +426,8 @@ def lint_all(
     if template_path is None:
         template_path = plugin_dir / "templates" / "CLAUDE.md.template"
     issues.extend(lint_template_rule_blocks(template_path))
+    if include_frontmatter_strict:
+        issues.extend(lint_frontmatter_values(plugin_dir))
     return issues
 
 
@@ -339,6 +438,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     plugin_dir = Path("plugin")
     template_path: Path | None = None
+    strict_frontmatter = False
 
     i = 0
     while i < len(argv):
@@ -348,8 +448,14 @@ def main(argv: list[str] | None = None) -> int:
         elif argv[i] == "--template" and i + 1 < len(argv):
             template_path = Path(argv[i + 1])
             i += 2
+        elif argv[i] == "--strict-frontmatter":
+            strict_frontmatter = True
+            i += 1
         elif argv[i] in ("-h", "--help"):
-            sys.stdout.write("usage: python -m renmark.lint [--plugin-dir DIR] [--template PATH]\n")
+            sys.stdout.write(
+                "usage: python -m renmark.lint [--plugin-dir DIR] [--template PATH]"
+                " [--strict-frontmatter]\n"
+            )
             return 0
         else:
             sys.stderr.write(f"unknown arg: {argv[i]}\n")
@@ -359,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"plugin dir not found: {plugin_dir}\n")
         return 2
 
-    issues = lint_all(plugin_dir, template_path)
+    issues = lint_all(plugin_dir, template_path, include_frontmatter_strict=strict_frontmatter)
     if issues:
         for issue in issues:
             sys.stderr.write(f"  - {issue}\n")

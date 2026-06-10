@@ -41,12 +41,16 @@ def test_read_pause_loads_old_paused_dict_with_defaults(tmp_path):
 
 
 def test_usage_limit_pause_round_trips_through_pause_file(tmp_path):
+    # write_pause now validates a usage_limit pause (validate_usage_pause):
+    # resume_after must be non-empty. classify_usage_pause always computes one;
+    # supply it here so the persisted pause is contractually valid.
     state = usage_limit_pause(
         run_id="r",
         plan_path="p",
         last_task_index=0,
         ts="2026-06-09T12:00:00Z",
         provider="claude",
+        resume_after="2026-06-09T17:00:00Z",
     )
 
     assert state.pause_kind == "usage_limit"
@@ -55,6 +59,30 @@ def test_usage_limit_pause_round_trips_through_pause_file(tmp_path):
     loaded = read_pause(tmp_path)
 
     assert loaded == state
+
+
+def test_write_pause_rejects_invalid_usage_limit_pause(tmp_path):
+    """A usage_limit pause missing its required resume_after is a writer bug —
+    write_pause raises rather than persisting unrecoverable pause state."""
+    import pytest
+
+    bad = usage_limit_pause(
+        run_id="r", plan_path="p", last_task_index=0,
+        ts="2026-06-09T12:00:00Z", provider="claude",  # no resume_after
+    )
+    with pytest.raises(ValueError):
+        write_pause(tmp_path, bad)
+
+
+def test_write_pause_allows_plain_manual_pause(tmp_path):
+    """validate_usage_pause no-ops for non-usage_limit kinds — a plain pause
+    (no resume_after) must still write cleanly."""
+    plain = PauseState(
+        run_id="r", plan_path="p", last_task_index=0,
+        reason="manual pause", ts="2026-06-09T12:00:00Z",
+    )
+    write_pause(tmp_path, plain)
+    assert read_pause(tmp_path) == plain
 
 
 def test_usage_record_round_trips_with_new_fields(tmp_path):
@@ -83,6 +111,7 @@ def test_usage_record_round_trips_with_new_fields(tmp_path):
             "model": "claude-sonnet",
             "prompt_tokens": 100,
             "completion_tokens": 25,
+            "attempt": 0,
             "provider": "claude",
             "cached_tokens": 9,
             "context_window_tokens": 0,

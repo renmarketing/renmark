@@ -33,7 +33,6 @@ from renmark.loop import (
 )
 from renmark.state import UsageRecord, append_usage, usage_by_run_id
 
-
 # ── write_loop / read_loop round-trip ──────────────────────────────────────
 
 
@@ -127,7 +126,7 @@ def test_parse_budget_numeric_string() -> None:
 def test_parse_budget_dollar_string_matches_default() -> None:
     """At $0.01/1k tokens, a $3.00 budget resolves to the 300k default."""
     # Guard: this equivalence only holds if the constant is the assumed rate.
-    assert COST_PER_KTOKEN_USD == pytest.approx(0.01)
+    assert pytest.approx(0.01) == COST_PER_KTOKEN_USD
     expected = round((3.00 / COST_PER_KTOKEN_USD) * 1000.0)
     tokens, usd = parse_budget("$3.00")
     assert tokens == expected
@@ -308,7 +307,7 @@ def _seed_usage(repo: Path, run_id: str, pairs: list[tuple[int, int]], *, task_i
         append_usage(
             repo,
             UsageRecord(
-                ts="2026-06-09T00:00:0%d+00:00" % (i % 10),
+                ts=f"2026-06-09T00:00:0{i % 10}+00:00",
                 run_id=run_id,
                 task_id=task_id,
                 model="codex",
@@ -359,7 +358,7 @@ def test_budget_remaining_normal() -> None:
 def test_module_constants_have_expected_defaults() -> None:
     assert DEFAULT_MAX_ITERATIONS == 5
     assert DEFAULT_BUDGET_TOKENS == 300_000
-    assert COST_PER_KTOKEN_USD == pytest.approx(0.01)
+    assert pytest.approx(0.01) == COST_PER_KTOKEN_USD
 
 
 # ── Major #1: failed verify must DERIVE next_action and CONTINUE ─────────────

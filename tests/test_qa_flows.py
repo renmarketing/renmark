@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QA_FLOWS_PATH = REPO_ROOT / ".renmark" / "memory" / "qa-flows.md"
 VERIFY_SKILL_PATH = REPO_ROOT / "plugin" / "skills" / "verify" / "SKILL.md"

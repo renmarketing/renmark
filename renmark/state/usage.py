@@ -23,6 +23,10 @@ class UsageRecord:
     model: str
     prompt_tokens: int
     completion_tokens: int
+    # Retry/attempt counter (default 0). Part of the dedup key in append_usage:
+    # codex retries legitimately re-ledger the same (run_id, task_id) — a higher
+    # attempt is a genuine new row, but a replayed SAME attempt is idempotent.
+    attempt: int = 0
     # Optional, keyword-defaulted enrichment fields (REQ-15). All default so
     # construction from old rows / call sites stays back-compatible, and old
     # usage.jsonl rows (without these keys) still parse via read_usage().
@@ -43,7 +47,28 @@ class UsageRecord:
 
 
 def append_usage(repo_root: str | Path, rec: UsageRecord) -> None:
+    """Append a usage row, idempotent on (run_id, task_id, attempt, model).
+
+    A replayed ledgering of the SAME attempt (e.g. a crash-resume that
+    re-ledgers without re-dispatching) is skipped so spend isn't double-counted.
+    Genuine retries increment ``attempt`` and DO append a new row. Dedup only
+    fires when ``run_id`` is non-empty — adhoc rows with no run_id always append
+    (they carry no stable identity to dedup against).
+    """
     path = state_dir(repo_root) / USAGE_LEDGER
+    # Dedup fires ONLY for explicit retries (attempt > 0): a task may make many
+    # legitimate calls within attempt 0 (one row each — roadmap counts them to
+    # detect retries), so attempt-0 rows always append. A replayed retry
+    # ledgering (same attempt > 0) is idempotent.
+    if rec.run_id and rec.attempt > 0:
+        for existing in read_usage(repo_root):
+            if (
+                existing.get("run_id") == rec.run_id
+                and existing.get("task_id") == rec.task_id
+                and int(existing.get("attempt", 0) or 0) == rec.attempt
+                and existing.get("model") == rec.model
+            ):
+                return  # already ledgered this exact attempt — idempotent
     with path.open("a", encoding="utf-8") as fh:
         fh.write(rec.as_jsonl() + "\n")
 
@@ -56,6 +81,7 @@ def log_agent_call(
     tokens_in: int = 0,
     tokens_out: int = 0,
     run_id: str | None = None,
+    attempt: int = 0,
 ) -> UsageRecord:
     """Record one Agent-tool call (haiku/sonnet/opus) in usage.jsonl.
 
@@ -74,6 +100,7 @@ def log_agent_call(
         model=model,
         prompt_tokens=int(tokens_in),
         completion_tokens=int(tokens_out),
+        attempt=int(attempt),
     )
     append_usage(repo_root, rec)
     return rec

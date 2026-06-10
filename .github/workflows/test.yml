@@ -29,6 +29,8 @@ jobs:
         run: mypy renmark/
       - name: pytest
         run: pytest -q
+      - name: shadow regression net
+        run: python -m renmark.shadow run
       - name: drift check
         run: python -m renmark.release check
       - name: plugin lint

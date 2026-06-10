@@ -48,6 +48,9 @@ class Task:
 
 
 _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
+# Loose pattern: any line starting with ### followed by "Task" (case-insensitive)
+# that does NOT match the strict _HEADER_RE is a malformed header and must raise.
+_LOOSE_TASK_RE = re.compile(r"^###\s*Task\b", re.IGNORECASE)
 _FIELD_RE = re.compile(r"^-\s+\*\*([a-z_]+):\*\*\s*(.*?)\s*$")
 _LIST_RE = re.compile(r"^\[(.*)\]$")
 
@@ -98,6 +101,12 @@ def parse_plan(path: str | Path) -> list[Task]:
             spec_lines = None
             reading_spec = False
             continue
+
+        # A line that looks like a task header but doesn't match the strict
+        # format (missing colon, no space after ###, etc.) is malformed — raise
+        # rather than silently absorbing it into the previous task's spec.
+        if _LOOSE_TASK_RE.match(raw) and not _HEADER_RE.match(raw):
+            raise PlanError(f"malformed task header at line {line_no}: {raw!r}")
 
         if current is None:
             continue

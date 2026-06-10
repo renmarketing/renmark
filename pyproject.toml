@@ -12,7 +12,6 @@ authors = [{ name = "renmark" }]
 license = { text = "MIT" }
 keywords = ["orchestration", "multi-llm", "codex", "haiku", "sonnet", "opus", "claude-code"]
 dependencies = [
-    "requests>=2.32.0",
     "python-dotenv>=1.0.0",
 ]
 
@@ -59,7 +58,3 @@ warn_unreachable = true
 warn_redundant_casts = true
 show_error_codes = true
 exclude = ["build/", "dist/", "\\.venv/", "tests/"]
-
-[[tool.mypy.overrides]]
-module = "requests"
-ignore_missing_imports = true

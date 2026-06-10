@@ -5,12 +5,13 @@ import json
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from renmark import state
 
 
 def test_usage_round_trip(tmp_path: Path) -> None:
+    """Attempt-0 rows always append (a task may make many legitimate calls);
+    only explicit retries (attempt > 0) are idempotent on
+    (run_id, task_id, attempt, model)."""
     rec = state.UsageRecord(
         ts="2026-05-11T15:30:22+00:00",
         run_id="run-x",
@@ -20,11 +21,89 @@ def test_usage_round_trip(tmp_path: Path) -> None:
         completion_tokens=80,
     )
     state.append_usage(tmp_path, rec)
-    state.append_usage(tmp_path, rec)
+    state.append_usage(tmp_path, rec)  # attempt 0 → two legit calls, two rows
     rows = state.read_usage(tmp_path)
     assert len(rows) == 2
     assert rows[0]["task_id"] == 3
     assert rows[0]["prompt_tokens"] == 120
+
+    # A retry row (attempt > 0) is idempotent: replaying the same attempt
+    # appends exactly once.
+    retry = state.UsageRecord(
+        ts="2026-05-11T15:31:00+00:00",
+        run_id="run-x",
+        task_id=3,
+        model="codestral-22b",
+        prompt_tokens=120,
+        completion_tokens=80,
+        attempt=1,
+    )
+    state.append_usage(tmp_path, retry)
+    state.append_usage(tmp_path, retry)  # replayed retry → deduped
+    rows = state.read_usage(tmp_path)
+    assert len(rows) == 3
+
+
+def test_usage_no_run_id_always_appends(tmp_path: Path) -> None:
+    """Rows with an empty run_id carry no stable identity → never deduped."""
+    rec = state.UsageRecord(
+        ts="2026-05-11T15:30:22+00:00",
+        run_id="",
+        task_id=1,
+        model="codex",
+        prompt_tokens=0,
+        completion_tokens=0,
+    )
+    state.append_usage(tmp_path, rec)
+    state.append_usage(tmp_path, rec)
+    assert len(state.read_usage(tmp_path)) == 2
+
+
+def test_usage_old_rows_without_attempt_still_parse(tmp_path: Path) -> None:
+    """Read-side back-compat: pre-existing rows lacking the 'attempt' key still
+    parse (treated as attempt=0) and retry-dedup works alongside them."""
+    led = tmp_path / ".renmark" / "state"
+    led.mkdir(parents=True)
+    (led / "usage.jsonl").write_text(
+        json.dumps(
+            {
+                "ts": "2026-05-11T15:30:22+00:00",
+                "run_id": "run-old",
+                "task_id": 2,
+                "model": "codex",
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+            }
+        )
+        + "\n"
+    )
+    # A new attempt-0 row always appends (legit additional call).
+    state.append_usage(
+        tmp_path,
+        state.UsageRecord(
+            ts="2026-05-11T15:31:00+00:00",
+            run_id="run-old",
+            task_id=2,
+            model="codex",
+            prompt_tokens=0,
+            completion_tokens=0,
+        ),
+    )
+    assert len(state.read_usage(tmp_path)) == 2
+    # A retry row (attempt=1) replayed twice appends exactly once, even with
+    # attempt-less legacy rows in the ledger.
+    retry = state.UsageRecord(
+        ts="2026-05-11T15:32:00+00:00",
+        run_id="run-old",
+        task_id=2,
+        model="codex",
+        prompt_tokens=0,
+        completion_tokens=0,
+        attempt=1,
+    )
+    state.append_usage(tmp_path, retry)
+    state.append_usage(tmp_path, retry)
+    assert len(state.read_usage(tmp_path)) == 3
 
 
 def test_pause_round_trip(tmp_path: Path) -> None:
@@ -52,9 +131,10 @@ def test_usage_today_filters_dates(tmp_path: Path) -> None:
         tmp_path,
         state.UsageRecord(today_iso, "r", 1, "m", 100, 50),
     )
+    # Distinct task_id so it isn't deduped against the row above.
     state.append_usage(
         tmp_path,
-        state.UsageRecord(old_iso, "r", 1, "m", 99999, 99999),
+        state.UsageRecord(old_iso, "r", 2, "m", 99999, 99999),
     )
     assert state.usage_today(tmp_path) == 150
 

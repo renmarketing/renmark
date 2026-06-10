@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..parser import Task
@@ -23,7 +23,12 @@ class CodexError(RuntimeError):
 class CodexResult:
     exit_code: int
     output_tail: str  # last lines of codex stdout/stderr — for retry feedback
-    changed_files: list[str]  # files in workspace that codex modified
+    changed_files: list[str]  # files THIS task changed (post-minus-pre delta)
+    # Pre-call porcelain snapshot, so the engine can tell which of this task's
+    # changed_files were UNTRACKED before the task (delete-on-rollback) vs
+    # tracked (checkout-on-rollback). Paths only — same normalization as
+    # changed_files.
+    pre_changed_files: list[str] = field(default_factory=list)
 
 
 def codex_available() -> bool:
@@ -105,6 +110,12 @@ def run_codex_task(
 
     prompt = build_codex_prompt(task, repo)
 
+    # Snapshot the working tree BEFORE the codex call. In a parallel wave,
+    # sibling tasks have in-flight changes; without a pre-snapshot, repo-global
+    # porcelain would attribute those to THIS task. The task's changed set is
+    # the post-minus-pre delta, so siblings' files never look out-of-lane here.
+    pre = _git_status_porcelain(repo)
+
     cmd = [
         "codex",
         "exec",
@@ -132,28 +143,57 @@ def run_codex_task(
             partial += e.stdout if isinstance(e.stdout, str) else e.stdout.decode(errors="replace")  # type: ignore[unreachable]
         if e.stderr:
             partial += e.stderr if isinstance(e.stderr, str) else e.stderr.decode(errors="replace")  # type: ignore[unreachable]
+        post = _git_status_porcelain(repo)
         return CodexResult(
             exit_code=124,
             output_tail=f"[codex timed out after {timeout_s}s]\n{partial[-2000:]}",
-            changed_files=_git_status_porcelain(repo),
+            changed_files=_delta(pre, post),
+            pre_changed_files=pre,
         )
 
     combined = (proc.stdout or "") + (proc.stderr or "")
     tail = "\n".join(combined.splitlines()[-50:])
+    post = _git_status_porcelain(repo)
     return CodexResult(
         exit_code=proc.returncode,
         output_tail=tail,
-        changed_files=_git_status_porcelain(repo),
+        changed_files=_delta(pre, post),
+        pre_changed_files=pre,
     )
 
 
-def check_only_target_modified(changed: list[str], target: str) -> tuple[bool, str]:
+def _delta(pre: list[str], post: list[str]) -> list[str]:
+    """Files changed by this task = those dirty AFTER but not BEFORE the call.
+
+    A sibling task's in-flight file is in both pre and post, so it drops out of
+    the delta and is never mistaken for this task's out-of-lane work.
+    """
+    before = set(pre)
+    return [p for p in post if p not in before]
+
+
+def check_only_target_modified(
+    changed: list[str],
+    target: str,
+    *,
+    sibling_targets: list[str] | None = None,
+) -> tuple[bool, str]:
     """Codex sometimes modifies files outside the target. Reject those tasks.
 
     Returns (ok, reason). Both target and target-relative variants are accepted.
+
+    ``sibling_targets`` are the OTHER tasks' targets in the same parallel wave.
+    Even with the pre/post delta, a sibling's file can leak into this task's
+    delta if the sibling created it during this task's call window; excluding
+    the wave's declared targets keeps such races from tripping the lane check.
+    Wave targets are guaranteed disjoint (dispatch.validate_wave), so excluding
+    them can never mask a real over-write of this task's own target.
     """
-    target_variants = {target, "./" + target}
-    extras = [p for p in changed if p not in target_variants]
+    allowed = {target, "./" + target}
+    for sib in sibling_targets or []:
+        allowed.add(sib)
+        allowed.add("./" + sib)
+    extras = [p for p in changed if p not in allowed]
     if extras:
         return False, f"codex modified files beyond target: {extras}"
     return True, "ok"

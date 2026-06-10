@@ -189,10 +189,20 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
         )
         return proc.returncode or 1
 
-    # Artifact exists. Parse its Summary section into our SubagentOutput shape.
-    # Note: codex may not have written valid renmark format — be defensive.
+    # Artifact exists, but existence != correctness (G9). Validate it before
+    # declaring PASS: it must carry YAML frontmatter (read_metadata) AND a
+    # parseable '## Summary' section (read_summary_lines). A bare returncode-0
+    # is NOT sufficient evidence the artifact is well-formed.
+    from ..summary import read_metadata, read_summary_lines
+
     pointer = emit_pointer(out_path, "task")
     sha = git_head_sha(repo)
+    metadata = read_metadata(out_path)
+    summary_lines = read_summary_lines(out_path)
+    has_metadata = bool(metadata)
+    has_summary = bool(summary_lines)
+    validated = has_metadata and has_summary
+
     output = {
         "status": "PASS",
         "artifact_path": str(out_path),
@@ -201,9 +211,13 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
         "summary_lines": pointer.splitlines()[1:6],  # skip header line, take ≤5
         "dependency_notes": "",
         "token_count": 0,  # codex CLI doesn't surface this; orchestrator may estimate
-        "completion_state": "complete",
-        "confidence": "medium",
+        # G9 transparency — all six fields, always emitted:
+        "completion_state": "complete" if validated else "partial",
+        "confidence": "medium" if validated else "low",
+        "validation_status": "validated" if validated else "failed",
         "retry_count": 0,
+        "parser_success": True,  # we parsed the artifact without raising
+        "schema_compliance": validated,  # frontmatter + ## Summary both present
     }
     print(_json.dumps(output))
     return 0

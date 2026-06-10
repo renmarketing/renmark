@@ -13,9 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .. import memory as _memory
-from ..apply import ApplyError, apply_mode_a, apply_mode_b
 from ..parser import PlanError, Task, parse_plan
-from ..prompts import mode_a_prompt, mode_b_prompt
 from ..providers.codex import (
     CodexError,
     check_only_target_modified,
@@ -147,6 +145,55 @@ def _git_restore_target(cwd: Path, target: str) -> None:
         _git("checkout", "--", target, cwd=cwd)
 
 
+def _untracked_paths(cwd: Path, paths: list[str]) -> set[str]:
+    """Subset of ``paths`` that git does NOT track (no committed version).
+
+    Such a path is a newly-created file: `git checkout -- <path>` is a no-op
+    (returncode 0, nothing restored), so rollback must DELETE it instead. We
+    ask git directly (`ls-files --error-unmatch`) rather than parsing porcelain
+    status codes, which the changed-files list has already stripped.
+    """
+    untracked: set[str] = set()
+    for p in paths:
+        norm = p[2:] if p.startswith("./") else p
+        with _GIT_LOCK:
+            r = _git("ls-files", "--error-unmatch", "--", norm, cwd=cwd)
+        if r.returncode != 0:
+            untracked.add(norm)
+    return untracked
+
+
+def _rollback_paths(cwd: Path, paths: list[str], *, untracked_before: set[str]) -> None:
+    """Restore ONLY the given paths — never `git checkout -- .` (whole tree),
+    which would revert a sibling wave-task's in-flight work.
+
+    Mode-aware per path: a path that was UNTRACKED before the task can't be
+    restored by checkout (git has no committed version), so it's deleted;
+    tracked paths are checked-out. We hold _GIT_LOCK for index consistency and
+    surface any subprocess failure to the caller's log via the returned notes.
+    """
+    if not paths:
+        return
+    with _GIT_LOCK:
+        for p in paths:
+            norm = p[2:] if p.startswith("./") else p
+            if norm in untracked_before or p in untracked_before:
+                # Untracked → delete the file/dir codex created.
+                cleaned = _git("clean", "-fd", "--", norm, cwd=cwd)
+                if cleaned.returncode != 0:
+                    # Fall back to a direct unlink if clean refused.
+                    fp = cwd / norm
+                    try:
+                        if fp.is_file():
+                            fp.unlink()
+                    except OSError:
+                        pass
+            else:
+                co = _git("checkout", "--", norm, cwd=cwd)
+                if co.returncode != 0:
+                    _print(f"warning: rollback checkout failed for {norm}: {co.stderr.strip()[:120]}")
+
+
 def _choose_model(task: Task, cfg: Config) -> str:
     return task.model or cfg.prefer_small_model
 
@@ -192,29 +239,6 @@ def _memory_log_outcome(repo: Path, task: Task, outcome: str, run_id: str, note:
             )
     except Exception:
         pass  # memory updates are non-critical
-
-
-def _build_prompt(task: Task, repo: Path) -> str:
-    if task.mode == "A":
-        return mode_a_prompt(task)
-    # Mode B: read current contents + context files.
-    current = (repo / task.target).read_text(encoding="utf-8")
-    context: dict[str, str] = {}
-    for ctx in task.context_files:
-        if ctx == task.target:
-            continue
-        p = repo / ctx
-        if not p.is_file():
-            raise ApplyError(f"context_file missing: {ctx}")
-        context[ctx] = p.read_text(encoding="utf-8")
-    return mode_b_prompt(task, current, context)
-
-
-def _apply(task: Task, repo: Path, response: str) -> None:
-    if task.mode == "A":
-        apply_mode_a(repo, task.target, response)
-    else:
-        apply_mode_b(repo, task.target, response)
 
 
 def _format_status_line(
@@ -336,8 +360,13 @@ def execute_plan(
 
     needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
 
+    # Holder for the current wave's task list, set per-wave below so the
+    # runner can compute each task's sibling targets (for rollback isolation).
+    current_wave: list[Task] = []
+
     def _runner(task: Task, _repo: Path) -> _dispatch.TaskResult:
         """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
+        sibling_targets = [t.target for t in current_wave if t.index != task.index]
         ok, reason, used, sha = _execute_task(
             task=task,
             repo=_repo,
@@ -345,6 +374,7 @@ def execute_plan(
             cfg=cfg,
             remaining_token_budget=max(0, cfg.max_tokens_per_run - tokens_used),
             total=len(tasks),
+            sibling_targets=sibling_targets,
         )
         return _dispatch.TaskResult(
             task_index=task.index,
@@ -355,7 +385,23 @@ def execute_plan(
             note=reason,
         )
 
-    for wave in waves:
+    # Set when a wave-level budget/deadline gate trips. Unlike a per-task
+    # failure, this is not tied to one task — it means "stop, out of budget".
+    budget_kind: str | None = None
+
+    def _skip_all_remaining(from_wave_idx: int) -> None:
+        """Mark every not-done, not-yet-run task from this wave onward skipped.
+
+        Without this the run only recorded the CURRENT wave's tasks as skipped,
+        silently dropping later waves from the count and the pause state.
+        """
+        for later in waves[from_wave_idx:]:
+            for t in later:
+                if t.index in done or t.index in passed or t.index in skipped:
+                    continue
+                skipped.append(t.index)
+
+    for wave_idx, wave in enumerate(waves):
         # Already-committed tasks (from --resume) just emit DONE lines.
         for t in wave:
             if t.index in done:
@@ -377,20 +423,21 @@ def execute_plan(
         if not runnable or failed_task is not None:
             continue
 
-        # Wave-level budget gates.
+        # Wave-level budget gates. Trip → record EVERY remaining task (this wave
+        # and all later waves) as skipped, then break to the budget-pause path.
         if tokens_used >= cfg.max_tokens_per_run:
-            failure_kind = "token_budget"
-            for t in runnable:
-                skipped.append(t.index)
+            budget_kind = "token_budget"
+            _skip_all_remaining(wave_idx)
             break
         if time.monotonic() > deadline:
-            failure_kind = "time_budget"
-            for t in runnable:
-                skipped.append(t.index)
+            budget_kind = "time_budget"
+            _skip_all_remaining(wave_idx)
             break
 
         # Dispatch the wave. codex/haiku run in parallel; opus/sonnet are
         # marked `needs_agent` for the skill to handle via Agent tool.
+        # Publish the wave so _runner can derive each task's sibling targets.
+        current_wave = runnable
         try:
             wave_result = _dispatch.dispatch_wave(
                 runnable,
@@ -450,20 +497,55 @@ def execute_plan(
     _print("")
     parts = [
         f"{len(passed)}/{len(tasks)} passed",
-        f"{1 if failed_task else 0} failed",
+        f"{1 if (failed_task or budget_kind) else 0} failed",
         f"{len(skipped)} skipped",
     ]
     if needs_agent:
         parts.append(f"{len(needs_agent)} needs-agent ({sorted(needs_agent)})")
     _print(", ".join(parts))
     today = usage_today(repo)
-    _print(
-        f"Tokens this run: {tokens_used} / {cfg.max_tokens_per_run} "
-        f"({100 * tokens_used / max(cfg.max_tokens_per_run, 1):.1f}%) | "
-        f"Today: {today} | Month: {usage_this_month(repo)}"
-    )
+    # Token-gate honesty: codex usage rolls up to OpenAI's dashboard, recorded
+    # here as 0 tokens — so for a codex-only run tokens_used stays 0 and the
+    # RENMARK_MAX_TOKENS_PER_RUN gate is INERT (the time/task budgets are the
+    # real gates). Printing "0 / 50000 (0.0%)" would falsely imply the token
+    # gate is live. When nothing was metered locally, say so plainly instead.
+    if tokens_used == 0:
+        _print(
+            f"Tokens this run: n/a (codex usage reported upstream) | "
+            f"Today: {today} | Month: {usage_this_month(repo)}"
+        )
+    else:
+        _print(
+            f"Tokens this run: {tokens_used} / {cfg.max_tokens_per_run} "
+            f"({100 * tokens_used / max(cfg.max_tokens_per_run, 1):.1f}%) | "
+            f"Today: {today} | Month: {usage_this_month(repo)}"
+        )
     waves_count = len(waves)
     _print(f"Waves: {waves_count} (parallel-grouped from {len(tasks)} tasks)")
+
+    # Budget/deadline exhaustion: NOT a success. Write an honest pause keyed to
+    # the first skipped task and exit non-zero — never the "All tasks completed"
+    # branch. Checked before the success branch so a tripped gate can't fall
+    # through to exit 0.
+    if budget_kind is not None and failed_task is None:
+        first_skipped = min(skipped) if skipped else 0
+        reason = "budget" if budget_kind == "token_budget" else "deadline"
+        write_pause(
+            repo,
+            PauseState(
+                run_id=run_id,
+                plan_path=str(plan_path),
+                last_task_index=first_skipped,
+                reason=reason,
+                ts=now_iso(),
+            ),
+        )
+        _print(
+            f"PAUSED ({reason}): {budget_kind} gate tripped with "
+            f"{len(skipped)} task(s) unrun {sorted(skipped)}.\n"
+            f"Resume with: renmark-execute --resume {plan_path}"
+        )
+        return 10
 
     if failed_task is None and not needs_agent:
         _git_tag(repo, f"renmark-run-{run_id}-end")
@@ -509,10 +591,13 @@ def _execute_task(
     cfg: Config,
     remaining_token_budget: int,
     total: int,
+    sibling_targets: list[str] | None = None,
 ) -> tuple[bool, str, int, str]:
     """Execute one task. Returns (ok, failure_reason_or_blank, tokens_used, sha_or_blank)."""
     # nim executor removed in v0.2.0; only codex reaches this function now.
-    return _execute_task_codex(task=task, repo=repo, run_id=run_id, cfg=cfg, total=total)
+    return _execute_task_codex(
+        task=task, repo=repo, run_id=run_id, cfg=cfg, total=total, sibling_targets=sibling_targets
+    )
 
 
 def _execute_task_codex(
@@ -522,6 +607,7 @@ def _execute_task_codex(
     run_id: str,
     cfg: Config,
     total: int,
+    sibling_targets: list[str] | None = None,
 ) -> tuple[bool, str, int, str]:
     """Run a task via the Codex CLI instead of NIM.
 
@@ -592,7 +678,9 @@ def _execute_task_codex(
             )
             return False, "codex_error", 0, ""
 
-        # Log a usage row so --usage shows the call.
+        # Log a usage row so --usage shows the call. The attempt counter makes
+        # the row idempotent on replay while still appending one row per genuine
+        # retry (each retry decrements retries_left → higher attempt index).
         append_usage(
             repo,
             UsageRecord(
@@ -602,6 +690,7 @@ def _execute_task_codex(
                 model="codex",
                 prompt_tokens=0,
                 completion_tokens=0,
+                attempt=cfg.max_task_retries - retries_left,
             ),
         )
 
@@ -636,23 +725,22 @@ def _execute_task_codex(
             )
             return False, "codex_failed", 0, ""
 
-        # Constrain codex: must have modified only the target file.
-        ok, reason = check_only_target_modified(result.changed_files, task.target)
+        # Constrain codex: must have modified only the target file (sibling
+        # wave-targets are excluded — they're another task's lane, not ours).
+        ok, reason = check_only_target_modified(
+            result.changed_files, task.target, sibling_targets=sibling_targets
+        )
         if not ok:
-            # Roll back everything codex did and either retry or escalate.
-            subprocess.run(["git", "-C", str(repo), "checkout", "--", "."], capture_output=True)
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(repo),
-                    "clean",
-                    "-fd",
-                    "--",
-                    *(p for p in result.changed_files if p != task.target),
-                ],
-                capture_output=True,
-            )
+            # Roll back ONLY this task's own extra paths — NEVER the whole tree
+            # (which would clobber concurrent sibling work). The task's target
+            # is restored too; the wave's siblings are left untouched.
+            sib = set(sibling_targets or [])
+            own_extras = [
+                p
+                for p in result.changed_files
+                if (p[2:] if p.startswith("./") else p) not in sib
+            ]
+            _rollback_paths(repo, own_extras, untracked_before=_untracked_paths(repo, own_extras))
             if retries_left > 0:
                 retries_left -= 1
                 continue
@@ -703,9 +791,15 @@ def _execute_task_codex(
             )
             return True, "", 0, sha
 
-        # Verifier failed. Roll back target and retry.
+        # Verifier failed. Roll back the target and retry. Mode-aware: a mode-A
+        # task that just CREATED the target leaves it untracked, so a plain
+        # `git checkout` is a no-op (returncode ignored) and the rejected
+        # artifact would persist and poison the NEXT task's change detection.
+        # _rollback_paths deletes untracked targets and checks out tracked ones.
         last_verifier_tail = vres.tail
-        subprocess.run(["git", "-C", str(repo), "checkout", "--", task.target], capture_output=True)
+        _rollback_paths(
+            repo, [task.target], untracked_before=_untracked_paths(repo, [task.target])
+        )
         if retries_left > 0:
             retries_left -= 1
             continue

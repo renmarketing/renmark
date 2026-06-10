@@ -322,6 +322,18 @@ def parse_subagent_response(response: dict[str, Any] | str) -> SubagentOutput:
     # never silently promoted to the optimistic dataclass default.
     if "confidence" not in filtered:
         filtered["confidence"] = "low"
+
+    # Structural validation AFTER the G11 leakage + required-field checks above
+    # (those raise their own contract-pinned messages first). This catches
+    # wrong-typed / out-of-enum fields the dataclass __post_init__ would only
+    # partially cover. Function-local import avoids the schemas ↔ dispatch
+    # circular import (schemas imports dispatch).
+    from renmark import schemas
+
+    issues = schemas.validate_subagent_output(filtered)
+    if issues:
+        raise IsolationViolation(f"invalid subagent output: {issues}")
+
     return SubagentOutput(**filtered)
 
 

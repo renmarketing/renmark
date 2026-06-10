@@ -11,8 +11,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 
 def test_renmark_execute_runs_without_codex_on_path(repo_root: Path, tmp_path: Path):
     """`renmark-execute --help` must work even when codex CLI is unfindable.

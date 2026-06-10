@@ -87,16 +87,6 @@ def ensure_memory(repo: str | Path) -> Path:
     return d
 
 
-def read_index(repo: str | Path) -> str:
-    return (ensure_memory(repo) / "INDEX.md").read_text(encoding="utf-8")
-
-
-def read_file(repo: str | Path, name: str) -> str:
-    if name not in MEMORY_FILES:
-        raise ValueError(f"unknown memory file: {name}")
-    return (ensure_memory(repo) / name).read_text(encoding="utf-8")
-
-
 def _today() -> str:
     return dt.date.today().isoformat()
 
@@ -107,17 +97,23 @@ def _insert_after_section(text: str, section_header: str, new_block: str) -> str
     `section_header` is matched as a markdown header line (e.g., "## Shipped").
     If the section is not found, the block is appended at the end of the file
     under a new H2 with that name.
+
+    Exactly one blank line is emitted between the header and the new block —
+    any trailing blank lines that were already present after the header are
+    consumed so repeated appends never grow the gap.
     """
     lines = text.splitlines(keepends=True)
     pattern = re.compile(r"^" + re.escape(section_header) + r"\s*$")
     for i, line in enumerate(lines):
         if pattern.match(line.rstrip("\n")):
-            # Skip any blank lines immediately following the header so the
-            # new block starts cleanly.
+            # Consume any blank lines immediately following the header so that
+            # we emit exactly ONE blank, regardless of how many were there before.
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
-            return "".join(lines[:j]) + "\n" + new_block.rstrip() + "\n\n" + "".join(lines[j:])
+            # lines[:i+1] = header line; then exactly one blank; then new block;
+            # then the rest of the file (j onward, which is the first non-blank line).
+            return "".join(lines[: i + 1]) + "\n" + new_block.rstrip() + "\n\n" + "".join(lines[j:])
     return text.rstrip("\n") + f"\n\n{section_header}\n\n{new_block.rstrip()}\n"
 
 
@@ -552,7 +548,12 @@ def dedupe_memory_log(repo: str | Path, name: str, *, dry_run: bool = False) -> 
     schema = _SCHEMA_BY_NAME[name]
     ensure_memory(repo)
     path = memory_dir(repo) / name
-    text = path.read_text(encoding="utf-8")
+    # Pure read: corrupt bytes are replaced rather than raised — we only need
+    # to parse the content to find duplicates, not rewrite those bytes.
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0
     entries = _parse_memory_entries(text, schema)
     seen: set[tuple[str, str]] = set()
     duplicates: list[_MemoryEntry] = []
@@ -620,7 +621,12 @@ def age_out_memory_log(
     schema = _SCHEMA_BY_NAME[name]
     ensure_memory(repo)
     path = memory_dir(repo) / name
-    text = path.read_text(encoding="utf-8")
+    # Pure read: corrupt bytes are replaced rather than raised — we only need
+    # to parse the content to identify aged entries, not rewrite those bytes.
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0
     entries = _parse_memory_entries(text, schema)
     today = dt.datetime.now(dt.timezone.utc).date()
     cutoff_delta = dt.timedelta(days=days)

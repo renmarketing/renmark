@@ -71,8 +71,20 @@ def usage_limit_pause(*, run_id: str, plan_path: str, last_task_index: int, ts: 
 
 
 def write_pause(repo_root: str | Path, state: PauseState) -> None:
+    payload = asdict(state)
+
+    # Writer-side validation. validate_usage_pause no-ops for non-usage_limit
+    # kinds (schemas.py), so a plain manual pause is never gated; a usage_limit
+    # pause missing its required fields is a bug. Function-local import keeps
+    # the state package free of a top-level schemas dependency.
+    from renmark import schemas
+
+    issues = schemas.validate_usage_pause(payload)
+    if issues:
+        raise ValueError(f"write_pause would persist an invalid usage-limit pause: {issues}")
+
     path = state_dir(repo_root) / PAUSED_FILE
-    path.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def read_pause(repo_root: str | Path) -> PauseState | None:

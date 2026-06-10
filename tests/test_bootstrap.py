@@ -47,3 +47,28 @@ def test_bootstrap_git_init(tmp_path: Path) -> None:
     result = bootstrap.bootstrap(tmp_path, project_name="x", init_git=True)
     assert result.git_initialized is True
     assert (tmp_path / ".git").is_dir()
+
+
+def test_bootstrap_git_init_non_empty_does_not_commit_preexisting_file(tmp_path: Path) -> None:
+    """bootstrap with init_git=True in a non-empty folder must NOT commit
+    pre-existing user files — only the scaffold files it created.
+
+    Regression for: bootstrap's `git add -A` would silently stage and commit
+    every pre-existing file when the project was not empty.
+    """
+    # Write a pre-existing user file BEFORE bootstrap runs
+    preexisting = tmp_path / "my-secret.txt"
+    preexisting.write_text("sensitive content\n", encoding="utf-8")
+
+    result = bootstrap.bootstrap(tmp_path, project_name="x", init_git=True)
+    assert result.git_initialized is True
+
+    # Check that my-secret.txt is NOT tracked in git
+    import subprocess
+    tracked = subprocess.run(
+        ["git", "-C", str(tmp_path), "ls-files", "my-secret.txt"],
+        capture_output=True, text=True,
+    )
+    assert tracked.stdout.strip() == "", (
+        "pre-existing my-secret.txt must NOT have been committed by bootstrap"
+    )

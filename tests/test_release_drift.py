@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import textwrap
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -183,7 +184,6 @@ def test_check_drift_on_real_repo():
 # ── packaging ────────────────────────────────────────────────────────────────
 
 
-import zipfile
 
 
 def test_build_package_writes_versioned_zip_to_version(tmp_path: Path):
@@ -270,3 +270,45 @@ def test_build_package_excludes_secret_files(tmp_path: Path):
     assert "id_rsa" not in joined
     assert "credentials.json" not in joined
     assert ".env.example" in joined
+
+
+# ── --name traversal guard ───────────────────────────────────────────────────
+
+
+def test_safe_archive_stem_strips_traversal_to_leaf() -> None:
+    """../../x is neutralized: path separators are stripped, the leaf 'x' is kept."""
+    assert release._safe_archive_stem("../../evil") == "evil"
+    assert release._safe_archive_stem("some/path/archive") == "archive"
+
+
+def test_safe_archive_stem_rejects_dot_only_result() -> None:
+    """A value that sanitizes to a dot-only/empty name raises ValueError."""
+    with pytest.raises(ValueError):
+        release._safe_archive_stem("..")
+    with pytest.raises(ValueError):
+        release._safe_archive_stem(".")
+    with pytest.raises(ValueError):
+        release._safe_archive_stem("")
+
+
+def test_safe_archive_stem_allows_normal_name() -> None:
+    """A plain filename passes through unchanged."""
+    assert release._safe_archive_stem("my-archive-v1.0.0") == "my-archive-v1.0.0"
+
+
+def test_build_package_traversal_name_is_sanitized(tmp_path: Path) -> None:
+    """build_package with archive_stem='../../evil' produces a zip named 'evil.zip',
+    not a file escaped from the destination directory."""
+    repo = _make_repo(tmp_path, version="0.3.3")
+    out = release.build_package(repo, archive_stem="../../evil")
+    # The zip must be named 'evil.zip', not '../../evil.zip'
+    assert out.name == "evil.zip"
+    # And it must land INSIDE .renmark/version/, not escaped
+    assert ".renmark" in str(out)
+
+
+def test_build_package_dot_only_stem_raises(tmp_path: Path) -> None:
+    """build_package with archive_stem='..' raises ValueError (not a traversal escape)."""
+    repo = _make_repo(tmp_path, version="0.3.3")
+    with pytest.raises(ValueError):
+        release.build_package(repo, archive_stem="..")

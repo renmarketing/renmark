@@ -6,10 +6,10 @@ import json
 import pytest
 
 from renmark.dispatch import (
+    SUBAGENT_OUTPUT_FIELDS,
     IsolationViolation,
     SubagentInput,
     SubagentOutput,
-    SUBAGENT_OUTPUT_FIELDS,
     build_subagent_input,
     dispatch_task_isolated,
     parse_subagent_response,
@@ -78,7 +78,7 @@ def test_subagent_output_rejects_too_many_summary_lines() -> None:
 
 
 def test_subagent_output_rejects_oversized_summary_line() -> None:
-    """G3 per-line cap: 5 lines × 5000 chars must not slip through."""
+    """G3 per-line cap: 5 lines x 5000 chars must not slip through."""
     with pytest.raises(IsolationViolation) as exc_info:
         SubagentOutput(
             status="PASS", artifact_path="x",

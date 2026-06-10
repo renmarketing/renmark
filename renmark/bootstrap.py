@@ -7,6 +7,7 @@ project name + date, and creates the directory structure.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import subprocess
 from dataclasses import dataclass
@@ -149,11 +150,26 @@ def bootstrap(
                     check=True,
                     capture_output=True,
                 )
-            subprocess.run(
-                ["git", "-C", str(repo_p), "add", "-A"],
-                check=True,
-                capture_output=True,
-            )
+            # Safety: only stage the files bootstrap itself created.
+            # If the project is not empty (pre-existing user files present),
+            # `git add -A` would silently commit every pre-existing file —
+            # restrict the add to only the scaffolded paths instead.
+            if is_empty_project.__doc__ and not created:
+                # Nothing to stage — shouldn't happen, but guard defensively.
+                pass
+            else:
+                # Stage only the files bootstrap created, not -A (traversal
+                # guard: a non-empty project's pre-existing files must NOT be
+                # committed as part of the scaffold commit).
+                for path_str in created:
+                    # Strip the " (appended)" annotation we sometimes add
+                    clean = path_str.removesuffix(" (appended)")
+                    with contextlib.suppress(subprocess.CalledProcessError):
+                        subprocess.run(
+                            ["git", "-C", str(repo_p), "add", "--", clean],
+                            check=True,
+                            capture_output=True,
+                        )
             subprocess.run(
                 ["git", "-C", str(repo_p), "commit", "-q", "-m", "chore: renmark scaffold"],
                 check=True,

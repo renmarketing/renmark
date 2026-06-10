@@ -49,7 +49,30 @@ def read_limits(repo: str | Path) -> dict[str, Any]:
         parsed = json.loads(text)
     except (json.JSONDecodeError, ValueError):
         return {}
-    return parsed if isinstance(parsed, dict) else {}
+    if not isinstance(parsed, dict):
+        return {}
+
+    # Non-raising validation: a malformed limits.json must not crash preflight.
+    # validate_limits reports issues per provider entry; drop any provider whose
+    # ceilings block is not a dict or carries a non-positive / non-int ceiling,
+    # returning only the valid subset. Function-local import avoids any cycle.
+    from renmark import schemas
+
+    if not schemas.validate_limits(parsed):
+        return parsed
+    clean: dict[str, Any] = {}
+    for provider, ceilings in parsed.items():
+        if not isinstance(ceilings, dict):
+            continue
+        block: dict[str, Any] = {}
+        for key, value in ceilings.items():
+            # Mirror schemas._isinstance int handling (bool is not an int here).
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                continue
+            block[key] = value
+        if block:
+            clean[provider] = block
+    return clean
 
 
 def percent_used(observed: int, limit: int | None) -> float | None:

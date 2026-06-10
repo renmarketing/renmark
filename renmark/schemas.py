@@ -3,16 +3,26 @@ payloads. Zero external dependencies — validation is structural, not full
 JSON Schema. Returns lists of human-readable issues; empty list = valid.
 
 Validators cover:
-    - lifecycle.json       (workflow state, G12)
-    - pipeline.json        (runtime state)
-    - SubagentOutput JSON  (G11 task isolation)
-    - ArtifactMetadata     (YAML frontmatter, G6)
+    - lifecycle.json        (workflow state, G12)
+    - pipeline.json         (runtime state)
+    - SubagentOutput JSON   (G11 task isolation)
+    - ArtifactMetadata      (YAML frontmatter, G6)
+    - limits.json           (usage ceilings, REQ-15)
+    - analytics summary.json
+    - feature-report metrics.json
+    - PAUSED usage-limit pause
+    - analytics event record
 
 CLI:
     python -m renmark.schemas lifecycle  <path>
     python -m renmark.schemas pipeline   <path>
     python -m renmark.schemas subagent   <path>
     python -m renmark.schemas artifact   <path>
+    python -m renmark.schemas limits     <path>
+    python -m renmark.schemas analytics  <path>
+    python -m renmark.schemas report     <path>
+    python -m renmark.schemas pause      <path>
+    python -m renmark.schemas event      <path>
 
 Exit code 0 = valid, 1 = invalid, 2 = bad CLI usage.
 """
@@ -67,8 +77,11 @@ def validate_lifecycle(data: Any) -> list[str]:
         for s in completed:
             if not isinstance(s, str):
                 issues.append(f"lifecycle.stages_completed has non-string: {s!r}")
-            elif s not in STAGES:
-                issues.append(f"lifecycle.stages_completed has unknown stage: {s!r}")
+            # NOTE: an unknown but string-typed completed stage is tolerated (no
+            # issue). Only the ACTIVE `stage` must be canonical. This keeps
+            # legacy lifecycle.json carrying a since-removed stage (e.g. the
+            # cut "restored" stage) loadable + re-writable instead of hard-
+            # failing the writer-side validator mid-recovery.
 
     artifacts = data.get("artifacts")
     if isinstance(artifacts, dict):
@@ -329,6 +342,34 @@ def validate_report_metrics(data: object) -> list[str]:
     return issues
 
 
+def validate_event(data: object) -> list[str]:
+    """Validate an analytics event record. Requires a non-empty string ``kind``
+    and a string ``ts`` if present. The ``kind`` must be in the registered
+    :data:`renmark.analytics.EVENT_KINDS` set — an unregistered kind is flagged
+    but is NOT fatal at the writer (record_event still persists it, stamped
+    ``unregistered_kind``); validate_event simply makes the drift inspectable.
+    """
+    issues: list[str] = []
+    if not isinstance(data, dict):
+        return [f"event: expected object, got {type(data).__name__}"]
+
+    kind = data.get("kind")
+    if not isinstance(kind, str):
+        issues.append(f"event.kind expected str, got {type(kind).__name__}")
+    elif not kind.strip():
+        issues.append("event.kind is empty")
+    else:
+        from renmark.analytics import EVENT_KINDS
+
+        if kind not in EVENT_KINDS:
+            issues.append(f"event.kind={kind!r} not in registered EVENT_KINDS")
+
+    if "ts" in data and not isinstance(data["ts"], str):
+        issues.append(f"event.ts expected str, got {type(data['ts']).__name__}")
+
+    return issues
+
+
 def validate_usage_pause(data: object) -> list[str]:
     """Validate a PauseState dict. Only enforced when
     ``pause_kind == "usage_limit"``: requires a non-empty ``resume_after``
@@ -403,13 +444,21 @@ VALIDATORS: dict[str, Callable[[Any], list[str]]] = {
     "pipeline": validate_pipeline,
     "subagent": validate_subagent_output,
     "artifact": validate_artifact_metadata,
+    "limits": validate_limits,
+    "analytics": validate_analytics_summary,
+    "report": validate_report_metrics,
+    "pause": validate_usage_pause,
+    "event": validate_event,
 }
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 2 or argv[0] not in VALIDATORS:
-        sys.stderr.write("usage: python -m renmark.schemas {lifecycle|pipeline|subagent|artifact} <path>\n")
+        sys.stderr.write(
+            "usage: python -m renmark.schemas "
+            "{lifecycle|pipeline|subagent|artifact|limits|analytics|report|pause|event} <path>\n"
+        )
         return 2
 
     kind, path = argv

@@ -4,9 +4,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -88,9 +86,49 @@ def test_task_mode_emits_pass_json_when_codex_succeeds(tmp_path: Path, capsys, m
     assert payload["artifact_path"] == str(out)
     assert payload["completion_state"] == "complete"
     assert len(payload["summary_lines"]) <= 5
+    # G9: a valid artifact (frontmatter + ## Summary, as write_artifact emits)
+    # must validate, and all six transparency fields must be present.
+    assert payload["validation_status"] == "validated"
+    assert payload["confidence"] == "medium"
+    assert payload["parser_success"] is True
+    assert payload["schema_compliance"] is True
+    assert "retry_count" in payload
     # Crucial G3 check: orchestrator-visible payload has no "body" / "transcript" / "diff" leak
     forbidden = {"transcript", "body", "diff", "generated_code", "reasoning"}
     assert not (set(payload.keys()) & forbidden)
+
+
+def test_task_mode_malformed_artifact_downgrades_g9(tmp_path: Path, capsys, monkeypatch) -> None:
+    """G9 emitting side: codex exits 0 but writes a malformed artifact (no
+    frontmatter / no ## Summary). cmd_task must still report the path but
+    downgrade — partial / low / validation_status=failed — never silent PASS
+    with optimistic confidence."""
+    spec = tmp_path / "spec.md"
+    spec.write_text("summarize")
+    out = tmp_path / "artifact.md"
+
+    monkeypatch.setattr(shutil, "which", lambda name: "/fake/codex" if name == "codex" else None)
+
+    def fake_run(cmd, **kwargs):
+        # Write a malformed artifact: plain text, no frontmatter, no ## Summary.
+        out.write_text("just some prose codex emitted, not renmark format")
+        class FakeProc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    rc = cli.cmd_task(task_spec_path=str(spec), output_path=str(out), repo=tmp_path)
+    assert rc == 0  # artifact exists → status PASS, but downgraded
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PASS"
+    assert payload["artifact_path"] == str(out)
+    assert payload["completion_state"] == "partial"
+    assert payload["confidence"] == "low"
+    assert payload["validation_status"] == "failed"
+    assert payload["schema_compliance"] is False
 
 
 def test_task_mode_emits_fail_when_codex_exits_nonzero(tmp_path: Path, capsys, monkeypatch) -> None:

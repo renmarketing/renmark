@@ -3,7 +3,6 @@ then verify lifecycle.json alone tells us where to resume. Zero-LLM
 recovery is the framework's load-bearing innovation (principle #6)."""
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -83,7 +82,9 @@ def test_cold_start_recovers_at_every_stage(fixture_project: Path, repo_root: Pa
         "plan-validated":        "/renmark:orchestrate",
         "created":               "/renmark:verify",
         "verified":              "/renmark:codereview",
-        "ready-to-release":      "/renmark:release",
+        # No /renmark:release skill ships — ready-to-release surfaces the
+        # manual tag/zip hint, never a dead pointer.
+        "ready-to-release":      "manual",
     }
     for stage, expected in expected_routes.items():
         lifecycle.write_lifecycle(repo, stage=stage, feature="x", branch="x")

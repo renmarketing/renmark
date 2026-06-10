@@ -132,6 +132,17 @@ def write_artifact(
         schema_compliance=schema_compliance,
     )
 
+    # Writer-side metadata validation (G6): a writer emitting invalid
+    # frontmatter is a bug. Function-local import avoids a schemas ↔ summary
+    # import cycle at module load.
+    from dataclasses import asdict
+
+    from renmark import schemas
+
+    meta_issues = schemas.validate_artifact_metadata(asdict(meta))
+    if meta_issues:
+        raise SummaryBoundaryError(f"invalid artifact metadata: {meta_issues}")
+
     summary_block = "\n".join(f"- {line}" for line in summary_lines_list)
     content = f"{meta.to_yaml()}\n\n{body.rstrip()}\n\n## Summary\n\n{summary_block}\n"
 

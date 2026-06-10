@@ -544,3 +544,53 @@ def test_append_routing_idempotent_on_exact_entry(tmp_path: Path) -> None:
         )
     text = (memory.memory_dir(tmp_path) / "routing.md").read_text(encoding="utf-8")
     assert text.count("run=r1") == 1
+
+
+# ── _insert_after_section blank-line leak regression ─────────────────────────
+
+
+def test_insert_after_section_exactly_one_blank_on_first_insert() -> None:
+    """A fresh section gets exactly one blank line between the header and the block."""
+    text = "# Doc\n\n## Shipped\n\nold entry\n"
+    result = memory._insert_after_section(text, "## Shipped", "new entry")
+    after = result.split("## Shipped", 1)[1]
+    # Exactly one blank line (i.e. "\n\n") before "new entry"
+    assert after.startswith("\n\nnew entry"), repr(after[:40])
+
+
+def test_insert_after_section_no_blank_leak_on_repeated_appends() -> None:
+    """Two consecutive appends must leave exactly ONE blank line after the header.
+
+    Regression for the blank-line LEAK: prior code preserved all existing
+    blanks AND added one, so every append grew the gap by one line.
+    After the fix, two appends still leave only one blank line after the header.
+    """
+    text = "# Doc\n\n## Shipped\n\n"
+
+    result = memory._insert_after_section(text, "## Shipped", "entry-1")
+    result = memory._insert_after_section(result, "## Shipped", "entry-2")
+
+    after = result.split("## Shipped", 1)[1]
+    # One blank line then the new entry — not two+ blanks.
+    assert after.startswith("\n\nentry-2"), repr(after[:40])
+    # And entry-1 is still present somewhere later in the file
+    assert "entry-1" in result
+
+
+def test_insert_after_section_body_blank_lines_preserved() -> None:
+    """Blank lines WITHIN entries (below the first non-blank) are NOT collapsed."""
+    text = "# Doc\n\n## Shipped\n\nentry-a\n\nbody-a\n"
+    result = memory._insert_after_section(text, "## Shipped", "entry-b")
+    assert "entry-a" in result
+    assert "body-a" in result
+    after = result.split("## Shipped", 1)[1]
+    assert after.startswith("\n\nentry-b"), repr(after[:40])
+
+
+# ── dead code absence guard ───────────────────────────────────────────────────
+
+
+def test_read_index_and_read_file_are_removed() -> None:
+    """read_index and read_file were dead-code; they must not be present."""
+    assert not hasattr(memory, "read_index"), "read_index must be deleted (dead code)"
+    assert not hasattr(memory, "read_file"), "read_file must be deleted (dead code)"

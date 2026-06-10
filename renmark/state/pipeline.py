@@ -104,9 +104,20 @@ def write_pipeline_state(
         current.failed_tasks.append(add_failed_task)
     current.last_updated = now_iso()
 
+    payload = asdict(current)
+
+    # Writer-side validation: a writer producing structurally-invalid pipeline
+    # state is a bug. Function-local import keeps the state package free of a
+    # top-level schemas dependency (schemas imports lifecycle/dispatch).
+    from renmark import schemas
+
+    issues = schemas.validate_pipeline(payload)
+    if issues:
+        raise ValueError(f"write_pipeline_state would produce invalid state: {issues}")
+
     path = _pipeline_path(repo_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(current), indent=2), encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return current
 
 

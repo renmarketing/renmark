@@ -6,8 +6,6 @@ import os
 import subprocess
 from pathlib import Path
 
-import pytest
-
 
 def test_install_sh_creates_symlinks(repo_root: Path, tmp_path: Path):
     fake_home = tmp_path / "home"
