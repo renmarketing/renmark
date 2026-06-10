@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-06-09] — v0.9.1 — leftovers patch (engine safety polish, audit passes, doc truth)
+**Request:** Close the gaps left open at v0.9.0 (user-tightened patch scope: engine TOCTOU/porcelain, two new audit passes, routing.md truth, resume event, hygiene hint) — plan → execute → gate → adversarial review → release.
+**Built:** Workflow with 2 implementation agents + full gate battery + 2 Opus adversarial reviewers (0 critical / 0 major / 2 minor — both minors fixed before tagging).
+- **Engine:** rollback classification+action now atomic under ONE `_GIT_LOCK` (`_classify_and_rollback`, `_judge_lane_and_rollback`; lock never held during the codex subprocess; 8-thread stress-verified); porcelain switched to `-z --untracked-files=all` — unicode/space/newline paths verbatim, rename/copy records handled, and **two latent bugs fixed that the new direct tests exposed**: new-directory targets no longer collapse to `dir/` and judge out-of-lane against their own work, and out-of-lane rollback now spares the task's own target (extras only).
+- **Audit:** `registry_sync` flags SKILL.md-less dirs; new `no-raw-jsonl` pass (flag-token aware, prohibition-tolerant) and `disclaimer` pass (pins usage/analytics governance markers); output keys backward compatible; both at 0 on the real repo.
+- **Docs/runtime gaps:** routing.md Format section now documents the real `append_routing` format + newest-entry-wins rule (root + template); `resume` analytics event emitted at the two real resume paths; hygiene argument-hint leads with the safe default.
+**Gates at release:** pytest 680 passed / 28 skipped · RENMARK_SMOKE 28 · ruff check + format clean · mypy strict clean · precommit 6/6 (incl. shadow) · audit --quick PASS across all 7 passes · version parity 7/7 at 0.9.1.
+**Do not change:**
+- `_GIT_LOCK` is a non-reentrant `threading.Lock` — code inside `_classify_and_rollback`/`_judge_lane_and_rollback` must only call `*_locked` helpers, never the lock-acquiring wrappers.
+- `--untracked-files=all` on the porcelain snapshot is load-bearing — removing it re-introduces the new-directory out-of-lane false positive.
+- Deferred by explicit scope decision (NOT forgotten): check-plan Python backing, verify --bootstrap extraction, workspace-level CLAUDE.md edit — candidates for v0.10/feature work.
+
 ## [2026-06-09] — v0.9.0 — audit-implementation release (all findings + 3 new skills)
 **Request:** Orchestrate Opus/Sonnet agents to implement ALL findings from both audits (Opus original + Fable 5 delta), including the PRD scope update, build /renmark:audit + /renmark:inventory (+ the gate-completing /renmark:approve), test everything, and release as v0.9.0.
 **Built:** Two implementation waves (8 agents: 2 opus engine/state, 6 sonnet) on branch `feature/audit-cleanup-v0.9.0`, gates between waves.
