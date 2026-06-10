@@ -107,9 +107,7 @@ _BOUND_CAPS = re.compile(r"\|\s*(head|tail|grep|wc|awk\s+['\"]NR|tee)\b|>\s*/dev
 
 # test -f only: matches verifier that is purely "test -f <path>" (possibly with
 # an alias like "[ -f ... ]") with nothing else meaningful after.
-_TEST_F_ONLY_RE = re.compile(
-    r"^\s*(?:test\s+-[fF]\s+\S+|\[\s+-[fF]\s+\S+\s*\])\s*$"
-)
+_TEST_F_ONLY_RE = re.compile(r"^\s*(?:test\s+-[fF]\s+\S+|\[\s+-[fF]\s+\S+\s*\])\s*$")
 
 
 # ---------------------------------------------------------------------------
@@ -150,15 +148,12 @@ def _check_verifiers(tasks: list[Task]) -> list[tuple[str, str]]:
     for t in tasks:
         v = (t.verifier or "").strip()
         if not v:
-            issues.append(
-                ("BLOCK", f"Task {t.index}: verifier is missing or empty.")
-            )
+            issues.append(("BLOCK", f"Task {t.index}: verifier is missing or empty."))
         elif _TEST_F_ONLY_RE.match(v):
             issues.append(
                 (
                     "WARN",
-                    f"Task {t.index}: verifier proves file existence only (`{v}`). "
-                    "Consider adding a behavioral check.",
+                    f"Task {t.index}: verifier proves file existence only (`{v}`). Consider adding a behavioral check.",
                 )
             )
     return issues
@@ -296,8 +291,7 @@ def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
                 issues.append(
                     (
                         "WARN",
-                        f"Task {t.index}: est_tokens is negative ({t.est_tokens}). "
-                        "Check planner estimate.",
+                        f"Task {t.index}: est_tokens is negative ({t.est_tokens}). Check planner estimate.",
                     )
                 )
             elif t.est_tokens > _MAX_EST_TOKENS:
@@ -313,8 +307,7 @@ def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
                 issues.append(
                     (
                         "WARN",
-                        f"Task {t.index}: est_cost_usd is negative ({t.est_cost_usd}). "
-                        "Check planner estimate.",
+                        f"Task {t.index}: est_cost_usd is negative ({t.est_cost_usd}). Check planner estimate.",
                     )
                 )
             elif t.est_cost_usd > _MAX_EST_COST_USD:
@@ -438,13 +431,13 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("BLOCK (must fix before running):\n")
         for b in blocks:
             # Strip the "BLOCK: " prefix so format matches SKILL's spec.
-            sys.stdout.write(f"- {b[len('BLOCK: '):]}\n")
+            sys.stdout.write(f"- {b[len('BLOCK: ') :]}\n")
         sys.stdout.write("\n")
 
     if warns:
         sys.stdout.write("WARN (review before running):\n")
         for w in warns:
-            sys.stdout.write(f"- {w[len('WARN: '):]}\n")
+            sys.stdout.write(f"- {w[len('WARN: ') :]}\n")
         sys.stdout.write("\n")
 
     if report.verdict in ("PASS", "WARN"):

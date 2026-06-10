@@ -103,8 +103,7 @@ def test_missing_verifier_block(tmp_path: Path) -> None:
     # The parser itself raises PlanError when verifier is absent, so
     # lint_plan must catch it and return BLOCK gracefully.
     body = (
-        _BASE_HEADER
-        + "### Task 1: no verifier\n"
+        _BASE_HEADER + "### Task 1: no verifier\n"
         "- **mode:** A\n"
         "- **target:** a.py\n"
         "- **executor:** sonnet\n"
@@ -166,8 +165,7 @@ def test_same_target_different_groups_pass(tmp_path: Path) -> None:
 
 def test_invalid_executor_block(tmp_path: Path) -> None:
     body = (
-        _BASE_HEADER
-        + "### Task 1: bad executor\n"
+        _BASE_HEADER + "### Task 1: bad executor\n"
         "- **mode:** A\n"
         "- **target:** a.py\n"
         "- **executor:** claude-3\n"
@@ -187,8 +185,7 @@ def test_invalid_executor_block(tmp_path: Path) -> None:
 
 def test_invalid_mode_c_block(tmp_path: Path) -> None:
     body = (
-        _BASE_HEADER
-        + "### Task 1: bad mode\n"
+        _BASE_HEADER + "### Task 1: bad mode\n"
         "- **mode:** C\n"
         "- **target:** a.py\n"
         "- **verifier:** true\n"
@@ -207,8 +204,7 @@ def test_invalid_mode_c_block(tmp_path: Path) -> None:
 
 def test_bad_est_tokens_type_block_no_exception(tmp_path: Path) -> None:
     body = (
-        _BASE_HEADER
-        + "### Task 1: bad tokens\n"
+        _BASE_HEADER + "### Task 1: bad tokens\n"
         "- **mode:** A\n"
         "- **target:** a.py\n"
         "- **executor:** sonnet\n"
@@ -301,8 +297,7 @@ def test_heavy_read_sonnet_block(tmp_path: Path) -> None:
 
     # Write plan in the same tmp_path so relative path resolves
     plan_body = (
-        _BASE_HEADER
-        + "### Task 1: heavy read\n"
+        _BASE_HEADER + "### Task 1: heavy read\n"
         "- **mode:** A\n"
         "- **target:** a.py\n"
         "- **executor:** sonnet\n"
@@ -329,8 +324,7 @@ def test_heavy_read_haiku_no_block(tmp_path: Path) -> None:
     ctx_file.write_text("\n".join(f"line {i}" for i in range(201)), encoding="utf-8")
 
     plan_body = (
-        _BASE_HEADER
-        + "### Task 1: heavy read haiku\n"
+        _BASE_HEADER + "### Task 1: heavy read haiku\n"
         "- **mode:** A\n"
         "- **target:** a.py\n"
         "- **executor:** haiku\n"
@@ -478,8 +472,7 @@ def test_check_plan_skill_references_engine() -> None:
     assert _CHECK_PLAN_SKILL.exists(), f"Missing: {_CHECK_PLAN_SKILL}"
     content = _CHECK_PLAN_SKILL.read_text(encoding="utf-8")
     assert _ENGINE_INVOCATION in content, (
-        f"{_CHECK_PLAN_SKILL} does not contain `{_ENGINE_INVOCATION}`. "
-        "Task 3 in the plan must add this reference."
+        f"{_CHECK_PLAN_SKILL} does not contain `{_ENGINE_INVOCATION}`. Task 3 in the plan must add this reference."
     )
 
 
@@ -491,13 +484,11 @@ def test_orchestrate_skill_references_engine() -> None:
     after the full wave lands.
     """
     assert _ORCHESTRATE_SKILL.exists(), (
-        f"Missing: {_ORCHESTRATE_SKILL} — Task 4 adds this reference; "
-        "may be incomplete mid-wave."
+        f"Missing: {_ORCHESTRATE_SKILL} — Task 4 adds this reference; may be incomplete mid-wave."
     )
     content = _ORCHESTRATE_SKILL.read_text(encoding="utf-8")
     assert _ENGINE_INVOCATION in content, (
-        f"{_ORCHESTRATE_SKILL} does not contain `{_ENGINE_INVOCATION}`. "
-        "Task 4 in the plan must add this reference."
+        f"{_ORCHESTRATE_SKILL} does not contain `{_ENGINE_INVOCATION}`. Task 4 in the plan must add this reference."
     )
 
 
@@ -507,8 +498,7 @@ def test_orchestrate_skill_references_engine() -> None:
 def _one_task_plan(tmp_path, verifier: str):
     return _write(
         tmp_path,
-        "# P\n\n### Task 1: t\n- **mode:** A\n- **target:** a.py\n"
-        f"- **verifier:** {verifier}\n- **spec:**\n  x\n",
+        f"# P\n\n### Task 1: t\n- **mode:** A\n- **target:** a.py\n- **verifier:** {verifier}\n- **spec:**\n  x\n",
     )
 
 
