@@ -146,6 +146,8 @@ CHANGELOG.md, stack.md). Canonical artifact homes:
 - runtime state → `.renmark/state/`
 - memory → `.renmark/memory/`
 - logs → `.renmark/logs/`
+- debug sessions → `.renmark/debug/<session-id>/`
+- audit reports → `.renmark/audits/`
 
 **Never write outside the project.** Do NOT create or modify files in the global
 plugin install (`~/.claude/plugins/...`, `${CLAUDE_PLUGIN_ROOT}`), in `$HOME`, or
@@ -177,9 +179,9 @@ continuing. `.renmark/memory/` survives clears — persistent state is preserved
 
 **Domains:**
 - `debug` — debug, codereview
-- `build` — start, brainstorm, plan, check-plan, orchestrate, verify, finish, feature
-- `audit` — secure, document, map, research
-- `meta` — setup, roadmap, help
+- `build` — start, brainstorm, plan, check-plan, orchestrate, verify, finish, feature, prd, blueprint, backlog, loop
+- `audit` — audit, inventory
+- `meta` — setup, roadmap, help, resume, approve, hygiene, doctor, init, usage, analytics
 
 Same-domain transitions do not trigger the recommendation. Cross-domain ones do.
 Do not assume debugging context is useful for planning; planning context for
@@ -297,7 +299,7 @@ well before it's full — track utilization and act early:
   the recommendation as a one-line note: *"Context at ~60% — consider
   `/compact` before continuing."*
 - **At ~80% utilization (≈ 160k tokens):** refuse to start a new long-running
-  skill (`orchestrate`, `research`, `map`, `secure`) until the user runs
+  skill (`orchestrate`, `loop`, `audit`) until the user runs
   `/compact` or `/clear`. Short skills (`roadmap`, `help`, `check-plan`,
   `resume`) still run.
 - **On cross-domain skill transition** (per `context-contamination-rule`):
@@ -316,9 +318,9 @@ Domains for subject-change detection (per `renmark.lifecycle.DOMAIN_BY_SKILL`):
 | Domain | Skills |
 |---|---|
 | `debug` | debug, codereview |
-| `build` | start, brainstorm, plan, check-plan, orchestrate, verify, finish, feature |
-| `audit` | secure, document, map, research |
-| `meta` | setup, roadmap, help, resume, release, restore, approve, issue |
+| `build` | start, brainstorm, plan, check-plan, orchestrate, verify, finish, feature, prd, blueprint, backlog, loop |
+| `audit` | audit, inventory |
+| `meta` | setup, roadmap, help, resume, approve, hygiene, doctor, init, usage, analytics |
 
 Same-domain transitions don't trigger the prompt. Cross-domain ones do.
 <!-- END:context-budget-rule -->
@@ -337,8 +339,6 @@ init → brainstorm-complete → plan-drafted → plan-validated → created
      → verified → reviewed → documented → ready-to-release → released
 ```
 
-Plus `restored` (after `/renmark:restore`).
-
 **Cold-start recovery:** after `/clear`, run `/renmark:resume`. It reads
 lifecycle.json (≤ 1KB), prints the recommended next command, exits. Zero
 LLM calls. The cost of survival is one file read.
@@ -351,28 +351,43 @@ If lifecycle.json exceeds ~1KB, it's a bug — runtime cruft has leaked in.
 this at write time.
 
 **Human approval gates:** lifecycle.json carries `human_review_required`,
-`human_review_completed`, `human_review_for` fields. Release, restore,
-merge, and security overrides MUST set these before destructive operations
-and MUST check them on re-entry. `/renmark:approve` is the only way to
-flip the bit. AI may generate code; the human owns merges and releases.
+`human_review_completed`, `human_review_for` fields. Release, merge, and
+security overrides MUST set these before destructive operations and MUST
+check them on re-entry. `/renmark:approve` is the sole surface for flipping
+`human_review_completed` — ships in 0.9.0. AI may generate code; the human
+owns merges and releases.
 <!-- END:lifecycle-rule -->
 
 ## Tooling — renmark workflow
 
 | Command | When to use |
 |---|---|
-| `/renmark:start` | Starting point for vibe coders — plain-English entry to the full pipeline |
-| `/renmark:brainstorm <topic>` | Fleshing out an idea into a spec |
-| `/renmark:prd` | Create/update the project PRD — the source of truth that plans and features align to |
-| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype when there's a UI) |
-| `/renmark:plan <spec>` | Decomposing a spec into atomic, executor-tagged tasks |
-| `/renmark:orchestrate <plan>` | Executing a plan (Haiku / Codex / Sonnet / Opus) |
+| `/renmark:start` | Plain-English entry — describe what to build, renmark routes the pipeline |
+| `/renmark:brainstorm <topic>` | Flesh out an idea into a spec with scope contract |
+| `/renmark:prd` | Create/update the project PRD — the durable source of truth |
+| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |
+| `/renmark:plan <spec>` | Decompose a spec into atomic, executor-tagged tasks |
 | `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
+| `/renmark:orchestrate <plan>` | Execute a plan — routes tasks to Haiku / Codex / Sonnet / Opus |
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
+| `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
+| `/renmark:loop "<goal>"` | Bounded, resumable agentic loop (iterate until verified or budget hit) |
 | `/renmark:finish` | Close branch — create PR, merge, or clean up |
-| `/renmark:backlog` | Triage & approve backlog items; "Approve and build" launches bounded Loop Mode on a managed branch (max 5 iterations, no orphan branches) |
+| `/renmark:backlog` | Triage backlog items; "Approve and build" launches bounded Loop Mode |
 | `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
-| `/renmark:codereview <ref>` | Multi-pass diff review (adversarial + quality + architecture) |
+| `/renmark:codereview <ref>` | Diff-proportional review: lite in-context for small diffs, full Codex pass for core code |
+| `/renmark:audit` | Read-only self-audit — verifies registry/docs/skill parity; artifacts under `.renmark/audits/` |
+| `/renmark:inventory` | Alias for `/renmark:audit` — lists registered skills and command surface |
+| `/renmark:approve` | Flip the human-review gate (`human_review_completed`) — sole approval surface |
+| `/renmark:hygiene --apply` | Flag and optionally clean stale artifacts, orphan branches, oversized memory |
+| `/renmark:doctor` | Diagnose install health — run if `/renmark:*` commands don't appear |
+| `/renmark:init` | Scaffold or update CLAUDE.md / AGENTS.md / `.renmark/` in an existing project |
+| `/renmark:setup` | Thin alias for `/renmark:init` (rule-block refresh only) |
+| `/renmark:resume` | Cold-start recovery — reads lifecycle.json, prints next recommended command |
+| `/renmark:roadmap` | Project status, gap discovery (PRD vs shipped), and token usage |
+| `/renmark:usage` | Rolling observed usage — 5-hour / weekly, top features, quota events |
+| `/renmark:analytics` | Usage analytics over time — model/executor mix, verification outcomes |
+| `/renmark:help` | List all commands |
 
 ## File conventions
 

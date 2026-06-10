@@ -341,16 +341,13 @@ _FM_UNQUOTED_COLON_RE = re.compile(
     r'.*:\s',                             # contains ": " somewhere
 )
 
-# Matches a frontmatter line whose quoted value has unbalanced quotes.
-# We check single-quoted values that contain an unescaped ' inside, or
-# double-quoted values that contain an unescaped " inside the value body.
-_FM_UNBALANCED_QUOTE_RE = re.compile(
-    r'^[a-zA-Z][a-zA-Z0-9_-]*:\s+'      # key: space
-    r'(?:'
-    r"'[^']*'[^']*'"                      # single-quoted with extra '
-    r'|"[^"]*"[^"]*"'                     # double-quoted with extra "
-    r')',
-)
+# Balanced quoted scalars per strict YAML: double-quoted values may contain
+# backslash escapes (\" is legal); single-quoted values escape ' by doubling
+# (''). A quoted value that doesn't fully match its balanced form (with only
+# trailing whitespace after the closing quote) is flagged.
+_FM_KEY_VALUE_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*):\s+(.*)$")
+_FM_DQ_BALANCED_RE = re.compile(r'"(?:[^"\\]|\\.)*"\s*$')
+_FM_SQ_BALANCED_RE = re.compile(r"'(?:[^']|'')*'\s*$")
 
 
 def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
@@ -390,14 +387,24 @@ def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
             line = raw_line.rstrip()
             if not line or line.startswith("#"):
                 continue
-            if _FM_UNQUOTED_COLON_RE.match(line):
+            kv = _FM_KEY_VALUE_RE.match(line)
+            if not kv:
+                continue
+            value = kv.group(2)
+            if value.startswith('"'):
+                if not _FM_DQ_BALANCED_RE.match(value):
+                    issues.append(
+                        f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
+                    )
+            elif value.startswith("'"):
+                if not _FM_SQ_BALANCED_RE.match(value):
+                    issues.append(
+                        f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
+                    )
+            elif _FM_UNQUOTED_COLON_RE.match(line):
                 issues.append(
                     f"{rel}: frontmatter value contains unquoted ': ' — "
                     f"quote the value to fix strict-YAML: {line!r}"
-                )
-            elif _FM_UNBALANCED_QUOTE_RE.match(line):
-                issues.append(
-                    f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
                 )
     return issues
 

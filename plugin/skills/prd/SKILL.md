@@ -1,6 +1,6 @@
 ---
 name: prd
-description: Use when the user wants to author or maintain the project's Product Requirements Document — typed as /renmark:prd or phrases like "write the PRD", "what's the PRD say", "update the product spec", "keep the PRD current". Authors and maintains a single per-project `PRD.md` at the repo root as the human-owned source of truth for what the product is and is not. Two modes: CREATE (no PRD yet) interviews one-question-at-a-time on a fresh project or synthesizes a draft from existing docs on a mature one; UPDATE (PRD exists) reconciles a requested change and presents a diff. Every write is human-gated — the PRD is a living doc the human owns, never silently rewritten by an automated stage.
+description: "Use when the user wants to author or maintain the project's Product Requirements Document — typed as /renmark:prd or phrases like \"write the PRD\", \"what's the PRD say\", \"update the product spec\", \"keep the PRD current\". Authors and maintains a single per-project `PRD.md` at the repo root as the human-owned source of truth for what the product is and is not. Two modes: CREATE (no PRD yet) interviews one-question-at-a-time on a fresh project or synthesizes a draft from existing docs on a mature one; UPDATE (PRD exists) reconciles a requested change and presents a diff. Every write is human-gated — the PRD is a living doc the human owns, never silently rewritten by an automated stage."
 ---
 
 # prd
@@ -112,8 +112,8 @@ When a PRD write is **proposed by an automated stage** rather than typed by the 
       human_review_for="prd-edit: <one-line description of the proposed change>",
   )
   ```
-- **Never write `PRD.md` while `human_review_required and not human_review_completed`.** Present the draft/diff and stop until the human approves. (`/renmark:approve` is the *planned* skill to flip `human_review_completed`; until it ships, `lifecycle.next_recommended()` surfaces a manual gate message and the human clears it by approving the draft/diff here.)
-- After the human approves and the write lands, clear the gate (`human_review_required=False, human_review_completed=False, human_review_for=""`) so it doesn't leak into the next stage. (Pass `""`, not `None` — `write_lifecycle` treats `None` as "leave unchanged", so `None` would strand the stale gate text in lifecycle.json.)
+- **Never write `PRD.md` while `human_review_required and not human_review_completed`.** Present the draft/diff and stop until the human approves. (Invoke `/renmark:approve` to flip `human_review_completed`; `lifecycle.next_recommended()` surfaces it as the recommended next command when a gate is pending.)
+- After the human approves and the write lands, clear the gate (`human_review_required=False, human_review_completed=False, human_review_for=""`) so it doesn't leak into the next stage. (Pass `""`, not `None` — `write_lifecycle` treats `None` as "leave unchanged", so `None` would strand the stale gate text in lifecycle.json.) `/renmark:approve` is the flip surface for the `human_review_required` bit when the gate was set by an automated stage.
 - A user typing `/renmark:prd` directly **is** the human in the loop — the explicit draft/diff approval above satisfies the gate; you don't additionally block on the lifecycle bit unless an automated stage set it.
 
 ### Context hygiene (load-bearing)

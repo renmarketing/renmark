@@ -1,7 +1,6 @@
 # Decisions (ADRs)
 
-
-
+Architecture Decision Records. Newest at top. Each ADR captures: context (why we needed to decide), the decision, alternatives considered, and consequences. Updated by `/renmark:brainstorm` and `/renmark:plan` when they make non-trivial calls; hand-editable.
 
 
 
@@ -21,7 +20,7 @@
 **Date:** 2026-06-09
 **Status:** Accepted
 
-**Context.** Completed stages: plan-drafted, plan-validated, created
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed [corrected 2026-06-09 — stage tracking dropped verified/reviewed; see audit-delta]
 
 **Decision.** Branch feature/reporting-and-usage-analytics reached stage ready-to-release
 
@@ -355,8 +354,6 @@ requirement coverage flows plan → tasks → verify transitively, which is *why
 **Decision.** Branch feature/lifecycle-hygiene reached stage ready-to-release
 
 ---
-
-Architecture Decision Records. Newest at top. Each ADR captures: context (why we needed to decide), the decision, alternatives considered, and consequences. Updated by `/renmark:brainstorm` and `/renmark:plan` when they make non-trivial calls; hand-editable.
 
 ## ADR-000 — (example) Choose JSON over MessagePack for /api responses
 

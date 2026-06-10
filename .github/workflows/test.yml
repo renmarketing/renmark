@@ -34,4 +34,4 @@ jobs:
       - name: drift check
         run: python -m renmark.release check
       - name: plugin lint
-        run: python -m renmark.lint
+        run: python -m renmark.lint --strict-frontmatter

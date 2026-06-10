@@ -219,11 +219,10 @@ def test_hygiene_is_meta_domain() -> None:
     assert lifecycle.DOMAIN_BY_SKILL["hygiene"] == "meta"
 
 
-# Skills whose plugin/skills/<name>/ dir is created in a LATER wave of this
-# release. The registry already lists them (they ship this release), so the
-# parity check tolerates registry⊋dirs ONLY for these names. Tighten to an
-# exact-match assertion once the wave that scaffolds these dirs lands.
-_REGISTRY_AHEAD_OF_DIRS = {"approve", "audit", "inventory"}
+# Previously this tolerated the registry listing approve/audit/inventory before
+# their dirs were scaffolded. Those dirs now exist, so parity is EXACT — the
+# tolerance set is empty and any registry entry without a backing dir is a ghost.
+_REGISTRY_AHEAD_OF_DIRS: set[str] = set()
 
 
 def _skill_dirs() -> set[str]:

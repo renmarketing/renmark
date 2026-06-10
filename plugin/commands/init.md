@@ -1,5 +1,5 @@
 ---
-description: Use when the user wants renmark to document the project itself — scans the repo for file structure, modules, and public functions/exports, then merges a managed project map block into CLAUDE.md and AGENTS.md. Renmark's analog to Claude Code's native /init. Idempotent — re-run anytime to refresh the map without touching hand-written content.
+description: "Use when the user wants renmark to onboard or document a project — the non-destructive front door. Scaffolds missing CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/, back-fills missing rule blocks, scans the repo for structure/modules/public symbols, writes a stub into CLAUDE.md/AGENTS.md and the full map into .renmark/memory/project-map.md, reports standards health, then hands off to roadmap gap discovery. Renmark's analog to Claude Code's native /init. Idempotent."
 ---
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/init/SKILL.md` and follow its instructions exactly. The user provided this input: $ARGUMENTS

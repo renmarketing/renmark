@@ -52,7 +52,7 @@ else
 fi
 
 hdr "4/6  plugin lint"
-if out=$(python -m renmark.lint 2>&1); then
+if out=$(python -m renmark.lint --strict-frontmatter 2>&1); then
     say "$out"
 else
     say "FAIL — plugin contract issues:"

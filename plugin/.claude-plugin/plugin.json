@@ -1,7 +1,7 @@
 {
   "name": "renmark",
   "version": "0.7.8",
-  "description": "Vibe coder aide and multi-LLM orchestration plugin. /renmark:start is the plain-English entry point — describe what you want to build, renmark handles stack, scope, best practices, and pipeline routing. Full wizard: start → brainstorm → plan → check-plan → orchestrate → verify → finish. Dispatches tasks to Haiku, Codex, Sonnet, Opus. Persistent project memory in .renmark/.",
+  "description": "Vibe coder aide and multi-LLM orchestration plugin for Claude Code. /renmark:start is the plain-English entry for vibe coders; the full wizard (brainstorm → plan → orchestrate → verify → finish) is also directly accessible. 26 guided commands covering build, debug, audit (audit, inventory), and meta (approve, hygiene, doctor, analytics). Dispatches tasks to Haiku, Codex, Sonnet, Opus. Persistent project memory in .renmark/.",
   "author": {
     "name": "renmark"
   },

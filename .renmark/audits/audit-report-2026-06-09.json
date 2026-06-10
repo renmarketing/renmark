@@ -1,0 +1,21 @@
+{
+  "quick": true,
+  "passes": {
+    "registry-sync": [],
+    "shim-thinness": [],
+    "description-drift": [],
+    "lint": [],
+    "version-drift": []
+  },
+  "pass_counts": {
+    "registry-sync": 0,
+    "shim-thinness": 0,
+    "description-drift": 0,
+    "lint": 0,
+    "version-drift": 0
+  },
+  "modularity_counts": {},
+  "inventory_count": 26,
+  "total_issues": 0,
+  "verdict": "PASS"
+}

@@ -106,6 +106,7 @@ if view.get("limit_exceeded"):  # a configured local limit is already over budge
         now=state.now_iso(), feature=<feature or "">, repo=repo,
     )
     state.write_pause(repo, pause)
+    analytics.record_event(repo, ts=state.now_iso(), kind="pause")  # kind registered in EVENT_KINDS
     # Surface the resume command and STOP — do NOT dispatch this wave.
 ```
 
@@ -236,6 +237,9 @@ pause = usage.classify_usage_pause(
     feature=<feature or "">, repo=repo,
 )
 state.write_pause(repo, pause)  # pause_reason="usage_limit", pause_kind="usage_limit"
+# Emit a classified event — use "rate_limit" or "quota" based on the observed signal (both registered in EVENT_KINDS)
+analytics.record_event(repo, ts=state.now_iso(),
+    kind="rate_limit" if <is_rate_limit_signal> else "quota")
 ```
 
 Surface: *"Provider usage limit hit at task <index> — paused (not failed). Resume with `/renmark:orchestrate --resume` after `resume_after`."* The PauseState's `resume_after` follows the same fallback rule as the preflight pause (provider reset → next local window → now+60min).
@@ -269,13 +273,7 @@ Report the orchestrate completion line first, then let verify take over:
 
 > *"All N tasks committed (M commits, ~$X spent). Running verification…"*
 
-→ invoke `/renmark:verify`. From here the user follows verify's hand-off:
-> *  1. [c] Code review — run an adversarial Codex pass over the diff via /renmark:codereview*
-> *  2. [f] Finish — close the branch (PR or merge) via /renmark:finish*
-> *  3. [d] Debug — investigate the failure verify surfaced via /renmark:debug*
-> *  4. [n] Nothing — stop here; work stays committed*
-
-(Verify renders the live menu per `_shared/handoff-menu.md` — an interactive `AskUserQuestion` choice when available, numbered text only as fallback; the user must pick a choice to continue.)
+→ invoke `/renmark:verify`. From here the user follows verify's hand-off menu, rendered per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` (an interactive `AskUserQuestion` choice when available, numbered text only as fallback; the user must pick a choice to continue).
 
 **Next step is state-derived (pipeline skill, next-steps.md class 1).** Orchestrate's own next action after a clean run is the stage-routed `next_recommended(repo)` (= `/renmark:verify` at stage `created`), which it auto-invokes above. On a paused/failed run it does NOT advance — it surfaces the resume command. Per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 — Tier-0 stage routing); orchestrate hands directly to verify rather than rendering a separate picker.
 

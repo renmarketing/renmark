@@ -11,7 +11,7 @@ What this project depends on and how it runs. Updated by `/renmark:brainstorm` i
 
 | Library | Version | Purpose |
 |---|---|---|
-| (none — stdlib only) | — | Runtime has no third-party runtime deps; blueprint adds none |
+| python-dotenv | ≥1.0 | Runtime — `.env` file loading for optional local config; `requests` was removed in 0.9.0 (stdlib `urllib` used instead) |
 
 ## Development dependencies
 
