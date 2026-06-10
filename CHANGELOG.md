@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-10] — PRD updated (REQ-2 amendment: Fable executor tier)
+**Request:** `/renmark:feature fable-integration` flagged PRD drift (Fable absent from the routed executor set); reconcile the Fable tier into the PRD before planning.
+**Built:** Reconciled the Goals multi-LLM bullet and REQ-2 of `PRD.md`; bumped `last_reviewed` to 2026-06-10. Routed executor set is now Haiku / Codex / Sonnet / Opus / Fable (`claude-fable-5`, $10/$50 per MTok, 1M context). Approval recorded via the `/renmark:approve` surface (REQ-18 flow), gate cleared by prd after the write.
+**Files changed:**
+- `PRD.md` — Goals bullet + REQ-2 extension + revision note; `last_reviewed` bump
+**Do not change:**
+- Fable is an **escalation target, not a default**: reserved for ideation (brainstorm), strategy (plan/prd/blueprint), and adversarial audit/review passes — never mechanical or bulk work. The REQ-2 cheapest-capable-model rule still governs all routing.
+- PRD.md is human-owned. Automated stages may PROPOSE edits but never write without explicit approval.
+
 ## [2026-06-10] — v0.10.0 — deterministic planning and verification hardening
 **Request:** One-thing minor release via the full /renmark:feature pipeline: move check-plan's structural validation into deterministic Python, rewire both surfaces onto one engine, test-pin everything, release as v0.10.0.
 **Built:** `renmark/plan_lint.py` — the single authoritative implementation of check-plan's 8 checks (severities behavior-preserved: 1–6 BLOCK incl. the `test -f`→WARN refinement, 7–8 WARN; sanity extras WARN-only), composing `parser.parse_plan`, never raising (PlanError → graceful BLOCK), with `lint_plan()` API + CLI (`python -m renmark.plan_lint`, exit 0 PASS/WARN, 1 BLOCK). `/renmark:check-plan` collapses its manual Steps 1–2.5 into the engine invocation (bounded report passed through verbatim; judgment smells stay advisory); `/renmark:orchestrate` pre-flight runs the SAME engine — a text-pin test asserts both surfaces reference it so they can never drift. 36 tests pin every check + CLI exit codes. Doc rows updated in CLAUDE/AGENTS/templates/help.
