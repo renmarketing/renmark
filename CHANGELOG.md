@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-10] — v0.10.0 — deterministic planning and verification hardening
+**Request:** One-thing minor release via the full /renmark:feature pipeline: move check-plan's structural validation into deterministic Python, rewire both surfaces onto one engine, test-pin everything, release as v0.10.0.
+**Built:** `renmark/plan_lint.py` — the single authoritative implementation of check-plan's 8 checks (severities behavior-preserved: 1–6 BLOCK incl. the `test -f`→WARN refinement, 7–8 WARN; sanity extras WARN-only), composing `parser.parse_plan`, never raising (PlanError → graceful BLOCK), with `lint_plan()` API + CLI (`python -m renmark.plan_lint`, exit 0 PASS/WARN, 1 BLOCK). `/renmark:check-plan` collapses its manual Steps 1–2.5 into the engine invocation (bounded report passed through verbatim; judgment smells stay advisory); `/renmark:orchestrate` pre-flight runs the SAME engine — a text-pin test asserts both surfaces reference it so they can never drift. 36 tests pin every check + CLI exit codes. Doc rows updated in CLAUDE/AGENTS/templates/help.
+**Pipeline evidence:** PRD alignment `aligned` (REQ-5/7/3, no PRD change); plan validated by its own engine — which BLOCKed the original plan on 6 genuine G5 heavy-read violations the prose-era check missed (plan fixed, not the rule); verify 4/4 goal-backward behaviors; codereview 0 critical / 2 major / 2 minor — all four fixed before tagging (node/python verifier-bound trigger restored, find/-name and git-log cap shapes, stray audit artifacts dropped from the branch).
+**Files changed:**
+- `renmark/plan_lint.py` (new) + `tests/test_plan_lint.py` (new, 36 tests)
+- `plugin/skills/check-plan/SKILL.md`, `plugin/skills/orchestrate/SKILL.md`, `plugin/commands/check-plan.md` — engine rewiring
+- `CLAUDE.md`, `AGENTS.md`, both templates, `plugin/skills/help/SKILL.md` — check-plan row wording
+**Do not change:**
+- Both SKILLs must keep the literal `python -m renmark.plan_lint` invocation — tests/test_plan_lint.py text-pins it (the no-drift guard).
+- plan_lint severities mirror check-plan SKILL §1–2.5; changing either side alone breaks the contract — change both + the tests together.
+- Deferred (explicit): verify --bootstrap extraction; workspace-level ~/projects/CLAUDE.md still says v0.4.0 (outside repo, awaiting separate approval — needed diff: "(v0.10.0, current)").
+
 ## [2026-06-09] — v0.9.1 — leftovers patch (engine safety polish, audit passes, doc truth)
 **Request:** Close the gaps left open at v0.9.0 (user-tightened patch scope: engine TOCTOU/porcelain, two new audit passes, routing.md truth, resume event, hygiene hint) — plan → execute → gate → adversarial review → release.
 **Built:** Workflow with 2 implementation agents + full gate battery + 2 Opus adversarial reviewers (0 critical / 0 major / 2 minor — both minors fixed before tagging).
