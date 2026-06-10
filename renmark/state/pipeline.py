@@ -71,6 +71,12 @@ def read_pipeline_state(repo_root: str | Path) -> PipelineState | None:
                 filtered[int_field] = int(filtered[int_field])
             except (TypeError, ValueError):
                 filtered.pop(int_field, None)
+    # Legacy tolerance (mirrors lifecycle's): an out-of-vocab current_phase on
+    # disk would make the writer-side validate_pipeline raise on the next
+    # read-modify-write — normalize unknown phases to the default instead.
+    phase = filtered.get("current_phase")
+    if phase is not None and phase not in ("idle", "orchestrate", "paused"):
+        filtered.pop("current_phase", None)
     return PipelineState(**filtered)
 
 

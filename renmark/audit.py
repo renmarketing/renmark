@@ -360,7 +360,12 @@ def run_audit(repo: Path | str, *, quick: bool = False) -> AuditReport:
     passes["shim-thinness"] = shim_thinness(repo, inventory=inv)
     passes["description-drift"] = description_drift(repo, inventory=inv)
     passes["lint"] = lint.lint_all(plugin, include_frontmatter_strict=True)
-    passes["version-drift"] = release.drift_report(repo)
+    try:
+        passes["version-drift"] = release.drift_report(repo)
+    except (FileNotFoundError, OSError):
+        # User projects (where this skill ships) may have no VERSION file —
+        # degrade to an advisory line instead of crashing the whole audit.
+        passes["version-drift"] = ["VERSION file not found — version parity skipped"]
 
     report = AuditReport(quick=quick, passes=passes, inventory_count=len(inv))
 

@@ -28,4 +28,4 @@ What this project depends on and how it runs. Updated by `/renmark:brainstorm` i
 
 | Service | What for | Auth |
 |---|---|---|
-| (example) NVIDIA NIM | LLM inference | `NVIDIA_NIM_API_KEY` |
+| (example) LLM provider | LLM inference | `PROVIDER_API_KEY` |

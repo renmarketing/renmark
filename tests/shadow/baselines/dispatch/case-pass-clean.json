@@ -3,7 +3,9 @@
   "completion_state": "complete",
   "confidence": "high",
   "dependency_notes": "",
+  "parser_success": true,
   "retry_count": 0,
+  "schema_compliance": true,
   "sha": "abc123",
   "status": "PASS",
   "summary_lines": [
@@ -13,5 +15,6 @@
   "token_count": 1234,
   "touched_files": [
     "src/greeting.py"
-  ]
+  ],
+  "validation_status": "unvalidated"
 }

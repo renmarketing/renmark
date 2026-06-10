@@ -154,7 +154,7 @@ def bootstrap(
             # If the project is not empty (pre-existing user files present),
             # `git add -A` would silently commit every pre-existing file —
             # restrict the add to only the scaffolded paths instead.
-            if is_empty_project.__doc__ and not created:
+            if not created:
                 # Nothing to stage — shouldn't happen, but guard defensively.
                 pass
             else:

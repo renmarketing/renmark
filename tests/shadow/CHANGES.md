@@ -1,5 +1,9 @@
 # Shadow baseline changes
 
+## 2026-06-10 00:56:22 UTC — dispatch
+
+SUBAGENT_OUTPUT_FIELDS gained G9 triplet validation_status/parser_success/schema_compliance (v0.9.0 codereview fix)
+
 ## 2026-05-26 17:13:08 UTC — lifecycle
 
 fix: dead-pointer lifecycle stages route to manual hint until /renmark:release ships

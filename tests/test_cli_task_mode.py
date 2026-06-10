@@ -184,3 +184,50 @@ def test_task_mode_emits_fail_on_timeout(tmp_path: Path, capsys, monkeypatch) ->
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "FAIL"
     assert any("timed out" in line.lower() for line in payload["summary_lines"])
+
+
+def test_task_mode_pass_payload_round_trips_through_parser(tmp_path: Path, capsys, monkeypatch) -> None:
+    """KEY INTEGRATION (G11): orchestrate pipes renmark-execute --task output
+    through dispatch.parse_subagent_response. The PASS payload must be accepted
+    — emitting any field outside SUBAGENT_OUTPUT_FIELDS would mark every
+    successful codex task FAIL. (Release blocker found by v0.9.0 codereview.)"""
+    from renmark.dispatch import parse_subagent_response
+
+    spec = tmp_path / "spec.md"
+    spec.write_text("summarize")
+    out = tmp_path / "artifact.md"
+    monkeypatch.setattr(shutil, "which", lambda name: "/fake/codex" if name == "codex" else None)
+
+    def fake_run(cmd, **kwargs):
+        from renmark.summary import write_artifact
+
+        write_artifact(out, artifact_type="research", body="b", summary_lines=["a"], generator="codex")
+
+        class FakeProc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    rc = cli.cmd_task(task_spec_path=str(spec), output_path=str(out), repo=tmp_path)
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    parsed = parse_subagent_response(payload)  # must NOT raise IsolationViolation
+    assert parsed.status == "PASS"
+    assert parsed.validation_status == "validated"
+
+
+def test_task_mode_fail_payload_round_trips_through_parser(tmp_path: Path, capsys, monkeypatch) -> None:
+    """The early-fail payloads must also stay parser-legal with all six G9 fields."""
+    from renmark.dispatch import parse_subagent_response
+
+    monkeypatch.setattr(shutil, "which", lambda name: None if name == "codex" else "/usr/bin/" + name)
+    rc = cli.cmd_task(task_spec_path=str(tmp_path / "spec.md"), output_path=str(tmp_path / "o.md"), repo=tmp_path)
+    assert rc != 0
+    payload = json.loads(capsys.readouterr().out)
+    for f in ("validation_status", "parser_success", "schema_compliance"):
+        assert f in payload
+    parsed = parse_subagent_response(payload)
+    assert parsed.status == "FAIL"

@@ -48,9 +48,12 @@ class Task:
 
 
 _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
-# Loose pattern: any line starting with ### followed by "Task" (case-insensitive)
-# that does NOT match the strict _HEADER_RE is a malformed header and must raise.
-_LOOSE_TASK_RE = re.compile(r"^###\s*Task\b", re.IGNORECASE)
+# Loose pattern: a "### Task <digits>" heading that does NOT match the strict
+# _HEADER_RE is a malformed numbered header and must raise. The digit is
+# required so prose headings ("### Task overview", "### Task description")
+# stay legal preamble; a word-numbered typo ("### Task Four:") is therefore
+# absorbed silently — the contiguous-index check still catches the gap.
+_LOOSE_TASK_RE = re.compile(r"^###\s*Task\s*\d", re.IGNORECASE)
 _FIELD_RE = re.compile(r"^-\s+\*\*([a-z_]+):\*\*\s*(.*?)\s*$")
 _LIST_RE = re.compile(r"^\[(.*)\]$")
 

@@ -408,20 +408,41 @@ def test_serves_defaults_to_none(tmp_path: Path) -> None:
 # ── malformed task header detection ──────────────────────────────────────────
 
 
-def test_malformed_header_missing_colon_raises(tmp_path: Path) -> None:
-    """'### Task Four:' — word index instead of digit — raises PlanError."""
+def test_word_numbered_header_absorbed_not_raised(tmp_path: Path) -> None:
+    """'### Task Four:' has no digit, so the loose detector treats it as prose
+    (the digit requirement keeps legitimate '### Task overview' headings legal);
+    the surrounding valid task still parses."""
     plan = _write(
         tmp_path,
         "# X\n\n## Tasks\n\n"
-        "### Task Four: no digit\n"
+        "### Task Four: no digit\n\n"
+        "### Task 1: real\n"
         "- **mode:** A\n"
         "- **target:** a.py\n"
         "- **verifier:** true\n"
         "- **spec:**\n"
         "  noop\n",
     )
-    with pytest.raises(PlanError, match="malformed task header"):
-        parse_plan(plan)
+    tasks = parse_plan(plan)
+    assert len(tasks) == 1
+    assert tasks[0].index == 1
+
+
+def test_prose_task_heading_is_legal_preamble(tmp_path: Path) -> None:
+    """'### Task overview' style prose headings must NOT raise — only
+    digit-bearing malformed headers are errors."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n### Task overview\n\nSome narrative.\n\n## Tasks\n\n"
+        "### Task 1: real\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert len(tasks) == 1
 
 
 def test_malformed_header_no_space_after_hashes_raises(tmp_path: Path) -> None:

@@ -308,3 +308,13 @@ def test_cli_subprocess_real_repo() -> None:
 def test_cli_no_plugin_dir(tmp_path: Path) -> None:
     code = audit.main(["--repo", str(tmp_path)])
     assert code == 2
+
+
+def test_run_audit_survives_missing_version_file(tmp_path):
+    """User projects (where this skill ships) may have no VERSION file — the
+    audit must degrade to an advisory line, never crash. (v0.9.0 codereview.)"""
+    plugin = tmp_path / "plugin"
+    (plugin / "commands").mkdir(parents=True)
+    (plugin / "skills").mkdir(parents=True)
+    report = audit.run_audit(tmp_path, quick=True)
+    assert any("version" in line.lower() for line in report.passes["version-drift"])

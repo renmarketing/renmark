@@ -178,3 +178,16 @@ def test_read_wave_summary_non_dict_returns_none(tmp_path: Path) -> None:
     d.mkdir(parents=True)
     (d / "wave-2.json").write_text("[1, 2, 3]")
     assert state.read_wave_summary(tmp_path, 2) is None
+
+
+def test_legacy_unknown_phase_normalized_on_read(tmp_path: Path) -> None:
+    """An out-of-vocab current_phase on disk must not make the next
+    read-modify-write raise via the writer-side validator. (v0.9.0 codereview.)"""
+    p = tmp_path / ".renmark" / "state"
+    p.mkdir(parents=True)
+    (p / "pipeline.json").write_text('{"current_phase": "legacy-phase", "wave_index": 1}')
+    loaded = state.read_pipeline_state(tmp_path)
+    assert loaded is not None
+    assert loaded.current_phase == "idle"
+    # And the write path stays legal:
+    state.write_pipeline_state(tmp_path, add_completed_task=1)

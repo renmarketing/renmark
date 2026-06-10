@@ -3,7 +3,9 @@
   "completion_state": "failed",
   "confidence": "low",
   "dependency_notes": "",
+  "parser_success": true,
   "retry_count": 2,
+  "schema_compliance": true,
   "sha": null,
   "status": "FAIL",
   "summary_lines": [
@@ -11,5 +13,6 @@
     "AssertionError"
   ],
   "token_count": 0,
-  "touched_files": []
+  "touched_files": [],
+  "validation_status": "unvalidated"
 }

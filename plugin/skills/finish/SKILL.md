@@ -282,6 +282,7 @@ This is the same zip a GitHub release would attach.
 ```python
 from renmark import lifecycle, analytics, state
 from pathlib import Path
+version = Path('VERSION').read_text().strip()  # the version tagged in 4b
 lifecycle.write_lifecycle(Path('.'), stage="released")
 analytics.record_event(Path('.'), ts=state.now_iso(), kind="release", version=version)
 # Final step on the release path — clear lifecycle so the next /renmark:start is not redirected to resume.

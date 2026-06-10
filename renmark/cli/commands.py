@@ -97,6 +97,9 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
                     "completion_state": "failed",
                     "confidence": "high",
                     "retry_count": 0,
+                    "validation_status": "failed",
+                    "parser_success": False,
+                    "schema_compliance": False,
                 }
             )
         )
@@ -122,6 +125,9 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
                     "completion_state": "failed",
                     "confidence": "high",
                     "retry_count": 0,
+                    "validation_status": "failed",
+                    "parser_success": False,
+                    "schema_compliance": False,
                 }
             )
         )
@@ -164,6 +170,9 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
                     "completion_state": "failed",
                     "confidence": "high",
                     "retry_count": 0,
+                    "validation_status": "failed",
+                    "parser_success": False,
+                    "schema_compliance": False,
                 }
             )
         )
@@ -184,6 +193,9 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
                     "completion_state": "failed",
                     "confidence": "high",
                     "retry_count": 0,
+                    "validation_status": "failed",
+                    "parser_success": False,
+                    "schema_compliance": False,
                 }
             )
         )

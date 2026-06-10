@@ -140,7 +140,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 330,
+    "skill_lines": 331,
     "has_skill": true
   },
   {

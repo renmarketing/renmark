@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-06-10T00:28:35+00:00
-source_sha: 991b198794ea043694b699f916868d2781301ad7
+created_at: 2026-06-10T00:56:24+00:00
+source_sha: 388f1ab43ca6a5a47868ec5fb9350366a86485fa
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -30,7 +30,7 @@ schema_compliance: true
 | debug | debug | aux | 2 | 123 | Use when the user reports a bug or unexpected behavior — typed as /renmark:debug… |
 | doctor | meta | aux | 2 | 94 | Use when `/renmark:*` commands aren't appearing, the plugin seems broken, or the… |
 | feature | build | pipeline | 2 | 231 | Use to start a new feature or significant change with branch isolation — typed a… |
-| finish | build | pipeline | 2 | 330 | Use when implementation is complete — re-runs verifiers, shows commit summary, t… |
+| finish | build | pipeline | 2 | 331 | Use when implementation is complete — re-runs verifiers, shows commit summary, t… |
 | help | meta | aux | 2 | 182 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
 | hygiene | meta | aux | 2 | 75 | Use to garbage-collect stale renmark artifacts and prune append-only memory logs… |
 | init | meta | aux | 2 | 153 | Use when the user wants renmark to onboard or document a project — the non-destr… |

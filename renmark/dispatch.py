@@ -198,12 +198,18 @@ SUBAGENT_OUTPUT_FIELDS = frozenset(
         "completion_state",
         "confidence",
         "retry_count",
+        # G9 transparency triplet — emitted by cmd_task (renmark-execute --task)
+        # and accepted here so executor outputs can expose all six G9 fields.
+        "validation_status",
+        "parser_success",
+        "schema_compliance",
     }
 )
 
 SUBAGENT_OUTPUT_STATUS_VALUES = {"PASS", "FAIL", "SKIP"}
 SUBAGENT_OUTPUT_COMPLETION_STATES = {"complete", "partial", "failed"}
 SUBAGENT_OUTPUT_CONFIDENCE_VALUES = {"low", "medium", "high"}
+SUBAGENT_OUTPUT_VALIDATION_STATUSES = {"validated", "unvalidated", "failed"}
 
 # G3 caps — kept in sync with renmark.summary.MAX_SUMMARY_LINES /
 # MAX_CHARS_PER_LINE and renmark.schemas.validate_subagent_output.
@@ -248,6 +254,11 @@ class SubagentOutput:
     completion_state: Literal["complete", "partial", "failed"] = "complete"
     confidence: Literal["low", "medium", "high"] = "medium"
     retry_count: int = 0
+    # G9 transparency: pessimistic defaults — an output that doesn't declare
+    # validation explicitly is treated as unvalidated, never as validated.
+    validation_status: Literal["validated", "unvalidated", "failed"] = "unvalidated"
+    parser_success: bool = True
+    schema_compliance: bool = True
 
     def __post_init__(self) -> None:
         # G3 cap: ≤ 5 lines AND ≤ 1200 chars per line. Both checks live here so
@@ -270,6 +281,8 @@ class SubagentOutput:
             raise IsolationViolation(f"SubagentOutput.completion_state={self.completion_state!r} invalid")
         if self.confidence not in SUBAGENT_OUTPUT_CONFIDENCE_VALUES:
             raise IsolationViolation(f"SubagentOutput.confidence={self.confidence!r} invalid")
+        if self.validation_status not in SUBAGENT_OUTPUT_VALIDATION_STATUSES:
+            raise IsolationViolation(f"SubagentOutput.validation_status={self.validation_status!r} invalid")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -283,6 +296,9 @@ class SubagentOutput:
             "completion_state": self.completion_state,
             "confidence": self.confidence,
             "retry_count": self.retry_count,
+            "validation_status": self.validation_status,
+            "parser_success": self.parser_success,
+            "schema_compliance": self.schema_compliance,
         }
 
 

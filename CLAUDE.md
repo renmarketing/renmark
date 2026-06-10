@@ -311,7 +311,7 @@ skill code. The cross-domain side IS automated via
 `renmark.lifecycle.skill_preamble(repo, skill)` — the single Step-0 helper
 every skill calls, which resolves the domain from `DOMAIN_BY_SKILL`, runs
 `context_budget_check`, records the invocation, and returns the hint string
-to surface. Skills no longer inline these calls (consolidated v0.3.2).
+to surface. Skills no longer inline these calls (consolidated into `lifecycle.skill_preamble`).
 
 Domains for subject-change detection (per `renmark.lifecycle.DOMAIN_BY_SKILL`):
 
@@ -336,7 +336,7 @@ The canonical lifecycle stages (in order):
 
 ```
 init → brainstorm-complete → plan-drafted → plan-validated → created
-     → verified → reviewed → documented → ready-to-release → released
+     → verified → reviewed → documented (dormant — no writer yet) → ready-to-release → released
 ```
 
 **Cold-start recovery:** after `/clear`, run `/renmark:resume`. It reads
@@ -354,7 +354,7 @@ this at write time.
 `human_review_completed`, `human_review_for` fields. Release, merge, and
 security overrides MUST set these before destructive operations and MUST
 check them on re-entry. `/renmark:approve` is the sole surface for flipping
-`human_review_completed` — ships in 0.9.0. AI may generate code; the human
+`human_review_completed` (since 0.9.0). AI may generate code; the human
 owns merges and releases.
 <!-- END:lifecycle-rule -->
 
@@ -372,7 +372,7 @@ owns merges and releases.
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
 | `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
 | `/renmark:loop "<goal>"` | Bounded, resumable agentic loop (iterate until verified or budget hit) |
-| `/renmark:finish` | Close branch — create PR, merge, or clean up |
+| `/renmark:finish` | Close branch — build version zip+snapshot into `.renmark/version/`, then PR, merge, or release (gh release only with a remote) |
 | `/renmark:backlog` | Triage backlog items; "Approve and build" launches bounded Loop Mode |
 | `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
 | `/renmark:codereview <ref>` | Diff-proportional review: lite in-context for small diffs, full Codex pass for core code |

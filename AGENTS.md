@@ -77,7 +77,7 @@
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
 | `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
 | `/renmark:loop "<goal>"` | Bounded, resumable agentic loop (iterate until verified or budget hit) |
-| `/renmark:finish` | Close branch — create PR, merge, or clean up |
+| `/renmark:finish` | Close branch — build version zip+snapshot into `.renmark/version/`, then PR, merge, or release (gh release only with a remote) |
 | `/renmark:backlog` | Triage backlog items; "Approve and build" launches bounded Loop Mode |
 | `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
 | `/renmark:codereview <ref>` | Diff-proportional review: lite in-context for small diffs, full Codex pass for core code |

@@ -98,7 +98,7 @@ if prior:
 Before dispatching any task in this wave, compute the bounded usage view and check it against the configured local limits in `.renmark/analytics/limits.json`. This is a deterministic file-IO check — **never read raw usage logs into conversation**; `build_usage_view` returns the bounded summary dict only.
 
 ```python
-from renmark import usage, state
+from renmark import usage, state, analytics
 view = usage.build_usage_view(repo, now=state.now_iso())
 if view.get("limit_exceeded"):  # a configured local limit is already over budget
     pause = usage.classify_usage_pause(
@@ -229,7 +229,7 @@ Use the task's `summary_lines` and `touched_files` from `SubagentOutput` to fill
 **Tier-2 — provider-error classification (usage_limit, not failure).** When a task's failure signal is a provider rate-limit / quota / `retry-later` / usage-exceeded error (from `renmark-execute` output or an Agent error), do NOT record it as `status: FAIL`. Reclassify the run as paused for usage and stop the wave — this is a transient quota event, not a broken task. MVP: no polling, no auto-retry; `/renmark:resume` re-enters once the window clears.
 
 ```python
-from renmark import usage, state
+from renmark import usage, state, analytics
 pause = usage.classify_usage_pause(
     run_id=<run_id>, plan_path=<plan>, last_task_index=task.index,
     now=state.now_iso(), provider=<provider>, model=<model>,

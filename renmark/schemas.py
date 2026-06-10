@@ -146,6 +146,9 @@ SUBAGENT_OUTPUT_TYPES = {
     "completion_state": str,
     "confidence": str,
     "retry_count": int,
+    "validation_status": str,
+    "parser_success": bool,
+    "schema_compliance": bool,
 }
 
 

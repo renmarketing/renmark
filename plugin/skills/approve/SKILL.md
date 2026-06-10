@@ -100,7 +100,7 @@ from pathlib import Path
 from renmark.loop import read_loop, LOOPS_SUBDIR
 from renmark.state import RENMARK_DIR_NAME
 root = Path('.') / RENMARK_DIR_NAME / LOOPS_SUBDIR
-for d in sorted(root.glob('loop-*')) if root.is_dir() else []:
+for d in (sorted(root.glob('loop-*')) if root.is_dir() else []):
     st = read_loop('.', d.name)
     if st is not None and st.status == 'awaiting-approval':
         print(f'⟳  Loop awaiting approval: {d.name} — resume with /renmark:loop --resume {d.name}')
