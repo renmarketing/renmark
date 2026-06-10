@@ -81,7 +81,7 @@ Each entry: signal, observation, model that caught it, date.
 
 - (2026-06-08, run) model `opus`: **codereview/verify can mutate the live repo** — Running the MUTATING python -m renmark.init on the working repo (once as a verify smoke, once by codex while verifying findings) back-filled CLAUDE.md + refreshed the map twice. Guard: run mutating CLI smokes in mktemp copies; codex read-only sandbox does not fully prevent cwd writes when it executes code.
 
-- (2026-06-08, run) model `verify`: **verify smoke must not mutate the deliverable** — A regression smoke ran the MUTATING OK  stub=unchanged agents=unchanged map=refreshed standards=unchanged blocks=1 modules=74 commands=19 langs=python ref=2026-06-08@42b332d on the live repo, which back-filled a rule block + refreshed the map + scaffolded .renmark files. Correct behavior, but a verify side-effect. Run mutating CLI smokes in a tmp copy (mktemp), not the working repo. Reverted cleanly.
+- (2026-06-08, run) model `verify`: **verify smoke must not mutate the deliverable** — A regression smoke ran `python -m renmark.init` on the live repo, which back-filled a rule block + refreshed the map + scaffolded .renmark files. Correct behavior, but a verify side-effect. Run mutating CLI smokes in a tmp copy (mktemp), not the working repo. Reverted cleanly. (Same lesson as the opus entry above — merged for clarity.)
 
 - (2026-06-08, .renmark/reviews/2026-06-08-42b332dcbcaa9274bcb3b9a436902d77b4400157.verification.md) model `verify`: **verify-init-pipeline** — 5/5 behaviors verified; headline bug (init exit-1 w/o CLAUDE.md) fixed; merge_rule_blocks non-destructive+idempotent confirmed on a real file
 
@@ -130,5 +130,3 @@ Each entry: signal, observation, model that caught it, date.
 - (2026-05-29, .renmark/reviews/2026-05-29-729e0ca.verification.md) model `verify`: **verify-lifecycle-hygiene** — 6/6 behaviors verified; failed: none; regressions: 0
 
 - (2026-05-28, run) **task 1 failed on codex** — codex_verifier_failed
-
-(Empty — will fill as runs complete.)

@@ -62,8 +62,6 @@ def test_lifecycle_recommends_correct_next_stage(fixture_project: Path):
     """next_recommended must always match NEXT_BY_STAGE for the current stage."""
     repo = fixture_project
     for stage in STAGES:
-        if stage == "restored":
-            continue  # restored is a leaf, no canonical next
         lifecycle.write_lifecycle(repo, stage=stage, feature="x", branch="x")
         rec = lifecycle.next_recommended(repo)
         expected = lifecycle.NEXT_BY_STAGE.get(stage, "")

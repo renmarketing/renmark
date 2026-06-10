@@ -1,4 +1,4 @@
-# renmark v0.7.8
+# renmark v0.9.0
 
 A Claude Code plugin that turns Claude into a guided build assistant. Type `/renmark:start`, describe what you want to build, and renmark handles stack selection, scope, best practices, and the full build pipeline — no prior knowledge of specs, plans, or executors needed.
 
@@ -96,19 +96,31 @@ Describe what you want to build. renmark asks at most 2 questions, confirms the 
 
 | Command | What it does |
 |---|---|
-| `/renmark:start` | Vibe coder entry — describe what you want, renmark builds the rest |
-| `/renmark:setup` | Add renmark to an existing project (creates CLAUDE.md, AGENTS.md, .renmark/) |
+| `/renmark:start` | Vibe coder entry — describe what you want, renmark routes the pipeline |
 | `/renmark:brainstorm` | Design a feature into a spec — researches prior art + best practices, sets the scope contract |
+| `/renmark:prd` | Create/update the project PRD — the durable source of truth that plans align to |
+| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |
 | `/renmark:plan` | Decompose a spec into executor-tagged tasks with cost preview (auto-validates via check-plan) |
 | `/renmark:check-plan` | Validate a plan before spending tokens (runs automatically inside plan) |
 | `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus, wave-parallel) — auto-verifies on completion |
 | `/renmark:verify` | Confirm the feature goal was achieved (runs automatically after orchestrate) |
+| `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
+| `/renmark:loop` | Bounded, resumable agentic loop — iterate until goal verified or budget hit |
 | `/renmark:finish` | Close branch — create PR, merge, or clean up |
-| `/renmark:feature` | Full pipeline with branch isolation |
+| `/renmark:backlog` | Triage backlog items; "Approve and build" launches bounded Loop Mode |
 | `/renmark:debug` | Systematic root-cause loop for bugs |
-| `/renmark:codereview` | Multi-pass diff review |
-| `/renmark:roadmap` | Project status and token usage report |
+| `/renmark:codereview` | Diff-proportional review: lite in-context for small diffs, full Codex pass for core code |
+| `/renmark:audit` | Read-only self-audit — verifies registry/docs/skill parity; artifacts under `.renmark/audits/` |
+| `/renmark:inventory` | Alias for `/renmark:audit` — lists registered skills and command surface |
+| `/renmark:approve` | Flip the human-review gate — sole approval surface for merge/release gates |
+| `/renmark:hygiene` | Flag stale artifacts, orphan branches, oversized memory (use `--apply` to clean) |
 | `/renmark:doctor` | Diagnose install health — run if `/renmark:*` commands don't appear |
+| `/renmark:init` | Scaffold or non-destructively update CLAUDE.md / AGENTS.md / `.renmark/` |
+| `/renmark:setup` | Thin alias for `/renmark:init` (rule-block refresh only) |
+| `/renmark:resume` | Cold-start recovery after `/clear` — one file read, zero LLM calls |
+| `/renmark:roadmap` | Project status, PRD gap discovery, and token usage report |
+| `/renmark:usage` | Rolling observed usage — 5-hour / weekly, top features, quota events |
+| `/renmark:analytics` | Usage analytics over time — model/executor mix, verification outcomes |
 | `/renmark:help` | List all commands |
 
 ---

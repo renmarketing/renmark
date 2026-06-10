@@ -49,12 +49,15 @@
 
 **Context budget — `/compact` at 60%, `/clear` on subject change.** At ~60% utilization, surface a `/compact` recommendation. At ~80%, refuse new long-running skills until /compact or /clear runs. Cross-domain transitions auto-recommend `/clear` via `renmark.state.context_budget_check`. See `CLAUDE.md` § `context-budget-rule`.
 
-**Lifecycle persists across `/clear`.** Every workflow stage transition writes `.renmark/state/lifecycle.json`. After `/clear`, run `/renmark:resume` to recover — one file read, zero LLM calls. Runtime state lives in `pipeline.json`, never lifecycle.json. Human approval gates (release/restore/merge/security override) flow through `human_review_required` / `human_review_completed` fields. See `CLAUDE.md` § `lifecycle-rule`.
+**Lifecycle persists across `/clear`.** Every workflow stage transition writes `.renmark/state/lifecycle.json`. After `/clear`, run `/renmark:resume` to recover — one file read, zero LLM calls. Runtime state lives in `pipeline.json`, never lifecycle.json. Human approval gates (release/merge/security override) flow through `human_review_required` / `human_review_completed` fields; `/renmark:approve` is the sole flip surface. See `CLAUDE.md` § `lifecycle-rule`.
 
 ## Conventions
 
 - Plans: `.renmark/plans/`
 - Specs: `.renmark/specs/`
+- Reviews / verification: `.renmark/reviews/`
+- Debug sessions: `.renmark/debug/<session-id>/`
+- Audit reports: `.renmark/audits/`
 - Project memory: `.renmark/memory/` — read `INDEX.md` first
 - Changelog: `CHANGELOG.md` — persistent project history
 - Tests: run via command in `CLAUDE.md` § Testing
@@ -64,18 +67,32 @@
 
 | Command | When to use |
 |---|---|
-| `/renmark:start` | Starting point for vibe coders — plain-English entry to the full pipeline |
-| `/renmark:brainstorm <topic>` | Fleshing out an idea into a spec |
-| `/renmark:prd` | Create/update the project PRD — the source of truth that plans and features align to |
-| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype when there's a UI) |
-| `/renmark:plan <spec>` | Decomposing a spec into atomic, executor-tagged tasks |
-| `/renmark:orchestrate <plan>` | Executing a plan (Haiku / Codex / Sonnet / Opus) |
+| `/renmark:start` | Plain-English entry — describe what to build, renmark routes the pipeline |
+| `/renmark:brainstorm <topic>` | Flesh out an idea into a spec with scope contract |
+| `/renmark:prd` | Create/update the project PRD — the durable source of truth |
+| `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |
+| `/renmark:plan <spec>` | Decompose a spec into atomic, executor-tagged tasks |
 | `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
+| `/renmark:orchestrate <plan>` | Execute a plan — routes tasks to Haiku / Codex / Sonnet / Opus |
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
+| `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
+| `/renmark:loop "<goal>"` | Bounded, resumable agentic loop (iterate until verified or budget hit) |
 | `/renmark:finish` | Close branch — create PR, merge, or clean up |
-| `/renmark:backlog` | Triage & approve backlog items; "Approve and build" launches bounded Loop Mode on a managed branch (max 5 iterations, no orphan branches) |
+| `/renmark:backlog` | Triage backlog items; "Approve and build" launches bounded Loop Mode |
 | `/renmark:debug <symptom>` | Systematic root-cause loop for bugs |
-| `/renmark:codereview <ref>` | Multi-pass diff review (adversarial + quality + architecture) |
+| `/renmark:codereview <ref>` | Diff-proportional review: lite in-context for small diffs, full Codex pass for core code |
+| `/renmark:audit` | Read-only self-audit — verifies registry/docs/skill parity; artifacts under `.renmark/audits/` |
+| `/renmark:inventory` | Alias for `/renmark:audit` — lists registered skills and command surface |
+| `/renmark:approve` | Flip the human-review gate (`human_review_completed`) — sole approval surface |
+| `/renmark:hygiene --apply` | Flag and optionally clean stale artifacts, orphan branches, oversized memory |
+| `/renmark:doctor` | Diagnose install health — run if `/renmark:*` commands don't appear |
+| `/renmark:init` | Scaffold or update CLAUDE.md / AGENTS.md / `.renmark/` in an existing project |
+| `/renmark:setup` | Thin alias for `/renmark:init` (rule-block refresh only) |
+| `/renmark:resume` | Cold-start recovery — reads lifecycle.json, prints next recommended command |
+| `/renmark:roadmap` | Project status, gap discovery (PRD vs shipped), and token usage |
+| `/renmark:usage` | Rolling observed usage — 5-hour / weekly, top features, quota events |
+| `/renmark:analytics` | Usage analytics over time — model/executor mix, verification outcomes |
+| `/renmark:help` | List all commands |
 
 ## What renmark expects
 

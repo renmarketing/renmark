@@ -10,13 +10,15 @@ description: Use when you need a bounded project build-health summary — typed 
 Project build-health reporter. Aggregates cross-feature metrics into a bounded
 summary — no LLM calls, no raw log ingestion. Sources:
 
-- `.renmark/state/pipeline.json` — wave/task status per feature
+- `.renmark/analytics/*.jsonl` — the 4 analytics ledgers: feature runs, loop
+  iterations, verify results, and cost events (Python aggregates; never loaded
+  into context)
 - `.renmark/state/usage.jsonl` — token spend per LLM call
-- `.renmark/memory/features.md` — declared features
-- `.renmark/analytics/*.jsonl` — loop telemetry (Python aggregates; never loaded into context)
 
 Output: shipped vs. blocked feature counts, loop success rate, token/cost breakdown
-by feature. Also writes `.renmark/memory/analytics.md` as a committed snapshot.
+by feature. The Python aggregator (`aggregate()`) WRITES `.renmark/analytics/summary.json`
+as a machine-readable snapshot, and also writes `.renmark/memory/analytics.md` as a
+committed human-readable snapshot.
 
 ## Step 0 — context check
 
@@ -46,9 +48,15 @@ so it can be committed alongside the rest of the project memory.
   returned by `renmark-execute --analytics`.
 - **Zero LLM calls.** This skill is purely deterministic aggregation and
   display. No inference, no subagents, no web calls.
-- **Read-only.** Do not modify `features.md`, `usage.jsonl`, pipeline state, or
-  git history. Only `.renmark/memory/analytics.md` is written (by the Python
-  aggregator, not by this skill directly).
+- **Read-only (except managed snapshots).** Do not modify `usage.jsonl`, pipeline
+  state, or git history. Only `.renmark/analytics/summary.json` and
+  `.renmark/memory/analytics.md` are written (by the Python aggregator, not by
+  this skill directly).
+
+## See also
+
+- `/renmark:usage` — rolling 5-hour window, pause state, and local limits
+- `/renmark:roadmap` — per-task status table (shipped/retried/in-progress) synthesized from git log + usage.jsonl
 
 ## What's next
 

@@ -23,11 +23,6 @@ import os
 import tempfile
 from pathlib import Path
 
-# Generic run-report kinds (per-feature reports use write_feature_report).
-RUN_REPORT_KINDS: frozenset[str] = frozenset(
-    {"tasks", "loops", "backlog", "releases", "features"}
-)
-
 
 def _safe_component(value: str) -> str:
     """Coerce ``value`` into a single safe path component (no traversal).
@@ -253,6 +248,15 @@ def write_feature_report(
     Returns ``(md_path, json_path)`` — the intended paths even if a write
     degraded to ``None`` internally (caller can re-check existence).
     """
+    # Writer-side validation, log-don't-raise: report writing must never crash
+    # a finish/loop close-out. On structural issues we still write the report
+    # but stamp a bounded validation_issues count for downstream readers.
+    from renmark import schemas
+
+    issues = schemas.validate_report_metrics(report)
+    if issues:
+        report = {**report, "validation_issues": len(issues)}
+
     out_dir = feature_reports_dir(repo, slug)
     with contextlib.suppress(OSError):
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -261,25 +265,3 @@ def write_feature_report(
     _atomic_write(md_path, render_report_md(report))
     _atomic_write(json_path, json.dumps(report, indent=2))
     return md_path, json_path
-
-
-def write_run_report(
-    repo: Path | str, kind: str, run_id: str, report: dict[str, object]
-) -> Path:
-    """Atomically write a generic run report to ``.renmark/reports/<kind>/<run_id>.json``.
-
-    ``kind`` MUST be one of ``RUN_REPORT_KINDS`` (callers are internal; an
-    unknown kind is a programmer error and raises ``ValueError``). ``run_id`` is
-    sanitized to a single safe path component so it cannot escape the kind dir.
-    Returns the intended path (mkdir is non-raising).
-    """
-    if kind not in RUN_REPORT_KINDS:
-        raise ValueError(
-            f"invalid run-report kind {kind!r}; expected one of {sorted(RUN_REPORT_KINDS)}"
-        )
-    out_dir = reports_dir(repo) / kind
-    with contextlib.suppress(OSError):
-        out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{_safe_component(run_id)}.json"
-    _atomic_write(path, json.dumps(report, indent=2))
-    return path

@@ -58,6 +58,24 @@ SUCCESS_STATUSES: frozenset[str] = frozenset(
 #: Status strings (case-insensitive) that mean a task/feature/loop was blocked.
 BLOCKED_STATUSES: frozenset[str] = frozenset({"blocked", "failed", "fail"})
 
+#: Registered ``record_event`` kinds. Observational only — record_event still
+#: persists an UNregistered kind (events are never load-bearing), but stamps
+#: ``unregistered_kind: True`` on it so drift is visible. Mirrored by
+#: :func:`renmark.schemas.validate_event`.
+EVENT_KINDS: frozenset[str] = frozenset(
+    {
+        "loop_iteration",
+        "pause",
+        "resume",
+        "rate_limit",
+        "quota",
+        "release",
+        "backlog_completed",
+        "backlog_blocked",
+        "backlog_rejected",
+    }
+)
+
 #: Ledger filenames under ``.renmark/analytics/``.
 EVENTS_LEDGER: str = "events.jsonl"
 TASK_RUNS_LEDGER: str = "task-runs.jsonl"
@@ -130,9 +148,15 @@ def record_event(repo: str | Path, *, ts: str, kind: str, **fields: object) -> N
     ``kind`` is the marker the aggregation buckets on (e.g. ``"pause"``,
     ``"resume"``, ``"rate_limit"``, ``"quota"``, ``"release"``,
     ``"backlog_completed"``). Extra ``fields`` are stored verbatim.
+
+    Unregistered kinds (not in :data:`EVENT_KINDS`) are STILL recorded — events
+    are observational, never load-bearing — but stamped ``unregistered_kind:
+    True`` so registry drift surfaces in the ledger.
     """
     record: dict[str, object] = {"ts": ts, "kind": kind}
     record.update(fields)
+    if kind not in EVENT_KINDS:
+        record["unregistered_kind"] = True
     _append(repo, EVENTS_LEDGER, record)
 
 
@@ -563,6 +587,14 @@ def aggregate(repo: str | Path, *, now: str) -> dict[str, object]:
             "agent_calls": usage["agent_calls"],
         },
     }
+    # Analytics is documented never-raise. Validate as an observation only: on
+    # any structural issue still write the summary, but stamp a bounded
+    # validation_issues count so a downstream reader can notice drift.
+    from renmark import schemas
+
+    issues = schemas.validate_analytics_summary(summary)
+    if issues:
+        summary["validation_issues"] = len(issues)
     _write_summary_atomic(repo, summary)
     return summary
 
@@ -686,6 +718,7 @@ __all__ = [
     "BLOCKED_STATUSES",
     "DEFAULT_SOURCE",
     "EVENTS_LEDGER",
+    "EVENT_KINDS",
     "FEATURE_RUNS_LEDGER",
     "HEALTH_LIST_CAP",
     "LOOP_RUNS_LEDGER",

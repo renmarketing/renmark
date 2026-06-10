@@ -20,7 +20,9 @@ Three steps: verify everything still passes → show what was built → offer ne
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'finish')`. If it returns a non-None hint, surface as a one-line note.
 
-**Final step — Lifecycle update.** After all verifiers pass, call `lifecycle.write_lifecycle(repo, stage='ready-to-release')` — but **only when the feature is not already at a later stage** (`released`). Never downgrade `released → ready-to-release` on a re-run; if the stage is already `released`, leave it and report that the feature is already shipped. There is **no `/renmark:release` skill** — it is unimplemented (see `lifecycle.NEXT_BY_STAGE`, which routes `ready-to-release` to the manual fallback *"tag the release and build the zip; see README § Release"*; the `/renmark:release` target lives only in the aspirational `NEXT_BY_STAGE_PLANNED`). PR, merge, branch cleanup, and release packaging/tagging all live in **this skill** (steps 3–4 below), not in a separate release command.
+**Final step — Lifecycle update.** After all verifiers pass, call `lifecycle.write_lifecycle(repo, stage='ready-to-release')` — but **only when the feature is not already at a later stage** (`released`). Never downgrade `released → ready-to-release` on a re-run; if the stage is already `released`, leave it and report that the feature is already shipped. There is **no `/renmark:release` skill** — PR, merge, branch cleanup, and release packaging/tagging all live in **this skill** (steps 3–4 below), not in a separate release command.
+
+**Human approval gate.** Merge, release, and branch-destructive operations require explicit human selection (from the step 3 menu). `/renmark:approve` is the flip surface for the lifecycle `human_review_required` bit — invoke it when an automated stage (e.g. `/renmark:feature`'s drift check) has set a pending gate; it clears `human_review_required` so finish can proceed. A user selecting from the step 3 menu directly IS the approval — no additional gate is needed.
 
 **Decision log entry.** Immediately after the lifecycle write, finish appends a single ADR to `.renmark/memory/decisions.md` via `memory.log_decision()` — capturing the feature name (`state.feature`), branch, stage transition (e.g. `documented → ready-to-release`), and the list of completed stages. The call is idempotent on `(title.strip(), date)`, so re-running finish on the same day short-circuits and never duplicates ADRs. Canonical snippet finish runs:
 
@@ -194,6 +196,13 @@ created it, so closing the feature is what removes it. Use `git branch -d` (lowe
 the *safe* form: it refuses to delete an unmerged branch); never `-D` unless the user
 explicitly discards unmerged work. Omit both `git push` lines when there's no `origin`.
 
+After the merge and branch deletion complete, clear lifecycle state so the next
+`/renmark:start` is not permanently redirected to resume:
+```python
+from renmark import lifecycle
+lifecycle.clear_lifecycle(Path('.'))  # final step on the merge path; must come after feature report lands
+```
+
 **[r] Release:** see § Release below. A release is cut from `main` *after* the merge,
 so by release time the feature branch is already gone (deleted by the merge step above).
 If a stray merged feature branch still exists at release time, delete it with
@@ -267,6 +276,17 @@ This single command writes **both**:
 Both outputs write **only inside the project** (`project-write-boundary-rule`) and
 exclude `.git`, `.venv`, `__pycache__`, `.env`, `.renmark/`, `PLAN.md`, etc.
 This is the same zip a GitHub release would attach.
+
+**4c-post. Lifecycle + analytics (after tag + snapshot succeed).** After 4b and 4c both complete without error, advance the lifecycle stage and emit the release event:
+
+```python
+from renmark import lifecycle, analytics, state
+from pathlib import Path
+lifecycle.write_lifecycle(Path('.'), stage="released")
+analytics.record_event(Path('.'), ts=state.now_iso(), kind="release", version=version)
+# Final step on the release path — clear lifecycle so the next /renmark:start is not redirected to resume.
+lifecycle.clear_lifecycle(Path('.'))
+```
 
 **4d. GitHub release — only if a remote + `gh` both exist.** Detect first:
 ```bash

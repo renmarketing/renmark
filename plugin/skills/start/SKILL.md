@@ -1,6 +1,6 @@
 ---
 name: start
-description: Use when a vibe coder wants to build something and doesn't know where to begin — the plain-English entry point for the full renmark pipeline. Adaptive: one open question, at most 2 follow-ups, then routes to plan or brainstorm automatically.
+description: "Use when a vibe coder wants to build something and doesn't know where to begin — the plain-English entry point for the full renmark pipeline. Adaptive: one open question, at most 2 follow-ups, then routes to plan or brainstorm automatically."
 ---
 
 # start
@@ -24,6 +24,8 @@ Do not mention specs, plans, executors, or any renmark terminology. Do not ask a
 ---
 
 ### 2. Assess the response
+
+> *The canonical scope questions (Q1–Q3) and their menus live in `_shared/scope-contract.md`; the tables in Steps 2–4 below are their rendering for vibe coders — do not improvise alternatives.*
 
 From the description, determine silently:
 

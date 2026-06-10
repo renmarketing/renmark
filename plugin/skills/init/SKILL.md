@@ -73,11 +73,11 @@ That single command runs steps 1–5 above (detect → scaffold → back-fill �
 
 **Stdout format:**
 ```
-OK  stub=<created|refreshed|unchanged> agents=<…|skipped> map=<…> standards=<…> blocks=<N back-filled|none> modules=<N> commands=<N> langs=<py,ts,…> ref=YYYY-MM-DD@<git-sha>
-HEALTH: <N> gaps (<X danger>, <Y warn>, <Z info>) — see `.renmark/memory/dev-standards.md`
+OK  stub=<created|refreshed|unchanged> agents=<…|skipped> map=<…> standards=<…> blocks=<N|unchanged> modules=<N> commands=<N> langs=<py,ts,…> ref=YYYY-MM-DD@<git-sha>
+HEALTH: <N> standards gaps (<X danger>, <Y warn>, <Z info>)[, <M> modularity (<major> major/<warn> warn)] — see `.renmark/memory/dev-standards.md`
 ```
 
-The `HEALTH:` line only appears when there's at least one gap. A clean, fully-initialized project produces just the `OK` line with everything `unchanged`.
+The `HEALTH:` line appears with two optional parts: standards gaps (if any) and modularity gaps (if any), joined by `, `. Both halves are omitted when their count is zero. A clean, fully-initialized project produces just the `OK` line with everything `unchanged`.
 
 **Exit codes:**
 - `0` — success (whether or not anything changed; this is the normal path even when CLAUDE.md was absent and had to be scaffolded)
@@ -138,7 +138,7 @@ CLAUDE.md/AGENTS.md.
 
 ## Fallback (if `renmark.init` is unavailable)
 
-If `python -m renmark.init` returns "module not found" — older renmark install — tell the user to run `bin/renmark-install` or update renmark. Do not implement the scan, scaffold, or rule-block merge manually in the agent context; that wastes tokens and re-introduces the very problem the script exists to solve.
+If `python -m renmark.init` returns "module not found" — older or broken renmark install — tell the user to re-run `bash install.sh` from the renmark checkout (or reinstall the plugin). Do not implement the scan, scaffold, or rule-block merge manually in the agent context; that wastes tokens and re-introduces the very problem the script exists to solve.
 
 ## Boundaries
 

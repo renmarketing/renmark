@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-06-09T23:40:30+00:00",
+  "source": "local-observed",
+  "features": {
+    "started": 0,
+    "completed": 0,
+    "blocked": 0,
+    "by_status": {},
+    "branch_dispositions": {},
+    "shipped_names": [],
+    "blocked_names": []
+  },
+  "tasks": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "verification_pass": 0,
+    "verification_fail": 0,
+    "common_failure_reasons": [],
+    "tokens_by_executor": {},
+    "tokens_by_model": {},
+    "tokens_by_provider": {}
+  },
+  "loops": {
+    "total": 0,
+    "success": 0,
+    "failure": 0,
+    "avg_iterations": 0.0,
+    "by_stop_reason": {},
+    "branch_dispositions": {}
+  },
+  "backlog": {
+    "completed": 0,
+    "blocked": 0,
+    "rejected": 0
+  },
+  "verification": {
+    "pass": 0,
+    "fail": 0
+  },
+  "releases_created": 0,
+  "branch_dispositions": {},
+  "common_failure_reasons": [],
+  "events": {},
+  "quota_rate_limit": {
+    "rate_limit": 0,
+    "quota": 0,
+    "pause": 0,
+    "resume": 0
+  },
+  "tokens": {
+    "total": 649704,
+    "by_provider": {
+      "unknown": 649704
+    },
+    "by_model": {
+      "sonnet": 347071,
+      "haiku": 179463,
+      "opus": 123170,
+      "codex": 0
+    },
+    "by_executor": {},
+    "by_feature": {},
+    "requests": 0,
+    "agent_calls": 0
+  }
+}

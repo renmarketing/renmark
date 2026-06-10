@@ -1,19 +1,22 @@
 ---
 name: roadmap
-description: Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, "show the roadmap", "what's been built", "token usage report". Prints a table of task | llm | status | tokens | $ | commit, synthesized from features.md, usage.jsonl, and git log. Zero LLM calls.
+description: "Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, \"show the roadmap\", \"what's been built\", \"token usage report\". Prints a table of task | llm | status | tokens | $ | commit, synthesized from usage.jsonl and git log. Zero LLM calls (default table; --gaps dispatches bounded subagents)."
 ---
 
 # roadmap
 
 ## Overview
 
-Project-level status reporter. Pulls from three sources to build a per-task table with totals:
+Project-level status reporter. Pulls from two sources to build a per-task table with totals:
 
-- `.renmark/memory/features.md` — declared features
 - `.renmark/state/usage.jsonl` — token spend per LLM call
 - `git log` — task-N commits that have landed
 
 Output columns: **task | llm | status | tokens | $ | commit** + totals.
+
+## Steps
+
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'roadmap')`. If it returns a non-None hint, surface as a one-line note.
 
 ## When invoked
 
@@ -27,12 +30,13 @@ Show the rendered table to the user. Also write the current snapshot to `.renmar
 
 ## Statuses
 
+`build_rows` derives status from git log and usage.jsonl only — there is no "planned" status.
+
 | Status | Meaning |
 |---|---|
 | `shipped` | a `[renmark] task N:` (or `[codex] task N:` or `[manual] task N:`) commit exists in git |
 | `in-progress` | usage.jsonl has an entry for the task but no matching commit |
 | `retried` | multiple usage entries for the same task without a commit (likely escalated) |
-| `planned` | listed in features.md "Planned" but no usage yet |
 
 ## When to use
 
@@ -44,16 +48,16 @@ Show the rendered table to the user. Also write the current snapshot to `.renmar
 ## Sample output
 
 ```
-| task   | llm                            | status      | tokens | $       | commit  |
-|--------|--------------------------------|-------------|-------:|--------:|---------|
-| task 1 | llama-3.2-3b-instruct          | shipped     |    191 | free    | `e373204` |
-| task 2 | mistral-large-3-675b-instruct  | shipped     |    981 | free    | `45227a1` |
-| task 3 | llama-3.2-3b-instruct          | shipped     |    304 | free    | `611391f` |
-| task 4 | codex                          | retried     | 148321 | $7.416  | `—`     |
-| task 5 | llama-3.2-3b-instruct          | shipped     |    362 | free    | `bda857a` |
-| task 6 | llama-3.2-3b-instruct          | shipped     |   1320 | free    | `f7720b2` |
+| task   | llm    | status      | tokens | $       | commit    |
+|--------|--------|-------------|-------:|--------:|-----------|
+| task 1 | haiku  | shipped     |    191 | $0.002  | `e373204` |
+| task 2 | haiku  | shipped     |    981 | $0.010  | `45227a1` |
+| task 3 | codex  | shipped     |    304 | $0.015  | `611391f` |
+| task 4 | codex  | retried     | 148321 | $7.416  | `—`       |
+| task 5 | sonnet | shipped     |    362 | $0.011  | `bda857a` |
+| task 6 | haiku  | shipped     |   1320 | $0.013  | `f7720b2` |
 
-Totals: 6 tasks · 151,479 tokens · $7.416
+Totals: 6 tasks · 151,479 tokens · $7.467
 By status: retried=1, shipped=5
 ```
 

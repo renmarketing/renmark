@@ -5,10 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from renmark import schemas
-
 
 # ── lifecycle ────────────────────────────────────────────────────────────────
 
@@ -68,11 +65,21 @@ def test_validate_lifecycle_flags_runtime_cruft():
     assert any("budget" in i for i in issues)
 
 
-def test_validate_lifecycle_rejects_unknown_stage_in_completed():
+def test_validate_lifecycle_tolerates_unknown_stage_in_completed():
+    """Only the ACTIVE stage must be canonical. An unknown but string-typed
+    completed stage (e.g. a since-removed stage like the cut "restored") is
+    tolerated so legacy lifecycle.json stays loadable + re-writable instead of
+    hard-failing the writer-side validator mid-recovery."""
     data = _valid_lifecycle()
-    data["stages_completed"] = ["init", "bogus-stage"]
+    data["stages_completed"] = ["init", "restored", "bogus-stage"]
+    assert schemas.validate_lifecycle(data) == []
+
+
+def test_validate_lifecycle_rejects_non_string_stage_in_completed():
+    data = _valid_lifecycle()
+    data["stages_completed"] = ["init", 42]
     issues = schemas.validate_lifecycle(data)
-    assert any("stages_completed" in i and "bogus-stage" in i for i in issues)
+    assert any("stages_completed" in i and "non-string" in i for i in issues)
 
 
 # ── pipeline ────────────────────────────────────────────────────────────────

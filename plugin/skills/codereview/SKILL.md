@@ -1,6 +1,6 @@
 ---
 name: codereview
-description: Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like "review this", "review my changes", "check this PR", "code review HEAD~3..HEAD". Review depth is proportional to the diff: a lite/doc diff runs the built-in cheap `/review` in-context by default (then offers a one-keystroke escalate to the full codex pass); a standard/full diff runs the full codex review pass in a read-only sandbox, emitting a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean. Supports `--full` (force codex), `--skip` (explicit skip), and `--focus optimize`/`--focus standards` to swap the prompt template; default focus is correctness + quality.
+description: "Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like \"review this\", \"review my changes\", \"check this PR\", \"code review HEAD~3..HEAD\". Review depth is proportional to the diff: a lite/doc diff runs the built-in cheap `/review` in-context by default (then offers a one-keystroke escalate to the full codex pass); a standard/full diff runs the full codex review pass in a read-only sandbox, emitting a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean. Supports `--full` (force codex), `--skip` (explicit skip), and `--focus optimize`/`--focus standards` to swap the prompt template; default focus is correctness + quality."
 ---
 
 # codereview
@@ -132,10 +132,11 @@ Do not modify any files. Do not exit until the review is complete.
 
 ```
 Review the diff <range> for adherence to the project's UNWRITTEN code
-standards. Skip what tools/precommit.sh already checks (ruff lint, ruff
-format, mypy strict, plugin lint, pytest) — those are the WRITTEN
-standards and the gate already enforces them. Look only at the
-conventions that exist in the codebase but are not enforced by tooling.
+standards. Skip whatever the project's own pre-commit/CI gates already
+enforce (check for .pre-commit-config.yaml and CI config files — in
+renmark's own repo that is tools/precommit.sh: ruff lint, ruff format,
+mypy strict, plugin lint, pytest). Look only at conventions that exist
+in the codebase but are not enforced by tooling.
 
 Sources of truth:
   - Spot-check 3–5 other files in the same module/package for
@@ -177,7 +178,18 @@ Codex writes its review to `.renmark/reviews/YYYY-MM-DD-<sha>.review.md` directl
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'codereview')`. If it returns a non-None hint, surface as a one-line note.
 
-**Lifecycle note:** Codereview is orthogonal to stage progression but commonly runs as part of the Review stage. Skill should NOT bump `lifecycle.json.stage` directly — the wrapper `/renmark:feature` handles that after both codereview AND any secure audit complete.
+**Lifecycle note:** Codereview advances the lifecycle stage when it runs against a verified feature. After the full codex pass writes its report, check whether the project has a lifecycle and the stage is `"verified"`:
+
+```python
+from renmark import lifecycle
+from pathlib import Path
+s = lifecycle.read_lifecycle(Path('.'))
+if s and s.stage == "verified":
+    lifecycle.write_lifecycle(Path('.'), stage="reviewed",
+                              artifact_update=("review", report_path))
+```
+
+Ad-hoc reviews on arbitrary diffs (stage is not `"verified"`, or no lifecycle exists) skip this write — stage ownership stays with the pipeline, not with incidental reviews.
 
 ### 1. Determine scope & classify the tier
 
@@ -215,10 +227,10 @@ surfacing this line.
 the same range, in-context. Report its findings inline. Do not write a `.review.md`
 artifact — proceed to Hand off, which always offers the escalate.
 
-**Full lane (`standard`/`full`, or `--full`):** shell out via the renmark CLI (or
-directly) with the focus prompt above, piped to `codex exec --sandbox read-only -`.
-Streaming output goes to `.renmark/logs/codereview-<run_id>.log` for troubleshooting
-if codex misbehaves.
+**Full lane (`standard`/`full`, or `--full`):** pipe the focus prompt to
+`codex exec --sandbox read-only -`. If you want a log for troubleshooting, tee
+codex's output to `.renmark/logs/codereview-<run_id>.log` yourself — there is no
+implicit logging machinery; the log only exists if you explicitly write it.
 
 ### 3. Capture the review
 

@@ -42,7 +42,7 @@ test -e CLAUDE.md || test -e AGENTS.md || test -d .renmark
 If none exist, ask the user: *"This looks like a fresh project. Scaffold `CLAUDE.md`, `AGENTS.md`, and `.renmark/` to organize work? [Y/n]"*
 
 On yes:
-- Read templates from `~/.claude/plugins/renmark/templates/` (CLAUDE.md.template, AGENTS.md.template, memory/INDEX.md, etc.).
+- Read templates from `${CLAUDE_PLUGIN_ROOT}/templates/` (CLAUDE.md.template, AGENTS.md.template, memory/INDEX.md, etc.).
 - Substitute placeholders for project name and date.
 - Write `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `.gitignore` (with `.renmark/state/`, `.renmark/debug/`, and `.renmark/logs/` entries — transient runtime), and the `.renmark/` directory tree.
 - `CHANGELOG.md` starts with a single bootstrap entry (date, "project bootstrap", files created, standard "Do not change" guards for `.renmark/memory/` and CLAUDE.md↔AGENTS.md sync).
@@ -147,15 +147,7 @@ Also update `.renmark/memory/project.md` with any new project facts learned.
 
 ### 7. Hand off (wizard step)
 
-Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestrate (auto-verifies) → finish`. After writing the spec, prompt explicitly:
-
-> *"Spec written to `<path>`.*
-> *What's next?*
-> *  1. [p] Plan — decompose the spec into executor-tagged tasks via /renmark:plan (auto-validates)*
-> *  2. [w] Wait — stop here; the spec stays on disk to plan later*
-> *  3. [n] No — stop, and log why planning was deferred"*
-
-**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): arrow-selectable choices `Plan [p]`, `Wait [w]`, `No [n]`. **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — never auto-proceed.
+Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestrate (auto-verifies) → finish`. After writing the spec, render the 3 options per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules (Plan [p], Wait [w], No [n]). The rendering rules, picker vs. numbered-list fallback, and required-choice contract all live there — do not duplicate them here.
 
 - **1 / p** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
 - **2 / w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
@@ -181,4 +173,4 @@ This hand-off follows the shared next-step contract (brainstorm is a class-1 pip
 ## Reference
 
 - Plan format spec: `PLAN.md` in the renmark install
-- Template files: `~/.claude/plugins/renmark/templates/`
+- Template files: `${CLAUDE_PLUGIN_ROOT}/templates/`

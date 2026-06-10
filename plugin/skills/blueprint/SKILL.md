@@ -86,7 +86,7 @@ These are the only two pieces of content the LLM generates; everything else is m
 
 For **each** artifact to write — `SCHEMATIC.md`, and `PROTOTYPE.html` when UI — apply this decision per root file. Use the marker-id constants `blueprint.MARKER_SCHEMATIC` (`"SCHEMATIC"`) and `blueprint.MARKER_PROTOTYPE` (`"PROTOTYPE"`). The `source_sha` is the project-map.md sha captured in Step 1.
 
-1. **Root file absent** → create it from the template (`plugin/templates/SCHEMATIC.md.template` / `plugin/templates/PROTOTYPE.html.template`), substituting `{{PROJECT_NAME}}` / `{{DATE}}`. The template already carries the `RENMARK:GENERATED:<id>:START…END` markers around its `## Current Architecture` block, so after creating it you splice the generated content into those markers exactly as in case 2.
+1. **Root file absent** → create it from the template (`${CLAUDE_PLUGIN_ROOT}/templates/SCHEMATIC.md.template` / `${CLAUDE_PLUGIN_ROOT}/templates/PROTOTYPE.html.template`), substituting `{{PROJECT_NAME}}` / `{{DATE}}`. The template already carries the `RENMARK:GENERATED:<id>:START…END` markers around its `## Current Architecture` block, so after creating it you splice the generated content into those markers exactly as in case 2.
 2. **Root file exists WITH markers** → splice in place, replacing only the generated block and preserving every human-owned section:
    ```python
    new_text = blueprint.splice_generated_block(

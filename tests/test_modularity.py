@@ -635,3 +635,49 @@ def test_try_except_counted() -> None:
     assert _cyclomatic_of(src) == 3
     # cognitive: 2 except handlers at top level → 1 each = 2.
     assert _cognitive_of(src) == 2
+
+
+# ── qualified labels for same-named methods ────────────────────────────────────
+
+
+def test_method_label_is_qualified_with_class_name(tmp_path: Path) -> None:
+    """A method ``run`` inside ``class MyClass`` must appear as ``MyClass.run()``,
+    not the bare ``run()`` label that was used before this fix.
+
+    Without qualification, two classes with a same-named method (e.g. both
+    have ``def run(self):``) would produce identical Gap titles, making it
+    impossible to tell which class exceeded the threshold.
+    """
+    repo = tmp_path / "repo"
+    # Two classes each with a ``run`` method long enough to breach warn
+    body = "\n".join(f"        a{i} = {i}" for i in range(FUNC_LOC_WARN - 1))
+    src = (
+        f"class Alpha:\n"
+        f"    def run(self):\n"
+        f"{body}\n"
+        f"\n"
+        f"class Beta:\n"
+        f"    def run(self):\n"
+        f"{body}\n"
+    )
+    _write(repo, "src/twoclasses.py", src)
+    gaps = _gaps_for(repo, title_contains="Long function")
+    titles = [g.title for g in gaps]
+    # Both methods must be reported — qualified so they are distinguishable
+    assert any("Alpha.run()" in t for t in titles), f"Alpha.run() not in {titles}"
+    assert any("Beta.run()" in t for t in titles), f"Beta.run() not in {titles}"
+    # Bare "run()" without a class prefix must NOT appear (ambiguous label)
+    assert not any(t.endswith("→ `run()`") for t in titles), (
+        f"bare 'run()' label found — must be qualified: {titles}"
+    )
+
+
+def test_top_level_function_label_unchanged(tmp_path: Path) -> None:
+    """A top-level (non-method) function still uses the bare label ``f()``."""
+    repo = tmp_path / "repo"
+    body = "\n".join(f"    a{i} = {i}" for i in range(FUNC_LOC_WARN - 1))
+    src = f"def toplevel():\n{body}\n"
+    _write(repo, "src/tlfn.py", src)
+    gaps = _gaps_for(repo, title_contains="Long function")
+    titles = [g.title for g in gaps]
+    assert any("toplevel()" in t for t in titles), f"top-level label missing: {titles}"

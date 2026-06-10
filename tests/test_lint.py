@@ -7,7 +7,6 @@ import pytest
 
 from renmark import lint
 
-
 # ── frontmatter ──────────────────────────────────────────────────────────────
 
 
@@ -284,3 +283,95 @@ def test_lints_real_renmark_plugin():
         pytest.skip("not running from repo root")
     issues = lint.lint_all(real_plugin)
     assert issues == [], "renmark plugin should lint clean:\n  " + "\n  ".join(issues)
+
+
+# ── frontmatter-value strict pass ────────────────────────────────────────────
+
+
+def _make_plugin_with_fm(tmp_path: Path, skill_fm_body: str, cmd_fm_body: str) -> Path:
+    """Build a plugin with custom frontmatter for one skill and one command."""
+    plugin = _make_plugin(
+        tmp_path,
+        skills={"myplugin": f"---\n{skill_fm_body}---\n\n# body\n\nSee next-steps.md.\n"},
+        commands={"myplugin": f"---\n{cmd_fm_body}---\n\nRead skills/myplugin/SKILL.md.\n"},
+    )
+    return plugin
+
+
+def test_lint_frontmatter_values_clean(tmp_path: Path) -> None:
+    """Well-formed frontmatter passes the strict pass."""
+    plugin = _make_plugin_with_fm(
+        tmp_path,
+        "name: myplugin\ndescription: A simple description\n",
+        "description: A simple description\n",
+    )
+    issues = lint.lint_frontmatter_values(plugin)
+    assert issues == []
+
+
+def test_lint_frontmatter_values_flags_unquoted_colon_space(tmp_path: Path) -> None:
+    """An unquoted value containing ': ' is flagged."""
+    plugin = _make_plugin_with_fm(
+        tmp_path,
+        "name: myplugin\ndescription: foo: bar baz\n",
+        "description: A simple description\n",
+    )
+    issues = lint.lint_frontmatter_values(plugin)
+    assert any(": " in i and "unquoted" in i for i in issues), issues
+
+
+def test_lint_frontmatter_values_quoted_value_ok(tmp_path: Path) -> None:
+    """A value with ': ' that IS properly quoted passes."""
+    plugin = _make_plugin_with_fm(
+        tmp_path,
+        'name: myplugin\ndescription: "foo: bar baz"\n',
+        "description: A simple description\n",
+    )
+    issues = lint.lint_frontmatter_values(plugin)
+    assert issues == []
+
+
+def test_lint_all_strict_frontmatter_off_by_default(tmp_path: Path) -> None:
+    """lint_all does NOT run the strict pass unless include_frontmatter_strict=True."""
+    plugin = _make_plugin_with_fm(
+        tmp_path,
+        "name: myplugin\ndescription: foo: bar baz\n",
+        "description: A simple description\n",
+    )
+    # Standard lint_all (strict off) should not report the colon-space issue
+    issues_default = lint.lint_all(plugin)
+    fm_issues = [i for i in issues_default if "unquoted" in i]
+    assert fm_issues == [], "strict-frontmatter pass should be off by default"
+
+    # With strict on, the issue appears
+    issues_strict = lint.lint_all(plugin, include_frontmatter_strict=True)
+    assert any("unquoted" in i for i in issues_strict)
+
+
+def test_cli_strict_frontmatter_flag(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """--strict-frontmatter CLI flag enables the strict pass."""
+    plugin = _make_plugin(
+        tmp_path,
+        skills={"start": _valid_skill_md("start")},
+        commands={"start": _valid_command_md("start")},
+    )
+    # Without flag: exit 0
+    assert lint.main(["--plugin-dir", str(plugin)]) == 0
+    # With flag and clean plugin: still exit 0
+    assert lint.main(["--plugin-dir", str(plugin), "--strict-frontmatter"]) == 0
+
+
+def test_lint_unreadable_skill_file(tmp_path: Path) -> None:
+    """An unreadable SKILL.md is reported as an issue, not a crash."""
+    import os
+    plugin = _make_plugin(tmp_path, skills={"myskill": _valid_skill_md("myskill")},
+                          commands={"myskill": _valid_command_md("myskill")})
+    skill_md = plugin / "skills" / "myskill" / "SKILL.md"
+    # Make the file unreadable
+    os.chmod(str(skill_md), 0o000)
+    try:
+        issues = lint.lint_skill_files(plugin)
+        # Should report something about unreadable, not crash
+        assert any("unreadable" in i or "myskill" in i for i in issues)
+    finally:
+        os.chmod(str(skill_md), 0o644)

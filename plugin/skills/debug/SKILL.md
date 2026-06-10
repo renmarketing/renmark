@@ -34,9 +34,9 @@ The `renmark.debug` Python module exposes the session helpers the skill drives:
 
 - `debug.new_session(repo, symptom)` — creates `.renmark/debug/<id>/session.md`
 - `debug.add_hypothesis(session, idx, title, likely)` — appends to Hypotheses section
-- `debug.log_investigation(session, hypothesis, inspector, finding, rules_out)` — appends to log
+- `debug.log_investigation(session, *, hypothesis, inspector, finding, rules_out=False)` — appends to log
 - `debug.set_root_cause(session, text)` — replaces the Root cause section
-- `debug.close_session(session, repo, title, severity, symptom, root_cause, fix, lesson)` — finalizes + writes a `bugs.md` entry
+- `debug.close_session(session, repo, *, title, severity, symptom, root_cause, fix, lesson=None)` — finalizes + writes a `bugs.md` entry
 - `debug.suggest_inspector(intent)` — returns the cheapest executor for a step:
   - `haiku` (or direct Bash) for grep / file-read / line-count / regex
   - `codex` for multi-file-trace / find-usages / context-gather

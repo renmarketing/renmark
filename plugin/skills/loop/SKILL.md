@@ -237,7 +237,7 @@ The loop **commits each passing iteration** to the feature branch (safe / revert
 **NEVER merges, releases, opens a PR, escalates the budget, or makes destructive changes
 autonomously.** When such a step would be required it sets `pending_step`, reaches
 `awaiting-approval`, and stops. AI may generate and commit code; the human owns merges and
-releases. Only `/renmark:approve` flips the human-approval bit.
+releases. Invoke `/renmark:approve` to flip the lifecycle `human_review_required` bit.
 
 ## Resumability (REQ-10)
 

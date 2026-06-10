@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: Use to review, approve, and dispatch tracked work items — typed as `/renmark:backlog` or "show the backlog", "what's pending review", "approve and build X". An interactive intake + approval buffer: lists the backlog (title · status · source · risk · pending decision), opens a per-item detail view, and on **Approve and build** launches a bounded Loop Mode internally (max 5 iterations, default budget) to build the item on a managed branch — no user-facing --budget / --max-iterations / backlog-ID flags. Never merges or releases on its own (REQ-12); every managed branch ends in exactly one recorded disposition (no orphan branches). Reads only item metadata + verify evidence — never code or diffs.
+description: "Use to review, approve, and dispatch tracked work items — typed as `/renmark:backlog` or \"show the backlog\", \"what's pending review\", \"approve and build X\". An interactive intake + approval buffer: lists the backlog (title · status · source · risk · pending decision), opens a per-item detail view, and on **Approve and build** launches a bounded Loop Mode internally (max 5 iterations, default budget) to build the item on a managed branch — no user-facing --budget / --max-iterations / backlog-ID flags. Never merges or releases on its own (REQ-12); every managed branch ends in exactly one recorded disposition (no orphan branches). Reads only item metadata + verify evidence — never code or diffs."
 ---
 
 # backlog
@@ -107,7 +107,7 @@ This is the only path that spends tokens. It is gated by the human's explicit se
 1. **Promote status.** Set the item `approved`, then `in progress`, and persist:
    ```python
    item.status = "in progress"
-   backlog.write_item(repo, item)        # never raises; coerces a bad status to needs review
+   backlog.write_item(repo, item)        # status is validated on read: off-vocabulary values coerce to needs review on the next read
    ```
 2. **Derive the loop goal** from the item — `title` + `summary` + `recommended_action`
    composed into one goal sentence. No new flags, no extra prompts.
@@ -136,8 +136,8 @@ Every managed branch MUST end in **exactly one** recorded `DISPOSITIONS` value b
 skill returns. Route on the loop's terminal verify result:
 
 **Final verify PASS** (loop reached `done`):
-- **STOP for human merge approval (REQ-12 — never auto-merge).** Surface the gate; only
-  `/renmark:approve` flips the human bit.
+- **STOP for human merge approval (REQ-12 — never auto-merge).** Surface the gate; invoke
+  `/renmark:approve` to flip the lifecycle `human_review_required` bit.
 - **INTERIM state — awaiting-merge (NOT a disposition, NOT an orphan):** while the human
   has not yet approved the merge, the item remains `status = "in progress"` with its
   `branch` and `loop_id` recorded on the item. The branch is intentionally retained and
@@ -149,11 +149,18 @@ skill returns. Route on the loop's terminal verify result:
   goal must still hold post-merge) → delete the branch → set
   `item.status = "completed"`, `item.disposition = "merged-deleted"`, `backlog.write_item`.
   This is the terminal outcome; `merged-deleted` is recorded only after merge + delete
-  complete.
+  complete. Then emit the completion event:
+  ```python
+  from renmark import analytics, state as rstate
+  analytics.record_event(repo, ts=rstate.now_iso(), kind="backlog_completed", item_id=item.id)
+  ```
 
 **Final verify FAIL, or loop hit `5/5` without success** (`max-iter` / `stalled` / failing
 `done`):
-- Do **NOT** merge. Set `item.status = "blocked"`, `backlog.write_item`.
+- Do **NOT** merge. Set `item.status = "blocked"`, `backlog.write_item`. Emit the blocked event:
+  ```python
+  analytics.record_event(repo, ts=rstate.now_iso(), kind="backlog_blocked", item_id=item.id)
+  ```
 - OFFER keep-or-delete via `AskUserQuestion`:
   | Choice | Disposition | Branch |
   |---|---|---|
@@ -170,16 +177,16 @@ The skill MUST NOT return while a managed branch exists without a recorded dispo
 |---|---|
 | **Research more** | Route to `/renmark:brainstorm` (its research step covers prior-art/best-practice digging; a dedicated `/renmark:research` skill does not exist). Leave `item.status = "needs review"` — it stays in the queue for re-triage after research lands. |
 | **Split into smaller items** | Guidance: create child items (one per sub-scope) at `status = "needs approval"` via `backlog.next_id` + `backlog.write_item`, each pointing back at the parent in its `summary`. MVP MAY stub the decomposition mechanics, but MUST persist the split intent (at minimum the parent re-tagged + a note of the requested children) so the decision survives a `/clear`. |
-| **Reject** | Set `item.status = "rejected"`, `backlog.write_item`. No branch is created. |
+| **Reject** | Set `item.status = "rejected"`, `backlog.write_item`. No branch is created. Emit: `analytics.record_event(repo, ts=rstate.now_iso(), kind="backlog_rejected", item_id=item.id)`. |
 | **Back** | Return to the List view (Step 1) — no state change. |
 
 ## Human gates & hygiene
 
 - **Human approval gates (REQ-12).** Merge, release, PRD edits, destructive ops, and any
   budget escalation REQUIRE explicit human approval. AI generates and commits code on the
-  managed branch; the human owns merges and releases. `/renmark:approve` is the only way to
-  flip the human-approval bit. Approve-and-build's bounded loop never crosses these edges —
-  it stops at `awaiting-approval` and hands off.
+  managed branch; the human owns merges and releases. Invoke `/renmark:approve` to flip the
+  lifecycle `human_review_required` bit. Approve-and-build's bounded loop never crosses
+  these edges — it stops at `awaiting-approval` and hands off.
 - **One code-writing loop per working tree.** REFUSE to start a second concurrent build
   while a `running` loop or an `in progress` backlog item exists in this tree (Step 0
   detects it). Offer resume, not a parallel build.

@@ -64,6 +64,11 @@ where orchestration left off.
   layer explicitly reports.
 - Modify any usage, analytics, or state files. Read-only operation.
 
+## See also
+
+- `/renmark:analytics` — per-feature build-health summary (shipped/blocked counts, loop success rate, token/cost by feature)
+- `/renmark:roadmap` — per-task status table (shipped/retried/in-progress) synthesized from git log + usage.jsonl
+
 ## What's next
 
 *End by calling `renmark.lifecycle.next_steps(repo, "usage")` and render per

@@ -242,8 +242,7 @@ def _analyze_file(path: Path, repo: Path) -> list[Gap]:
         gaps.extend(_fan_out_gap(rel, fan_out))
 
     # 2, 3, 5. per-function metrics
-    for func in _iter_functions(tree):
-        qual = _func_label(func)
+    for func, qual in _iter_functions(tree):
         func_loc = _func_code_lines(func, text)
         gaps.extend(_func_loc_gap(rel, qual, func_loc))
         gaps.extend(_cyclomatic_gap(rel, qual, _cyclomatic(func)))
@@ -387,13 +386,47 @@ def _import_fan_out(tree: ast.Module) -> int:
 # ── Function iteration ──────────────────────────────────────────────────────────
 
 
-def _iter_functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
-    """All function/method defs in the module (nested ones included)."""
-    return [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+def _iter_functions(tree: ast.Module) -> list[tuple[ast.FunctionDef | ast.AsyncFunctionDef, str]]:
+    """All function/method defs in the module with their qualified label.
+
+    Returns a list of ``(func_node, qualified_label)`` pairs so same-named
+    methods in different classes (or nested functions with the same name) can
+    be distinguished in Gap messages.
+
+    Labels use the enclosing ClassDef / FunctionDef chain:
+    - top-level ``def f`` → ``f()``
+    - ``class A`` → ``def run`` → ``A.run()``
+    - nested function ``outer`` → ``def inner`` → ``outer.<locals>.inner()``
+    """
+    results: list[tuple[ast.FunctionDef | ast.AsyncFunctionDef, str]] = []
+
+    def walk(
+        node: ast.AST,
+        prefix: str,
+    ) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                child_prefix = f"{prefix}{child.name}." if prefix else f"{child.name}."
+                walk(child, child_prefix)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    # Nested inside a function — use <locals> convention
+                    label = f"{prefix}<locals>.{child.name}()"
+                else:
+                    label = f"{prefix}{child.name}()"
+                results.append((child, label))
+                # Descend: nested defs inside this function use <locals> prefix
+                nested_prefix = f"{prefix}{child.name}.<locals>."
+                walk(child, nested_prefix)
+
+    walk(tree, "")
+    return results
 
 
 def _func_label(func: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
-    """Function name plus its measured value placeholder, e.g. ``my_func``."""
+    """Function name as a bare label (unqualified) — legacy helper kept for
+    call sites that don't need the class context.  Prefer the qualified label
+    from ``_iter_functions`` for user-visible Gap messages."""
     return f"{func.name}()"
 
 

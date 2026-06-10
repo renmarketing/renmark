@@ -1,4 +1,4 @@
 {
   "error": "IsolationViolation",
-  "message": "SubagentOutput.summary_lines has 6 entries; max 5 (G3)"
+  "message": "invalid subagent output: ['subagent.summary_lines has 6 entries — G3 cap is 5']"
 }

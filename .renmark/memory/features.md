@@ -4,8 +4,47 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-06-09 — reporting-and-usage-analytics: local usage reporting and analytics layer
 
+**Files:** `renmark/analytics.py`, `renmark/reports.py`, `plugin/skills/usage/SKILL.md`, `plugin/skills/analytics/SKILL.md`, `plugin/commands/usage.md`, `plugin/commands/analytics.md`
+**ADR:** ADR-022
+**Commits:** (feature/reporting-and-usage-analytics → merged main)
 
+Local-only reporting/analytics: on-disk JSON/JSONL under `.renmark/reports/` and `.renmark/analytics/`; `/renmark:usage` rolling 5hr/weekly observed usage; `/renmark:analytics` model/executor/verification outcome trends. No external telemetry. Python aggregates raw logs into bounded summaries (REQ-5). Usage-aware pause/resume for loops/orchestrate (REQ-16).
+
+---
+
+### 2026-06-09 — release-version-snapshot: release tagging + zip snapshot
+
+**Files:** `tools/release.sh`, `plugin/skills/finish/SKILL.md`, `.renmark/version/`
+**ADR:** ADR-020 / ADR-021 (v0.7.8 release)
+**Commits:** (feature/release-version-snapshot → merged main)
+
+Version snapshot tooling: `tools/release.sh` tags + builds zip; `/renmark:finish` routes to it at `ready-to-release`; snapshot in `.renmark/version/<tag>/`. Tagged v0.7.8 dogfood copy.
+
+---
+
+### 2026-06-09 — backlog-driven-loop-execution: backlog → Loop Mode bridge
+
+**Files:** `renmark/backlog.py`, `plugin/skills/backlog/SKILL.md`, `plugin/commands/backlog.md`, `tests/test_backlog.py`
+**ADR:** ADR-018 / ADR-019 (v0.7.7 release)
+**Commits:** (feature/backlog-driven-loop-execution → merged main)
+
+`/renmark:backlog` interactive intake (list → detail → Approve and build); bridges approval buffer to bounded Loop Mode on a managed feature branch (max 5 iter, human merge gate, no orphan branches). Item state in `.renmark/state/`. Satisfies REQ-13.
+
+---
+
+### 2026-06-05 — blueprint (/renmark:blueprint): living schematic + prototype
+
+**Files:** `renmark/blueprint.py`, `plugin/skills/blueprint/SKILL.md`, `plugin/commands/blueprint.md`, `tests/test_blueprint.py`
+**Spec:** `.renmark/specs/2026-06-05-blueprint.spec.md`
+**Plan:** `.renmark/plans/2026-06-05-blueprint.plan.md`
+**ADR:** ADR-008
+**Commits:** `8a1ddc7..bb09cad` (feature/blueprint → merged main)
+
+Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from project-map.md via hybrid marker-based update; standalone + start/feature touchpoints. codereview caught 4 Majors (detect_ui, inline regex, splice guard, SKILL.md contradiction) — all fixed.
+
+---
 
 
 
@@ -123,20 +162,7 @@ Returns server status and version. Used by load balancers and uptime monitoring.
 
 ## In progress
 
-
-### 2026-06-05 — blueprint (/renmark:blueprint)
-
-**Spec:** `.renmark/specs/2026-06-05-blueprint.spec.md`
-**Plan:** `.renmark/plans/2026-06-05-blueprint.plan.md`
-**Commits:** `8a1ddc7..HEAD on feature/blueprint`
-
-Living SCHEMATIC.md (always) + PROTOTYPE.html (UI builds) synthesized from project-map.md via hybrid marker-based update; standalone + start/feature touchpoints.
-
----
-
 (Features the current plan is mid-execution on. Cleared on completion.)
-
-(Empty.)
 
 ---
 

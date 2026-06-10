@@ -1,6 +1,6 @@
 """Lifecycle state for renmark features — enforces G12 (lifecycle persistence)
-and the seven-stage workflow: Brainstorm → Plan → Create → Test → Review →
-Document → Release.
+and the canonical multi-stage workflow: Brainstorm → Plan → Create → Test →
+Review → Document → Release.
 
 Lifecycle state lives in ``.renmark/state/lifecycle.json``. It is the source
 of truth for cold-start recovery: any session can read this file after
@@ -24,6 +24,7 @@ import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .summary import is_stale, read_metadata
 
@@ -41,7 +42,6 @@ STAGES: list[str] = [
     "documented",  # document complete
     "ready-to-release",  # finish flipped the marker
     "released",  # release tagged + zip built
-    "restored",  # a /renmark:restore happened
 ]
 
 # Skills that actually have a `plugin/skills/<name>/SKILL.md`. Stages that
@@ -49,28 +49,41 @@ STAGES: list[str] = [
 # in `next_recommended()` — vibe coders never get sent to a non-existent skill.
 IMPLEMENTED_SKILLS: frozenset[str] = frozenset(
     {
+        "analytics",
+        "approve",
+        "audit",
+        "backlog",
+        "blueprint",
         "brainstorm",
         "check-plan",
         "codereview",
         "debug",
+        "doctor",
         "feature",
         "finish",
         "help",
+        "hygiene",
+        "init",
+        "inventory",
+        "loop",
         "orchestrate",
         "plan",
+        "prd",
         "resume",
         "roadmap",
         "setup",
         "start",
+        "usage",
         "verify",
     }
 )
 
 # Stage transitions — the router uses this to compute next_recommended.
-# Stages that previously pointed at unimplemented skills (`document`, `release`,
-# `restore`, `approve`, `secure`, `map`, `research`) now route to the closest
-# real next step. The legacy targets are preserved in `NEXT_BY_STAGE_PLANNED`
-# for documentation; they take effect once the skill ships.
+# `reviewed` and `released` are real stages whose SKILL writers land alongside
+# this release: codereview marks `reviewed` (→ finish), finish marks `released`
+# (terminal). `documented` is dormant — no skill writes it, but it routes
+# sensibly through finish if a legacy file carries it. `ready-to-release` has no
+# shipped release skill yet, so it surfaces a manual tag/zip hint.
 NEXT_BY_STAGE: dict[str, str] = {
     "init": "/renmark:brainstorm",
     "brainstorm-complete": "/renmark:plan",
@@ -78,22 +91,14 @@ NEXT_BY_STAGE: dict[str, str] = {
     "plan-validated": "/renmark:orchestrate",
     "created": "/renmark:verify",
     "verified": "/renmark:codereview",
-    # `documented` stage is skipped today — go straight to /renmark:finish.
+    # codereview marks `reviewed`; the natural next step is closing the branch.
     "reviewed": "/renmark:finish",
+    # `documented` is dormant (no writer) — route through finish if it appears.
     "documented": "/renmark:finish",
     # `release` skill is not implemented yet — finish marks ready-to-release;
     # actual release is a manual `git tag` + `bash install.sh` zip step.
     "ready-to-release": "(manual: tag the release and build the zip; see README § Release)",
     "released": "(feature complete — start a new one with /renmark:start)",
-    "restored": "(working tree restored — start a new feature or continue manually)",
-}
-
-# Aspirational routing — what NEXT_BY_STAGE will return once the named skill
-# ships. Kept here as documentation so the v0.3.x → v0.4 migration is obvious.
-NEXT_BY_STAGE_PLANNED: dict[str, str] = {
-    "reviewed": "/renmark:document",
-    "documented": "/renmark:finish",
-    "ready-to-release": "/renmark:release",
 }
 
 # Domain classification for context-contamination detection (G4).
@@ -111,19 +116,19 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "prd": "build",
     "blueprint": "build",
     "backlog": "build",
-    "secure": "audit",
-    "document": "audit",
-    "map": "audit",
-    "research": "audit",
+    "loop": "build",
+    "audit": "audit",
+    "inventory": "audit",
     "setup": "meta",
     "roadmap": "meta",
     "help": "meta",
     "resume": "meta",
-    "release": "meta",
-    "restore": "meta",
     "approve": "meta",
-    "issue": "meta",
     "hygiene": "meta",
+    "doctor": "meta",
+    "init": "meta",
+    "usage": "meta",
+    "analytics": "meta",
 }
 
 # ── Skill classes (next-steps.md contract) ────────────────────────────────────
@@ -144,6 +149,7 @@ PIPELINE_SKILLS: frozenset[str] = frozenset(
         "feature",
         "prd",
         "blueprint",
+        "loop",
     }
 )
 
@@ -167,6 +173,11 @@ AUX_SKILLS: frozenset[str] = frozenset(
         "help",
         "resume",
         "backlog",
+        "usage",
+        "analytics",
+        "approve",
+        "audit",
+        "inventory",
     }
 )
 
@@ -175,7 +186,7 @@ AUX_SKILLS: frozenset[str] = frozenset(
 AUX_LOCAL_ACTIONS: dict[str, list[str]] = {
     "debug": ["/renmark:verify the fix", "re-run the failing verifier"],
     "doctor": ["re-run the failing skill", "/renmark:doctor --fix"],
-    "hygiene": ["/renmark:hygiene --fix", "review flagged artifacts"],
+    "hygiene": ["/renmark:hygiene --apply", "review flagged artifacts"],
     "roadmap": ["open the top-ranked roadmap item", "/renmark:plan"],
     "init": ["/renmark:start", "/renmark:brainstorm"],
     "setup": ["/renmark:start", "/renmark:brainstorm"],
@@ -288,7 +299,7 @@ def read_lifecycle(repo: Path | str) -> LifecycleState | None:
         return None
     # Tolerate unknown fields and wrong-typed values — drop them rather than
     # crashing on schema drift.
-    filtered = {
+    filtered: dict[str, Any] = {
         k: v
         for k, v in data.items()
         if k in _LIFECYCLE_FIELD_TYPES and isinstance(v, _LIFECYCLE_FIELD_TYPES[k])
@@ -346,19 +357,34 @@ def write_lifecycle(
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = current.to_json()
 
+    # Byte-budget guard runs FIRST: an oversize file is its own dedicated error
+    # (LifecycleBloatError), and validate_lifecycle would otherwise pre-empt it
+    # with a generic ValueError on the same 1KB budget.
     if len(payload.encode("utf-8")) > LIFECYCLE_JSON_BYTE_BUDGET:
         raise LifecycleBloatError(
             f"lifecycle.json would be {len(payload)} bytes; budget {LIFECYCLE_JSON_BYTE_BUDGET}. "
             "Runtime cruft has leaked in — move it to pipeline.json."
         )
 
+    # Writer-side validation (never a hard gate at readers): a writer producing
+    # structurally-invalid lifecycle state is a bug. Function-local import
+    # avoids the schemas ↔ lifecycle circular import (schemas imports STAGES).
+    from renmark import schemas
+
+    issues = schemas.validate_lifecycle(json.loads(payload))
+    if issues:
+        raise ValueError(f"write_lifecycle would produce invalid state: {issues}")
+
     path.write_text(payload, encoding="utf-8")
     return current
 
 
 def clear_lifecycle(repo: Path | str) -> None:
-    """Delete lifecycle.json. Called when a feature finishes (released) or
-    when the user wants a clean slate."""
+    """Delete lifecycle.json. The `/renmark:finish` SKILL calls this on a
+    merged/released branch so the next `/renmark:start` is not redirected to
+    resume forever; also called when the user wants a clean slate. Not dead
+    code — keep it even when grep shows no in-tree caller (the caller is a
+    SKILL.md, not Python)."""
     path = _lifecycle_path(repo)
     if path.exists():
         path.unlink()
@@ -393,8 +419,8 @@ def next_recommended(repo: Path | str) -> str:
 
     if state.human_review_required and not state.human_review_completed:
         target = state.human_review_for or "pending action"
-        # `approve` skill is not implemented yet — surface the manual gate.
-        return f"(manual approval required for: {target} — flip lifecycle.human_review_completed)"
+        # `/renmark:approve` is the only sanctioned way to flip the gate (G7).
+        return f"/renmark:approve (approval pending for: {target})"
 
     candidate = state.next_recommended or NEXT_BY_STAGE.get(state.stage, "")
     return _resolve_next(candidate, state.stage)
@@ -597,7 +623,10 @@ def validate_artifact_refs(
     if state is None:
         return []
 
-    if not isinstance(state.artifacts, dict):
+    # Widen to object so the corrupt/hand-built guards below are type-checkable
+    # (the dataclass declares dict[str, str], but disk state may lie).
+    artifacts: object = state.artifacts
+    if not isinstance(artifacts, dict):
         # Hand-built or corrupt state — nothing to validate.
         return []
 
@@ -605,7 +634,7 @@ def validate_artifact_refs(
     block_issues: list[dict[str, str]] = []
     warn_issues: list[dict[str, str]] = []
 
-    for key, path_str in state.artifacts.items():
+    for key, path_str in artifacts.items():
         if not isinstance(path_str, str):
             continue
         raw = Path(path_str)

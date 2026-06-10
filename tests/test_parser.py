@@ -402,3 +402,71 @@ def test_serves_defaults_to_none(tmp_path: Path) -> None:
     )
     tasks = parse_plan(plan)
     assert tasks[0].serves is None
+
+
+# ── malformed task header detection ──────────────────────────────────────────
+
+
+def test_malformed_header_missing_colon_raises(tmp_path: Path) -> None:
+    """'### Task Four:' — word index instead of digit — raises PlanError."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task Four: no digit\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="malformed task header"):
+        parse_plan(plan)
+
+
+def test_malformed_header_no_space_after_hashes_raises(tmp_path: Path) -> None:
+    """'###Task 4:' — no space between ### and Task — raises PlanError."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "###Task 4: no space\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="malformed task header"):
+        parse_plan(plan)
+
+
+def test_malformed_header_no_colon_raises(tmp_path: Path) -> None:
+    """'### Task 4' — missing the colon separator — raises PlanError."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 4 no colon title\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(PlanError, match="malformed task header"):
+        parse_plan(plan)
+
+
+def test_well_formed_header_still_parses(tmp_path: Path) -> None:
+    """Sanity: a correct '### Task 1: title' header continues to parse."""
+    plan = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: correct header\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(plan)
+    assert len(tasks) == 1
+    assert tasks[0].title == "correct header"

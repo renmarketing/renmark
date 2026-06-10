@@ -6,7 +6,7 @@ A new skill that cannot tick all 9 boxes below does not merge.
 
 ## The 9-rule compliance checklist
 
-For each new SKILL.md, confirm and document in a `## Governance compliance` section at the bottom of the skill file:
+For each new **pipeline-class or quality-gate-class** SKILL.md, confirm and document in a `## Governance compliance` section at the bottom of the skill file. Aux/meta skills (class 3 per `_shared/next-steps.md`) MAY use a shorter form — a single-sentence compliance note per applicable rule — but MUST still call out any rule the skill actively relies on:
 
 | # | Rule | Check |
 |---|---|---|
@@ -18,7 +18,7 @@ For each new SKILL.md, confirm and document in a `## Governance compliance` sect
 | G8 | Compounding verification | If the skill fails, it appends a learning to `.renmark/memory/learnings.md` and/or a bug to `.renmark/memory/bugs.md`. Failures expand future regression coverage, not vanish silently. |
 | G9 | Failure transparency | Artifact metadata sets `completion_state`, `confidence`, `validation_status`, `retry_count`, `parser_success`, `schema_compliance` honestly. Skills that succeed half-way return `partial`, not `complete`. |
 | G10 | Workflow recovery | The skill can be re-run after interruption and pick up from the state file. It does not require the user to "start over." |
-| G11 | Task isolation | If the skill dispatches sub-tasks (orchestrate, research, secure, document, map): each sub-dispatch uses `dispatch_task_isolated` (or the documented equivalent for Codex subprocesses), and the orchestrator consumes only `SubagentOutput` fields — never inline transcripts, generated code, or diffs. |
+| G11 | Task isolation | If the skill dispatches sub-tasks (orchestrate, loop, backlog, debug, feature): each sub-dispatch uses `dispatch_task_isolated` (or the documented equivalent for Codex subprocesses), and the orchestrator consumes only `SubagentOutput` fields — never inline transcripts, generated code, or diffs. |
 
 ## What this means in practice
 
@@ -32,7 +32,7 @@ When you draft a new SKILL.md, before merging, run yourself through these questi
 6. **If my skill fails, does anyone learn from it?** If the answer is no, redesign — add the learnings.md write.
 7. **Does my output say `validation_status: validated` when nothing actually validated it?** If yes, redesign — be honest about uncertainty.
 8. **If the process crashes mid-skill, can I resume?** If the answer is "you re-run from scratch," redesign — write resume points.
-9. **If I dispatch sub-tasks, do they each get an isolated context?** If the answer is "they share the orchestrator's chat history," redesign — use `dispatch_task_isolated`.
+9. **If I dispatch sub-tasks, do they each get an isolated context?** If the answer is "they share the orchestrator's chat history," redesign — use `dispatch_task_isolated`. (Dispatching skills: `orchestrate`, `loop`, `backlog`, `debug`, `feature`.)
 
 ## Skill structure template
 
@@ -61,9 +61,8 @@ description: <one paragraph — when to use, what it does, what's unique>
 
 ### 0. Context check
 
-Call `state.context_budget_check(repo, '<skill>', '<domain>')`. If it returns
-'clear' or 'compact', surface as a one-line note. Do NOT block — user decides.
-Then call `state.record_skill_invocation(repo, '<skill>', '<domain>')`.
+Call `lifecycle.skill_preamble(repo, '<skill>')`. If it returns a non-None hint,
+surface as a one-line note. Do NOT block — user decides.
 
 ### 1. ...
 
@@ -94,10 +93,10 @@ If a skill's full rule set runs more than ~50 lines, extract the long-form rules
 
 If you're proposing a new governance rule (G12+):
 
-1. Add it to the Governance Charter in `/home/renmark/.claude/plans/cheerful-drifting-seal.md` (or its successor plan).
+1. Add it to the governance sections in the repo's root `CLAUDE.md` (the canonical in-repo governance source).
 2. Add a `BEGIN:<name>-rule` block to `plugin/templates/CLAUDE.md.template`.
 3. Add a one-liner mirror to `plugin/templates/AGENTS.md.template`.
-4. Add the block name to `plugin/skills/setup/SKILL.md`'s merge table.
+4. Register the block name in `renmark/init.py`'s rule-block registry and add a reference in `plugin/skills/init/SKILL.md`.
 5. Add a row to the compliance checklist in this file.
 
 All five edits land in the same commit. Rules without a checklist row don't bind; checklist rows without a CLAUDE.md block aren't merged into existing projects on `/renmark:setup`.

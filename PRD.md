@@ -148,6 +148,16 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     and lets `/renmark:resume` continue later. It must NOT poll repeatedly or
     auto-schedule retries in the MVP (extends REQ-3 / REQ-10 / REQ-12).
 
+17. `REQ-17` A read-only self-audit surface (`/renmark:audit`, with
+    `/renmark:inventory` as its alias) keeps the plugin registry, docs, and
+    skill parity verifiable at any time, writing artifacts under
+    `.renmark/audits/`. It MUST NOT edit code, commit, or modify docs — advisory
+    output only.
+18. `REQ-18` `/renmark:approve` is the sole surface for flipping
+    `human_review_completed` in lifecycle.json; no other skill may flip this
+    field directly. All human approval gates (release, merge, security override)
+    route through it.
+
 ## Success metrics
 
 - A vibe coder reaches working, committed code from `/renmark:start` with no
@@ -165,16 +175,17 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 
 - **In scope:** the `/renmark:*` skill pipeline (start, brainstorm, prd,
   blueprint, plan, check-plan, orchestrate, verify, finish, feature, debug,
-  codereview, secure, doctor, resume, roadmap, help, hygiene, usage, analytics,
+  codereview, doctor, resume, roadmap, help, hygiene, usage, analytics,
   and `init` — the front-door adoption pipeline, with `setup` as its
   rule-block-refresh alias); the bounded loop execution engine (`loop`) +
   `.renmark/loops/` state; the `/renmark:backlog` intake + approval-buffer layer
   + `.renmark/state/` item storage; the local reporting/analytics/usage layer
   (`/renmark:usage`, `/renmark:analytics`, `.renmark/reports/`,
   `.renmark/analytics/`, observed-local by default, with usage-aware pause/resume
-  for loops and orchestrated runs); the Python runtime (CLI dispatch, verifier,
-  lifecycle, memory); persistent `.renmark/` state and memory; cross-platform
-  install.
+  for loops and orchestrated runs); the self-audit surface (`/renmark:audit`,
+  `/renmark:inventory`) and the human-approval gate surface (`/renmark:approve`);
+  the Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
+  `.renmark/` state and memory; cross-platform install.
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
@@ -238,3 +249,11 @@ per working tree**.
   so reporting never bloats orchestrator context. Usage/rate/quota limits pause
   loops and orchestrated runs safely for later `/renmark:resume`; MVP does not
   poll or auto-schedule retries.
+
+---
+
+**Revision note (2026-06-09, user-authorized):** Added REQ-17 (audit surface —
+`/renmark:audit` + `/renmark:inventory`) and REQ-18 (`/renmark:approve` as the
+sole human-review gate flip surface); updated Scope boundaries to include
+`audit`, `inventory`, and `approve`; removed ghost command `secure` from the
+in-scope list (never implemented). These commands ship in 0.9.0.

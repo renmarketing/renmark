@@ -150,8 +150,8 @@ def test_next_recommended_normal_flow(tmp_path: Path) -> None:
 
 
 def test_next_recommended_pending_approval(tmp_path: Path) -> None:
-    """When approval is pending and /renmark:approve is not yet implemented,
-    surface the manual gate — never point a vibe coder at a missing skill."""
+    """When approval is pending, route to /renmark:approve (the only sanctioned
+    gate-flip per G7) and name the pending target."""
     lifecycle.write_lifecycle(
         tmp_path,
         stage="ready-to-release",
@@ -161,12 +161,12 @@ def test_next_recommended_pending_approval(tmp_path: Path) -> None:
     )
     rec = lifecycle.next_recommended(tmp_path)
     assert "release-v0.3.0" in rec
-    assert "manual" in rec.lower() or "/renmark:approve" in rec
+    assert "/renmark:approve" in rec
 
 
 def test_next_recommended_approved_proceeds(tmp_path: Path) -> None:
-    """ready-to-release with approval recorded routes to a manual release hint
-    until /renmark:release ships (see lifecycle.NEXT_BY_STAGE_PLANNED)."""
+    """ready-to-release with approval recorded routes to a manual release hint —
+    no /renmark:release skill ships."""
     lifecycle.write_lifecycle(
         tmp_path,
         stage="ready-to-release",
@@ -209,13 +209,58 @@ def test_byte_budget_enforced(tmp_path: Path) -> None:
 def test_domain_classification() -> None:
     assert lifecycle.domain_of("debug") == "debug"
     assert lifecycle.domain_of("plan") == "build"
-    assert lifecycle.domain_of("secure") == "audit"
+    assert lifecycle.domain_of("audit") == "audit"
+    assert lifecycle.domain_of("inventory") == "audit"
     assert lifecycle.domain_of("setup") == "meta"
     assert lifecycle.domain_of("unknown-skill") == "build"  # default
 
 
 def test_hygiene_is_meta_domain() -> None:
     assert lifecycle.DOMAIN_BY_SKILL["hygiene"] == "meta"
+
+
+# Previously this tolerated the registry listing approve/audit/inventory before
+# their dirs were scaffolded. Those dirs now exist, so parity is EXACT — the
+# tolerance set is empty and any registry entry without a backing dir is a ghost.
+_REGISTRY_AHEAD_OF_DIRS: set[str] = set()
+
+
+def _skill_dirs() -> set[str]:
+    """Every plugin/skills/<name>/ dir (with a SKILL.md), minus _shared."""
+    repo_root = Path(__file__).resolve().parent.parent
+    skills = repo_root / "plugin" / "skills"
+    return {
+        d.name
+        for d in skills.iterdir()
+        if d.is_dir() and d.name != "_shared" and (d / "SKILL.md").exists()
+    }
+
+
+def test_registry_covers_every_skill_dir() -> None:
+    """Dirs-side parity: every shipped skill DIR must be in both
+    IMPLEMENTED_SKILLS and DOMAIN_BY_SKILL — no skill ships without routing."""
+    dirs = _skill_dirs()
+    assert dirs, "no skill dirs discovered — path resolution broke"
+    missing_impl = dirs - set(lifecycle.IMPLEMENTED_SKILLS)
+    missing_domain = dirs - set(lifecycle.DOMAIN_BY_SKILL)
+    assert not missing_impl, f"skill dirs absent from IMPLEMENTED_SKILLS: {sorted(missing_impl)}"
+    assert not missing_domain, f"skill dirs absent from DOMAIN_BY_SKILL: {sorted(missing_domain)}"
+
+
+def test_registry_has_no_ghost_skills() -> None:
+    """Registry-side parity: the only registry entries WITHOUT a backing dir are
+    the wave-2 skills (approve/audit/inventory). Any other entry is a ghost.
+
+    DOMAIN_BY_SKILL carries `unknown-skill`-style synthetic names? No — it must
+    not. Once the wave-2 dirs land, _REGISTRY_AHEAD_OF_DIRS should empty out and
+    this becomes an exact-match check."""
+    dirs = _skill_dirs()
+    for registry, name in (
+        (set(lifecycle.IMPLEMENTED_SKILLS), "IMPLEMENTED_SKILLS"),
+        (set(lifecycle.DOMAIN_BY_SKILL), "DOMAIN_BY_SKILL"),
+    ):
+        ghosts = registry - dirs - _REGISTRY_AHEAD_OF_DIRS
+        assert not ghosts, f"{name} has ghost skills (no dir, not wave-2): {sorted(ghosts)}"
 
 
 def test_cross_domain_transition() -> None:

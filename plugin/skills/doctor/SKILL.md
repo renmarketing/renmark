@@ -28,8 +28,8 @@ python -m renmark.doctor
 ```
 
 The script returns:
-- Exit 0 if everything is healthy
-- Exit 1 if any check failed or warned
+- Exit 0 if healthy (warnings alone still exit 0)
+- Exit 1 only when a check FAILED
 
 It prints a checklist with ✓ / ✗ / ! glyphs and a `fix:` line for any failure that has a known remediation.
 

@@ -123,6 +123,13 @@ contextual:
    user must make. (`AskUserQuestion` enforces this by construction; in the text
    fallback, if the answer matches no option, re-show the list and ask again.)
 
+   > **Note on `[o]` and `[fix]` codes:** `[o] Open` (open the review file) and
+   > `[fix] Fix` (kick off a plan from the findings) are codereview-lite-lane
+   > extension codes defined in `codereview/SKILL.md`. They are NOT in the
+   > canonical master list above — they appear only in the combined menu that
+   > codereview builds for its own hand-off. Priority for the 4-option cap
+   > (above) already accounts for them when they are present.
+
 9. **Hard guarantee — visible choices XOR printed fallback, never neither.**
    Every hand-off MUST end in one of exactly two visible states: (a) an
    `AskUserQuestion` picker showing the selectable choices, OR (b) the printed

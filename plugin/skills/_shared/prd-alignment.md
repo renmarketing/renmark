@@ -18,8 +18,8 @@ default is NOTHING. This is the guard against PRD duplication and context bloat
 | Interaction | The only allowed mechanism | Skills |
 |---|---|---|
 | **WRITE** (create/update) | `/renmark:prd` only — every other skill *routes* (proposes), never writes `PRD.md` | `prd` |
-| **ALIGN** (read-only ≤5-line verdict) | this subagent contract only — never inline PRD reading | `feature`, `brainstorm` |
-| **NOTHING** | — | everything else (orchestrate, verify, finish, check-plan, init, roadmap, debug, codereview, resume, help, doctor) |
+| **ALIGN** (read-only ≤5-line verdict) | this subagent contract only — never inline PRD reading | `feature`, `brainstorm`, `roadmap` |
+| **NOTHING** | — | everything else (orchestrate, verify, finish, check-plan, init, debug, codereview, resume, help, doctor) |
 
 - **One writer.** start / brainstorm / feature may *route* to `/renmark:prd`; none
   write `PRD.md` themselves. This is what keeps "multiple entry points, one file"
@@ -34,8 +34,9 @@ default is NOTHING. This is the guard against PRD duplication and context bloat
   never copy.
 
 Rejected as bloat (don't re-propose without revisiting ADR-005): brainstorm as a
-PRD writer, `verify --coverage`, roadmap progress view, init/document PRD
-pointers, orchestrate reading the PRD.
+PRD writer, `verify --coverage`, init/document PRD pointers, orchestrate reading
+the PRD. (`roadmap --gaps` uses this ALIGN subagent per ADR-009 — it is in the
+ALIGN row, not here.)
 
 ---
 

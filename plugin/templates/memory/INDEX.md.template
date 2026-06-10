@@ -15,15 +15,13 @@ Renmark's persistent project memory. Each file follows a documented format and i
 | `conventions.md` | Code, test, commit conventions | hand-edited (skills read but don't write) |
 | `routing.md` | Which executor for which task signature | `/renmark:orchestrate` (auto) |
 | `learnings.md` | Cross-run patterns (failure modes, cost surprises) | `/renmark:debug`, `/renmark:orchestrate` (auto) |
+| `qa-flows.md` | Reusable browser QA flows / baselines (the QA playbook) | `/renmark:verify --qa`, `/renmark:verify --qa --bootstrap` |
+| `project-map.md` | Full module/symbol/file tree (managed by `/renmark:init`) | `/renmark:init` (auto-refresh) |
+| `dev-standards.md` | Dev gates, code quality standards, modularity thresholds | hand-edited, `/renmark:init` (standards-health) |
 
 ## Counts
 
-(Auto-maintained — currently zero entries everywhere.)
-
-- features: 0 shipped, 0 in-progress, 0 planned
-- bugs: 0 open, 0 fixed
-- decisions: 0 ADRs
-- routing entries: 0 learned overrides
+Counts intentionally not tracked here; see `/renmark:audit` for a live inventory of shipped features, open bugs, ADRs, and routing entries.
 
 ## Conventions
 
@@ -37,6 +35,10 @@ Renmark's persistent project memory. Each file follows a documented format and i
 - `.renmark/specs/` — `/renmark:brainstorm` output (committed)
 - `.renmark/plans/` — `/renmark:plan` output (committed)
 - `.renmark/reviews/` — `/renmark:codereview` output (committed)
+- `.renmark/audits/` — `/renmark:audit` output (committed)
+- `.renmark/reports/` — usage/task/feature reports (committed)
+- `.renmark/research/` — brainstorm-driven research artifacts (committed)
+- `.renmark/version/` — release snapshots per tag (committed)
 - `.renmark/state/` — runtime: usage ledger, pause file, escalations (gitignored)
 - `.renmark/debug/` — debug session state (gitignored)
 - `.renmark/logs/` — per-invocation logs for troubleshooting (gitignored, list via `renmark-execute --logs`)

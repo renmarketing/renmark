@@ -64,8 +64,9 @@ LITE_MAX_TASKS: int = 3
 FULL_MIN_TASKS: int = 8
 
 #: Summed planner ``est_tokens`` at/under this is "very small" and may stay
-#: ``lite`` even for code (when no harder signal fires). ``None`` est_tokens are
-#: treated as 0 (planner gave no estimate — size is governed by task count).
+#: ``lite`` even for code (when no harder signal fires).  ``None`` est_tokens
+#: are treated as 0 for summing, but the token branch of the lite test is
+#: only allowed when EVERY task has an explicit estimate — see ``classify_plan``.
 LITE_MAX_EST_TOKENS: int = 4_000
 
 #: Summed planner ``est_tokens`` at/over this forces ``full`` (large change).
@@ -106,6 +107,9 @@ TEMPLATE_SUFFIXES: frozenset[str] = frozenset({".template", ".j2"})
 #: Core-module path roots: an edit under here is risk-bearing and forces
 #: ``>= standard`` even when small. ``renmark/`` is the runtime package; touching
 #: parser / lifecycle / dispatch / init / sizing etc. must never be ``lite``.
+#: NOTE: this only fires in renmark's own repository.  In user projects the
+#: ``renmark/`` tree is not present so this floor is inert.  A project-aware
+#: floor (reading pyproject.toml / package.json source-root config) is deferred.
 CORE_MODULE_ROOTS: tuple[str, ...] = ("renmark/", "bin/")
 
 #: Code suffixes — presence of any of these makes a change "code-leaning".
@@ -151,6 +155,11 @@ def classify_plan(tasks: list[Task]) -> Tier:
         has_core = any(_is_core_module(p) for p in targets)
         all_doc_config = bool(targets) and all(_is_doc_or_config(p) for p in targets)
         total_est = sum(_task_est_tokens(t) for t in tasks)
+        # The token branch of the lite test is only safe when EVERY task carries
+        # an explicit estimate.  Tasks with no estimate contribute 0 to the sum,
+        # which would silently classify a ≤3-task code plan as lite —
+        # contradicting the "never lite by accident" doctrine.
+        all_have_est = all(getattr(t, "est_tokens", None) is not None for t in tasks)
 
         # ── full: heaviest signals win first ──
         if has_hard:
@@ -169,7 +178,11 @@ def classify_plan(tasks: list[Task]) -> Tier:
             return TIER_STANDARD
 
         # ── lite: confidently small ──
-        if n_tasks <= LITE_MAX_TASKS and (all_doc_config or total_est <= LITE_MAX_EST_TOKENS):
+        # The token branch (total_est <= LITE_MAX_EST_TOKENS) requires that
+        # EVERY task has an explicit estimate — a missing estimate contributes
+        # 0 to the sum and would silently push a code plan into the lite lane.
+        token_branch_ok = all_have_est and total_est <= LITE_MAX_EST_TOKENS
+        if n_tasks <= LITE_MAX_TASKS and (all_doc_config or token_branch_ok):
             return TIER_LITE
 
         # ── everything in between ──

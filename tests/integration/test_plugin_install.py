@@ -6,8 +6,6 @@ import os
 import subprocess
 from pathlib import Path
 
-import pytest
-
 
 def test_install_sh_creates_symlinks(repo_root: Path, tmp_path: Path):
     fake_home = tmp_path / "home"
@@ -71,16 +69,29 @@ def test_install_sh_idempotent(repo_root: Path, tmp_path: Path):
 
 
 def test_plugin_has_required_skill_files(repo_root: Path):
-    """A deployed plugin must have all 15 documented skills with SKILL.md."""
+    """A deployed plugin must ship every documented skill with a SKILL.md.
+
+    The pinned roster below is the full set of 26 commands shipped at this
+    release; `_shared/` and `CONTRIBUTING.md` are reference files, not skills,
+    and are excluded. Adding a skill means adding it here AND to the lifecycle
+    registries — `tests/test_lifecycle.py` enforces exact registry⇄dir parity.
+    """
     skills_dir = repo_root / "plugin" / "skills"
     required = {
         "start", "setup", "brainstorm", "plan", "check-plan", "orchestrate",
         "verify", "finish", "feature", "debug", "codereview", "roadmap",
-        "help", "resume", "prd",
+        "help", "resume", "prd", "blueprint", "loop", "backlog", "doctor",
+        "hygiene", "init", "analytics", "usage",
+        "approve", "audit", "inventory",
     }
-    actual = {p.name for p in skills_dir.iterdir() if p.is_dir()}
+    actual = {
+        p.name for p in skills_dir.iterdir()
+        if p.is_dir() and not p.name.startswith("_")
+    }
     missing = required - actual
     assert not missing, f"missing skill directories: {missing}"
+    extra = actual - required
+    assert not extra, f"undocumented skill directories (add to pinned roster): {extra}"
     for name in required:
         assert (skills_dir / name / "SKILL.md").exists(), f"missing SKILL.md for {name}"
 

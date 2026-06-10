@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Use to start a new feature or significant change with branch isolation — typed as /renmark:feature or phrases like "new feature X", "build X", "start feature". Creates a branch then runs the full pipeline: plan → check-plan → orchestrate → verify → finish.
+description: "Use to start a new feature or significant change with branch isolation — typed as /renmark:feature or phrases like \"new feature X\", \"build X\", \"start feature\". Creates a branch then runs the full pipeline: plan → check-plan → orchestrate → verify → finish."
 ---
 
 # feature

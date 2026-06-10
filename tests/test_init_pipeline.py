@@ -28,7 +28,6 @@ import pytest
 from renmark import init, memory
 from renmark.lint import iter_rule_blocks
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -328,3 +327,54 @@ def test_merge_rule_blocks_ignores_prose_marker(tmp_path: Path) -> None:
     assert result.get("CLAUDE.md", 0) == len(canonical)
     for n, _ in canonical:
         assert n in after_blocks, f"{n} should have been back-filled"
+
+
+# ── _file_purpose multi-line docstring regression ────────────────────────────
+
+
+def test_file_purpose_single_line_docstring() -> None:
+    """A same-line triple-quoted docstring returns the full sentence."""
+    text = '"""Single-line module purpose."""\n\nx = 1\n'
+    assert init._file_purpose(text, "python") == "Single-line module purpose."
+
+
+def test_file_purpose_multiline_joins_to_first_sentence() -> None:
+    """A wrapped multi-line docstring is joined and the first sentence returned.
+
+    Prior bug: the function returned only the *second* physical line
+    (e.g. "tracking tuned.") rather than the complete first sentence that
+    wraps across lines.
+    """
+    text = (
+        '"""\n'
+        "Persistent project memory at `.renmark/memory/`.\n"
+        "\n"
+        "Files act as living documentation.\n"
+        '"""\n'
+    )
+    result = init._file_purpose(text, "python")
+    # Must include the full first sentence, not a fragment from the second line
+    assert result == "Persistent project memory at `.renmark/memory/`."
+
+
+def test_file_purpose_multiline_no_period_returns_first_line() -> None:
+    """When no sentence-end is found, the first non-empty body line is returned."""
+    text = '"""\nModule with no period anywhere\nSome more description\n"""\n'
+    result = init._file_purpose(text, "python")
+    assert result == "Module with no period anywhere"
+
+
+def test_file_purpose_multiline_wraps_across_lines() -> None:
+    """A long first sentence that wraps across multiple lines is joined correctly."""
+    # Use a short sentence that fits within the 80-char cap
+    text = (
+        '"""\n'
+        "Drift detection that keeps pyproject,\n"
+        "VERSION in sync.\n"
+        '"""\n'
+    )
+    result = init._file_purpose(text, "python")
+    # First sentence ends with the period after "sync."
+    assert result.endswith("sync.")
+    # Should contain the wrapped content joined
+    assert "pyproject," in result and "VERSION in sync" in result

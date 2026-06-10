@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from renmark import dispatch
-from renmark.dispatch import TaskResult, WaveResult
+from renmark.dispatch import TaskResult
 from renmark.parser import Task
 
 
@@ -96,8 +96,10 @@ def test_estimate_wave_cost_sums() -> None:
     tasks = [
         _task(1, "a"), _task(2, "b"),
     ]
-    tasks[0].est_tokens = 100; tasks[0].est_cost_usd = 0.01
-    tasks[1].est_tokens = 250; tasks[1].est_cost_usd = 0.05
+    tasks[0].est_tokens = 100
+    tasks[0].est_cost_usd = 0.01
+    tasks[1].est_tokens = 250
+    tasks[1].est_cost_usd = 0.05
     tok, cost = dispatch.estimate_wave_cost(tasks)
     assert tok == 350
     assert cost == pytest.approx(0.06)

@@ -424,7 +424,13 @@ def _extract_symbols(text: str, lang: str, include_private: bool) -> list[str]:
 
 
 def _file_purpose(text: str, lang: str) -> str:
-    """One-line purpose from the first docstring or comment of a file."""
+    """One-line purpose from the first docstring or comment of a file.
+
+    For multi-line Python docstrings, all physical lines up to the first
+    sentence-end (period, exclamation mark, or question mark) are joined so
+    we never return a mid-sentence wrapped fragment.  If no sentence-end is
+    found, the first non-empty line is returned on its own.
+    """
     lines = text.splitlines()
     if lang == "python":
         # Look for module docstring
@@ -435,10 +441,33 @@ def _file_purpose(text: str, lang: str) -> str:
                 # Same-line docstring
                 if s.endswith(quote) and len(s) > 6:
                     return s[3:-3].strip()[:80]
-                # Multi-line — next non-blank line
-                for j in range(i + 1, min(i + 10, len(lines))):
-                    if lines[j].strip():
-                        return lines[j].strip()[:80]
+                # Multi-line — collect body lines, join, extract first sentence.
+                body_lines: list[str] = []
+                # Text after the opening triple-quote on the same line (may be empty)
+                after_open = s[3:].strip()
+                if after_open:
+                    body_lines.append(after_open)
+                for j in range(i + 1, min(i + 20, len(lines))):
+                    inner = lines[j].strip()
+                    if inner.startswith(quote):
+                        break  # closing quotes
+                    body_lines.append(inner)
+                if not body_lines:
+                    continue
+                joined = " ".join(body_lines)
+                # Find first sentence end: a period, ! or ? that is followed by
+                # a space, end-of-string, or closing punctuation.  This avoids
+                # stopping inside backtick paths (`path/to/file.py`), URL dots,
+                # or mid-word abbreviations.
+                for k, ch in enumerate(joined):
+                    if ch in "!?":
+                        return joined[: k + 1].strip()[:80]
+                    if ch == "." and (k + 1 >= len(joined) or joined[k + 1] in (" ", "\t")):
+                        return joined[: k + 1].strip()[:80]
+                # No sentence-end found — return the first non-empty line
+                for segment in body_lines:
+                    if segment:
+                        return segment[:80]
     # Generic: first non-shebang comment line
     for ln in lines[:15]:
         s = ln.strip()

@@ -108,8 +108,8 @@ def test_pipeline_tier0_matches_next_by_stage_every_pipeline_pointer(tmp_path: P
 def test_unimplemented_target_routes_to_fallback_not_dead_pointer() -> None:
     """If a stage's NEXT_BY_STAGE target ever points at a skill with no SKILL.md,
     the resolver must emit a manual-hint string, NOT a dead /renmark:<x>."""
-    # Pick a skill that is intentionally NOT implemented (document is in the
-    # planned-but-unshipped set per NEXT_BY_STAGE_PLANNED).
+    # Pick a skill name that is intentionally NOT implemented and NOT in any
+    # registry (document was a ghost stage target; no SKILL.md exists).
     unimplemented = "document"
     assert unimplemented not in IMPLEMENTED_SKILLS
     resolved = lifecycle._resolve_next(f"/renmark:{unimplemented}", "reviewed")

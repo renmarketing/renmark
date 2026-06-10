@@ -192,6 +192,22 @@ def _is_excluded(rel_parts: tuple[str, ...]) -> bool:
     return False
 
 
+def _safe_archive_stem(value: str) -> str:
+    """Sanitize a CLI ``--name`` value to a single safe path component.
+
+    Mirrors ``reports._safe_component``: strips path separators and ``..``
+    so a value like ``../../evil`` can never escape the destination directory.
+    Raises ``ValueError`` if the result is empty after sanitization.
+    """
+    name = str(value).replace("\\", "/").split("/")[-1].strip()
+    if not name or set(name) <= {"."}:
+        raise ValueError(
+            f"--name {value!r} sanitizes to an empty or dot-only component; "
+            "provide a simple filename without path separators"
+        )
+    return name
+
+
 def package_basename(repo: Path | str = ".") -> str:
     """Archive base name = plugin manifest name, falling back to the repo dir."""
     repo = Path(repo)
@@ -234,7 +250,8 @@ def build_package(
     """
     repo = Path(repo)
     ver = version or current_version(repo)
-    stem = archive_stem or f"{package_basename(repo)}-v{ver}"
+    raw_stem = archive_stem or f"{package_basename(repo)}-v{ver}"
+    stem = _safe_archive_stem(raw_stem)
 
     out_dir = Path(dest_dir).expanduser() if dest_dir is not None else repo / VERSION_SUBDIR
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -466,9 +483,12 @@ def build_version_snapshot(
     base = Path(dest_dir).expanduser() if dest_dir is not None else repo / VERSION_SUBDIR
     base.mkdir(parents=True, exist_ok=True)
 
-    zip_path = build_package(repo, version=ver, dest_dir=base, archive_stem=archive_stem)
+    # Sanitize archive_stem once here; build_package also sanitizes but we
+    # need the clean value for the snap_name below.
+    safe_stem = _safe_archive_stem(archive_stem) if archive_stem is not None else None
+    zip_path = build_package(repo, version=ver, dest_dir=base, archive_stem=safe_stem)
 
-    snap_name = archive_stem if archive_stem is not None else f"v{ver}"
+    snap_name = safe_stem if safe_stem is not None else f"v{ver}"
     snap = base / snap_name
     if snap.exists() or snap.is_symlink():
         _rmtree_robust(snap)
@@ -596,6 +616,12 @@ def main(argv: list[str] | None = None) -> int:
                 positional.append(rest[i])
                 i += 1
         repo = Path(positional[0]) if positional else Path(".")
+        if name is not None:
+            try:
+                name = _safe_archive_stem(name)
+            except ValueError as e:
+                sys.stderr.write(f"error: {e}\n")
+                return 2
         issues = drift_report(repo)
         if issues:
             sys.stderr.write("refusing to package — version drift:\n")
@@ -623,6 +649,12 @@ def main(argv: list[str] | None = None) -> int:
                 snap_positional.append(rest[i])
                 i += 1
         repo = Path(snap_positional[0]) if snap_positional else Path(".")
+        if snap_name is not None:
+            try:
+                snap_name = _safe_archive_stem(snap_name)
+            except ValueError as e:
+                sys.stderr.write(f"error: {e}\n")
+                return 2
         issues = drift_report(repo)
         if issues:
             sys.stderr.write("refusing to snapshot — version drift:\n")

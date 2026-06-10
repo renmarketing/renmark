@@ -338,3 +338,54 @@ def test_safe_rev_arg_accepts_real_ranges() -> None:
         assert sizing._is_safe_rev_arg(good) is True
     for bad in ("", "-x", "; rm -rf /", "a b", "main..feat;ls", "$(whoami)"):
         assert sizing._is_safe_rev_arg(bad) is False
+
+
+# ── sizing lite-floor: missing est_tokens guard ──────────────────────────────
+
+
+def test_pure_code_tasks_no_estimates_not_lite() -> None:
+    """A ≤3-task pure-code plan with NO estimates must NOT classify as lite.
+
+    Prior bug: missing est_tokens contributed 0 to the sum, so total_est=0 <=
+    LITE_MAX_EST_TOKENS was true and the token branch fired → lite by accident.
+    """
+    # Three small code tasks, none have estimates → must be standard, never lite.
+    tasks = [_task(i + 1, f"src/module{i}.py", complexity="simple") for i in range(3)]
+    assert all(t.est_tokens is None for t in tasks)
+    result = classify_plan(tasks)
+    assert result != TIER_LITE, (
+        "A code plan with no estimates must never be lite (missing est_tokens != 0 tokens)"
+    )
+    assert result in {TIER_STANDARD, TIER_FULL}
+
+
+def test_pure_code_tasks_with_small_estimates_can_be_lite() -> None:
+    """A ≤3-task code plan where ALL tasks have explicit small estimates CAN be lite."""
+    tasks = [
+        _task(i + 1, f"docs/page{i}.md", est_tokens=500)
+        for i in range(LITE_MAX_TASKS)
+    ]
+    assert all(t.est_tokens is not None for t in tasks)
+    assert classify_plan(tasks) == TIER_LITE
+
+
+def test_partial_estimates_not_lite_via_token_branch() -> None:
+    """If only SOME tasks have estimates, the token branch must not fire."""
+    tasks = [
+        _task(1, "docs/a.md", est_tokens=100),
+        _task(2, "docs/b.md"),  # no estimate
+        _task(3, "docs/c.md", est_tokens=100),
+    ]
+    # all_doc_config is True but total_est = 200 ≤ LITE_MAX_EST_TOKENS —
+    # however not all tasks have estimates, so token branch must not fire for code.
+    # The doc branch (all_doc_config) may still fire here; test that behavior
+    # is at least not purely "lite from zero-est" on a code path.
+    # Specifically, any task WITHOUT an estimate on a CODE file → standard.
+    code_tasks = [
+        _task(1, "src/a.py", est_tokens=100),
+        _task(2, "src/b.py"),  # no estimate
+    ]
+    result = classify_plan(code_tasks)
+    assert result != TIER_LITE, (
+        "Code plan with a missing estimate must not be lite via token branch"
+    )

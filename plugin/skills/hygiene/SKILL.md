@@ -37,7 +37,7 @@ Subcommands: `scan` (artifacts), `prune` (memory logs), `all` (both).
 
 ### 2. Relay the result
 
-Pass the bounded ≤5-line stdout through to the user unchanged. The script emits two status lines (`HYGIENE …`, `MEMORY …`) plus an optional `ERRORS …` line. Do not paraphrase or expand — the format is the contract.
+Pass the bounded stdout through to the user unchanged. The script emits one or two status lines — `HYGIENE …` always, and `MEMORY …` only when pruning ran — plus an `ERRORS …` line only on `--apply` failures. Do not paraphrase or expand — the format is the contract.
 
 ## Flags
 

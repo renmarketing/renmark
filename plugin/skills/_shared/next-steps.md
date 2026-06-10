@@ -64,8 +64,8 @@ Each renmark skill belongs to exactly one class. The class decides what
 
 ### 1. Pipeline skills — Tier-0 stage routing
 
-`start`, `brainstorm`, `plan`, `check-plan`, `orchestrate`, `verify`, `finish`,
-`feature`, `prd`, `blueprint`.
+`start`, `brainstorm`, `plan`, `check-plan`, `orchestrate`, `finish`,
+`feature`, `prd`, `blueprint`, `loop`.
 
 These advance the lifecycle. Their next step is the deterministic stage
 transition from `next_recommended()` (which reads `lifecycle.json` and applies
@@ -83,9 +83,14 @@ cite EITHER this contract OR `handoff-menu.md` directly; both resolve to the sam
 rendered menu. Do not duplicate the gate menu text here — it lives in
 `handoff-menu.md`.
 
+`verify` belongs to class 2 only — it is NOT a pipeline skill.
+
 ### 3. Aux / terminal skills — resume-pipeline + local actions
 
-`debug`, `doctor`, `hygiene`, `roadmap`, `init`, `setup`, `help`, `resume`.
+`debug`, `doctor`, `hygiene`, `roadmap`, `init`, `setup`, `help`, `resume`,
+`backlog`, `usage`, `analytics`, `approve`, `audit`, `inventory`.
+
+Unlisted skills default to class 3 (aux) via `lifecycle.skill_class`.
 
 These sit off the main line. Their recommended next step is **resume-pipeline**:
 the in-flight feature's `next_recommended()` (from `lifecycle.json`), so the user
