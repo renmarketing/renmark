@@ -4,7 +4,15 @@ Auto-maintained by `/renmark:orchestrate`. Records which executor worked best fo
 
 ## Format
 
-Each entry: `(signal) → executor, confidence, last-confirmed-on, sample-size`
+Each entry (as written by `renmark.memory.append_routing`):
+
+```
+- (YYYY-MM-DD) `<signature>` → **<executor>** (<outcome>, run=<run-id>)
+```
+
+Example: `- (2026-06-09) \`target=tests/**, complexity=medium, mode=A\` → **codex** (passed, run=20260609-190829-757f)`
+
+When entries conflict for the same signature, the newest dated entry wins.
 
 ## Defaults (until experience accumulates)
 

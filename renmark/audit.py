@@ -200,6 +200,9 @@ def registry_sync(repo: Path | str) -> list[str]:
     - **ghost** — a name in ``DOMAIN_BY_SKILL`` / ``IMPLEMENTED_SKILLS`` /
       class-set (pipeline + gate + aux) that has no backing skill directory.
     - **missing** — a shipped skill directory absent from a registry.
+    - **no-skill-md** — a skill directory that exists but lacks a ``SKILL.md``
+      file.  Such directories are invisible to the inventory harvester and to
+      Claude Code's skill dispatcher — the dir ships dead weight.
 
     The class-set membership check is the union of ``PIPELINE_SKILLS``,
     ``GATE_SKILLS`` and ``AUX_SKILLS`` — every shipped skill must belong to
@@ -211,15 +214,20 @@ def registry_sync(repo: Path | str) -> list[str]:
     """
     repo = Path(repo)
     skills_dir = _plugin_dir(repo) / "skills"
-    dirs = (
-        {
-            d.name
-            for d in skills_dir.iterdir()
-            if d.is_dir() and not d.name.startswith("_") and (d / "SKILL.md").exists()
-        }
-        if skills_dir.is_dir()
-        else set()
-    )
+
+    issues: list[str] = []
+
+    if not skills_dir.is_dir():
+        return issues
+
+    # All non-underscore subdirectories, regardless of SKILL.md presence.
+    all_dirs = {d.name for d in skills_dir.iterdir() if d.is_dir() and not d.name.startswith("_")}
+    # Only dirs that actually have a SKILL.md — these are "known to the registry."
+    dirs = {name for name in all_dirs if (skills_dir / name / "SKILL.md").exists()}
+
+    # Emit an issue for every dir that lacks a SKILL.md.
+    for name in sorted(all_dirs - dirs):
+        issues.append(f"registry-sync: skill dir without SKILL.md: {name}")
 
     class_union = set(lifecycle.PIPELINE_SKILLS) | set(lifecycle.GATE_SKILLS) | set(lifecycle.AUX_SKILLS)
 
@@ -229,13 +237,130 @@ def registry_sync(repo: Path | str) -> list[str]:
         ("class-sets", class_union),
     ]
 
-    issues: list[str] = []
     for label, reg in registries:
         for ghost in sorted(reg - dirs):
             issues.append(f"registry-sync: {label} lists '{ghost}' but no plugin/skills/{ghost}/ exists (ghost)")
         for missing in sorted(dirs - reg):
             issues.append(f"registry-sync: plugin/skills/{missing}/ has no entry in {label} (missing)")
     return sorted(set(issues))
+
+
+def no_raw_jsonl(repo: Path | str) -> list[str]:
+    """Flag lines in plugin skills/commands that instruct shell-reading a JSONL ledger.
+
+    Heuristic (deterministic):
+    - Scan every ``plugin/skills/*/SKILL.md`` and ``plugin/commands/*.md``.
+    - For each non-blank line, flag it if:
+        (a) it matches the regex
+            ``\\b(cat|head|tail|less|more)\\b(\\s+-\\S+)*\\s+\\S*\\.jsonl``
+            (a shell command reading a ``.jsonl`` file, with or without
+            intermediate flag tokens like ``head -5`` / ``tail -n 20``); AND
+        (b) the line is NOT inside a fenced code block whose language marker is
+            ``python`` (python snippets may legitimately reference .jsonl paths in
+            string literals without actually shell-reading them); AND
+        (c) the line does NOT appear to be a prose prohibition — it is NOT a line
+            that contains common prohibition tokens such as "never", "do not",
+            "don't", "NEVER", "do NOT" (these are "never cat ... .jsonl"-style
+            guard clauses that explicitly forbid the action; flagging them would
+            produce false positives against the very warnings that prevent the
+            violation).
+
+    The heuristic is intentionally lenient on prose prohibitions so the pass
+    returns zero issues against the current clean plugin.  It fires only on
+    affirmative shell-read instructions: a line like
+    ``cat .renmark/state/usage.jsonl | jq ...`` in an imperative code block would
+    be flagged; a line like "NEVER cat .renmark/analytics/*.jsonl" would not.
+
+    Returns a sorted issue list (empty = clean). Never raises.
+    """
+    repo = Path(repo)
+    plugin = _plugin_dir(repo)
+    issues: list[str] = []
+
+    # Optional flag tokens (and their bare-number values) between the command
+    # and the path: `head -5 f.jsonl`, `tail -n 20 f.jsonl`, `cat -- f.jsonl`
+    # must all be caught (v0.9.1 review).
+    _SHELL_JSONL_RE = re.compile(r"\b(cat|head|tail|less|more)\b(\s+(-+\S*|\d+))*\s+\S*\.jsonl")
+    _PROHIBIT_RE = re.compile(r"\b(never|do\s+not|don'?t)\b", re.IGNORECASE)
+
+    candidate_files: list[Path] = []
+    skills_dir = plugin / "skills"
+    if skills_dir.is_dir():
+        for skill_dir in sorted(skills_dir.iterdir()):
+            if skill_dir.is_dir() and not skill_dir.name.startswith("_"):
+                skill_md = skill_dir / "SKILL.md"
+                if skill_md.exists():
+                    candidate_files.append(skill_md)
+    commands_dir = plugin / "commands"
+    if commands_dir.is_dir():
+        candidate_files.extend(sorted(commands_dir.glob("*.md")))
+
+    for fpath in candidate_files:
+        try:
+            text = fpath.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        in_python_fence = False
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            stripped = line.strip()
+            # Track python fenced code blocks.
+            if stripped.startswith("```"):
+                lang = stripped[3:].strip().lower()
+                if in_python_fence:
+                    in_python_fence = False  # closing fence
+                elif lang == "python":
+                    in_python_fence = True
+                # Non-python opening fences: don't toggle in_python_fence
+                continue
+            if in_python_fence:
+                continue  # inside a python block — skip
+            if _SHELL_JSONL_RE.search(line) and not _PROHIBIT_RE.search(line):
+                rel = str(fpath.relative_to(repo)).replace("\\", "/")
+                issues.append(f"no-raw-jsonl: {rel}:{lineno}: {stripped[:120]}")
+
+    return sorted(set(issues))
+
+
+# Stable substrings pinned from the actual plugin files (grep'd at authoring time):
+#   usage/SKILL.md: "Observed local usage only. Provider-side account limits may differ."
+#   analytics/SKILL.md: "NEVER dump raw logs."
+_USAGE_DISCLAIMER_MARKER: str = "Observed local usage only. Provider-side account limits may differ."
+_ANALYTICS_NO_RAW_LOG_MARKER: str = "NEVER dump raw logs."
+
+
+def disclaimer_present(repo: Path | str) -> list[str]:
+    """Check that mandatory governance markers are present in usage and analytics skills.
+
+    Two markers are checked:
+    - ``plugin/skills/usage/SKILL.md`` must contain the exact disclaimer:
+      "Observed local usage only. Provider-side account limits may differ."
+    - ``plugin/skills/analytics/SKILL.md`` must contain: "NEVER dump raw logs."
+
+    These are governance-critical sentences.  If either disappears (e.g. via
+    accidental edit or template regeneration), this pass emits an issue line so
+    the audit catches it before the change reaches CI.
+
+    Returns a sorted issue list (empty = markers present). Never raises.
+    """
+    repo = Path(repo)
+    plugin = _plugin_dir(repo)
+    issues: list[str] = []
+
+    checks: list[tuple[str, str]] = [
+        ("skills/usage/SKILL.md", _USAGE_DISCLAIMER_MARKER),
+        ("skills/analytics/SKILL.md", _ANALYTICS_NO_RAW_LOG_MARKER),
+    ]
+    for rel, marker in checks:
+        fpath = plugin / rel
+        try:
+            text = fpath.read_text(encoding="utf-8")
+        except OSError:
+            issues.append(f"disclaimer: {rel} is missing or unreadable (cannot verify marker)")
+            continue
+        if marker not in text:
+            issues.append(f"disclaimer: {rel} is missing required governance marker: {marker!r}")
+
+    return sorted(issues)
 
 
 def shim_thinness(repo: Path | str, *, inventory: list[CommandEntry] | None = None) -> list[str]:
@@ -344,8 +469,10 @@ def run_audit(repo: Path | str, *, quick: bool = False) -> AuditReport:
     """Run the full deterministic audit and return a structured report.
 
     Always runs: ``registry_sync`` + ``shim_thinness`` + ``description_drift`` +
-    the composed ``lint.lint_all`` (with the strict-YAML frontmatter pass
-    **enabled** — those frontmatters are fixed in this wave) + ``release.check_drift``.
+    ``no_raw_jsonl`` (key ``"no-raw-jsonl"``) + ``disclaimer_present`` (key
+    ``"disclaimer"``) + the composed ``lint.lint_all`` (with the strict-YAML
+    frontmatter pass **enabled** — those frontmatters are fixed in this wave) +
+    ``release.check_drift``.
 
     Non-quick additionally runs ``modularity.analyze`` and records its
     danger/warn/info counts (advisory — never folds into the issue total).
@@ -359,6 +486,8 @@ def run_audit(repo: Path | str, *, quick: bool = False) -> AuditReport:
     passes["registry-sync"] = registry_sync(repo)
     passes["shim-thinness"] = shim_thinness(repo, inventory=inv)
     passes["description-drift"] = description_drift(repo, inventory=inv)
+    passes["no-raw-jsonl"] = no_raw_jsonl(repo)
+    passes["disclaimer"] = disclaimer_present(repo)
     passes["lint"] = lint.lint_all(plugin, include_frontmatter_strict=True)
     try:
         passes["version-drift"] = release.drift_report(repo)
@@ -565,6 +694,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.ok else 1
 
     # Bounded ≤5-line stdout: counts per pass + artifact path + verdict.
+    # Passes: registry-sync shim-thinness description-drift no-raw-jsonl disclaimer lint version-drift
     counts = " ".join(f"{k}={len(v)}" for k, v in report.passes.items())
     sys.stdout.write(f"audit ({'quick' if quick else 'full'}): {counts}\n")
     if not quick and report.modularity_counts:

@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-06-10T01:02:52+00:00
-source_sha: cfed51f7bb603c41612d5967413dec77a04b7890
+created_at: 2026-06-10T03:45:41+00:00
+source_sha: 55eb314e6e0eef66f3e27841f576ff70cd62076e
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -35,8 +35,8 @@ schema_compliance: true
 | hygiene | meta | aux | 2 | 75 | Use to garbage-collect stale renmark artifacts and prune append-only memory logs… |
 | init | meta | aux | 2 | 153 | Use when the user wants renmark to onboard or document a project — the non-destr… |
 | inventory | audit | aux | 2 | 67 | Use to harvest a flat inventory of every renmark command and skill — name, domai… |
-| loop | build | pipeline | 2 | 271 | Use to run a bounded agentic loop — `/renmark:loop` or "loop on this until it pa… |
-| orchestrate | build | pipeline | 2 | 294 | Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "b… |
+| loop | build | pipeline | 2 | 275 | Use to run a bounded agentic loop — `/renmark:loop` or "loop on this until it pa… |
+| orchestrate | build | pipeline | 2 | 298 | Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "b… |
 | plan | build | pipeline | 2 | 234 | Use when the user has a spec and wants it decomposed into an executable task lis… |
 | prd | build | pipeline | 2 | 156 | Use to create or update the project's PRD (Product Requirements Document) — the … |
 | resume | meta | aux | 2 | 216 | Use after `/clear` or `/compact`, or at the start of a fresh session, to discove… |

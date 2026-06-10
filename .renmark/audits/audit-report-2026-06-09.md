@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-06-10T01:02:52+00:00
-source_sha: cfed51f7bb603c41612d5967413dec77a04b7890
+created_at: 2026-06-10T03:45:41+00:00
+source_sha: 55eb314e6e0eef66f3e27841f576ff70cd62076e
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -26,6 +26,12 @@ schema_compliance: true
 ## description-drift (0 issues)
 - (clean)
 
+## no-raw-jsonl (0 issues)
+- (clean)
+
+## disclaimer (0 issues)
+- (clean)
+
 ## lint (0 issues)
 - (clean)
 
@@ -34,5 +40,5 @@ schema_compliance: true
 
 ## Summary
 
-- verdict: PASS (0 issues across 5 passes)
+- verdict: PASS (0 issues across 7 passes)
 - all passes clean

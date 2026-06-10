@@ -160,7 +160,7 @@
     "shim_path": "plugin/commands/hygiene.md",
     "skill_path": "plugin/skills/hygiene/SKILL.md",
     "description": "Use to garbage-collect stale renmark artifacts and prune append-only memory logs. Default dry-run; --apply to make changes. Meta domain \u2014 never advances lifecycle.json.",
-    "argument_hint": "[scan|prune|all] [--apply] [--ttl-days N] [--memory-days N] [--include-memory]",
+    "argument_hint": "scan [scan|prune|all] [--apply] [--ttl-days N] [--memory-days N] [--include-memory]",
     "domain": "meta",
     "skill_class": "aux",
     "shim_body_lines": 2,
@@ -200,7 +200,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 271,
+    "skill_lines": 275,
     "has_skill": true
   },
   {
@@ -212,7 +212,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 294,
+    "skill_lines": 298,
     "has_skill": true
   },
   {

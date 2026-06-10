@@ -53,7 +53,11 @@ A blank / unparseable / non-positive value degrades to the bounded default — n
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'loop')`. If it returns a
 non-None hint, surface it as a one-line note. Also call `read_loop(repo, loop_id)` for any
 in-flight loop — if one is `running` or `awaiting-approval`, surface the resume command and
-iteration / budget-remaining instead of starting fresh.
+iteration / budget-remaining instead of starting fresh.  When resuming, emit:
+```python
+from renmark import analytics, state as rstate
+analytics.record_event(repo, ts=rstate.now_iso(), kind="resume")  # kind registered in EVENT_KINDS
+```
 
 ### 1. Single upfront approval gate
 

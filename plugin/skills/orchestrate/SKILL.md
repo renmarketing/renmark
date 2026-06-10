@@ -36,7 +36,11 @@ After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (t
 
 ## Steps
 
-**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'orchestrate')`. If it returns a non-None hint, surface as a one-line note. Also check `state.read_pipeline_state(repo)` — if `current_phase == "orchestrate"` and `pipeline_is_resumable(repo)`, surface: *"Existing orchestrate run paused at wave N — use `--resume` to continue, or clear pipeline state to start fresh."*
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'orchestrate')`. If it returns a non-None hint, surface as a one-line note. Also check `state.read_pipeline_state(repo)` — if `current_phase == "orchestrate"` and `pipeline_is_resumable(repo)`, surface: *"Existing orchestrate run paused at wave N — use `--resume` to continue, or clear pipeline state to start fresh."*  When the user passes `--resume` and an existing run is resumed from pipeline state, emit:
+```python
+from renmark import usage, state, analytics
+analytics.record_event(repo, ts=state.now_iso(), kind="resume")  # kind registered in EVENT_KINDS
+```
 
 ### 1. Discover plan
 
