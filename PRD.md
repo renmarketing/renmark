@@ -153,10 +153,11 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     skill parity verifiable at any time, writing artifacts under
     `.renmark/audits/`. It MUST NOT edit code, commit, or modify docs — advisory
     output only.
-18. `REQ-18` `/renmark:approve` is the sole surface for flipping
-    `human_review_completed` in lifecycle.json; no other skill may flip this
-    field directly. All human approval gates (release, merge, security override)
-    route through it.
+18. `REQ-18` `/renmark:approve` is the sole surface for **granting** approval —
+    setting `human_review_completed=True` in lifecycle.json; no other skill may
+    set it. The consuming skill (e.g. prd, finish, backlog) clears the gate
+    after acting on the approval. All human approval gates (release, merge,
+    security override) route through it.
 
 ## Success metrics
 
@@ -252,8 +253,11 @@ per working tree**.
 
 ---
 
-**Revision note (2026-06-09, user-authorized):** Added REQ-17 (audit surface —
-`/renmark:audit` + `/renmark:inventory`) and REQ-18 (`/renmark:approve` as the
-sole human-review gate flip surface); updated Scope boundaries to include
-`audit`, `inventory`, and `approve`; removed ghost command `secure` from the
-in-scope list (never implemented). These commands ship in 0.9.0.
+**Revision note (2026-06-09, human-approved diff):** Added REQ-17 (audit
+surface — `/renmark:audit` + `/renmark:inventory`) and REQ-18
+(`/renmark:approve` as the sole surface for granting approval; consuming
+skills clear the gate after acting — wording clarified at human review);
+updated Scope boundaries to include `audit`, `inventory`, and `approve`;
+removed ghost command `secure` from the in-scope list (never implemented).
+These commands ship in 0.9.0. The full diff was reviewed and explicitly
+approved by the project owner on 2026-06-09.
