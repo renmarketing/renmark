@@ -72,7 +72,7 @@
 | `/renmark:prd` | Create/update the project PRD — the durable source of truth |
 | `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |
 | `/renmark:plan <spec>` | Decompose a spec into atomic, executor-tagged tasks |
-| `/renmark:check-plan <plan>` | Validate plan structure before spending tokens |
+| `/renmark:check-plan <plan>` | Validate a plan deterministically (renmark.plan_lint — same engine as orchestrate pre-flight); PASS/WARN/BLOCK |
 | `/renmark:orchestrate <plan>` | Execute a plan — routes tasks to Haiku / Codex / Sonnet / Opus |
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
 | `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
