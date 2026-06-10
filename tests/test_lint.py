@@ -1,4 +1,5 @@
 """Tests for renmark.lint — plugin contract linter."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -33,10 +34,14 @@ def test_parse_frontmatter_ignores_comments_and_blanks():
 # ── plugin fixture builder ───────────────────────────────────────────────────
 
 
-def _make_plugin(tmp_path: Path, *, skills: dict[str, str] | None = None,
-                 commands: dict[str, str] | None = None,
-                 plugin_json: str | None = None,
-                 template: str | None = None) -> Path:
+def _make_plugin(
+    tmp_path: Path,
+    *,
+    skills: dict[str, str] | None = None,
+    commands: dict[str, str] | None = None,
+    plugin_json: str | None = None,
+    template: str | None = None,
+) -> Path:
     """Build a synthetic plugin/ directory for testing."""
     plugin_dir = tmp_path / "plugin"
     (plugin_dir / ".claude-plugin").mkdir(parents=True)
@@ -45,8 +50,7 @@ def _make_plugin(tmp_path: Path, *, skills: dict[str, str] | None = None,
     (plugin_dir / "templates").mkdir()
 
     (plugin_dir / ".claude-plugin" / "plugin.json").write_text(
-        plugin_json if plugin_json is not None else
-        '{"name":"renmark","version":"0.3.1","description":"test"}'
+        plugin_json if plugin_json is not None else '{"name":"renmark","version":"0.3.1","description":"test"}'
     )
 
     for name, body in (skills or {}).items():
@@ -57,8 +61,7 @@ def _make_plugin(tmp_path: Path, *, skills: dict[str, str] | None = None,
         (plugin_dir / "commands" / f"{name}.md").write_text(body)
 
     (plugin_dir / "templates" / "CLAUDE.md.template").write_text(
-        template if template is not None else
-        "<!-- BEGIN:demo-rule -->\nfoo\n<!-- END:demo-rule -->\n"
+        template if template is not None else "<!-- BEGIN:demo-rule -->\nfoo\n<!-- END:demo-rule -->\n"
     )
     return plugin_dir
 
@@ -139,8 +142,9 @@ def test_lint_command_shims_catches_skill_without_command(tmp_path: Path):
 def test_lint_ignores_underscore_shared_dirs(tmp_path: Path):
     """`_shared/` holds cross-skill reference files — not a skill, not orphaned.
     It must not trip 'missing SKILL.md' or 'unreachable' checks."""
-    plugin = _make_plugin(tmp_path, skills={"start": _valid_skill_md("start")},
-                          commands={"start": _valid_command_md("start")})
+    plugin = _make_plugin(
+        tmp_path, skills={"start": _valid_skill_md("start")}, commands={"start": _valid_command_md("start")}
+    )
     shared = plugin / "skills" / "_shared"
     shared.mkdir()
     (shared / "scope-contract.md").write_text("# shared reference\n")
@@ -150,8 +154,7 @@ def test_lint_ignores_underscore_shared_dirs(tmp_path: Path):
 
 def test_lint_command_shims_catches_missing_skill_reference(tmp_path: Path):
     bad_command = (
-        "---\ndescription: wrong\n---\n\n"
-        "Read ${CLAUDE_PLUGIN_ROOT}/skills/elsewhere/SKILL.md — wrong target.\n"
+        "---\ndescription: wrong\n---\n\nRead ${CLAUDE_PLUGIN_ROOT}/skills/elsewhere/SKILL.md — wrong target.\n"
     )
     plugin = _make_plugin(
         tmp_path,
@@ -166,10 +169,7 @@ def test_lint_command_shims_catches_missing_skill_reference(tmp_path: Path):
 
 
 def test_lint_template_passes_balanced(tmp_path: Path):
-    template = (
-        "<!-- BEGIN:foo -->\nbody\n<!-- END:foo -->\n\n"
-        "<!-- BEGIN:bar -->\nx\n<!-- END:bar -->\n"
-    )
+    template = "<!-- BEGIN:foo -->\nbody\n<!-- END:foo -->\n\n<!-- BEGIN:bar -->\nx\n<!-- END:bar -->\n"
     plugin = _make_plugin(tmp_path, template=template)
     issues = lint.lint_template_rule_blocks(plugin / "templates" / "CLAUDE.md.template")
     assert issues == []
@@ -190,10 +190,7 @@ def test_lint_template_catches_missing_begin(tmp_path: Path):
 
 
 def test_lint_template_catches_duplicate_begin(tmp_path: Path):
-    template = (
-        "<!-- BEGIN:foo -->\na\n<!-- END:foo -->\n"
-        "<!-- BEGIN:foo -->\nb\n<!-- END:foo -->\n"
-    )
+    template = "<!-- BEGIN:foo -->\na\n<!-- END:foo -->\n<!-- BEGIN:foo -->\nb\n<!-- END:foo -->\n"
     plugin = _make_plugin(tmp_path, template=template)
     issues = lint.lint_template_rule_blocks(plugin / "templates" / "CLAUDE.md.template")
     assert any("appears" in i for i in issues)
@@ -211,8 +208,7 @@ def test_markers_ignore_bare_prose(tmp_path: Path):
     line) is NOT a managed marker — the tightened regex only matches the
     `<!-- BEGIN:name -->` comment form."""
     template = (
-        "Some prose mentioning BEGIN:example and END:example inline.\n"
-        "<!-- BEGIN:real -->\nbody\n<!-- END:real -->\n"
+        "Some prose mentioning BEGIN:example and END:example inline.\n<!-- BEGIN:real -->\nbody\n<!-- END:real -->\n"
     )
     plugin = _make_plugin(tmp_path, template=template)
     issues = lint.lint_template_rule_blocks(plugin / "templates" / "CLAUDE.md.template")
@@ -364,8 +360,10 @@ def test_cli_strict_frontmatter_flag(tmp_path: Path, capsys: pytest.CaptureFixtu
 def test_lint_unreadable_skill_file(tmp_path: Path) -> None:
     """An unreadable SKILL.md is reported as an issue, not a crash."""
     import os
-    plugin = _make_plugin(tmp_path, skills={"myskill": _valid_skill_md("myskill")},
-                          commands={"myskill": _valid_command_md("myskill")})
+
+    plugin = _make_plugin(
+        tmp_path, skills={"myskill": _valid_skill_md("myskill")}, commands={"myskill": _valid_command_md("myskill")}
+    )
     skill_md = plugin / "skills" / "myskill" / "SKILL.md"
     # Make the file unreadable
     os.chmod(str(skill_md), 0o000)

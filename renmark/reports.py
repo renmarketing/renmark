@@ -39,6 +39,7 @@ def _safe_component(value: str) -> str:
         return "unnamed"
     return name
 
+
 # Ordered metrics keys assembled by build_feature_report (REQ-15).
 FEATURE_REPORT_KEYS: tuple[str, ...] = (
     "feature",
@@ -240,9 +241,7 @@ def _atomic_write(path: Path, text: str) -> Path | None:
     return path
 
 
-def write_feature_report(
-    repo: Path | str, slug: str, report: dict[str, object]
-) -> tuple[Path, Path]:
+def write_feature_report(repo: Path | str, slug: str, report: dict[str, object]) -> tuple[Path, Path]:
     """Atomically write ``report.md`` + ``metrics.json`` under the feature dir.
 
     Returns ``(md_path, json_path)`` — the intended paths even if a write

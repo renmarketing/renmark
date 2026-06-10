@@ -300,9 +300,7 @@ def read_lifecycle(repo: Path | str) -> LifecycleState | None:
     # Tolerate unknown fields and wrong-typed values — drop them rather than
     # crashing on schema drift.
     filtered: dict[str, Any] = {
-        k: v
-        for k, v in data.items()
-        if k in _LIFECYCLE_FIELD_TYPES and isinstance(v, _LIFECYCLE_FIELD_TYPES[k])
+        k: v for k, v in data.items() if k in _LIFECYCLE_FIELD_TYPES and isinstance(v, _LIFECYCLE_FIELD_TYPES[k])
     }
     return LifecycleState(**filtered)
 

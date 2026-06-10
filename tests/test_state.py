@@ -1,4 +1,5 @@
 """Unit tests for renmark.state."""
+
 from __future__ import annotations
 
 import json
@@ -148,12 +149,8 @@ def test_new_run_id_unique() -> None:
 def test_completed_task_indices_from_git(tmp_path: Path) -> None:
     """Build a tiny git repo, make commits, scan."""
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
-    subprocess.run(
-        ["git", "-C", str(tmp_path), "config", "user.email", "t@t"], check=True
-    )
-    subprocess.run(
-        ["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True
-    )
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "t@t"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True)
     (tmp_path / "a.txt").write_text("a")
     subprocess.run(["git", "-C", str(tmp_path), "add", "a.txt"], check=True)
     subprocess.run(
@@ -243,23 +240,21 @@ def test_commit_pattern_variants_all_recognized(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True)
 
     variants = [
-        ("[nim] task 1: bracketed nim",             1),
-        ("[manual] task 2: bracketed manual",       2),
-        ("nim task 3: bare nim",                    3),
-        ("manual task 4: bare manual",              4),
-        ("nim task 5 (manual): bare with paren",    5),
-        ("manual task 6 (nim): bare with paren",    6),
-        ("[renmark] task 7: bracketed renmark",     7),
-        ("[codex] task 8: bracketed codex",         8),
-        ("renmark task 9: bare renmark",            9),
+        ("[nim] task 1: bracketed nim", 1),
+        ("[manual] task 2: bracketed manual", 2),
+        ("nim task 3: bare nim", 3),
+        ("manual task 4: bare manual", 4),
+        ("nim task 5 (manual): bare with paren", 5),
+        ("manual task 6 (nim): bare with paren", 6),
+        ("[renmark] task 7: bracketed renmark", 7),
+        ("[codex] task 8: bracketed codex", 8),
+        ("renmark task 9: bare renmark", 9),
     ]
     for i, (msg, _) in enumerate(variants):
         f = tmp_path / f"{i}.txt"
         f.write_text(str(i))
         subprocess.run(["git", "-C", str(tmp_path), "add", f.name], check=True)
-        subprocess.run(
-            ["git", "-C", str(tmp_path), "commit", "-q", "-m", msg], check=True
-        )
+        subprocess.run(["git", "-C", str(tmp_path), "commit", "-q", "-m", msg], check=True)
 
     # Add one that must NOT match (no nim/manual prefix at all).
     (tmp_path / "noise.txt").write_text("x")

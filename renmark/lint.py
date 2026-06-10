@@ -336,9 +336,9 @@ def lint_plugin_json(plugin_dir: Path) -> list[str]:
 # where (a) the value doesn't start with ' or ", and (b) ": " appears inside
 # the value portion.
 _FM_UNQUOTED_COLON_RE = re.compile(
-    r'^([a-zA-Z][a-zA-Z0-9_-]*):\s+'   # key:
-    r'(?![\'"])'                          # value does NOT start with a quote
-    r'.*:\s',                             # contains ": " somewhere
+    r"^([a-zA-Z][a-zA-Z0-9_-]*):\s+"  # key:
+    r'(?![\'"])'  # value does NOT start with a quote
+    r".*:\s",  # contains ": " somewhere
 )
 
 # Balanced quoted scalars per strict YAML: double-quoted values may contain
@@ -393,18 +393,13 @@ def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
             value = kv.group(2)
             if value.startswith('"'):
                 if not _FM_DQ_BALANCED_RE.match(value):
-                    issues.append(
-                        f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
-                    )
+                    issues.append(f"{rel}: frontmatter value has unbalanced quotes: {line!r}")
             elif value.startswith("'"):
                 if not _FM_SQ_BALANCED_RE.match(value):
-                    issues.append(
-                        f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
-                    )
+                    issues.append(f"{rel}: frontmatter value has unbalanced quotes: {line!r}")
             elif _FM_UNQUOTED_COLON_RE.match(line):
                 issues.append(
-                    f"{rel}: frontmatter value contains unquoted ': ' — "
-                    f"quote the value to fix strict-YAML: {line!r}"
+                    f"{rel}: frontmatter value contains unquoted ': ' — quote the value to fix strict-YAML: {line!r}"
                 )
     return issues
 
@@ -460,8 +455,7 @@ def main(argv: list[str] | None = None) -> int:
             i += 1
         elif argv[i] in ("-h", "--help"):
             sys.stdout.write(
-                "usage: python -m renmark.lint [--plugin-dir DIR] [--template PATH]"
-                " [--strict-frontmatter]\n"
+                "usage: python -m renmark.lint [--plugin-dir DIR] [--template PATH] [--strict-frontmatter]\n"
             )
             return 0
         else:

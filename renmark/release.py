@@ -337,9 +337,7 @@ def _changelog_section(repo: Path, ver: str) -> str:
     return "\n".join(section).strip() + "\n"
 
 
-def _latest_verification(
-    repo: Path, ver: str, verification_path: str | None = None
-) -> str:
+def _latest_verification(repo: Path, ver: str, verification_path: str | None = None) -> str:
     """Return the text of the relevant ``.renmark/reviews/*.verification.md``.
 
     Selection order (artifacts are named ``YYYY-MM-DD-<sha>.verification.md``):
@@ -523,9 +521,7 @@ def build_version_snapshot(
     }
     (snap / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (snap / "release.md").write_text(_changelog_section(repo, ver), encoding="utf-8")
-    (snap / "verification.md").write_text(
-        _latest_verification(repo, ver, verification_path), encoding="utf-8"
-    )
+    (snap / "verification.md").write_text(_latest_verification(repo, ver, verification_path), encoding="utf-8")
     (snap / "files-changed.txt").write_text(_files_changed(repo, ver), encoding="utf-8")
 
     return {
@@ -587,10 +583,7 @@ def drift_report(repo: Path | str = ".") -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
-        sys.stderr.write(
-            "usage: python -m renmark.release "
-            "{check|current|scan PATH|package [PATH]|snapshot [PATH]}\n"
-        )
+        sys.stderr.write("usage: python -m renmark.release {check|current|scan PATH|package [PATH]|snapshot [PATH]}\n")
         return 2
 
     cmd = argv[0]

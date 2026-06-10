@@ -129,9 +129,7 @@ def test_merge_rule_blocks_backfills_only_missing_verbatim(tmp_path: Path) -> No
     # Hand-modify the kept block's BODY (not its markers) so we can prove the
     # back-fill leaves existing blocks alone.
     assert keep_modified_block in text
-    modified_block = keep_modified_block.replace(
-        "## ", "## EDITED ", 1
-    )
+    modified_block = keep_modified_block.replace("## ", "## EDITED ", 1)
     assert modified_block != keep_modified_block, "expected the edit to change the block"
     text = text.replace(keep_modified_block, modified_block, 1)
 
@@ -155,9 +153,7 @@ def test_merge_rule_blocks_backfills_only_missing_verbatim(tmp_path: Path) -> No
     # template's own blocks.
     for name in (drop_a_name, drop_b_name):
         assert name in after_blocks, f"{name} was not re-inserted"
-        assert after_blocks[name] == canon_by_name[name], (
-            f"{name} not byte-verbatim after back-fill"
-        )
+        assert after_blocks[name] == canon_by_name[name], f"{name} not byte-verbatim after back-fill"
 
     # The hand-modified block is left exactly as the user wrote it.
     assert "EDITED" in after_text
@@ -176,12 +172,8 @@ def test_merge_rule_blocks_agents_always_zero(tmp_path: Path) -> None:
     Never assert symmetry with CLAUDE.md."""
     tdir = _template_dir()
     # Both files present, derived from their own templates.
-    (tmp_path / "CLAUDE.md").write_text(
-        (tdir / "CLAUDE.md.template").read_text(encoding="utf-8"), encoding="utf-8"
-    )
-    (tmp_path / "AGENTS.md").write_text(
-        (tdir / "AGENTS.md.template").read_text(encoding="utf-8"), encoding="utf-8"
-    )
+    (tmp_path / "CLAUDE.md").write_text((tdir / "CLAUDE.md.template").read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text((tdir / "AGENTS.md.template").read_text(encoding="utf-8"), encoding="utf-8")
 
     result = init.merge_rule_blocks(tmp_path, template_dir=tdir)
 
@@ -195,9 +187,7 @@ def test_merge_rule_blocks_omits_absent_files(tmp_path: Path) -> None:
     """Files that don't exist are omitted from the result dict entirely."""
     tdir = _template_dir()
     # Only CLAUDE.md exists; AGENTS.md does not.
-    (tmp_path / "CLAUDE.md").write_text(
-        (tdir / "CLAUDE.md.template").read_text(encoding="utf-8"), encoding="utf-8"
-    )
+    (tmp_path / "CLAUDE.md").write_text((tdir / "CLAUDE.md.template").read_text(encoding="utf-8"), encoding="utf-8")
     result = init.merge_rule_blocks(tmp_path, template_dir=tdir)
     assert "CLAUDE.md" in result
     assert "AGENTS.md" not in result
@@ -265,12 +255,7 @@ def test_merge_rule_blocks_skips_orphan_end(tmp_path: Path) -> None:
     canonical = iter_rule_blocks(_claude_template_text())
     orphan_name = canonical[0][0]
 
-    malformed = (
-        "# Project\n\n"
-        "Some prose.\n\n"
-        f"<!-- END:{orphan_name} -->\n"
-        "Trailing prose.\n"
-    )
+    malformed = f"# Project\n\nSome prose.\n\n<!-- END:{orphan_name} -->\nTrailing prose.\n"
     claude = tmp_path / "CLAUDE.md"
     claude.write_text(malformed, encoding="utf-8")
 
@@ -289,9 +274,7 @@ def test_run_returns_exit_2_on_corrupted_claude_md(tmp_path: Path) -> None:
     canonical = iter_rule_blocks(_claude_template_text())
     orphan_name = canonical[0][0]
     # Orphan END with no matching BEGIN → corruption.
-    (tmp_path / "CLAUDE.md").write_text(
-        f"# Project\n\nprose\n\n<!-- END:{orphan_name} -->\n", encoding="utf-8"
-    )
+    (tmp_path / "CLAUDE.md").write_text(f"# Project\n\nprose\n\n<!-- END:{orphan_name} -->\n", encoding="utf-8")
 
     code, summary = init.run(tmp_path)
     assert code == 2, f"expected exit 2 on corrupted markers, got {code}: {summary!r}"
@@ -345,13 +328,7 @@ def test_file_purpose_multiline_joins_to_first_sentence() -> None:
     (e.g. "tracking tuned.") rather than the complete first sentence that
     wraps across lines.
     """
-    text = (
-        '"""\n'
-        "Persistent project memory at `.renmark/memory/`.\n"
-        "\n"
-        "Files act as living documentation.\n"
-        '"""\n'
-    )
+    text = '"""\nPersistent project memory at `.renmark/memory/`.\n\nFiles act as living documentation.\n"""\n'
     result = init._file_purpose(text, "python")
     # Must include the full first sentence, not a fragment from the second line
     assert result == "Persistent project memory at `.renmark/memory/`."
@@ -367,12 +344,7 @@ def test_file_purpose_multiline_no_period_returns_first_line() -> None:
 def test_file_purpose_multiline_wraps_across_lines() -> None:
     """A long first sentence that wraps across multiple lines is joined correctly."""
     # Use a short sentence that fits within the 80-char cap
-    text = (
-        '"""\n'
-        "Drift detection that keeps pyproject,\n"
-        "VERSION in sync.\n"
-        '"""\n'
-    )
+    text = '"""\nDrift detection that keeps pyproject,\nVERSION in sync.\n"""\n'
     result = init._file_purpose(text, "python")
     # First sentence ends with the period after "sync."
     assert result.endswith("sync.")

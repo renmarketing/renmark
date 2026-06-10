@@ -1,4 +1,5 @@
 """Unit tests for renmark.bootstrap."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -65,10 +66,10 @@ def test_bootstrap_git_init_non_empty_does_not_commit_preexisting_file(tmp_path:
 
     # Check that my-secret.txt is NOT tracked in git
     import subprocess
+
     tracked = subprocess.run(
         ["git", "-C", str(tmp_path), "ls-files", "my-secret.txt"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
-    assert tracked.stdout.strip() == "", (
-        "pre-existing my-secret.txt must NOT have been committed by bootstrap"
-    )
+    assert tracked.stdout.strip() == "", "pre-existing my-secret.txt must NOT have been committed by bootstrap"

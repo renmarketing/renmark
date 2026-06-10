@@ -7,6 +7,7 @@
 3. Mode-A failed-task rollback deletes an UNTRACKED target (checkout can't
    restore it) instead of silently leaving the rejected artifact on disk.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -166,9 +167,7 @@ def test_rollback_leaves_sibling_untouched(tmp_path):
     mine.write_text("my rejected artifact")
 
     # Roll back ONLY my path.
-    _engine._rollback_paths(
-        tmp_path, ["out/mine.txt"], untracked_before={"out/mine.txt"}
-    )
+    _engine._rollback_paths(tmp_path, ["out/mine.txt"], untracked_before={"out/mine.txt"})
     assert not mine.exists()
     assert sibling.exists(), "sibling's in-flight work must survive my rollback"
     assert sibling.read_text() == "sibling in-flight work"

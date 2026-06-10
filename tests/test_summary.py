@@ -1,4 +1,5 @@
 """Unit tests for renmark.summary (G3, G6, G9 enforcement)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -109,8 +110,7 @@ def test_emit_pointer_caps_at_n_lines(tmp_path: Path) -> None:
         "source_sha: null\nrelated_plan: null\ngenerator: test\nstale_after: null\n"
         "dependency_refs: []\ncompletion_state: complete\nconfidence: medium\n"
         "validation_status: unvalidated\nretry_count: 0\nparser_success: true\n"
-        "schema_compliance: true\n---\n\nbody\n\n## Summary\n\n"
-        + "\n".join(f"- line {i}" for i in range(10))
+        "schema_compliance: true\n---\n\nbody\n\n## Summary\n\n" + "\n".join(f"- line {i}" for i in range(10))
     )
     path.write_text(content)
     pointer = summary.emit_pointer(path, "X", n_lines=3)
@@ -147,9 +147,7 @@ def test_is_stale_missing_file(tmp_path: Path) -> None:
 
 def test_is_stale_fresh_artifact(tmp_path: Path) -> None:
     path = tmp_path / "fresh.md"
-    summary.write_artifact(
-        path, artifact_type="x", body="b", summary_lines=["s"], generator="t"
-    )
+    summary.write_artifact(path, artifact_type="x", body="b", summary_lines=["s"], generator="t")
     assert summary.is_stale(path) is False
 
 
@@ -157,7 +155,11 @@ def test_is_stale_past_stale_after(tmp_path: Path) -> None:
     path = tmp_path / "old.md"
     past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     summary.write_artifact(
-        path, artifact_type="x", body="b", summary_lines=["s"], generator="t",
+        path,
+        artifact_type="x",
+        body="b",
+        summary_lines=["s"],
+        generator="t",
         stale_after=past,
     )
     assert summary.is_stale(path) is True
@@ -166,8 +168,12 @@ def test_is_stale_past_stale_after(tmp_path: Path) -> None:
 def test_is_stale_sha_drift(tmp_path: Path) -> None:
     path = tmp_path / "drifted.md"
     summary.write_artifact(
-        path, artifact_type="x", body="b", summary_lines=["s"],
-        generator="t", source_sha="abc",
+        path,
+        artifact_type="x",
+        body="b",
+        summary_lines=["s"],
+        generator="t",
+        source_sha="abc",
     )
     assert summary.is_stale(path, against_sha="xyz") is True
     assert summary.is_stale(path, against_sha="abc") is False
@@ -188,9 +194,7 @@ def test_verifier_tail_failure(tmp_path: Path) -> None:
 
 def test_verifier_tail_bounded_output(tmp_path: Path) -> None:
     # Output a long string — verifier_tail must still return a bounded line
-    result = summary.verifier_tail(
-        "for i in $(seq 1 1000); do echo line-$i; done", cwd=tmp_path
-    )
+    result = summary.verifier_tail("for i in $(seq 1 1000); do echo line-$i; done", cwd=tmp_path)
     assert len(result) < summary.MAX_CHARS_PER_LINE + 100  # bounded
 
 

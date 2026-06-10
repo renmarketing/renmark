@@ -1,4 +1,5 @@
 """Tests for renmark.release.build_version_snapshot."""
+
 from __future__ import annotations
 
 import json
@@ -19,9 +20,7 @@ def _make_snapshot_repo(tmp_path: Path, version: str = "1.2.3") -> Path:
     # Plugin manifest (needed for package_basename)
     plugin_dir = tmp_path / "plugin" / ".claude-plugin"
     plugin_dir.mkdir(parents=True)
-    (plugin_dir / "plugin.json").write_text(
-        json.dumps({"name": "renmark", "version": version, "description": "test"})
-    )
+    (plugin_dir / "plugin.json").write_text(json.dumps({"name": "renmark", "version": version, "description": "test"}))
 
     # CHANGELOG with a real section containing a unique marker
     (tmp_path / "CHANGELOG.md").write_text(
@@ -31,9 +30,7 @@ def _make_snapshot_repo(tmp_path: Path, version: str = "1.2.3") -> Path:
     # Verification artifact under .renmark/reviews/
     reviews_dir = tmp_path / ".renmark" / "reviews"
     reviews_dir.mkdir(parents=True)
-    (reviews_dir / "2026-01-01-x.verification.md").write_text(
-        "UNIQUE_VERIFICATION_MARKER\n"
-    )
+    (reviews_dir / "2026-01-01-x.verification.md").write_text("UNIQUE_VERIFICATION_MARKER\n")
 
     # Application files that SHOULD be packaged
     (tmp_path / "renmark").mkdir(exist_ok=True)
@@ -56,23 +53,28 @@ def _make_snapshot_repo(tmp_path: Path, version: str = "1.2.3") -> Path:
     try:
         subprocess.run(
             ["git", "-C", str(tmp_path), "init", "--quiet"],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         subprocess.run(
             ["git", "-C", str(tmp_path), "config", "user.email", "test@test.com"],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         subprocess.run(
             ["git", "-C", str(tmp_path), "config", "user.name", "Test"],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         subprocess.run(
             ["git", "-C", str(tmp_path), "add", "-A"],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         subprocess.run(
             ["git", "-C", str(tmp_path), "commit", "-m", "init", "--quiet"],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
     except (OSError, subprocess.CalledProcessError):
         pass  # git absent or broken — fallbacks tested below
@@ -278,9 +280,7 @@ def test_changelog_section_exact_version_match(tmp_path: Path):
     _make_snapshot_repo(tmp_path, version="1.2.3")
     # v1.2.30 appears FIRST so a substring match would wrongly grab it.
     (tmp_path / "CHANGELOG.md").write_text(
-        "## v1.2.30 — decoy\n\nDECOY_MARKER_30\n\n"
-        "## v1.2.3 — real\n\nCORRECT_MARKER_3\n\n"
-        "## v1.0.0 — older\n\nOld.\n"
+        "## v1.2.30 — decoy\n\nDECOY_MARKER_30\n\n## v1.2.3 — real\n\nCORRECT_MARKER_3\n\n## v1.0.0 — older\n\nOld.\n"
     )
     release.build_version_snapshot(str(tmp_path), now="2026-06-09T00:00:00")
     snap = tmp_path / ".renmark" / "version" / "v1.2.3"
@@ -295,7 +295,8 @@ def test_verification_artifact_matches_head_sha(tmp_path: Path):
     _make_snapshot_repo(tmp_path)
     head = subprocess.run(
         ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if head.returncode != 0 or not head.stdout.strip():
         import pytest

@@ -1,4 +1,5 @@
 """Tests for renmark.audit — deterministic plugin/registry audit engine."""
+
 from __future__ import annotations
 
 import json
@@ -28,12 +29,8 @@ def _make_plugin(
     (plugin / "skills").mkdir()
     (plugin / "commands").mkdir()
     (plugin / "templates").mkdir()
-    (plugin / ".claude-plugin" / "plugin.json").write_text(
-        '{"name":"renmark","version":"0.0.0","description":"t"}'
-    )
-    (plugin / "templates" / "CLAUDE.md.template").write_text(
-        "<!-- BEGIN:x -->\nf\n<!-- END:x -->\n"
-    )
+    (plugin / ".claude-plugin" / "plugin.json").write_text('{"name":"renmark","version":"0.0.0","description":"t"}')
+    (plugin / "templates" / "CLAUDE.md.template").write_text("<!-- BEGIN:x -->\nf\n<!-- END:x -->\n")
     for name, body in (skills or {}).items():
         (plugin / "skills" / name).mkdir(parents=True)
         (plugin / "skills" / name / "SKILL.md").write_text(body)
@@ -53,8 +50,7 @@ def _skill_md(name: str, desc: str = "a skill") -> str:
 
 def _shim(name: str, desc: str = "a skill", body_lines: int = 1) -> str:
     body = "\n".join(
-        [f"Read skills/{name}/SKILL.md and follow it."]
-        + [f"extra line {i}" for i in range(body_lines - 1)]
+        [f"Read skills/{name}/SKILL.md and follow it."] + [f"extra line {i}" for i in range(body_lines - 1)]
     )
     return f"---\ndescription: {desc} for {name}\n---\n\n{body}\n"
 
@@ -189,9 +185,7 @@ def test_run_audit_real_repo() -> None:
     assert report.passes["shim-thinness"] == [], report.passes["shim-thinness"]
     assert report.passes["description-drift"] == [], report.passes["description-drift"]
     assert report.passes["version-drift"] == [], report.passes["version-drift"]
-    non_frontmatter_lint = [
-        i for i in report.passes["lint"] if "frontmatter value" not in i
-    ]
+    non_frontmatter_lint = [i for i in report.passes["lint"] if "frontmatter value" not in i]
     assert non_frontmatter_lint == [], non_frontmatter_lint
     # full run records modularity counts (advisory, not folded into total).
     assert isinstance(report.modularity_counts, dict)

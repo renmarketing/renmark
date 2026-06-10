@@ -1,4 +1,5 @@
 """Unit tests for the ad-hoc Codex task mode in renmark-execute."""
+
 from __future__ import annotations
 
 import json
@@ -62,6 +63,7 @@ def test_task_mode_emits_pass_json_when_codex_succeeds(tmp_path: Path, capsys, m
         # Write a valid renmark artifact to the output path.
         # (Codex would normally do this; we simulate it.)
         from renmark.summary import write_artifact
+
         write_artifact(
             out,
             artifact_type="research",
@@ -69,16 +71,20 @@ def test_task_mode_emits_pass_json_when_codex_succeeds(tmp_path: Path, capsys, m
             summary_lines=["finding A", "finding B"],
             generator="codex",
         )
+
         class FakeProc:
             returncode = 0
             stdout = ""
             stderr = ""
+
         return FakeProc()
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     rc = cli.cmd_task(
-        task_spec_path=str(spec), output_path=str(out), repo=tmp_path,
+        task_spec_path=str(spec),
+        output_path=str(out),
+        repo=tmp_path,
     )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
@@ -112,10 +118,12 @@ def test_task_mode_malformed_artifact_downgrades_g9(tmp_path: Path, capsys, monk
     def fake_run(cmd, **kwargs):
         # Write a malformed artifact: plain text, no frontmatter, no ## Summary.
         out.write_text("just some prose codex emitted, not renmark format")
+
         class FakeProc:
             returncode = 0
             stdout = ""
             stderr = ""
+
         return FakeProc()
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -141,12 +149,15 @@ def test_task_mode_emits_fail_when_codex_exits_nonzero(tmp_path: Path, capsys, m
             returncode = 3
             stdout = ""
             stderr = "codex error: rate limited\nretry later"
+
         return FakeProc()
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     rc = cli.cmd_task(
-        task_spec_path=str(spec), output_path=str(tmp_path / "out.md"), repo=tmp_path,
+        task_spec_path=str(spec),
+        output_path=str(tmp_path / "out.md"),
+        repo=tmp_path,
     )
     assert rc == 3
     payload = json.loads(capsys.readouterr().out)
@@ -165,7 +176,9 @@ def test_task_mode_emits_fail_on_timeout(tmp_path: Path, capsys, monkeypatch) ->
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     rc = cli.cmd_task(
-        task_spec_path=str(spec), output_path=str(tmp_path / "out.md"), repo=tmp_path,
+        task_spec_path=str(spec),
+        output_path=str(tmp_path / "out.md"),
+        repo=tmp_path,
     )
     assert rc == 124  # canonical timeout exit
     payload = json.loads(capsys.readouterr().out)

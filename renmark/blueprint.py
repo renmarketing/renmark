@@ -5,6 +5,7 @@ Provides:
 - splice_generated_block: idempotent region replacement.
 - detect_ui: parse Frontend field from stack.md text.
 """
+
 from __future__ import annotations
 
 import re
@@ -86,15 +87,11 @@ def splice_generated_block(
 
     start_match = start_re.search(text)
     if start_match is None:
-        raise MarkerNotFoundError(
-            f"START marker for '{marker_id}' not found in text."
-        )
+        raise MarkerNotFoundError(f"START marker for '{marker_id}' not found in text.")
 
     end_pos = text.find(end_literal, start_match.end())
     if end_pos == -1:
-        raise MarkerNotFoundError(
-            f"END marker for '{marker_id}' not found after START marker."
-        )
+        raise MarkerNotFoundError(f"END marker for '{marker_id}' not found after START marker.")
 
     new_start = build_start_marker(marker_id, source_sha)
     # Normalise new_content: strip outer newlines then wrap with exactly one

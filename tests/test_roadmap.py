@@ -1,4 +1,5 @@
 """Unit tests for renmark.roadmap."""
+
 from __future__ import annotations
 
 import json
@@ -20,16 +21,25 @@ def _commit(repo: Path, fname: str, msg: str) -> str:
     subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", msg], check=True)
     sha = subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     return sha
 
 
 def _log_usage(repo: Path, task_id: int, model: str, p: int, c: int, ts: str = "2026-05-12T10:00:00+00:00") -> None:
-    state.append_usage(repo, state.UsageRecord(
-        ts=ts, run_id="r1", task_id=task_id, model=model,
-        prompt_tokens=p, completion_tokens=c,
-    ))
+    state.append_usage(
+        repo,
+        state.UsageRecord(
+            ts=ts,
+            run_id="r1",
+            task_id=task_id,
+            model=model,
+            prompt_tokens=p,
+            completion_tokens=c,
+        ),
+    )
 
 
 def test_empty_repo_returns_no_rows(tmp_path: Path) -> None:
@@ -107,8 +117,13 @@ def test_aggregate_usage_tolerates_malformed_rows(tmp_path: Path) -> None:
     led = tmp_path / ".renmark" / "state"
     led.mkdir(parents=True)
     rows = [
-        {"task_id": 1, "prompt_tokens": 10, "completion_tokens": 5, "model": "codex",
-         "ts": "2026-06-09T00:00:00+00:00"},
+        {
+            "task_id": 1,
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "model": "codex",
+            "ts": "2026-06-09T00:00:00+00:00",
+        },
         {"task_id": "bogus", "prompt_tokens": 10},
         {"task_id": 1, "prompt_tokens": "oops", "completion_tokens": [1], "model": 7, "ts": 99},
     ]

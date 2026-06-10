@@ -1,4 +1,5 @@
 """Unit tests for state.py additions: pipeline state, wave summaries, skill invocations."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -31,8 +32,8 @@ def test_pipeline_state_preserves_unrelated_fields(tmp_path: Path) -> None:
     state.write_pipeline_state(tmp_path, wave_index=1)
     loaded = state.read_pipeline_state(tmp_path)
     assert loaded.current_phase == "orchestrate"  # preserved
-    assert loaded.wave_total == 4                  # preserved
-    assert loaded.wave_index == 1                  # updated
+    assert loaded.wave_total == 4  # preserved
+    assert loaded.wave_index == 1  # updated
 
 
 def test_pipeline_state_completed_and_failed_tracking(tmp_path: Path) -> None:
@@ -63,7 +64,10 @@ def test_clear_pipeline_state(tmp_path: Path) -> None:
 def test_pipeline_is_resumable(tmp_path: Path) -> None:
     assert state.pipeline_is_resumable(tmp_path) is False  # nothing in flight
     state.write_pipeline_state(
-        tmp_path, current_phase="orchestrate", wave_index=1, wave_total=4,
+        tmp_path,
+        current_phase="orchestrate",
+        wave_index=1,
+        wave_total=4,
     )
     assert state.pipeline_is_resumable(tmp_path) is True
     state.write_pipeline_state(tmp_path, wave_index=4)  # all waves done
@@ -78,10 +82,20 @@ def test_pipeline_corrupt_returns_none(tmp_path: Path) -> None:
 
 def test_wave_summary_round_trip(tmp_path: Path) -> None:
     outputs = [
-        {"task_id": 1, "status": "PASS", "artifact_path": ".renmark/state/escalations/task-1/",
-         "summary_lines": ["added auth route"], "dependency_notes": "exports authMiddleware()"},
-        {"task_id": 2, "status": "PASS", "artifact_path": ".renmark/state/escalations/task-2/",
-         "summary_lines": ["added tests"], "dependency_notes": ""},
+        {
+            "task_id": 1,
+            "status": "PASS",
+            "artifact_path": ".renmark/state/escalations/task-1/",
+            "summary_lines": ["added auth route"],
+            "dependency_notes": "exports authMiddleware()",
+        },
+        {
+            "task_id": 2,
+            "status": "PASS",
+            "artifact_path": ".renmark/state/escalations/task-2/",
+            "summary_lines": ["added tests"],
+            "dependency_notes": "",
+        },
     ]
     path = state.write_wave_summary(tmp_path, wave_index=1, task_outputs=outputs)
     assert path.exists()
@@ -147,18 +161,14 @@ def test_pipeline_wave_counters_coerced_from_strings(tmp_path: Path) -> None:
     False) — coercion makes pipeline_is_resumable arithmetically correct."""
     p = tmp_path / ".renmark" / "state"
     p.mkdir(parents=True)
-    (p / "pipeline.json").write_text(
-        '{"current_phase": "orchestrate", "wave_index": "9", "wave_total": "10"}'
-    )
+    (p / "pipeline.json").write_text('{"current_phase": "orchestrate", "wave_index": "9", "wave_total": "10"}')
     assert state.pipeline_is_resumable(tmp_path) is True
 
 
 def test_pipeline_uncoercible_wave_counters_degrade(tmp_path: Path) -> None:
     p = tmp_path / ".renmark" / "state"
     p.mkdir(parents=True)
-    (p / "pipeline.json").write_text(
-        '{"current_phase": "orchestrate", "wave_index": null, "wave_total": 3}'
-    )
+    (p / "pipeline.json").write_text('{"current_phase": "orchestrate", "wave_index": null, "wave_total": 3}')
     # null wave_index drops to the dataclass default — no TypeError.
     assert state.pipeline_is_resumable(tmp_path) in (True, False)
 

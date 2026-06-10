@@ -4,6 +4,7 @@ Set ``RENMARK_SMOKE=1`` in the environment to enable. Default behavior is
 to skip — unit tests stay fast (pytest tests/ -q completes in ~3s, smoke
 suite takes ~30s and shells out to subprocess).
 """
+
 from __future__ import annotations
 
 import os

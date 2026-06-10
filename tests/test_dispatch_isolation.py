@@ -1,4 +1,5 @@
 """Unit tests for G11 task-isolation contract in dispatch.py."""
+
 from __future__ import annotations
 
 import json
@@ -20,10 +21,18 @@ from renmark.parser import Task
 def make_task(**overrides):
     """Construct a minimal Task for testing."""
     defaults = dict(
-        index=1, title="t", mode="A", target="src/foo.py",
-        context_files=[], executor="codex", complexity="simple",
-        parallel_group=None, verifier="echo ok", spec="implement foo",
-        est_tokens=None, est_cost_usd=None,
+        index=1,
+        title="t",
+        mode="A",
+        target="src/foo.py",
+        context_files=[],
+        executor="codex",
+        complexity="simple",
+        parallel_group=None,
+        verifier="echo ok",
+        spec="implement foo",
+        est_tokens=None,
+        est_cost_usd=None,
     )
     defaults.update(overrides)
     return Task(**defaults)
@@ -62,8 +71,10 @@ def test_build_subagent_input_bounds_inputs() -> None:
 
 def test_subagent_output_valid() -> None:
     out = SubagentOutput(
-        status="PASS", artifact_path=".renmark/state/escalations/task-1/",
-        summary_lines=["added auth", "tests pass"], token_count=500,
+        status="PASS",
+        artifact_path=".renmark/state/escalations/task-1/",
+        summary_lines=["added auth", "tests pass"],
+        token_count=500,
     )
     assert out.status == "PASS"
     assert out.completion_state == "complete"  # default
@@ -72,7 +83,8 @@ def test_subagent_output_valid() -> None:
 def test_subagent_output_rejects_too_many_summary_lines() -> None:
     with pytest.raises(IsolationViolation):
         SubagentOutput(
-            status="PASS", artifact_path="x",
+            status="PASS",
+            artifact_path="x",
             summary_lines=["a", "b", "c", "d", "e", "f"],  # 6 lines
         )
 
@@ -81,7 +93,8 @@ def test_subagent_output_rejects_oversized_summary_line() -> None:
     """G3 per-line cap: 5 lines x 5000 chars must not slip through."""
     with pytest.raises(IsolationViolation) as exc_info:
         SubagentOutput(
-            status="PASS", artifact_path="x",
+            status="PASS",
+            artifact_path="x",
             summary_lines=["x" * 1201],  # 1 char over the G3 cap
         )
     assert "1200" in str(exc_info.value) or "G3" in str(exc_info.value)
@@ -90,7 +103,8 @@ def test_subagent_output_rejects_oversized_summary_line() -> None:
 def test_parse_response_rejects_oversized_summary_line() -> None:
     """Same cap, applied via parse_subagent_response (the orchestrator entrypoint)."""
     payload = {
-        "status": "PASS", "artifact_path": "x",
+        "status": "PASS",
+        "artifact_path": "x",
         "summary_lines": ["a", "b", "c", "d", "x" * 5000],  # legal count, illegal length
     }
     with pytest.raises(IsolationViolation):
@@ -100,7 +114,8 @@ def test_parse_response_rejects_oversized_summary_line() -> None:
 def test_subagent_output_rejects_non_string_summary_line() -> None:
     with pytest.raises(IsolationViolation):
         SubagentOutput(
-            status="PASS", artifact_path="x",
+            status="PASS",
+            artifact_path="x",
             summary_lines=["ok", 42],  # type: ignore[list-item]
         )
 
@@ -113,7 +128,8 @@ def test_subagent_output_rejects_bad_status() -> None:
 def test_subagent_output_rejects_bad_completion_state() -> None:
     with pytest.raises(IsolationViolation):
         SubagentOutput(
-            status="PASS", artifact_path="x",
+            status="PASS",
+            artifact_path="x",
             completion_state="kinda-done",  # type: ignore[arg-type]
         )
 
@@ -121,7 +137,8 @@ def test_subagent_output_rejects_bad_completion_state() -> None:
 def test_subagent_output_rejects_bad_confidence() -> None:
     with pytest.raises(IsolationViolation):
         SubagentOutput(
-            status="PASS", artifact_path="x",
+            status="PASS",
+            artifact_path="x",
             confidence="yolo",  # type: ignore[arg-type]
         )
 
@@ -131,8 +148,10 @@ def test_subagent_output_rejects_bad_confidence() -> None:
 
 def test_parse_response_dict() -> None:
     payload = {
-        "status": "PASS", "artifact_path": "x",
-        "summary_lines": ["a", "b"], "dependency_notes": "exports X",
+        "status": "PASS",
+        "artifact_path": "x",
+        "summary_lines": ["a", "b"],
+        "dependency_notes": "exports X",
         "token_count": 100,
     }
     out = parse_subagent_response(payload)
@@ -141,9 +160,13 @@ def test_parse_response_dict() -> None:
 
 
 def test_parse_response_json_string() -> None:
-    payload = json.dumps({
-        "status": "PASS", "artifact_path": "x", "summary_lines": ["a"],
-    })
+    payload = json.dumps(
+        {
+            "status": "PASS",
+            "artifact_path": "x",
+            "summary_lines": ["a"],
+        }
+    )
     out = parse_subagent_response(payload)
     assert out.status == "PASS"
 
@@ -153,16 +176,15 @@ def test_parse_response_missing_confidence_downgrades_to_low() -> None:
     must not silently promote it to the optimistic dataclass default."""
     out = parse_subagent_response({"status": "PASS", "artifact_path": "x"})
     assert out.confidence == "low"
-    explicit = parse_subagent_response(
-        {"status": "PASS", "artifact_path": "x", "confidence": "high"}
-    )
+    explicit = parse_subagent_response({"status": "PASS", "artifact_path": "x", "confidence": "high"})
     assert explicit.confidence == "high"
 
 
 def test_parse_response_rejects_inline_transcript() -> None:
     """The core G11 enforcement — transcripts must NOT cross the boundary."""
     payload = {
-        "status": "PASS", "artifact_path": "x",
+        "status": "PASS",
+        "artifact_path": "x",
         "summary_lines": ["done"],
         "transcript": "Here's everything I thought about and 500 lines of generated code...",
     }
@@ -173,7 +195,9 @@ def test_parse_response_rejects_inline_transcript() -> None:
 
 def test_parse_response_rejects_inline_diff() -> None:
     payload = {
-        "status": "PASS", "artifact_path": "x", "summary_lines": ["done"],
+        "status": "PASS",
+        "artifact_path": "x",
+        "summary_lines": ["done"],
         "diff": "--- a/foo.py\n+++ b/foo.py\n@@ ...",
     }
     with pytest.raises(IsolationViolation):
@@ -182,7 +206,9 @@ def test_parse_response_rejects_inline_diff() -> None:
 
 def test_parse_response_rejects_inline_generated_code() -> None:
     payload = {
-        "status": "PASS", "artifact_path": "x", "summary_lines": ["done"],
+        "status": "PASS",
+        "artifact_path": "x",
+        "summary_lines": ["done"],
         "generated_code": "def foo(): pass\n",
     }
     with pytest.raises(IsolationViolation):
@@ -191,7 +217,9 @@ def test_parse_response_rejects_inline_generated_code() -> None:
 
 def test_parse_response_rejects_inline_reasoning() -> None:
     payload = {
-        "status": "PASS", "artifact_path": "x", "summary_lines": ["done"],
+        "status": "PASS",
+        "artifact_path": "x",
+        "summary_lines": ["done"],
         "reasoning": "I thought about it like this...",
     }
     with pytest.raises(IsolationViolation):
@@ -217,6 +245,7 @@ def test_parse_response_non_dict_top_level() -> None:
 def test_subagent_output_fields_match_dataclass() -> None:
     """Schema drift guard: SUBAGENT_OUTPUT_FIELDS must match the dataclass exactly."""
     from dataclasses import fields
+
     dc_fields = {f.name for f in fields(SubagentOutput)}
     assert dc_fields == SUBAGENT_OUTPUT_FIELDS
 
@@ -232,11 +261,16 @@ def test_dispatch_task_isolated_happy_path() -> None:
         assert inp.task_spec == "implement foo"
         assert inp.required_files
         return {
-            "status": "PASS", "artifact_path": ".renmark/state/escalations/task-1/",
-            "touched_files": ["src/foo.py"], "sha": "abc123",
-            "summary_lines": ["implemented foo"], "dependency_notes": "exports foo()",
-            "token_count": 250, "completion_state": "complete",
-            "confidence": "high", "retry_count": 0,
+            "status": "PASS",
+            "artifact_path": ".renmark/state/escalations/task-1/",
+            "touched_files": ["src/foo.py"],
+            "sha": "abc123",
+            "summary_lines": ["implemented foo"],
+            "dependency_notes": "exports foo()",
+            "token_count": 250,
+            "completion_state": "complete",
+            "confidence": "high",
+            "retry_count": 0,
         }
 
     out = dispatch_task_isolated(task, subagent_runner=fake_runner)
@@ -250,7 +284,8 @@ def test_dispatch_task_isolated_refuses_leaky_runner() -> None:
 
     def leaky_runner(inp: SubagentInput) -> dict:
         return {
-            "status": "PASS", "artifact_path": "x",
+            "status": "PASS",
+            "artifact_path": "x",
             "summary_lines": ["done"],
             "full_generated_code": "thousands of lines here...",  # LEAK
         }
@@ -263,11 +298,14 @@ def test_dispatch_task_isolated_passes_dependency_summaries() -> None:
     task = make_task(spec="extend X")
 
     captured: dict = {}
+
     def capturing_runner(inp: SubagentInput) -> dict:
         captured["deps"] = inp.dependency_summaries
         captured["pointers"] = inp.upstream_artifact_pointers
         return {
-            "status": "PASS", "artifact_path": "x", "summary_lines": ["done"],
+            "status": "PASS",
+            "artifact_path": "x",
+            "summary_lines": ["done"],
         }
 
     dispatch_task_isolated(

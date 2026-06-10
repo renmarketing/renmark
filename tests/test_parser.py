@@ -1,4 +1,5 @@
 """Unit tests for renmark.parser."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -129,7 +130,7 @@ def test_context_files_list_parses(tmp_path: Path) -> None:
         "### Task 1: x\n"
         "- **mode:** B\n"
         "- **target:** a.py\n"
-        "- **context_files:** [a.py, b.py, \"c d.py\"]\n"
+        '- **context_files:** [a.py, b.py, "c d.py"]\n'
         "- **verifier:** true\n"
         "- **spec:**\n"
         "  noop\n",

@@ -229,11 +229,7 @@ def _skill_dirs() -> set[str]:
     """Every plugin/skills/<name>/ dir (with a SKILL.md), minus _shared."""
     repo_root = Path(__file__).resolve().parent.parent
     skills = repo_root / "plugin" / "skills"
-    return {
-        d.name
-        for d in skills.iterdir()
-        if d.is_dir() and d.name != "_shared" and (d / "SKILL.md").exists()
-    }
+    return {d.name for d in skills.iterdir() if d.is_dir() and d.name != "_shared" and (d / "SKILL.md").exists()}
 
 
 def test_registry_covers_every_skill_dir() -> None:
@@ -291,9 +287,7 @@ def test_wrong_typed_fields_dropped(tmp_path: Path) -> None:
     """Wrong-typed values degrade to dataclass defaults instead of raising."""
     state_dir = tmp_path / ".renmark" / "state"
     state_dir.mkdir(parents=True)
-    (state_dir / "lifecycle.json").write_text(
-        json.dumps({"stage": ["a"], "artifacts": ["a"], "feature": 7})
-    )
+    (state_dir / "lifecycle.json").write_text(json.dumps({"stage": ["a"], "artifacts": ["a"], "feature": 7}))
     state = lifecycle.read_lifecycle(tmp_path)
     assert state is not None
     assert state.stage == "init"
@@ -312,9 +306,7 @@ def test_non_dict_lifecycle_does_not_break_writes(tmp_path: Path) -> None:
 
 def test_field_type_map_matches_dataclass() -> None:
     """Drift guard: the read-time type filter must cover every dataclass field."""
-    assert set(lifecycle._LIFECYCLE_FIELD_TYPES) == set(
-        lifecycle.LifecycleState.__dataclass_fields__
-    )
+    assert set(lifecycle._LIFECYCLE_FIELD_TYPES) == set(lifecycle.LifecycleState.__dataclass_fields__)
 
 
 def test_validate_artifact_refs_survives_corrupt_state(tmp_path: Path) -> None:

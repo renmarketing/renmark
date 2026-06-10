@@ -1,5 +1,6 @@
 """Tests for renmark.schemas — validators for lifecycle.json, pipeline.json,
 SubagentOutput, ArtifactMetadata."""
+
 from __future__ import annotations
 
 import json

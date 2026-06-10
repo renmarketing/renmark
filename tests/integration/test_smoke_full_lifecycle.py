@@ -2,6 +2,7 @@
 lifecycle.json correctly. Does NOT actually call codex / execute code —
 the dispatch is mocked. This tests the workflow contract, not the
 multi-LLM machinery."""
+
 from __future__ import annotations
 
 import json
@@ -30,14 +31,14 @@ def test_full_lifecycle_round_trip(fixture_project: Path):
     # 2-9. Walk every canonical stage in order.
     transitions = [
         ("brainstorm-complete", ("spec", ".renmark/specs/2026-05-21-auth.spec.md")),
-        ("plan-drafted",        ("plan", ".renmark/plans/2026-05-21-auth.plan.md")),
-        ("plan-validated",      None),
-        ("created",             None),
-        ("verified",            ("verification", ".renmark/reviews/2026-05-21-auth.verification.md")),
-        ("reviewed",            ("review", ".renmark/reviews/2026-05-21-auth.review.md")),
-        ("documented",          None),
-        ("ready-to-release",    None),
-        ("released",            None),
+        ("plan-drafted", ("plan", ".renmark/plans/2026-05-21-auth.plan.md")),
+        ("plan-validated", None),
+        ("created", None),
+        ("verified", ("verification", ".renmark/reviews/2026-05-21-auth.verification.md")),
+        ("reviewed", ("review", ".renmark/reviews/2026-05-21-auth.review.md")),
+        ("documented", None),
+        ("ready-to-release", None),
+        ("released", None),
     ]
     for stage, artifact in transitions:
         kwargs = {"stage": stage}
@@ -75,8 +76,12 @@ def test_human_approval_gate_blocks_progression(fixture_project: Path):
     must point to /renmark:approve, not the natural next stage."""
     repo = fixture_project
     lifecycle.write_lifecycle(
-        repo, stage="documented", feature="x", branch="x",
-        human_review_required=True, human_review_for="release-v0.3.1",
+        repo,
+        stage="documented",
+        feature="x",
+        branch="x",
+        human_review_required=True,
+        human_review_for="release-v0.3.1",
     )
     rec = lifecycle.next_recommended(repo)
     assert "/renmark:approve" in rec
@@ -92,6 +97,7 @@ def test_pipeline_state_separation(fixture_project: Path):
     """Runtime fields (wave_index, completed_tasks) belong in pipeline.json,
     NOT lifecycle.json. This test asserts they live in separate files."""
     from renmark import state
+
     repo = fixture_project
 
     # Lifecycle is small.
@@ -100,11 +106,14 @@ def test_pipeline_state_separation(fixture_project: Path):
     assert life_size < 1024
 
     # Pipeline is separate.
-    state.write_pipeline_state(repo,
-                                current_phase="orchestrate",
-                                current_plan=".renmark/plans/x.plan.md",
-                                wave_index=2, wave_total=5,
-                                add_completed_task=1)
+    state.write_pipeline_state(
+        repo,
+        current_phase="orchestrate",
+        current_plan=".renmark/plans/x.plan.md",
+        wave_index=2,
+        wave_total=5,
+        add_completed_task=1,
+    )
     state.write_pipeline_state(repo, add_completed_task=2)
 
     pipe_path = repo / ".renmark" / "state" / "pipeline.json"

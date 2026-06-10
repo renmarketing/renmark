@@ -67,8 +67,11 @@ def test_write_pause_rejects_invalid_usage_limit_pause(tmp_path):
     import pytest
 
     bad = usage_limit_pause(
-        run_id="r", plan_path="p", last_task_index=0,
-        ts="2026-06-09T12:00:00Z", provider="claude",  # no resume_after
+        run_id="r",
+        plan_path="p",
+        last_task_index=0,
+        ts="2026-06-09T12:00:00Z",
+        provider="claude",  # no resume_after
     )
     with pytest.raises(ValueError):
         write_pause(tmp_path, bad)
@@ -78,8 +81,11 @@ def test_write_pause_allows_plain_manual_pause(tmp_path):
     """validate_usage_pause no-ops for non-usage_limit kinds — a plain pause
     (no resume_after) must still write cleanly."""
     plain = PauseState(
-        run_id="r", plan_path="p", last_task_index=0,
-        reason="manual pause", ts="2026-06-09T12:00:00Z",
+        run_id="r",
+        plan_path="p",
+        last_task_index=0,
+        reason="manual pause",
+        ts="2026-06-09T12:00:00Z",
     )
     write_pause(tmp_path, plain)
     assert read_pause(tmp_path) == plain

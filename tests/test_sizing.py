@@ -4,6 +4,7 @@ Hermetic: no network, no real git history dependence (we init throwaway repos
 in tmp_path or monkeypatch the git subprocess). Thresholds are imported as
 module constants so tuning them never silently breaks these tests.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -192,9 +193,7 @@ def _init_repo(path: Path) -> None:
 
 
 def _commit_all(path: Path, msg: str) -> None:
-    subprocess.run(
-        ["git", "-C", str(path), "add", "-A"], check=True, capture_output=True, text=True
-    )
+    subprocess.run(["git", "-C", str(path), "add", "-A"], check=True, capture_output=True, text=True)
     subprocess.run(
         ["git", "-C", str(path), "commit", "-q", "-m", msg],
         check=True,
@@ -248,9 +247,7 @@ def test_classify_diff_monkeypatched_large_diff_is_full(
     class _Proc:
         returncode = 0
         stdout = (
-            " a.py | 200 ++++++++++\n"
-            " b.py | 250 ++++++++++\n"
-            " 2 files changed, 400 insertions(+), 50 deletions(-)\n"
+            " a.py | 200 ++++++++++\n b.py | 250 ++++++++++\n 2 files changed, 400 insertions(+), 50 deletions(-)\n"
         )
 
     def fake_run(*args: object, **kwargs: object) -> _Proc:
@@ -267,10 +264,7 @@ def test_classify_diff_monkeypatched_tiny_doc_is_lite(
 
     class _Proc:
         returncode = 0
-        stdout = (
-            " docs/readme.md | 4 ++--\n"
-            " 1 file changed, 2 insertions(+), 2 deletions(-)\n"
-        )
+        stdout = " docs/readme.md | 4 ++--\n 1 file changed, 2 insertions(+), 2 deletions(-)\n"
 
     def fake_run(*args: object, **kwargs: object) -> _Proc:
         return _Proc()
@@ -317,10 +311,7 @@ def test_classify_diff_explicit_range_passthrough(
 
     class _Proc:
         returncode = 0
-        stdout = (
-            " docs/readme.md | 4 ++--\n"
-            " 1 file changed, 2 insertions(+), 2 deletions(-)\n"
-        )
+        stdout = " docs/readme.md | 4 ++--\n 1 file changed, 2 insertions(+), 2 deletions(-)\n"
 
     def fake_run(args: object, *rest: object, **kwargs: object) -> _Proc:
         captured["args"] = args
@@ -353,18 +344,13 @@ def test_pure_code_tasks_no_estimates_not_lite() -> None:
     tasks = [_task(i + 1, f"src/module{i}.py", complexity="simple") for i in range(3)]
     assert all(t.est_tokens is None for t in tasks)
     result = classify_plan(tasks)
-    assert result != TIER_LITE, (
-        "A code plan with no estimates must never be lite (missing est_tokens != 0 tokens)"
-    )
+    assert result != TIER_LITE, "A code plan with no estimates must never be lite (missing est_tokens != 0 tokens)"
     assert result in {TIER_STANDARD, TIER_FULL}
 
 
 def test_pure_code_tasks_with_small_estimates_can_be_lite() -> None:
     """A ≤3-task code plan where ALL tasks have explicit small estimates CAN be lite."""
-    tasks = [
-        _task(i + 1, f"docs/page{i}.md", est_tokens=500)
-        for i in range(LITE_MAX_TASKS)
-    ]
+    tasks = [_task(i + 1, f"docs/page{i}.md", est_tokens=500) for i in range(LITE_MAX_TASKS)]
     assert all(t.est_tokens is not None for t in tasks)
     assert classify_plan(tasks) == TIER_LITE
 
@@ -386,6 +372,4 @@ def test_partial_estimates_not_lite_via_token_branch() -> None:
         _task(2, "src/b.py"),  # no estimate
     ]
     result = classify_plan(code_tasks)
-    assert result != TIER_LITE, (
-        "Code plan with a missing estimate must not be lite via token branch"
-    )
+    assert result != TIER_LITE, "Code plan with a missing estimate must not be lite via token branch"

@@ -39,12 +39,23 @@ class PauseState:
     max_iterations: int = 0
 
 
-def usage_limit_pause(*, run_id: str, plan_path: str, last_task_index: int, ts: str,
-                      provider: str = "", model: str = "", observed_usage: str = "",
-                      provider_reset_at: str = "", resume_after: str = "",
-                      fallback_retry_minutes: int = 60, feature: str = "",
-                      loop_id: str = "", iteration: int = 0,
-                      max_iterations: int = 0) -> PauseState:
+def usage_limit_pause(
+    *,
+    run_id: str,
+    plan_path: str,
+    last_task_index: int,
+    ts: str,
+    provider: str = "",
+    model: str = "",
+    observed_usage: str = "",
+    provider_reset_at: str = "",
+    resume_after: str = "",
+    fallback_retry_minutes: int = 60,
+    feature: str = "",
+    loop_id: str = "",
+    iteration: int = 0,
+    max_iterations: int = 0,
+) -> PauseState:
     """Build a PauseState representing a usage-limit pause.
 
     Sets reason="usage limit reached" and pause_kind="usage_limit"; the caller

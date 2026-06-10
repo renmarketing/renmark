@@ -1,4 +1,5 @@
 """Unit tests for renmark.state log helpers."""
+
 from __future__ import annotations
 
 import time
@@ -36,8 +37,7 @@ def test_append_log_adds_timestamp_prefix(tmp_path: Path) -> None:
     assert "second line" in text
     # Each appended line should start with [<timestamp>]
     appended_lines = [
-        line for line in text.splitlines()
-        if line.startswith("[") and ("first line" in line or "second line" in line)
+        line for line in text.splitlines() if line.startswith("[") and ("first line" in line or "second line" in line)
     ]
     assert len(appended_lines) == 2
 

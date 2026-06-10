@@ -1,5 +1,6 @@
 """End-to-end: bash install.sh in a fake $HOME and assert the plugin
 symlinks land in the expected layout."""
+
 from __future__ import annotations
 
 import os
@@ -19,11 +20,12 @@ def test_install_sh_creates_symlinks(repo_root: Path, tmp_path: Path):
 
     result = subprocess.run(
         ["bash", str(repo_root / "install.sh")],
-        env=env, capture_output=True, text=True, timeout=30,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
-    assert result.returncode == 0, (
-        f"install.sh failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-    )
+    assert result.returncode == 0, f"install.sh failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     plugin_link = fake_home / ".claude" / "plugins" / "renmark"
     cli_link = fake_local_bin / "renmark-execute"
@@ -43,10 +45,17 @@ def test_install_sh_uninstall_cleans_up(repo_root: Path, tmp_path: Path):
     env["HOME"] = str(fake_home)
     env["PATH"] = f"{fake_local_bin}:{env['PATH']}"
 
-    subprocess.run(["bash", str(repo_root / "install.sh")],
-                   env=env, capture_output=True, text=True, timeout=30, check=True)
-    subprocess.run(["bash", str(repo_root / "install.sh"), "--uninstall"],
-                   env=env, capture_output=True, text=True, timeout=30, check=True)
+    subprocess.run(
+        ["bash", str(repo_root / "install.sh")], env=env, capture_output=True, text=True, timeout=30, check=True
+    )
+    subprocess.run(
+        ["bash", str(repo_root / "install.sh"), "--uninstall"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
 
     assert not (fake_home / ".claude" / "plugins" / "renmark").exists()
     assert not (fake_local_bin / "renmark-execute").exists()
@@ -63,9 +72,12 @@ def test_install_sh_idempotent(repo_root: Path, tmp_path: Path):
     for run in range(2):
         result = subprocess.run(
             ["bash", str(repo_root / "install.sh")],
-            env=env, capture_output=True, text=True, timeout=30,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
-        assert result.returncode == 0, f"install run #{run+1} failed: {result.stderr}"
+        assert result.returncode == 0, f"install run #{run + 1} failed: {result.stderr}"
 
 
 def test_plugin_has_required_skill_files(repo_root: Path):
@@ -78,16 +90,34 @@ def test_plugin_has_required_skill_files(repo_root: Path):
     """
     skills_dir = repo_root / "plugin" / "skills"
     required = {
-        "start", "setup", "brainstorm", "plan", "check-plan", "orchestrate",
-        "verify", "finish", "feature", "debug", "codereview", "roadmap",
-        "help", "resume", "prd", "blueprint", "loop", "backlog", "doctor",
-        "hygiene", "init", "analytics", "usage",
-        "approve", "audit", "inventory",
+        "start",
+        "setup",
+        "brainstorm",
+        "plan",
+        "check-plan",
+        "orchestrate",
+        "verify",
+        "finish",
+        "feature",
+        "debug",
+        "codereview",
+        "roadmap",
+        "help",
+        "resume",
+        "prd",
+        "blueprint",
+        "loop",
+        "backlog",
+        "doctor",
+        "hygiene",
+        "init",
+        "analytics",
+        "usage",
+        "approve",
+        "audit",
+        "inventory",
     }
-    actual = {
-        p.name for p in skills_dir.iterdir()
-        if p.is_dir() and not p.name.startswith("_")
-    }
+    actual = {p.name for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith("_")}
     missing = required - actual
     assert not missing, f"missing skill directories: {missing}"
     extra = actual - required
@@ -102,10 +132,7 @@ def test_commands_directory_complete(repo_root: Path):
     commands_dir = repo_root / "plugin" / "commands"
     # Underscore-prefixed dirs (e.g. _shared/) hold shared contract docs, not
     # skills — they have no command shim and are excluded from the parity check.
-    skill_names = {
-        p.name for p in skills_dir.iterdir()
-        if p.is_dir() and not p.name.startswith("_")
-    }
+    skill_names = {p.name for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith("_")}
     command_names = {p.stem for p in commands_dir.glob("*.md")}
     assert skill_names == command_names, (
         f"skills/ vs commands/ mismatch:\n"

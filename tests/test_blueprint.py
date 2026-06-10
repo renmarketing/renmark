@@ -1,4 +1,5 @@
 """Unit tests for renmark.blueprint — marker builders, splice, detect_ui."""
+
 from __future__ import annotations
 
 import pytest
@@ -114,15 +115,11 @@ def test_splice_preserves_human_edit_outside_markers() -> None:
     )
 
     # First splice — updates content, preserves surroundings
-    after_first_splice = splice_generated_block(
-        original_doc, "PROTOTYPE", "first generated", source_sha="sha1"
-    )
+    after_first_splice = splice_generated_block(original_doc, "PROTOTYPE", "first generated", source_sha="sha1")
     assert "Manual edit that must survive." in after_first_splice
 
     # Simulate a human edit to the surrounding prose
-    doc_with_human_edit = after_first_splice.replace(
-        "Manual edit that must survive.", "Manual edit CHANGED by human."
-    )
+    doc_with_human_edit = after_first_splice.replace("Manual edit that must survive.", "Manual edit CHANGED by human.")
 
     # Second splice with different generated content
     after_second_splice = splice_generated_block(

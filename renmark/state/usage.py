@@ -204,9 +204,7 @@ def _parse_ts(ts: str) -> float | None:
     return parsed.timestamp()
 
 
-def usage_in_window(
-    repo: str | Path, *, now: str, seconds: int, provider: str | None = None
-) -> dict[str, int]:
+def usage_in_window(repo: str | Path, *, now: str, seconds: int, provider: str | None = None) -> dict[str, int]:
     """Aggregate ledger rows whose ts falls within ``[now - seconds, now]``.
 
     ``now`` is injected (ISO-8601) — this reader never calls datetime.now().
@@ -251,9 +249,7 @@ def usage_in_window(
     }
 
 
-def usage_last_5h(
-    repo: str | Path, *, now: str, provider: str | None = None
-) -> dict[str, int]:
+def usage_last_5h(repo: str | Path, *, now: str, provider: str | None = None) -> dict[str, int]:
     """Usage aggregated over the trailing 5-hour window ending at ``now``.
 
     Pass ``provider`` to restrict the sum to one provider's rows.
@@ -261,9 +257,7 @@ def usage_last_5h(
     return usage_in_window(repo, now=now, seconds=5 * 3600, provider=provider)
 
 
-def usage_last_week(
-    repo: str | Path, *, now: str, provider: str | None = None
-) -> dict[str, int]:
+def usage_last_week(repo: str | Path, *, now: str, provider: str | None = None) -> dict[str, int]:
     """Usage aggregated over the trailing 7-day window ending at ``now``.
 
     Pass ``provider`` to restrict the sum to one provider's rows.
@@ -271,9 +265,7 @@ def usage_last_week(
     return usage_in_window(repo, now=now, seconds=7 * 24 * 3600, provider=provider)
 
 
-def tokens_by_feature(
-    repo: str | Path, *, now: str, seconds: int, top: int = 5
-) -> list[tuple[str, int]]:
+def tokens_by_feature(repo: str | Path, *, now: str, seconds: int, top: int = 5) -> list[tuple[str, int]]:
     """Top-N (feature, tokens) within ``[now - seconds, now]``, desc by tokens.
 
     Tokens are prompt + completion summed. Rows with an empty/missing feature
@@ -291,9 +283,7 @@ def tokens_by_feature(
         ts_epoch = _parse_ts(r.get("ts", ""))
         if ts_epoch is None or ts_epoch < lower or ts_epoch > now_epoch:
             continue
-        tokens = _clamp_tokens(r.get("prompt_tokens", 0)) + _clamp_tokens(
-            r.get("completion_tokens", 0)
-        )
+        tokens = _clamp_tokens(r.get("prompt_tokens", 0)) + _clamp_tokens(r.get("completion_tokens", 0))
         totals[feature] = totals.get(feature, 0) + tokens
     ranked = sorted(totals.items(), key=lambda kv: (-kv[1], kv[0]))
     return ranked[: max(0, int(top))]

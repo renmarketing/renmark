@@ -325,9 +325,7 @@ def validate_report_metrics(data: object) -> list[str]:
 
     feature = data.get("feature")
     if not isinstance(feature, str):
-        issues.append(
-            f"report_metrics.feature expected str, got {type(feature).__name__}"
-        )
+        issues.append(f"report_metrics.feature expected str, got {type(feature).__name__}")
     elif not feature.strip():
         issues.append("report_metrics.feature is empty")
 
@@ -384,22 +382,16 @@ def validate_usage_pause(data: object) -> list[str]:
 
     resume_after = data.get("resume_after")
     if not isinstance(resume_after, str):
-        issues.append(
-            f"usage_pause.resume_after expected str, got {type(resume_after).__name__}"
-        )
+        issues.append(f"usage_pause.resume_after expected str, got {type(resume_after).__name__}")
     elif not resume_after.strip():
         issues.append("usage_pause.resume_after is empty")
 
     retry = data.get("fallback_retry_minutes")
     if not _isinstance(retry, int):
-        issues.append(
-            f"usage_pause.fallback_retry_minutes expected int, got {type(retry).__name__}"
-        )
+        issues.append(f"usage_pause.fallback_retry_minutes expected int, got {type(retry).__name__}")
 
     if "provider" in data and not isinstance(data["provider"], str):
-        issues.append(
-            f"usage_pause.provider expected str, got {type(data['provider']).__name__}"
-        )
+        issues.append(f"usage_pause.provider expected str, got {type(data['provider']).__name__}")
 
     return issues
 

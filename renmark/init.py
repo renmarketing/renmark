@@ -1400,8 +1400,7 @@ class MarkerCorruptionError(RuntimeError):
         self.files = files
         detail = "; ".join(f"{fname}: {', '.join(probs)}" for fname, probs in files.items())
         super().__init__(
-            f"managed markers are unbalanced in {', '.join(files)} — "
-            f"resolve manually before re-running init ({detail})"
+            f"managed markers are unbalanced in {', '.join(files)} — resolve manually before re-running init ({detail})"
         )
 
 

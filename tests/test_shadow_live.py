@@ -8,6 +8,7 @@ baselines.
 All subsystems are hard gates — baselines were re-accepted after the v0.9.0
 cleanup wave landed (dispatch error-format + lifecycle stage edits).
 """
+
 from __future__ import annotations
 
 from renmark import shadow
@@ -15,11 +16,7 @@ from renmark import shadow
 
 def _collect_failures(diffs: list[shadow.ShadowDiff]) -> list[tuple[str, str, str, str | None]]:
     """Return (subsystem, case, result, error) for any non-match."""
-    return [
-        (d.subsystem, d.case, d.result, d.error)
-        for d in diffs
-        if d.result != "match"
-    ]
+    return [(d.subsystem, d.case, d.result, d.error) for d in diffs if d.result != "match"]
 
 
 def test_shadow_live_dispatch() -> None:
@@ -53,12 +50,7 @@ def test_shadow_live_all_registered_subsystems_have_cases() -> None:
 def test_shadow_live_no_missing_baselines() -> None:
     """No shipped case should be missing a baseline (run accept if you added a case)."""
     all_diffs = shadow.run_all()
-    missing = [
-        (sub, d.case)
-        for sub, dlist in all_diffs.items()
-        for d in dlist
-        if d.result == "missing-baseline"
-    ]
+    missing = [(sub, d.case) for sub, dlist in all_diffs.items() for d in dlist if d.result == "missing-baseline"]
     assert not missing, (
         f"cases without a baseline (run python -m renmark.shadow accept --subsystem <sub> -m 'reason'): {missing}"
     )

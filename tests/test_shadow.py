@@ -1,5 +1,6 @@
 """Tests for renmark.shadow — record-and-replay framework. Uses an
 isolated tmpdir to avoid touching real tests/shadow/ baselines."""
+
 from __future__ import annotations
 
 import json
@@ -42,17 +43,20 @@ def test_register_adds_subsystem():
 
 
 def test_run_match_when_baseline_agrees(shadow_root: Path):
-    _write_case(shadow_root, "dispatch", "case-x", {
-        "response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["ok"]}
-    })
+    _write_case(
+        shadow_root,
+        "dispatch",
+        "case-x",
+        {"response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["ok"]}},
+    )
     diffs = shadow.run_subsystem("dispatch")
     # No baseline yet → missing.
     assert all(d.result == "missing-baseline" for d in diffs)
 
     # Now record baseline by hand.
-    actual = shadow._REGISTRY["dispatch"]({
-        "response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["ok"]}
-    })
+    actual = shadow._REGISTRY["dispatch"](
+        {"response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["ok"]}}
+    )
     _write_baseline(shadow_root, "dispatch", "case-x", actual)
 
     diffs = shadow.run_subsystem("dispatch")
@@ -60,20 +64,26 @@ def test_run_match_when_baseline_agrees(shadow_root: Path):
 
 
 def test_run_drift_when_baseline_differs(shadow_root: Path):
-    _write_case(shadow_root, "dispatch", "case-y", {
-        "response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["new"]}
-    })
-    _write_baseline(shadow_root, "dispatch", "case-y", {
-        "status": "PASS", "artifact_path": "x", "summary_lines": ["old"]
-    })
+    _write_case(
+        shadow_root,
+        "dispatch",
+        "case-y",
+        {"response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["new"]}},
+    )
+    _write_baseline(
+        shadow_root, "dispatch", "case-y", {"status": "PASS", "artifact_path": "x", "summary_lines": ["old"]}
+    )
     diffs = shadow.run_subsystem("dispatch")
     assert any(d.result == "drift" for d in diffs)
 
 
 def test_run_missing_baseline_flagged(shadow_root: Path):
-    _write_case(shadow_root, "dispatch", "case-fresh", {
-        "response": {"status": "PASS", "artifact_path": "x", "summary_lines": []}
-    })
+    _write_case(
+        shadow_root,
+        "dispatch",
+        "case-fresh",
+        {"response": {"status": "PASS", "artifact_path": "x", "summary_lines": []}},
+    )
     diffs = shadow.run_subsystem("dispatch")
     assert any(d.result == "missing-baseline" for d in diffs)
 
@@ -94,12 +104,19 @@ def test_run_unknown_subsystem_raises(shadow_root: Path):
 def test_run_isolation_violation_is_baselineable(shadow_root: Path):
     """A SubagentOutput containing leaked fields should baseline as the
     IsolationViolation error message — not crash the runner."""
-    _write_case(shadow_root, "dispatch", "case-leak", {
-        "response": {
-            "status": "PASS", "artifact_path": "x", "summary_lines": ["ok"],
-            "transcript": "leak",
-        }
-    })
+    _write_case(
+        shadow_root,
+        "dispatch",
+        "case-leak",
+        {
+            "response": {
+                "status": "PASS",
+                "artifact_path": "x",
+                "summary_lines": ["ok"],
+                "transcript": "leak",
+            }
+        },
+    )
     diffs = shadow.run_subsystem("dispatch")
     # missing-baseline — but the replay didn't crash.
     assert len(diffs) >= 1
@@ -113,9 +130,12 @@ def test_run_isolation_violation_is_baselineable(shadow_root: Path):
 
 
 def test_accept_writes_baselines_and_changelog(shadow_root: Path):
-    _write_case(shadow_root, "dispatch", "case-a", {
-        "response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["ok"]}
-    })
+    _write_case(
+        shadow_root,
+        "dispatch",
+        "case-a",
+        {"response": {"status": "PASS", "artifact_path": "x", "summary_lines": ["ok"]}},
+    )
     count = shadow.accept_subsystem("dispatch", "first baseline")
     assert count == 1
     assert (shadow_root / "baselines" / "dispatch" / "case-a.json").exists()
@@ -138,18 +158,14 @@ def test_accept_rejects_unknown_subsystem(shadow_root: Path):
 
 
 def test_accept_makes_subsequent_run_clean(shadow_root: Path):
-    _write_case(shadow_root, "lifecycle", "case-z", {
-        "calls": [{"stage": "init", "feature": "x", "branch": "x"}]
-    })
+    _write_case(shadow_root, "lifecycle", "case-z", {"calls": [{"stage": "init", "feature": "x", "branch": "x"}]})
     shadow.accept_subsystem("lifecycle", "test baseline")
     diffs = shadow.run_subsystem("lifecycle")
     assert all(d.result == "match" for d in diffs)
 
 
 def test_accept_prepends_to_existing_changelog(shadow_root: Path):
-    _write_case(shadow_root, "lifecycle", "case-1", {
-        "calls": [{"stage": "init", "feature": "x", "branch": "x"}]
-    })
+    _write_case(shadow_root, "lifecycle", "case-1", {"calls": [{"stage": "init", "feature": "x", "branch": "x"}]})
     shadow.accept_subsystem("lifecycle", "first")
     shadow.accept_subsystem("lifecycle", "second")
     log = (shadow_root / "CHANGES.md").read_text()
@@ -164,35 +180,43 @@ def test_accept_prepends_to_existing_changelog(shadow_root: Path):
 
 
 def test_dispatch_replay_strips_isolation_violation():
-    out = shadow._replay_dispatch({"response": {
-        "status": "PASS", "artifact_path": "x", "summary_lines": ["ok"],
-        "transcript": "leak",
-    }})
+    out = shadow._replay_dispatch(
+        {
+            "response": {
+                "status": "PASS",
+                "artifact_path": "x",
+                "summary_lines": ["ok"],
+                "transcript": "leak",
+            }
+        }
+    )
     assert out["error"] == "IsolationViolation"
 
 
 def test_dispatch_replay_pristine_path():
-    out = shadow._replay_dispatch({"response": {
-        "status": "PASS", "artifact_path": "x.md", "summary_lines": ["one"],
-    }})
+    out = shadow._replay_dispatch(
+        {
+            "response": {
+                "status": "PASS",
+                "artifact_path": "x.md",
+                "summary_lines": ["one"],
+            }
+        }
+    )
     assert out["status"] == "PASS"
     assert "transcript" not in out
 
 
 def test_lifecycle_replay_strips_last_updated():
     """last_updated is a timestamp — must be stripped for deterministic baselines."""
-    out = shadow._replay_lifecycle({
-        "calls": [{"stage": "init", "feature": "x", "branch": "x"}]
-    })
+    out = shadow._replay_lifecycle({"calls": [{"stage": "init", "feature": "x", "branch": "x"}]})
     assert "last_updated" not in out
     assert out["feature"] == "x"
 
 
 def test_summary_replay_deterministic():
-    out1 = shadow._replay_summary({"metadata": {"artifact_type": "verification",
-                                                 "generator": "test"}})
-    out2 = shadow._replay_summary({"metadata": {"artifact_type": "verification",
-                                                 "generator": "test"}})
+    out1 = shadow._replay_summary({"metadata": {"artifact_type": "verification", "generator": "test"}})
+    out2 = shadow._replay_summary({"metadata": {"artifact_type": "verification", "generator": "test"}})
     # Same input → same output (we inject a fixed created_at).
     assert out1 == out2
 

@@ -51,9 +51,7 @@ HEALTH_LIST_CAP: int = 10
 MAP_CAP: int = 10
 
 #: Status strings (case-insensitive) that mean a task/feature/loop succeeded.
-SUCCESS_STATUSES: frozenset[str] = frozenset(
-    {"completed", "complete", "pass", "passed", "shipped"}
-)
+SUCCESS_STATUSES: frozenset[str] = frozenset({"completed", "complete", "pass", "passed", "shipped"})
 
 #: Status strings (case-insensitive) that mean a task/feature/loop was blocked.
 BLOCKED_STATUSES: frozenset[str] = frozenset({"blocked", "failed", "fail"})
@@ -408,9 +406,7 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
         reason = _as_str(r.get("failure_reason"))
         if reason:
             failure_c[reason] += 1
-        tokens = _as_int(r.get("total_tokens")) or (
-            _as_int(r.get("tokens_in")) + _as_int(r.get("tokens_out"))
-        )
+        tokens = _as_int(r.get("total_tokens")) or (_as_int(r.get("tokens_in")) + _as_int(r.get("tokens_out")))
         if tokens:
             tokens_by_executor[_as_str(r.get("executor")) or "unknown"] += tokens
             tokens_by_model[_as_str(r.get("model")) or "unknown"] += tokens

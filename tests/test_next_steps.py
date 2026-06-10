@@ -260,9 +260,10 @@ def test_non_str_skill_does_not_raise(tmp_path: Path) -> None:
 
 def _commit(path: Path) -> str:
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit",
-         "--allow-empty", "-m", "x"],
-        cwd=path, check=True, capture_output=True,
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "x"],
+        cwd=path,
+        check=True,
+        capture_output=True,
     )
     return subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=path, check=True, capture_output=True, text=True
@@ -281,10 +282,15 @@ def test_qa_gate_ignores_foreign_generator(tmp_path: Path) -> None:
 
     qa_path = tmp_path / ".renmark" / "reviews" / "2026-01-01-deadbeef.qa.md"
     summary.write_artifact(
-        qa_path, artifact_type="qa", body="stray",
+        qa_path,
+        artifact_type="qa",
+        body="stray",
         summary_lines=["stray qa artifact"],
-        source_sha=head, generator="something-else", completion_state="complete",
-        confidence="high", validation_status="validated",
+        source_sha=head,
+        generator="something-else",
+        completion_state="complete",
+        confidence="high",
+        validation_status="validated",
     )
     ns = next_steps(tmp_path, "verify")
     assert "qa" in ns.gates_not_run, "foreign-generator .qa.md must not unlock the qa gate"
@@ -292,10 +298,15 @@ def test_qa_gate_ignores_foreign_generator(tmp_path: Path) -> None:
     # Now a real verify-qa artifact for HEAD → qa counts as run.
     real = tmp_path / ".renmark" / "reviews" / "2026-01-01-cafef00d.qa.md"
     summary.write_artifact(
-        real, artifact_type="qa", body="real",
+        real,
+        artifact_type="qa",
+        body="real",
         summary_lines=["real qa"],
-        source_sha=head, generator="verify-qa", completion_state="complete",
-        confidence="high", validation_status="validated",
+        source_sha=head,
+        generator="verify-qa",
+        completion_state="complete",
+        confidence="high",
+        validation_status="validated",
     )
     ns2 = next_steps(tmp_path, "verify")
     assert "qa" not in ns2.gates_not_run, "a verify-qa .qa.md for HEAD must satisfy the qa gate"

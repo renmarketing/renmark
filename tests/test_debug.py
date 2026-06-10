@@ -1,4 +1,5 @@
 """Unit tests for renmark.debug session helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,12 +30,18 @@ def test_add_hypothesis_inserts_under_header(tmp_path: Path) -> None:
 def test_log_investigation_appends(tmp_path: Path) -> None:
     s = debug.new_session(tmp_path, "x")
     debug.log_investigation(
-        s, hypothesis="Missing import", inspector="haiku",
-        finding="no `import foo` in src/", rules_out=False,
+        s,
+        hypothesis="Missing import",
+        inspector="haiku",
+        finding="no `import foo` in src/",
+        rules_out=False,
     )
     debug.log_investigation(
-        s, hypothesis="Wrong port", inspector="codex",
-        finding="config says 8000 but server binds 8001", rules_out=True,
+        s,
+        hypothesis="Wrong port",
+        inspector="codex",
+        finding="config says 8000 but server binds 8001",
+        rules_out=True,
     )
     text = s.path.read_text()
     assert "**Missing import** (via haiku)" in text
@@ -52,8 +59,10 @@ def test_set_root_cause_replaces_placeholder(tmp_path: Path) -> None:
 def test_close_session_writes_to_bugs_md(tmp_path: Path) -> None:
     s = debug.new_session(tmp_path, "x")
     debug.close_session(
-        s, tmp_path,
-        title="PORT env typo", severity="major",
+        s,
+        tmp_path,
+        title="PORT env typo",
+        severity="major",
         symptom="server binds wrong port",
         root_cause="config file used PROT instead of PORT",
         fix="renamed env var to PORT; commit abc123",
@@ -68,6 +77,7 @@ def test_close_session_writes_to_bugs_md(tmp_path: Path) -> None:
 
 def test_latest_session_returns_newest(tmp_path: Path) -> None:
     import time
+
     a = debug.new_session(tmp_path, "first")
     time.sleep(0.02)
     b = debug.new_session(tmp_path, "second")

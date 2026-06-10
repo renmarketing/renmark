@@ -71,9 +71,7 @@ LoopStatus = Literal[
 ]
 
 #: The non-running statuses — reaching any of these ends the loop.
-TERMINAL_STATUSES: frozenset[str] = frozenset(
-    {"done", "budget-hit", "max-iter", "awaiting-approval", "stalled"}
-)
+TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "budget-hit", "max-iter", "awaiting-approval", "stalled"})
 
 #: ``loop.json`` filename inside each loop directory.
 LOOP_JSON: str = "loop.json"
@@ -252,9 +250,7 @@ def _coerce_loop_state(data: dict[str, object]) -> LoopState:
     if "spent_tokens" in data:
         state.spent_tokens = _coerce_int(data["spent_tokens"], _INT_DEFAULTS["spent_tokens"])
     if "max_iterations" in data:
-        state.max_iterations = _coerce_int(
-            data["max_iterations"], _INT_DEFAULTS["max_iterations"]
-        )
+        state.max_iterations = _coerce_int(data["max_iterations"], _INT_DEFAULTS["max_iterations"])
     if "iteration" in data:
         state.iteration = _coerce_int(data["iteration"], _INT_DEFAULTS["iteration"])
     if "status" in data:
@@ -425,9 +421,7 @@ def build_decision(verification_meta: dict[str, object], spent_delta: int) -> di
     # failing verify CONTINUES (within budget/max-iter) instead of stalling on
     # the first failure. Only when there is genuinely no actionable failure does
     # next_action stay blank → the driver maps that to ``stalled``.
-    next_action = (
-        "" if goal_reached else _meta_str(meta, "next_action") or _derive_next_action(meta, evidence)
-    )
+    next_action = "" if goal_reached else _meta_str(meta, "next_action") or _derive_next_action(meta, evidence)
 
     model_recommendation = _meta_str(meta, "model_recommendation") or "sonnet"
 

@@ -33,13 +33,7 @@ def test_build_and_write_feature_report(tmp_path):
         report,
     )
 
-    expected_dir = (
-        repo
-        / ".renmark"
-        / "reports"
-        / "features"
-        / "reporting-and-usage-analytics"
-    )
+    expected_dir = repo / ".renmark" / "reports" / "features" / "reporting-and-usage-analytics"
     assert report_path == expected_dir / "report.md"
     assert metrics_path == expected_dir / "metrics.json"
     assert report_path.is_file()
@@ -290,14 +284,22 @@ def test_record_feature_run_idempotent_on_rerun(tmp_path):
     repo = tmp_path
     for _ in range(2):
         analytics.record_feature_run(
-            repo, ts=NOW, feature="feat-x", status="shipped", sha="abc",
+            repo,
+            ts=NOW,
+            feature="feat-x",
+            status="shipped",
+            sha="abc",
             branch_disposition="merged",
         )
     ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
     assert len(analytics.read_jsonl(ledger)) == 1
     # A genuinely different run (new sha) still appends.
     analytics.record_feature_run(
-        repo, ts=NOW, feature="feat-x", status="shipped", sha="def",
+        repo,
+        ts=NOW,
+        feature="feat-x",
+        status="shipped",
+        sha="def",
         branch_disposition="merged",
     )
     assert len(analytics.read_jsonl(ledger)) == 2

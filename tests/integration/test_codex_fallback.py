@@ -4,6 +4,7 @@ or the executor falls back to a sonnet-style runner.
 
 This test stubs $PATH so codex is unfindable, then exercises the dispatch
 path that would normally shell out."""
+
 from __future__ import annotations
 
 import os
@@ -25,12 +26,14 @@ def test_renmark_execute_runs_without_codex_on_path(repo_root: Path, tmp_path: P
 
     result = subprocess.run(
         [sys.executable, "-m", "renmark", "--help"],
-        env=env, capture_output=True, text=True, timeout=10,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     # Help should succeed regardless of codex availability.
     assert result.returncode == 0, (
-        f"renmark --help failed without codex on PATH:\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        f"renmark --help failed without codex on PATH:\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
 
 
@@ -39,10 +42,12 @@ def test_codex_missing_emits_diagnostic(repo_root: Path, tmp_path: Path):
     the failure should be a clear diagnostic, not a Python traceback."""
     # Write a tiny task spec.
     task_path = tmp_path / "task.json"
-    task_path.write_text('{"task_spec": "do x", "required_files": [], '
-                         '"upstream_artifact_pointers": [], '
-                         '"dependency_summaries": [], '
-                         '"verifier_expectations": ""}')
+    task_path.write_text(
+        '{"task_spec": "do x", "required_files": [], '
+        '"upstream_artifact_pointers": [], '
+        '"dependency_summaries": [], '
+        '"verifier_expectations": ""}'
+    )
     out_path = tmp_path / "out.json"
 
     fake_path = tmp_path / "empty-bin"
@@ -52,9 +57,11 @@ def test_codex_missing_emits_diagnostic(repo_root: Path, tmp_path: Path):
     env["PYTHONPATH"] = str(repo_root)
 
     result = subprocess.run(
-        [sys.executable, "-m", "renmark", "--task", str(task_path),
-         "--output", str(out_path)],
-        env=env, capture_output=True, text=True, timeout=15,
+        [sys.executable, "-m", "renmark", "--task", str(task_path), "--output", str(out_path)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     # Acceptable outcomes:
     #   exit 127 (executable missing)
@@ -64,6 +71,7 @@ def test_codex_missing_emits_diagnostic(repo_root: Path, tmp_path: Path):
         return  # explicit "command not found" signal
     if result.returncode == 0 and out_path.exists():
         import json
+
         out = json.loads(out_path.read_text())
         # Should at minimum carry a status field even if fallback.
         assert "status" in out
@@ -71,6 +79,5 @@ def test_codex_missing_emits_diagnostic(repo_root: Path, tmp_path: Path):
     # Otherwise must mention codex in diagnostic.
     combined = result.stdout + result.stderr
     assert "codex" in combined.lower() or "executable" in combined.lower(), (
-        f"unclear failure mode (exit {result.returncode}):\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        f"unclear failure mode (exit {result.returncode}):\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )

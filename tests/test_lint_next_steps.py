@@ -3,6 +3,7 @@
 Every shipped skill must point the user at a next move (cite ``next-steps.md``)
 or, for gate skills, ``handoff-menu.md``. Skills that cite neither are dead ends.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -41,9 +42,7 @@ def test_cites_next_steps_no_issue(tmp_path: Path):
 
 def test_gate_skill_cites_handoff_menu_no_issue(tmp_path: Path):
     """Gate skills (verify/codereview) satisfy the contract via handoff-menu.md."""
-    plugin = _make_plugin(
-        tmp_path, skills={"codereview": _skill_body("codereview", citation="handoff-menu.md")}
-    )
+    plugin = _make_plugin(tmp_path, skills={"codereview": _skill_body("codereview", citation="handoff-menu.md")})
     assert lint.lint_next_steps_citation(plugin) == []
 
 
@@ -80,9 +79,9 @@ def test_multiple_skills_only_offender_flagged(tmp_path: Path):
     plugin = _make_plugin(
         tmp_path,
         skills={
-            "plan": _skill_body("plan", citation="next-steps.md"),       # pipeline, ok
+            "plan": _skill_body("plan", citation="next-steps.md"),  # pipeline, ok
             "codereview": _skill_body("codereview", citation="handoff-menu.md"),  # gate, ok
-            "bad": _skill_body("bad"),                                     # aux, cites neither
+            "bad": _skill_body("bad"),  # aux, cites neither
         },
     )
     issues = lint.lint_next_steps_citation(plugin)

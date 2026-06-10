@@ -511,8 +511,7 @@ def execute_plan(
     # gate is live. When nothing was metered locally, say so plainly instead.
     if tokens_used == 0:
         _print(
-            f"Tokens this run: n/a (codex usage reported upstream) | "
-            f"Today: {today} | Month: {usage_this_month(repo)}"
+            f"Tokens this run: n/a (codex usage reported upstream) | Today: {today} | Month: {usage_this_month(repo)}"
         )
     else:
         _print(
@@ -727,19 +726,13 @@ def _execute_task_codex(
 
         # Constrain codex: must have modified only the target file (sibling
         # wave-targets are excluded — they're another task's lane, not ours).
-        ok, reason = check_only_target_modified(
-            result.changed_files, task.target, sibling_targets=sibling_targets
-        )
+        ok, reason = check_only_target_modified(result.changed_files, task.target, sibling_targets=sibling_targets)
         if not ok:
             # Roll back ONLY this task's own extra paths — NEVER the whole tree
             # (which would clobber concurrent sibling work). The task's target
             # is restored too; the wave's siblings are left untouched.
             sib = set(sibling_targets or [])
-            own_extras = [
-                p
-                for p in result.changed_files
-                if (p[2:] if p.startswith("./") else p) not in sib
-            ]
+            own_extras = [p for p in result.changed_files if (p[2:] if p.startswith("./") else p) not in sib]
             _rollback_paths(repo, own_extras, untracked_before=_untracked_paths(repo, own_extras))
             if retries_left > 0:
                 retries_left -= 1
@@ -797,9 +790,7 @@ def _execute_task_codex(
         # artifact would persist and poison the NEXT task's change detection.
         # _rollback_paths deletes untracked targets and checks out tracked ones.
         last_verifier_tail = vres.tail
-        _rollback_paths(
-            repo, [task.target], untracked_before=_untracked_paths(repo, [task.target])
-        )
+        _rollback_paths(repo, [task.target], untracked_before=_untracked_paths(repo, [task.target]))
         if retries_left > 0:
             retries_left -= 1
             continue

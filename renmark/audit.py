@@ -131,7 +131,7 @@ def _frontmatter_and_body(text: str) -> tuple[dict[str, Any], str]:
     if fm is None:
         return {}, text
     m = lint._FRONTMATTER_RE.match(text)
-    body = text[m.end():] if m else text
+    body = text[m.end() :] if m else text
     return fm, body
 
 
@@ -211,17 +211,17 @@ def registry_sync(repo: Path | str) -> list[str]:
     """
     repo = Path(repo)
     skills_dir = _plugin_dir(repo) / "skills"
-    dirs = {
-        d.name
-        for d in skills_dir.iterdir()
-        if d.is_dir() and not d.name.startswith("_") and (d / "SKILL.md").exists()
-    } if skills_dir.is_dir() else set()
-
-    class_union = (
-        set(lifecycle.PIPELINE_SKILLS)
-        | set(lifecycle.GATE_SKILLS)
-        | set(lifecycle.AUX_SKILLS)
+    dirs = (
+        {
+            d.name
+            for d in skills_dir.iterdir()
+            if d.is_dir() and not d.name.startswith("_") and (d / "SKILL.md").exists()
+        }
+        if skills_dir.is_dir()
+        else set()
     )
+
+    class_union = set(lifecycle.PIPELINE_SKILLS) | set(lifecycle.GATE_SKILLS) | set(lifecycle.AUX_SKILLS)
 
     registries: list[tuple[str, set[str]]] = [
         ("IMPLEMENTED_SKILLS", set(lifecycle.IMPLEMENTED_SKILLS)),
@@ -261,9 +261,7 @@ def shim_thinness(repo: Path | str, *, inventory: list[CommandEntry] | None = No
         except OSError:
             text = ""
         if f"skills/{e.name}/SKILL.md" not in text:
-            issues.append(
-                f"shim-thinness: commands/{e.name}.md does not reference skills/{e.name}/SKILL.md"
-            )
+            issues.append(f"shim-thinness: commands/{e.name}.md does not reference skills/{e.name}/SKILL.md")
     return sorted(set(issues))
 
 
@@ -407,9 +405,7 @@ def write_inventory(repo: Path | str, *, inventory: list[CommandEntry] | None = 
         desc = (e.description[:80] + "…") if len(e.description) > 80 else e.description
         desc = desc.replace("|", "\\|")
         skill_cell = str(e.skill_lines) if e.has_skill else "—"
-        rows.append(
-            f"| {e.name} | {e.domain} | {e.skill_class} | {e.shim_body_lines} | {skill_cell} | {desc} |"
-        )
+        rows.append(f"| {e.name} | {e.domain} | {e.skill_class} | {e.shim_body_lines} | {skill_cell} | {desc} |")
     body = "# renmark command inventory\n\n" + "\n".join(rows)
 
     n_missing = sum(1 for e in inv if not e.has_skill)
@@ -433,9 +429,7 @@ def write_inventory(repo: Path | str, *, inventory: list[CommandEntry] | None = 
     )
 
     json_path = out_dir / f"inventory-{today}.json"
-    json_path.write_text(
-        json.dumps([e.as_dict() for e in inv], indent=2) + "\n", encoding="utf-8"
-    )
+    json_path.write_text(json.dumps([e.as_dict() for e in inv], indent=2) + "\n", encoding="utf-8")
 
     return {"md": str(md_path), "json": str(json_path)}
 
@@ -461,9 +455,7 @@ def write_audit_report(repo: Path | str, report: AuditReport) -> dict[str, str]:
     if not report.quick and report.modularity_counts:
         mc = report.modularity_counts
         sections.append("## modularity (advisory)")
-        sections.append(
-            f"- danger={mc.get('danger', 0)} warn={mc.get('warn', 0)} info={mc.get('info', 0)}"
-        )
+        sections.append(f"- danger={mc.get('danger', 0)} warn={mc.get('warn', 0)} info={mc.get('info', 0)}")
         sections.append("")
     body = "\n".join(sections).rstrip()
 
@@ -529,10 +521,7 @@ def main(argv: list[str] | None = None) -> int:
             as_json = True
             i += 1
         elif arg in ("-h", "--help"):
-            sys.stdout.write(
-                "usage: python -m renmark.audit [--quick] [--inventory-only] "
-                "[--json] [--repo PATH]\n"
-            )
+            sys.stdout.write("usage: python -m renmark.audit [--quick] [--inventory-only] [--json] [--repo PATH]\n")
             return 0
         else:
             sys.stderr.write(f"unknown arg: {arg}\n")
@@ -575,9 +564,7 @@ def main(argv: list[str] | None = None) -> int:
     sys.stdout.write(f"audit ({'quick' if quick else 'full'}): {counts}\n")
     if not quick and report.modularity_counts:
         mc = report.modularity_counts
-        sys.stdout.write(
-            f"  modularity (advisory): danger={mc.get('danger', 0)} warn={mc.get('warn', 0)}\n"
-        )
+        sys.stdout.write(f"  modularity (advisory): danger={mc.get('danger', 0)} warn={mc.get('warn', 0)}\n")
     sys.stdout.write(f"  report: {report_paths['md']}\n")
     sys.stdout.write(f"  inventory: {inv_paths['md']} ({report.inventory_count} commands)\n")
     sys.stdout.write(f"{'PASS' if report.ok else 'ISSUES'} ({report.total_issues} issues)\n")

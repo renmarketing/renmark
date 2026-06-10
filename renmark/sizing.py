@@ -191,9 +191,7 @@ def classify_plan(tasks: list[Task]) -> Tier:
         return DEFAULT_TIER
 
 
-def classify_diff(
-    repo: Path | str, base_ref: str = "main", diff_range: str | None = None
-) -> Tier:
+def classify_diff(repo: Path | str, base_ref: str = "main", diff_range: str | None = None) -> Tier:
     """Classify a git diff into a :data:`Tier`.
 
     By default classifies ``<base_ref>..HEAD``. Callers reviewing an explicit
@@ -374,9 +372,7 @@ def _is_safe_rev_arg(rev: str) -> bool:
     return bool(_REV_ARG_RE.match(rev))
 
 
-def _git_diff_stat(
-    repo: Path | str, base_ref: str, diff_range: str | None = None
-) -> tuple[list[str], int] | None:
+def _git_diff_stat(repo: Path | str, base_ref: str, diff_range: str | None = None) -> tuple[list[str], int] | None:
     """Return ``(changed_files, total_lines_changed)`` for the requested diff.
 
     When ``diff_range`` is given it is used as the ``git diff --stat`` revision

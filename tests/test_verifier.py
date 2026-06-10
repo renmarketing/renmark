@@ -1,4 +1,5 @@
 """Unit tests for renmark.verifier."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -31,7 +32,8 @@ def test_timeout(tmp_path: Path) -> None:
 def test_tail_truncation(tmp_path: Path) -> None:
     res = run_verifier(
         'for i in $(seq 1 200); do echo "line $i"; done; exit 1',
-        cwd=tmp_path, tail_lines=10,
+        cwd=tmp_path,
+        tail_lines=10,
     )
     assert res.exit_code == 1
     assert res.tail.count("\n") <= 10

@@ -227,9 +227,7 @@ def test_list_items_skips_unreadable_file(tmp_path: Path) -> None:
 
 
 def test_completion_report_goal_reached() -> None:
-    assert completion_report(goal_reached=True, iteration=3, max_iterations=5) == (
-        "Goal reached in 3/5 iterations."
-    )
+    assert completion_report(goal_reached=True, iteration=3, max_iterations=5) == ("Goal reached in 3/5 iterations.")
 
 
 def test_completion_report_goal_not_reached() -> None:

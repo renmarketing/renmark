@@ -106,8 +106,7 @@ def _provider_limit(limits: dict[str, Any], provider: str, key: str) -> int | No
         return None
 
 
-def _provider_percent(limits: dict[str, Any], provider: str, key: str,
-                      observed: int) -> float | str | None:
+def _provider_percent(limits: dict[str, Any], provider: str, key: str, observed: int) -> float | str | None:
     """Percent for one provider/key, or the no-local-limit sentinel when unset."""
     limit = _provider_limit(limits, provider, key)
     if limit is None:
@@ -121,11 +120,13 @@ def _recent_limit_events(repo: str | Path) -> list[dict[str, str]]:
     for r in state.read_usage(repo):
         kind = r.get("kind", "")
         if kind in _LIMIT_EVENT_KINDS:
-            events.append({
-                "ts": str(r.get("ts", "")),
-                "provider": str(r.get("provider", "")),
-                "kind": str(kind),
-            })
+            events.append(
+                {
+                    "ts": str(r.get("ts", "")),
+                    "provider": str(r.get("provider", "")),
+                    "kind": str(kind),
+                }
+            )
     return events[-5:]
 
 
@@ -175,20 +176,14 @@ def build_usage_view(repo: str | Path, *, now: str) -> dict[str, Any]:
         p_5h = state.usage_last_5h(repo, now=now, provider=provider)
         p_week = state.usage_last_week(repo, now=now, provider=provider)
         percent[provider] = {
-            "rolling_5h_tokens": _provider_percent(
-                limits, provider, "rolling_5h_tokens",
-                p_5h.get("total_tokens", 0)),
-            "weekly_tokens": _provider_percent(
-                limits, provider, "weekly_tokens",
-                p_week.get("total_tokens", 0)),
+            "rolling_5h_tokens": _provider_percent(limits, provider, "rolling_5h_tokens", p_5h.get("total_tokens", 0)),
+            "weekly_tokens": _provider_percent(limits, provider, "weekly_tokens", p_week.get("total_tokens", 0)),
         }
     # A configured local limit is breached when any real (non-sentinel) percent
     # is at or over 100. This is the signal Tier-1 preflight reads to pause
     # before spend; it is False whenever no local limit is configured.
     limit_exceeded = any(
-        isinstance(v, (int, float)) and v >= 100.0
-        for cells in percent.values()
-        for v in cells.values()
+        isinstance(v, (int, float)) and v >= 100.0 for cells in percent.values() for v in cells.values()
     )
     view: dict[str, Any] = {
         "now": now,
@@ -197,8 +192,7 @@ def build_usage_view(repo: str | Path, *, now: str) -> dict[str, Any]:
         "limits": limits,
         "percent": percent,
         "limit_exceeded": limit_exceeded,
-        "top_features": state.tokens_by_feature(
-            repo, now=now, seconds=_ONE_WEEK, top=5),
+        "top_features": state.tokens_by_feature(repo, now=now, seconds=_ONE_WEEK, top=5),
         "recent_limit_events": _recent_limit_events(repo),
         "paused_run": _paused_run(repo),
         "disclaimer": DISCLAIMER,
@@ -227,12 +221,13 @@ def _parse_iso(value: str) -> dt.datetime | None:
 
 def _has_rolling_5h_window(limits: dict[str, Any], provider: str) -> bool:
     """True when ``provider`` has a configured rolling-5h token/request limit."""
-    return (_provider_limit(limits, provider, "rolling_5h_tokens") is not None
-            or _provider_limit(limits, provider, "rolling_5h_requests") is not None)
+    return (
+        _provider_limit(limits, provider, "rolling_5h_tokens") is not None
+        or _provider_limit(limits, provider, "rolling_5h_requests") is not None
+    )
 
 
-def _earliest_in_window_ts(repo: str | Path, *, base: dt.datetime,
-                           provider: str, seconds: int) -> dt.datetime | None:
+def _earliest_in_window_ts(repo: str | Path, *, base: dt.datetime, provider: str, seconds: int) -> dt.datetime | None:
     """Earliest parseable ts for ``provider`` within ``[base - seconds, base]``.
 
     Bounded + non-raising: scans the ledger, returns the oldest contributing
@@ -270,11 +265,15 @@ def _fallback_reference(repo: str | Path | None, provider: str) -> dt.datetime:
     return dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
 
 
-def _compute_resume_after(*, now: str, provider: str,
-                          provider_reset_at: str,
-                          limits: dict[str, Any],
-                          repo: str | Path | None = None,
-                          fallback_minutes: int = 60) -> str:
+def _compute_resume_after(
+    *,
+    now: str,
+    provider: str,
+    provider_reset_at: str,
+    limits: dict[str, Any],
+    repo: str | Path | None = None,
+    fallback_minutes: int = 60,
+) -> str:
     """Resume_after rule — ALWAYS a non-empty, timezone-aware ISO timestamp.
 
     Order: provider reset (clamped to the future if stale) > earliest-in-window
@@ -301,24 +300,32 @@ def _compute_resume_after(*, now: str, provider: str,
 
     if _has_rolling_5h_window(limits, provider):
         if repo is not None:
-            earliest = _earliest_in_window_ts(
-                repo, base=base, provider=provider, seconds=_FIVE_HOURS)
+            earliest = _earliest_in_window_ts(repo, base=base, provider=provider, seconds=_FIVE_HOURS)
             if earliest is not None:
                 resume = earliest + dt.timedelta(seconds=_FIVE_HOURS)
                 # Stay conservative — never hand back a past time.
-                return (resume if resume > base else
-                        base + dt.timedelta(seconds=_FIVE_HOURS)).isoformat()
+                return (resume if resume > base else base + dt.timedelta(seconds=_FIVE_HOURS)).isoformat()
         return (base + dt.timedelta(seconds=_FIVE_HOURS)).isoformat()
     return (base + fallback).isoformat()
 
 
-def classify_usage_pause(*, run_id: str, plan_path: str, last_task_index: int,
-                         now: str, provider: str = "", model: str = "",
-                         observed_usage: str = "", provider_reset_at: str = "",
-                         limits: dict[str, Any] | None = None,
-                         feature: str = "", loop_id: str = "",
-                         iteration: int = 0, max_iterations: int = 0,
-                         repo: str | Path | None = None) -> state.PauseState:
+def classify_usage_pause(
+    *,
+    run_id: str,
+    plan_path: str,
+    last_task_index: int,
+    now: str,
+    provider: str = "",
+    model: str = "",
+    observed_usage: str = "",
+    provider_reset_at: str = "",
+    limits: dict[str, Any] | None = None,
+    feature: str = "",
+    loop_id: str = "",
+    iteration: int = 0,
+    max_iterations: int = 0,
+    repo: str | Path | None = None,
+) -> state.PauseState:
     """Build a usage-limit PauseState with resume_after by the fallback rule.
 
     No polling, no retry scheduling — purely computes resume_after and delegates
@@ -327,14 +334,29 @@ def classify_usage_pause(*, run_id: str, plan_path: str, last_task_index: int,
     """
     resolved_limits = limits if isinstance(limits, dict) else {}
     resume_after = _compute_resume_after(
-        now=now, provider=provider, provider_reset_at=provider_reset_at,
-        limits=resolved_limits, repo=repo, fallback_minutes=60)
+        now=now,
+        provider=provider,
+        provider_reset_at=provider_reset_at,
+        limits=resolved_limits,
+        repo=repo,
+        fallback_minutes=60,
+    )
     return state.usage_limit_pause(
-        run_id=run_id, plan_path=plan_path, last_task_index=last_task_index,
-        ts=now, provider=provider, model=model, observed_usage=observed_usage,
-        provider_reset_at=provider_reset_at, resume_after=resume_after,
-        fallback_retry_minutes=60, feature=feature, loop_id=loop_id,
-        iteration=iteration, max_iterations=max_iterations)
+        run_id=run_id,
+        plan_path=plan_path,
+        last_task_index=last_task_index,
+        ts=now,
+        provider=provider,
+        model=model,
+        observed_usage=observed_usage,
+        provider_reset_at=provider_reset_at,
+        resume_after=resume_after,
+        fallback_retry_minutes=60,
+        feature=feature,
+        loop_id=loop_id,
+        iteration=iteration,
+        max_iterations=max_iterations,
+    )
 
 
 def _percent_str(value: float | str | None) -> str:
@@ -346,16 +368,14 @@ def _percent_str(value: float | str | None) -> str:
     return f"{value}%"
 
 
-def _window_block(title: str, window: dict[str, Any],
-                  percents: dict[str, dict[str, Any]], key: str) -> list[str]:
+def _window_block(title: str, window: dict[str, Any], percents: dict[str, dict[str, Any]], key: str) -> list[str]:
     """Markdown lines for one rolling/weekly window with per-provider percent."""
     lines = [
         f"## {title}",
         f"- total tokens: {window.get('total_tokens', 0)} "
         f"(prompt {window.get('prompt_tokens', 0)}, "
         f"completion {window.get('completion_tokens', 0)})",
-        f"- requests: {window.get('requests', 0)}; "
-        f"agent calls: {window.get('agent_calls', 0)}",
+        f"- requests: {window.get('requests', 0)}; agent calls: {window.get('agent_calls', 0)}",
     ]
     for provider in ("claude", "codex"):
         cell = percents.get(provider, {}).get(key)
@@ -370,10 +390,8 @@ def render_usage_md(view: dict[str, Any]) -> str:
     """
     percents = view.get("percent", {}) if isinstance(view.get("percent"), dict) else {}
     lines: list[str] = ["# Usage status"]
-    lines += _window_block(
-        "Rolling 5h", view.get("rolling_5h", {}), percents, "rolling_5h_tokens")
-    lines += _window_block(
-        "Weekly", view.get("weekly", {}), percents, "weekly_tokens")
+    lines += _window_block("Rolling 5h", view.get("rolling_5h", {}), percents, "rolling_5h_tokens")
+    lines += _window_block("Weekly", view.get("weekly", {}), percents, "weekly_tokens")
 
     provider_reported = view.get("provider_reported")
     if isinstance(provider_reported, dict):
@@ -382,7 +400,8 @@ def render_usage_md(view: dict[str, Any]) -> str:
             f"- {provider_reported.get('provider', '')}: "
             f"used {provider_reported.get('used', '')} / "
             f"limit {provider_reported.get('limit', '')}; "
-            f"reset {provider_reported.get('reset', '')}")
+            f"reset {provider_reported.get('reset', '')}"
+        )
 
     lines.append("## Top features (last 7d)")
     top = view.get("top_features") or []
@@ -396,17 +415,15 @@ def render_usage_md(view: dict[str, Any]) -> str:
     if isinstance(paused, dict):
         lines.append("## Paused run")
         lines.append(
-            f"- {paused.get('reason', '')} "
-            f"({paused.get('provider', '')}); "
-            f"observed {paused.get('observed_usage', '')}")
+            f"- {paused.get('reason', '')} ({paused.get('provider', '')}); observed {paused.get('observed_usage', '')}"
+        )
         lines.append(f"- suggested resume after: {paused.get('resume_after', '')}")
 
     lines.append("## Recent limit events")
     events = view.get("recent_limit_events") or []
     if events:
         for ev in events:
-            lines.append(
-                f"- {ev.get('ts', '')} {ev.get('provider', '')} {ev.get('kind', '')}")
+            lines.append(f"- {ev.get('ts', '')} {ev.get('provider', '')} {ev.get('kind', '')}")
     else:
         lines.append("- (none)")
 

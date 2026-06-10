@@ -166,9 +166,7 @@ def test_classify_usage_pause_fallback_rule():
         limits={},
     )
     assert by_default.pause_kind == "usage_limit"
-    assert _parse_iso(by_default.resume_after) == _parse_iso(NOW) + timedelta(
-        minutes=60
-    )
+    assert _parse_iso(by_default.resume_after) == _parse_iso(NOW) + timedelta(minutes=60)
 
 
 def test_render_usage_md_ends_with_exact_disclaimer_and_hides_raw_jsonl(tmp_path):

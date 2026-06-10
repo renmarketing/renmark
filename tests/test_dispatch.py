@@ -1,4 +1,5 @@
 """Unit tests for renmark.dispatch."""
+
 from __future__ import annotations
 
 import time
@@ -11,14 +12,24 @@ from renmark.dispatch import TaskResult
 from renmark.parser import Task
 
 
-def _task(idx: int, target: str, executor: str = "codex",
-          parallel_group: int | None = None,
-          context_files: list[str] | None = None) -> Task:
+def _task(
+    idx: int,
+    target: str,
+    executor: str = "codex",
+    parallel_group: int | None = None,
+    context_files: list[str] | None = None,
+) -> Task:
     return Task(
-        index=idx, title=f"task {idx}", mode="A", target=target,
+        index=idx,
+        title=f"task {idx}",
+        mode="A",
+        target=target,
         context_files=context_files or [],
-        verifier="true", verifier_timeout_s=60, spec="noop",
-        executor=executor, complexity="simple",
+        verifier="true",
+        verifier_timeout_s=60,
+        spec="noop",
+        executor=executor,
+        complexity="simple",
         parallel_group=parallel_group,
     )
 
@@ -61,6 +72,7 @@ def test_validate_wave_rejects_context_into_wave_target() -> None:
 def test_dispatch_wave_parallel_runs_concurrently(tmp_path: Path) -> None:
     """Two slow tasks in the same wave should run in parallel — total
     elapsed time is closer to one task than two."""
+
     def slow(task: Task, repo: Path) -> TaskResult:
         time.sleep(0.1)
         return TaskResult(task_index=task.index, executor=task.executor, status="passed")
@@ -94,7 +106,8 @@ def test_dispatch_wave_marks_claude_tasks_needs_agent(tmp_path: Path) -> None:
 
 def test_estimate_wave_cost_sums() -> None:
     tasks = [
-        _task(1, "a"), _task(2, "b"),
+        _task(1, "a"),
+        _task(2, "b"),
     ]
     tasks[0].est_tokens = 100
     tasks[0].est_cost_usd = 0.01
@@ -123,6 +136,7 @@ def test_dispatch_wave_runner_exception_marks_failed(tmp_path: Path) -> None:
 
 def test_build_agent_dispatch_returns_structured(tmp_path: Path) -> None:
     from renmark.providers import claude_agent
+
     t = _task(7, "src/foo.py", executor="opus")
     t.spec = "make foo do X"
     d = claude_agent.build_agent_dispatch(t, tmp_path)
