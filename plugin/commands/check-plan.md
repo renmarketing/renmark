@@ -1,5 +1,5 @@
 ---
-description: Use before executing a renmark plan — validates task count, verifier presence, and parallel group safety. Returns PASS, WARN, or BLOCK. Invoked automatically by /renmark:orchestrate pre-flight.
+description: "Use before executing a renmark plan — deterministic validation via renmark.plan_lint engine (shared with orchestrate pre-flight). Returns PASS, WARN, or BLOCK."
 argument-hint: '[path to plan or empty to use latest]'
 ---
 

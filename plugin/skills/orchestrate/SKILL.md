@@ -64,7 +64,7 @@ state.write_pipeline_state(repo, current_phase="orchestrate", current_plan=<plan
 
 **Executor check** — `command -v codex` if the plan has any `executor: codex` tasks. If missing, stop and tell the user before running.
 
-**Plan validation** — invoke `/renmark:check-plan <plan>` before spending tokens. If it exits 1 (BLOCK), fix the plan first. WARNs can proceed.
+**Plan validation** — run `python -m renmark.plan_lint <plan>` directly before spending tokens. If it exits 1 (BLOCK), fix the plan first; WARNs can proceed with user acknowledgment. (Defense-in-depth: the same engine validated the plan at plan-time; running it again at dispatch-time means check-plan and orchestrate can never drift.)
 
 **Refactor safety** — if the plan has any `complexity: hard` task or the spec mentions "refactor"/"rename"/"restructure"/"migrate":
 1. Confirm clean working tree (`git status`).
