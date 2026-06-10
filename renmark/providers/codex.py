@@ -36,24 +36,61 @@ def codex_available() -> bool:
 
 
 def _git_status_porcelain(repo: Path) -> list[str]:
-    """Return list of paths with any change vs. HEAD (staged or unstaged)."""
+    """Return list of paths with any change vs. HEAD (staged or unstaged).
+
+    Uses ``--porcelain -z`` (NUL-separated, machine format): paths are emitted
+    verbatim — no surrounding quotes, no octal-escaping of unicode/space/control
+    bytes. That keeps filenames like ``fünf ä.txt`` un-mangled, which the
+    non-``-z`` form would render as ``"f\303\274nf \303\244.txt"`` and break the
+    delta/lane/rollback path-matching downstream.
+
+    ``--untracked-files=all`` lists untracked files INDIVIDUALLY instead of
+    collapsing a new directory to ``dir/`` — without it, a task whose target
+    lives in a brand-new directory reports ``out/`` instead of
+    ``out/target.txt`` and judges out-of-lane against its own work.
+    """
     proc = subprocess.run(
-        ["git", "-C", str(repo), "status", "--porcelain"],
+        ["git", "-C", str(repo), "status", "--porcelain", "-z", "--untracked-files=all"],
         capture_output=True,
         text=True,
     )
     if proc.returncode != 0:
         return []
+    return _parse_porcelain_z(proc.stdout)
+
+
+def _parse_porcelain_z(raw: str) -> list[str]:
+    """Parse ``git status --porcelain -z`` output into a list of paths.
+
+    Records are NUL-separated (no trailing newline per entry). Each record is
+    ``XY<space>path``; the leading status field is exactly 3 bytes (2 status
+    chars + 1 space) so the path is ``record[3:]``.
+
+    Rename/copy entries (status ``R`` or ``C`` in either column) are special:
+    git emits the *new* path in the current record and the *original* path as a
+    SEPARATE following NUL-terminated token. We take the new path and SKIP the
+    original (it is not a change to attribute on its own).
+    """
+    tokens = raw.split("\0")
+    # ``-z`` ends the stream with a trailing NUL → a final empty token; drop
+    # any empties so they aren't mistaken for a record.
+    tokens = [t for t in tokens if t != ""]
     paths: list[str] = []
-    for line in proc.stdout.splitlines():
-        # Porcelain v1: 2-char status + space + path. Untracked starts with "??".
-        if len(line) < 4:
+    i = 0
+    while i < len(tokens):
+        rec = tokens[i]
+        if len(rec) < 4:
+            i += 1
             continue
-        path = line[3:].strip()
-        # Handle rename/copy: "R  oldpath -> newpath" — take new path.
-        if " -> " in path:
-            path = path.split(" -> ", 1)[1]
-        paths.append(path.strip('"'))
+        status = rec[:2]
+        path = rec[3:]
+        # Rename/copy: the ORIGINAL path follows as the next NUL-separated
+        # token. Take the new path (already in `path`), skip the original.
+        if "R" in status or "C" in status:
+            i += 2  # consume this record AND the trailing original-path token
+        else:
+            i += 1
+        paths.append(path)
     return paths
 
 

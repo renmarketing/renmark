@@ -6,6 +6,10 @@
    wave-targets, so concurrent in-flight files never look out-of-lane.
 3. Mode-A failed-task rollback deletes an UNTRACKED target (checkout can't
    restore it) instead of silently leaving the rejected artifact on disk.
+4. Porcelain snapshots use `git status --porcelain -z` (NUL-separated): unicode
+   and space filenames survive un-mangled (no octal-escaping/quoting), and
+   rename/copy entries yield the NEW path only (the original NUL token is
+   skipped, never double-counted).
 """
 
 from __future__ import annotations
@@ -126,6 +130,50 @@ def test_check_only_target_excludes_sibling_targets():
     assert not bad
 
 
+# ── porcelain -z: NUL parsing keeps unicode/space filenames un-mangled ──────────
+
+
+def test_porcelain_z_unicode_space_filename_unmangled(tmp_path):
+    """A real `git status --porcelain -z` on a unicode+space filename returns the
+    path verbatim — NOT octal-escaped/quoted the way the non-`-z` form would
+    (`"f\\303\\274nf \\303\\244.txt"`). The path must appear in the delta exactly."""
+    _init_repo(tmp_path)
+    fname = "fünf ä.txt"
+    (tmp_path / fname).write_text("neu")
+
+    pre: list[str] = []  # nothing pending right after the init commit
+    post = codex_provider._git_status_porcelain(tmp_path)
+    assert fname in post, f"unicode/space path mangled in snapshot: {post!r}"
+    # No octal-escape artifacts and no wrapping quotes leaked in.
+    assert not any("\\" in p or p.startswith('"') for p in post), post
+
+    delta = codex_provider._delta(pre, post)
+    assert fname in delta, f"unicode/space path missing from delta: {delta!r}"
+
+
+def test_parse_porcelain_z_rename_returns_new_path_only():
+    """A rename entry in `-z` output carries the NEW path in the record and the
+    ORIGINAL path as a separate following NUL token. Parsing must yield the new
+    path and SKIP the original — never emit both, never emit the original."""
+    # Renamed old.txt -> new.txt, plus an ordinary modification, plus an add.
+    raw = "R  new.txt\0old.txt\0 M kept.txt\0?? added.txt\0"
+    paths = codex_provider._parse_porcelain_z(raw)
+    assert "new.txt" in paths, paths
+    assert "old.txt" not in paths, "original (pre-rename) path must be skipped"
+    assert "kept.txt" in paths
+    assert "added.txt" in paths
+    # Exactly three real changes — the rename's original token is consumed, not counted.
+    assert len(paths) == 3, paths
+
+
+def test_parse_porcelain_z_copy_entry_skips_source():
+    """Copy entries (status column 'C') behave like renames: new path kept,
+    source path (the following NUL token) skipped."""
+    raw = "C  copy.txt\0source.txt\0"
+    paths = codex_provider._parse_porcelain_z(raw)
+    assert paths == ["copy.txt"], paths
+
+
 # ── Task 3 + 2: path-scoped rollback (untracked delete, tracked checkout) ───────
 
 
@@ -171,3 +219,67 @@ def test_rollback_leaves_sibling_untouched(tmp_path):
     assert not mine.exists()
     assert sibling.exists(), "sibling's in-flight work must survive my rollback"
     assert sibling.read_text() == "sibling in-flight work"
+
+
+# ── v0.9.1 review fixes: pin the atomic hot-path functions directly ───────────
+
+
+def test_classify_and_rollback_atomic_deletes_untracked(tmp_path):
+    """_classify_and_rollback (single-lock hot path) deletes an untracked
+    rejected artifact — pins the TOCTOU-closing composition directly."""
+    _init_repo(tmp_path)
+    new_file = tmp_path / "out" / "new.txt"
+    new_file.parent.mkdir(parents=True)
+    new_file.write_text("rejected artifact")
+
+    _engine._classify_and_rollback(tmp_path, ["out/new.txt"])
+    assert not new_file.exists()
+
+
+def test_classify_and_rollback_atomic_restores_tracked(tmp_path):
+    _init_repo(tmp_path)
+    seed = tmp_path / "seed.txt"
+    seed.write_text("CORRUPTED")
+    _engine._classify_and_rollback(tmp_path, ["seed.txt"])
+    assert seed.read_text() == "seed"
+
+
+def test_judge_lane_and_rollback_cleans_extras_leaves_target_and_siblings(tmp_path):
+    """_judge_lane_and_rollback (single-lock snapshot→judge→rollback): an
+    out-of-lane extra is rolled back; the task's own target and a declared
+    sibling target survive."""
+    _init_repo(tmp_path)
+    target = tmp_path / "out" / "target.txt"
+    target.parent.mkdir(parents=True)
+    target.write_text("my work")
+    rogue = tmp_path / "rogue.txt"
+    rogue.write_text("out-of-lane write")
+    sibling = tmp_path / "sib.txt"
+    sibling.write_text("sibling in-flight work")
+
+    ok, _reason = _engine._judge_lane_and_rollback(
+        tmp_path,
+        pre_changed_files=[],
+        target="out/target.txt",
+        sibling_targets=["sib.txt"],
+    )
+    assert ok is False
+    assert not rogue.exists(), "out-of-lane extra must be rolled back"
+    assert target.exists() and target.read_text() == "my work", "own target must survive lane rollback"
+    assert sibling.exists() and sibling.read_text() == "sibling in-flight work"
+
+
+def test_judge_lane_and_rollback_in_lane_is_noop(tmp_path):
+    """A task that touched only its target judges in-lane; nothing rolled back."""
+    _init_repo(tmp_path)
+    target = tmp_path / "out" / "target.txt"
+    target.parent.mkdir(parents=True)
+    target.write_text("my work")
+    ok, _reason = _engine._judge_lane_and_rollback(
+        tmp_path,
+        pre_changed_files=[],
+        target="out/target.txt",
+        sibling_targets=None,
+    )
+    assert ok is True
+    assert target.exists()

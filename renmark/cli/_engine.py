@@ -145,53 +145,143 @@ def _git_restore_target(cwd: Path, target: str) -> None:
         _git("checkout", "--", target, cwd=cwd)
 
 
-def _untracked_paths(cwd: Path, paths: list[str]) -> set[str]:
+def _untracked_paths_locked(cwd: Path, paths: list[str]) -> set[str]:
     """Subset of ``paths`` that git does NOT track (no committed version).
 
-    Such a path is a newly-created file: `git checkout -- <path>` is a no-op
-    (returncode 0, nothing restored), so rollback must DELETE it instead. We
-    ask git directly (`ls-files --error-unmatch`) rather than parsing porcelain
-    status codes, which the changed-files list has already stripped.
+    LOCK CONTRACT: the caller MUST already hold ``_GIT_LOCK``. Classification
+    and the rollback that consumes it must run under a SINGLE lock acquisition
+    (``_classify_and_rollback`` is the only intended caller) so a sibling thread
+    cannot create/delete a file in the gap and flip a path between the
+    tracked→checkout and untracked→delete arms. ``_GIT_LOCK`` is a plain
+    ``threading.Lock`` (non-reentrant), so this helper must NEVER re-acquire it.
+
+    A path git doesn't track is a newly-created file: ``git checkout -- <path>``
+    is a no-op (returncode 0, nothing restored), so rollback must DELETE it
+    instead. We ask git directly (``ls-files --error-unmatch``) rather than
+    parsing porcelain status codes, which the changed-files list has stripped.
     """
     untracked: set[str] = set()
     for p in paths:
         norm = p[2:] if p.startswith("./") else p
-        with _GIT_LOCK:
-            r = _git("ls-files", "--error-unmatch", "--", norm, cwd=cwd)
+        r = _git("ls-files", "--error-unmatch", "--", norm, cwd=cwd)
         if r.returncode != 0:
             untracked.add(norm)
     return untracked
 
 
-def _rollback_paths(cwd: Path, paths: list[str], *, untracked_before: set[str]) -> None:
-    """Restore ONLY the given paths — never `git checkout -- .` (whole tree),
+def _rollback_paths_locked(cwd: Path, paths: list[str], *, untracked_before: set[str]) -> None:
+    """Restore ONLY the given paths — never ``git checkout -- .`` (whole tree),
     which would revert a sibling wave-task's in-flight work.
+
+    LOCK CONTRACT: the caller MUST already hold ``_GIT_LOCK`` (see
+    ``_classify_and_rollback``). Does NOT acquire the lock itself — ``_GIT_LOCK``
+    is non-reentrant, and the classify→rollback sequence must be one atomic
+    critical section.
 
     Mode-aware per path: a path that was UNTRACKED before the task can't be
     restored by checkout (git has no committed version), so it's deleted;
-    tracked paths are checked-out. We hold _GIT_LOCK for index consistency and
-    surface any subprocess failure to the caller's log via the returned notes.
+    tracked paths are checked-out.
+    """
+    if not paths:
+        return
+    for p in paths:
+        norm = p[2:] if p.startswith("./") else p
+        if norm in untracked_before or p in untracked_before:
+            # Untracked → delete the file/dir codex created.
+            cleaned = _git("clean", "-fd", "--", norm, cwd=cwd)
+            if cleaned.returncode != 0:
+                # Fall back to a direct unlink if clean refused.
+                fp = cwd / norm
+                try:
+                    if fp.is_file():
+                        fp.unlink()
+                except OSError:
+                    pass
+        else:
+            co = _git("checkout", "--", norm, cwd=cwd)
+            if co.returncode != 0:
+                _print(f"warning: rollback checkout failed for {norm}: {co.stderr.strip()[:120]}")
+
+
+def _classify_and_rollback(cwd: Path, paths: list[str]) -> None:
+    """Classify untracked-vs-tracked AND roll back, under ONE ``_GIT_LOCK``.
+
+    Replaces the old two-acquisition pattern (``_untracked_paths`` then
+    ``_rollback_paths``) which left a TOCTOU gap: a sibling thread could
+    create or delete a file between the classification and the rollback,
+    flipping a path's tracked/untracked status so rollback chose the wrong
+    arm (checkout-ing a now-untracked file as a no-op, or cleaning a tracked
+    one). Holding the lock across both makes the decision and the action
+    atomic with respect to sibling git operations.
     """
     if not paths:
         return
     with _GIT_LOCK:
-        for p in paths:
-            norm = p[2:] if p.startswith("./") else p
-            if norm in untracked_before or p in untracked_before:
-                # Untracked → delete the file/dir codex created.
-                cleaned = _git("clean", "-fd", "--", norm, cwd=cwd)
-                if cleaned.returncode != 0:
-                    # Fall back to a direct unlink if clean refused.
-                    fp = cwd / norm
-                    try:
-                        if fp.is_file():
-                            fp.unlink()
-                    except OSError:
-                        pass
-            else:
-                co = _git("checkout", "--", norm, cwd=cwd)
-                if co.returncode != 0:
-                    _print(f"warning: rollback checkout failed for {norm}: {co.stderr.strip()[:120]}")
+        untracked = _untracked_paths_locked(cwd, paths)
+        _rollback_paths_locked(cwd, paths, untracked_before=untracked)
+
+
+# Backwards-compatible standalone wrappers (each takes the lock itself). These
+# are NOT used on the hot rollback path — that goes through _classify_and_rollback
+# for a single atomic acquisition. They remain for callers/tests that exercise
+# classification or rollback in isolation. Never chain them on the hot path: two
+# acquisitions reintroduce the TOCTOU gap these helpers' _locked variants close.
+def _untracked_paths(cwd: Path, paths: list[str]) -> set[str]:
+    with _GIT_LOCK:
+        return _untracked_paths_locked(cwd, paths)
+
+
+def _rollback_paths(cwd: Path, paths: list[str], *, untracked_before: set[str]) -> None:
+    with _GIT_LOCK:
+        _rollback_paths_locked(cwd, paths, untracked_before=untracked_before)
+
+
+def _judge_lane_and_rollback(
+    cwd: Path,
+    *,
+    pre_changed_files: list[str],
+    target: str,
+    sibling_targets: list[str] | None,
+) -> tuple[bool, str]:
+    """Atomically snapshot → judge out-of-lane → roll back, under ONE ``_GIT_LOCK``.
+
+    The codex subprocess has already finished (the lock is NOT held during it —
+    that would serialize the parallel wave). Here we re-take the porcelain
+    post-snapshot, recompute the post-minus-pre delta, run the lane check, and —
+    if out of lane — classify + roll back this task's OWN extra paths, all in a
+    single critical section. That closes the window where a sibling could
+    interleave a git write between the lane judgment and the rollback (e.g.
+    creating a file that the rollback then misclassifies, or committing one the
+    judgment just saw).
+
+    RESIDUAL WINDOW (inherent, not fixable here): a sibling writing DURING this
+    task's codex subprocess cannot be attributed — porcelain-based detection
+    only diffs the pre/post snapshots and the lock is necessarily released
+    across the subprocess. The pre/post delta + sibling-target exclusion masks
+    those siblings from THIS task's lane check; what it cannot do is detect a
+    sibling's concurrent in-flight edit. Judgment+rollback themselves are now
+    atomic.
+
+    Returns ``(ok, reason)`` from the lane check. On ``ok`` nothing is rolled
+    back. ``_GIT_LOCK`` is non-reentrant, so every git call inside MUST use the
+    ``*_locked`` helpers (no nested acquisition).
+    """
+    from ..providers.codex import _delta, _git_status_porcelain
+
+    sib = set(sibling_targets or [])
+    with _GIT_LOCK:
+        post = _git_status_porcelain(cwd)
+        changed = _delta(pre_changed_files, post)
+        ok, reason = check_only_target_modified(changed, target, sibling_targets=sibling_targets)
+        if not ok:
+            # Roll back EXTRAS only — never the task's own target (its fate is
+            # the caller's decision: the FAIL/retry path rolls the target back
+            # separately via _classify_and_rollback) and never sibling targets.
+            skip = sib | {target}
+            own_extras = [p for p in changed if (p[2:] if p.startswith("./") else p) not in skip]
+            untracked = _untracked_paths_locked(cwd, own_extras)
+            _rollback_paths_locked(cwd, own_extras, untracked_before=untracked)
+    return ok, reason
 
 
 def _choose_model(task: Task, cfg: Config) -> str:
@@ -726,14 +816,19 @@ def _execute_task_codex(
 
         # Constrain codex: must have modified only the target file (sibling
         # wave-targets are excluded — they're another task's lane, not ours).
-        ok, reason = check_only_target_modified(result.changed_files, task.target, sibling_targets=sibling_targets)
+        # Re-snapshot → judge → roll back atomically under one _GIT_LOCK so a
+        # sibling cannot interleave a git write between the judgment and the
+        # rollback. The lock is NOT held during the codex subprocess above —
+        # that would serialize the whole parallel wave. Rolls back ONLY this
+        # task's own extra paths (never the whole tree, which would clobber
+        # concurrent sibling work); the wave's siblings are left untouched.
+        ok, reason = _judge_lane_and_rollback(
+            repo,
+            pre_changed_files=result.pre_changed_files,
+            target=task.target,
+            sibling_targets=sibling_targets,
+        )
         if not ok:
-            # Roll back ONLY this task's own extra paths — NEVER the whole tree
-            # (which would clobber concurrent sibling work). The task's target
-            # is restored too; the wave's siblings are left untouched.
-            sib = set(sibling_targets or [])
-            own_extras = [p for p in result.changed_files if (p[2:] if p.startswith("./") else p) not in sib]
-            _rollback_paths(repo, own_extras, untracked_before=_untracked_paths(repo, own_extras))
             if retries_left > 0:
                 retries_left -= 1
                 continue
@@ -788,9 +883,10 @@ def _execute_task_codex(
         # task that just CREATED the target leaves it untracked, so a plain
         # `git checkout` is a no-op (returncode ignored) and the rejected
         # artifact would persist and poison the NEXT task's change detection.
-        # _rollback_paths deletes untracked targets and checks out tracked ones.
+        # _classify_and_rollback deletes untracked targets and checks out tracked
+        # ones — classification + rollback under ONE lock (no TOCTOU gap).
         last_verifier_tail = vres.tail
-        _rollback_paths(repo, [task.target], untracked_before=_untracked_paths(repo, [task.target]))
+        _classify_and_rollback(repo, [task.target])
         if retries_left > 0:
             retries_left -= 1
             continue
