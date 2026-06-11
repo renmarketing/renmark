@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — capabilities module
+**Request:** fable-routing part 1 task 1 — the declared-capability resolver.
+**Built:** renmark/capabilities.py: read_tiers parses the ## Model tiers block from .renmark/memory/routing.md; top_tier resolves RENMARK_TOP_TIER env > file > opus; effective_executor maps fable->opus when undeclared, passes everything else through.
+**Files changed:**
+- `renmark/capabilities.py` — new pure-function stdlib module
+**Do not change:**
+- Resolution order is env > file > opus and unknown values fall through (never raise) — plan_lint/engine/lifecycle all depend on this being side-effect-free.
+
 ## [2026-06-11] — PRD updated (REQ-2: declared-capability Fable routing)
 **Request:** Adopt the fable-routing strategy decided 2026-06-11: make Fable the default for ideation/strategy synthesis when a project declares `top_tier: fable`.
 **Built:** Reconciled REQ-2 of `PRD.md`: Fable is the DEFAULT for ideation/strategy-synthesis/adversarial-review roles in projects with a committed `top_tier: fable` declaration (`.renmark/memory/routing.md`, `RENMARK_TOP_TIER` override); undeclared projects keep escalation-only, byte-identical behavior; availability declared never detected; mechanical/bulk prohibition absolute + deterministically enforced; Fable→Opus fallback single-retry and logged. Bumped `last_reviewed` to 2026-06-11; appended revision note. Approved via the `/renmark:prd` UPDATE diff gate.
