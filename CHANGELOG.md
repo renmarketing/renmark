@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — roadmap cost table
+**Request:** Price the fable tier in cost previews.
+**Built:** Added "fable": 0.030 to COST_PER_KT after opus, with 2x-opus pricing rationale comment.
+**Files changed:**
+- `renmark/roadmap.py` — Added "fable": 0.030 to COST_PER_KT after opus, with 2x-opus pricing rationale comment.
+**Do not change:**
+- Legacy "nim": 0.0 row stays — historical usage rows still reference it.
+
 ## [2026-06-11] — plan_lint heavy-read tier set
 **Request:** Extend the G5 heavy-read BLOCK to the most expensive tier.
 **Built:** Added "fable" to _HEAVY_READ_BLOCK_EXECUTORS alongside sonnet/opus.
