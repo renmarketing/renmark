@@ -25,19 +25,7 @@ When entries conflict for the same signature, the newest dated entry wins.
 
 ## Learned overrides
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+- (2026-06-11) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260611-142135-bcc2)
 
 - (2026-06-09) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260609-190829-757f)
 

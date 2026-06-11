@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-11] — roadmap cost test
+**Request:** Test-pin the fable cost row and tier ordering.
+**Built:** Added test_cost_per_kt_has_fable_tier pinning COST_PER_KT['fable'] == 0.030 and fable > opus (tier ordering guard). Includes routing.md ledger append from the engine run.
+**Files changed:**
+- `tests/test_roadmap.py` — task 9 artifact
+- `.renmark/memory/routing.md` — task 9 artifact
+**Do not change:**
+- COST_PER_KT['fable'] must stay strictly greater than opus — ordering is the tier guard.
+
 ## [2026-06-11] — plan_lint fable tests
 **Request:** Test-pin the G5 heavy-read BLOCK for the fable tier.
 **Built:** Added test_heavy_read_fable_block (fable heavy-read BLOCKs like sonnet/opus) and test_executor_fable_lints_clean (well-formed fable plan lints clean). 38 tests now.

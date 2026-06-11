@@ -112,6 +112,11 @@ def test_cost_estimate_zero_for_nim(tmp_path: Path) -> None:
     assert rows[0].cost_usd == 0.0
 
 
+def test_cost_per_kt_has_fable_tier() -> None:
+    assert roadmap.COST_PER_KT["fable"] == 0.030
+    assert roadmap.COST_PER_KT["fable"] > roadmap.COST_PER_KT["opus"]
+
+
 def test_aggregate_usage_tolerates_malformed_rows(tmp_path: Path) -> None:
     """One type-malformed ledger row must not kill /renmark:roadmap."""
     led = tmp_path / ".renmark" / "state"
