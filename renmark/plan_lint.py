@@ -28,7 +28,9 @@ Check severities (behaviour-preserving — mirrors the SKILL's definitions):
          parallel_group, 4 heavy-read G5 (>200-line context file with
          sonnet/opus executor), 5 transcript-leak G11 (denylist phrase in
          spec), 6 dependency-hygiene G11 (full-output reference without
-         artifact path).
+         artifact path), 9 fable-undeclared REQ-2 (executor fable without
+         a declared `top_tier: fable`), 10 fable-mechanical REQ-2 (executor
+         fable on a simple/mechanical task).
   WARN:  2b test -f only verifier, 7 unbounded verifier output, 8 spec
          length >80 lines, and sanity extras (negative/absurd est_ fields).
 """
@@ -282,6 +284,43 @@ def _check_spec_length(tasks: list[Task]) -> list[tuple[str, str]]:
     return issues
 
 
+def _check_fable_declared(tasks: list[Task], repo_root: Path) -> list[tuple[str, str]]:
+    """Check 9 — fable-undeclared REQ-2: executor fable without `top_tier: fable` → BLOCK."""
+    from . import capabilities
+
+    issues: list[tuple[str, str]] = []
+    fable_tasks = [t for t in tasks if t.executor == "fable"]
+    if not fable_tasks:
+        return issues
+    if capabilities.top_tier(repo_root) != "fable":
+        for t in fable_tasks:
+            issues.append(
+                (
+                    "BLOCK",
+                    f"Task {t.index}: executor `fable` but this project has not "
+                    "declared `top_tier: fable`. Declare it in "
+                    ".renmark/memory/routing.md (## Model tiers) or reassign to `opus`.",
+                )
+            )
+    return issues
+
+
+def _check_fable_mechanical(tasks: list[Task]) -> list[tuple[str, str]]:
+    """Check 10 — fable-mechanical REQ-2: executor fable on a simple task → BLOCK."""
+    issues: list[tuple[str, str]] = []
+    for t in tasks:
+        if t.executor == "fable" and t.complexity == "simple":
+            issues.append(
+                (
+                    "BLOCK",
+                    f"Task {t.index}: executor `fable` on a simple/mechanical task — "
+                    "REQ-2 prohibits fable for mechanical or bulk work regardless of "
+                    "declaration. Route to haiku/codex.",
+                )
+            )
+    return issues
+
+
 def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
     """Sanity extras — all WARN only, never BLOCK (behaviour-preserving)."""
     issues: list[tuple[str, str]] = []
@@ -380,6 +419,8 @@ def lint_plan(path: str | Path) -> PlanLintReport:
     raw.extend(_check_dependency_hygiene(tasks))
     raw.extend(_check_verifier_output_bound(tasks))
     raw.extend(_check_spec_length(tasks))
+    raw.extend(_check_fable_declared(tasks, repo_root))
+    raw.extend(_check_fable_mechanical(tasks))
     raw.extend(_check_sanity_extras(tasks))
 
     verdict = _derive_verdict(raw)

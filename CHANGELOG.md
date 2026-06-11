@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — plan_lint fable gates
+**Request:** fable-routing part 1 wave 2.
+**Built:** Checks 9-10: BLOCK executor:fable in undeclared projects; BLOCK fable on simple/mechanical tasks (unconditional REQ-2).
+**Files changed:**
+- `renmark/plan_lint.py`
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1-2.5 (now 10 checks) — change both sides + tests together. NOTE: test_executor_fable_lints_clean is expected-red until task 7 (same run) declares top_tier in its fixture.
+
 ## [2026-06-11] — capabilities module
 **Request:** fable-routing part 1 task 1 — the declared-capability resolver.
 **Built:** renmark/capabilities.py: read_tiers parses the ## Model tiers block from .renmark/memory/routing.md; top_tier resolves RENMARK_TOP_TIER env > file > opus; effective_executor maps fable->opus when undeclared, passes everything else through.
