@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — README executor row
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Orchestrate row reads Haiku / Codex / Sonnet / Opus / Fable, wave-parallel.
+**Files changed:**
+- `README.md`
+**Do not change:**
+- None.
+
 ## [2026-06-11] — templates — fable mirror blocks
 **Request:** Doc-sync per REQ-2 amendment (part 2); template mirror pair in one commit.
 **Built:** CLAUDE template: dispatch rule + tooling row + preferences row. AGENTS template: tooling row (only anchor).

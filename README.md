@@ -102,7 +102,7 @@ Describe what you want to build. renmark asks at most 2 questions, confirms the 
 | `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |
 | `/renmark:plan` | Decompose a spec into executor-tagged tasks with cost preview (auto-validates via check-plan) |
 | `/renmark:check-plan` | Validate a plan before spending tokens (runs automatically inside plan) |
-| `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus, wave-parallel) — auto-verifies on completion |
+| `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus / Fable, wave-parallel) — auto-verifies on completion |
 | `/renmark:verify` | Confirm the feature goal was achieved (runs automatically after orchestrate) |
 | `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
 | `/renmark:loop` | Bounded, resumable agentic loop — iterate until goal verified or budget hit |
