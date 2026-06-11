@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-11] — codereview fix — dry-run fable pricing
+**Request:** Codex review major: fable tasks without est_cost_usd showed as free in dry-run previews.
+**Built:** Added "fable": 0.030 to the engine's inline cost_per_kt table + quota note; test pins a fable task at $0.060/2k tokens, never 'free'.
+**Files changed:**
+- `renmark/cli/_engine.py`
+- `tests/test_engine_budget_and_rollback.py`
+**Do not change:**
+- Cost-rate knowledge is intentionally duplicated in roadmap.COST_PER_KT and _engine's inline table — shared-table refactor deferred; keep both in sync when adding tiers.
+
 ## [2026-06-11] — codereview fix — roadmap fable billing
 **Request:** Codex review major: fable usage rows billed as $0.0.
 **Built:** Added a fable branch to _estimate_cost() (descending-price precedence, no substring shadowing); tests pin 'fable' and 'claude-fable-5' at 0.030/kT direct + end-to-end.

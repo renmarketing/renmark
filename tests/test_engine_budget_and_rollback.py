@@ -283,3 +283,32 @@ def test_judge_lane_and_rollback_in_lane_is_noop(tmp_path):
     )
     assert ok is True
     assert target.exists()
+
+
+# ── Dry-run cost estimate covers every executor tier ───────────────────────────
+
+
+def test_dry_run_fable_task_without_est_cost_is_not_free(tmp_path, capsys):
+    """A fable task with no est_cost_usd must get a non-zero inferred cost in the
+    dry-run preview (rate $0.030/kT), not show as 'free' / drop out of the total."""
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        "### Task 1: fable task\n"
+        "- **mode:** A\n"
+        "- **target:** out/file1.txt\n"
+        "- **executor:** fable\n"
+        "- **est_tokens:** 2000\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  make file 1\n"
+    )
+
+    rc = _engine.execute_plan(str(plan), repo=tmp_path, dry_run=True)
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "free" not in out, "fable task must not be estimated as free"
+    # 2000 tok * $0.030/kT = $0.060 — on the task line and in the total.
+    assert "$0.060" in out
+    assert "TOTAL estimate" in out
+    assert "~$0.060" in out

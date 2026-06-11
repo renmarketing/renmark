@@ -397,7 +397,7 @@ def execute_plan(
         waves = _d.group_tasks_by_wave(tasks)
         _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
         # Cost estimates per executor — approximate $/kT (output tokens).
-        cost_per_kt = {"haiku": 0.0001, "codex": 0.05, "sonnet": 0.003, "opus": 0.015}
+        cost_per_kt = {"haiku": 0.0001, "codex": 0.05, "sonnet": 0.003, "opus": 0.015, "fable": 0.030}
         total_tokens = 0
         total_cost = 0.0
         for w_idx, w in enumerate(waves, 1):
@@ -422,7 +422,9 @@ def execute_plan(
                 total_tokens += tok
                 total_cost += cost
         _print(f"\n  TOTAL estimate: ~{total_tokens:,} tokens · ~${total_cost:.3f}")
-        _print("  (codex metered separately; haiku/sonnet/opus bill to your Claude Code quota, ~10k overhead/task)")
+        _print(
+            "  (codex metered separately; haiku/sonnet/opus/fable bill to your Claude Code quota, ~10k overhead/task)"
+        )
         return 0
 
     # Start anchor tag.
