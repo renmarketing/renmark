@@ -117,6 +117,20 @@ def test_cost_per_kt_has_fable_tier() -> None:
     assert roadmap.COST_PER_KT["fable"] > roadmap.COST_PER_KT["opus"]
 
 
+def test_estimate_cost_matches_fable_models(tmp_path: Path) -> None:
+    """Fable model strings must bill at the fable rate, not fall through to 0.0."""
+    # 1000 tokens at $0.030/kT = $0.030 — for both the bare tier name and the full model ID.
+    assert roadmap._estimate_cost("fable", 1000) == 0.030
+    assert roadmap._estimate_cost("claude-fable-5", 1000) == 0.030
+    # End-to-end: a ledgered fable row carries the fable cost.
+    _init_git(tmp_path)
+    _commit(tmp_path, "a.py", "[nim] task 1: a")
+    _log_usage(tmp_path, 1, "claude-fable-5", 1000, 500)
+    rows = roadmap.build_rows(tmp_path)
+    assert rows[0].cost_usd == 1500 / 1000.0 * roadmap.COST_PER_KT["fable"]
+    assert rows[0].cost_usd > 0.0
+
+
 def test_aggregate_usage_tolerates_malformed_rows(tmp_path: Path) -> None:
     """One type-malformed ledger row must not kill /renmark:roadmap."""
     led = tmp_path / ".renmark" / "state"

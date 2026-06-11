@@ -182,6 +182,8 @@ def _estimate_cost(model_str: str, tokens: int) -> float:
     m = model_str.lower()
     if "codex" in m:
         return (tokens / 1000.0) * COST_PER_KT["codex"]
+    if "fable" in m:
+        return (tokens / 1000.0) * COST_PER_KT["fable"]
     if "opus" in m:
         return (tokens / 1000.0) * COST_PER_KT["opus"]
     if "sonnet" in m:

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-11] — codereview fix — roadmap fable billing
+**Request:** Codex review major: fable usage rows billed as $0.0.
+**Built:** Added a fable branch to _estimate_cost() (descending-price precedence, no substring shadowing); tests pin 'fable' and 'claude-fable-5' at 0.030/kT direct + end-to-end.
+**Files changed:**
+- `renmark/roadmap.py`
+- `tests/test_roadmap.py`
+**Do not change:**
+- Match precedence in _estimate_cost is descending-price — new tiers must slot by price order or cheaper substrings shadow them.
+
 ## [2026-06-11] — roadmap cost test
 **Request:** Test-pin the fable cost row and tier ordering.
 **Built:** Added test_cost_per_kt_has_fable_tier pinning COST_PER_KT['fable'] == 0.030 and fable > opus (tier ordering guard). Includes routing.md ledger append from the engine run.
