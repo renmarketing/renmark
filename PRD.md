@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-06-10
+last_reviewed: 2026-06-11
 status: draft
 ---
 
@@ -77,10 +77,18 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 2. `REQ-2` Each unit of work is routed to the most cost-appropriate model, and
    the user sees a cost preview before tokens are spent. The routed executor
    set is Haiku / Codex / Sonnet / Opus / Fable (`claude-fable-5`, top
-   capability tier above Opus, 1M context, $10/$50 per MTok). Fable is an
-   escalation target reserved for the highest-reasoning roles — ideation
-   (brainstorm), strategy (plan / prd / blueprint), and adversarial
-   audit / review passes — never a default for mechanical or bulk work; cost
+   capability tier above Opus, 1M context, $10/$50 per MTok). Fable serves the
+   highest-reasoning roles — ideation (brainstorm), strategy synthesis
+   (plan / prd / blueprint), and adversarial audit / review passes. In a
+   project that has declared `top_tier: fable` (a committed `## Model tiers`
+   block in `.renmark/memory/routing.md`, set once via init / setup / doctor,
+   per-user overridable with `RENMARK_TOP_TIER`), Fable is the DEFAULT for
+   those roles; in an undeclared project it remains an opt-in escalation
+   target and behavior is byte-identical to the pre-Fable baseline.
+   Availability is always declared, never runtime-detected. Fable is never
+   assigned to mechanical or bulk work regardless of declaration — plan
+   validation enforces this deterministically — and an unavailable Fable
+   dispatch falls back to Opus exactly once, logged, never silently; cost
    previews and sizing tables MUST reflect its pricing.
 3. `REQ-3` Any multi-step workflow is resumable after interruption, `/clear`,
    `/compact`, executor failure, or a new session — recovery reads persisted
@@ -277,3 +285,15 @@ MTok), reserved as an escalation target for the highest-reasoning roles
 mechanical or bulk work. Proposed by the fable-integration feature's
 PRD-alignment gate; diff reviewed and explicitly approved by the project
 owner on 2026-06-10 via `/renmark:approve`.
+
+**Revision note (2026-06-11, human-approved diff):** Amended REQ-2 to adopt
+the declared-capability Fable routing strategy: Fable becomes the **default**
+for the highest-reasoning roles (ideation, strategy synthesis, adversarial
+audit/review) when a project declares `top_tier: fable` in
+`.renmark/memory/routing.md`; undeclared projects keep escalation-only,
+byte-identical pre-Fable behavior. Availability is declared, never
+runtime-detected; mechanical/bulk prohibition is absolute and
+deterministically enforced; Fable→Opus fallback is single-retry and logged.
+Strategy evidence: `.renmark/research/2026-06-11-fable-routing-strategy.md`
+(9-agent design workflow). Diff reviewed and explicitly approved by the
+project owner on 2026-06-11 via the `/renmark:prd` UPDATE gate.

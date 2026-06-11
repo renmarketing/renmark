@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-11] — PRD updated (REQ-2: declared-capability Fable routing)
+**Request:** Adopt the fable-routing strategy decided 2026-06-11: make Fable the default for ideation/strategy synthesis when a project declares `top_tier: fable`.
+**Built:** Reconciled REQ-2 of `PRD.md`: Fable is the DEFAULT for ideation/strategy-synthesis/adversarial-review roles in projects with a committed `top_tier: fable` declaration (`.renmark/memory/routing.md`, `RENMARK_TOP_TIER` override); undeclared projects keep escalation-only, byte-identical behavior; availability declared never detected; mechanical/bulk prohibition absolute + deterministically enforced; Fable→Opus fallback single-retry and logged. Bumped `last_reviewed` to 2026-06-11; appended revision note. Approved via the `/renmark:prd` UPDATE diff gate.
+**Files changed:**
+- `PRD.md` — REQ-2 amendment + revision note; `last_reviewed` bump
+**Do not change:**
+- PRD.md is human-owned. Automated stages may PROPOSE edits but never write without explicit approval.
+- The mechanical/bulk prohibition on Fable is unconditional — no declaration unlocks it.
+- Strategy decision record: `.renmark/research/2026-06-11-fable-routing-strategy.md` — the implementing feature must follow it (capabilities.py, plan_lint gates, logged fallback, init/doctor declaration).
+
 ## [2026-06-11] — v0.11.0 — fable executor tier (engine + tests + doc sync)
 **Request:** Make fable (Claude Fable 5, claude-fable-5) a first-class renmark executor tier above opus per the human-approved REQ-2 amendment; full pipeline: orchestrate (2 plans, 23 tasks) → verify → codereview → fix → merge → release.
 **Built:** Engine: parser allowlist, CLAUDE_EXECUTORS Agent-path routing (fable = the only executor with an explicit model override), plan_lint G5 heavy-read BLOCK, $0.030/kT in COST_PER_KT + _estimate_cost + engine dry-run table (last two were codex-review catches). Tests: 5 fable pins across parser/dispatch/plan_lint/roadmap/engine suites. Docs: 14 prose surfaces synced (SKILLs, shims, CLAUDE/AGENTS + templates, README, routing.md) + 6 review-fix sites (escalation wording, PLAN.md dispatch truth, installers, package docstring). Reviews: part 1 — 0 critical/2 major (fixed)/2 minor; part 2 — 0 critical/3 major/3 minor (5 fixed, 1 deferred by decision).
