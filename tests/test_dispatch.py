@@ -104,6 +104,24 @@ def test_dispatch_wave_marks_claude_tasks_needs_agent(tmp_path: Path) -> None:
     assert len(result.needs_agent) == 2
 
 
+def test_dispatch_wave_routes_fable_through_claude_partition(tmp_path: Path) -> None:
+    from renmark.providers import claude_agent
+
+    def runner(task: Task, repo: Path) -> TaskResult:
+        return TaskResult(task_index=task.index, executor=task.executor, status="passed")
+
+    wave = [
+        _task(1, "a", executor="codex", parallel_group=1),
+        _task(2, "b", executor="fable", parallel_group=1),
+    ]
+    result = dispatch.dispatch_wave(wave, repo=tmp_path, run_task=runner)
+    statuses = {t.task_index: t.status for t in result.tasks}
+    assert claude_agent.is_claude_executor("fable") is True
+    assert statuses[1] == "passed"
+    assert statuses[2] == "needs_agent"
+    assert [t.task_index for t in result.needs_agent] == [2]
+
+
 def test_estimate_wave_cost_sums() -> None:
     tasks = [
         _task(1, "a"),

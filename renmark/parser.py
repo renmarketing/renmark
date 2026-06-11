@@ -219,9 +219,9 @@ def _build_task(d: dict[str, Any]) -> Task:
     executor = (d.get("executor") or "codex").strip().lower()
     # Allow haiku, codex, sonnet, opus, or any provider-string of form "<provider>/<model>".
     # nim was removed in v0.2.0 — use haiku for simple tasks instead.
-    if executor not in ("haiku", "codex", "sonnet", "opus") and "/" not in executor:
+    if executor not in ("haiku", "codex", "sonnet", "opus", "fable") and "/" not in executor:
         raise PlanError(
-            f"executor must be one of haiku, codex, sonnet, opus, or a provider/model string, got {executor!r}"
+            f"executor must be one of haiku, codex, sonnet, opus, fable, or a provider/model string, got {executor!r}"
         )
 
     complexity = (d.get("complexity") or "medium").strip().lower()

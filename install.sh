@@ -190,7 +190,7 @@ Skills:
   /renmark:brainstorm  — design a feature into a spec
   /renmark:plan        — decompose spec into executor-tagged tasks
   /renmark:check-plan  — validate plan before spending tokens
-  /renmark:orchestrate — execute plan (Haiku / Codex / Sonnet / Opus)
+  /renmark:orchestrate — execute plan (Haiku / Codex / Sonnet / Opus / Fable)
   /renmark:verify      — confirm feature goal was achieved
   /renmark:finish      — create PR or merge branch
   /renmark:feature     — full pipeline with branch isolation

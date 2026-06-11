@@ -1,5 +1,200 @@
 # Changelog
 
+## [2026-06-11] — codereview fixes (part 2): escalation wording + missed surfaces
+**Request:** Codex part-2 review found 3 major / 3 minor; majors 2-3 + all minors fixed (major 1 deferred — see below).
+**Built:** plan SKILL+shim descriptions now say fable routes "only by explicit escalation signals, never cost routing" (byte-synced); plan SKILL executor field line includes fable-by-escalation; PLAN.md dispatch table corrected to engine reality (haiku/sonnet/opus no-override, fable the only override-based executor); install.sh + install.ps1 orchestrate rows and renmark/__init__.py docstring gain Fable.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`, `plugin/commands/plan.md` — escalation-only wording, synced
+- `PLAN.md` — dispatch table truth fix
+- `install.sh`, `install.ps1`, `renmark/__init__.py` — missed-surface enumerations
+**Do not change:**
+- Major 1 (brainstorm "Fable 5 when available" vs escalation-only PRD wording) is DEFERRED BY DECISION, not missed: the adopted fable-routing strategy (.renmark/research/2026-06-11-fable-routing-strategy.md) resolves it via a human-gated REQ-2 amendment making Fable the declared default for ideation/strategy. Do not reword brainstorm back to Opus-default.
+- PLAN.md is a historical architecture doc with broader staleness (nim/litellm rows) — only the flagged dispatch row was corrected; full refresh is hygiene work, out of scope.
+
+## [2026-06-11] — routing.md fable default
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Defaults gain: (signal=ideation|strategy-synthesis|adversarial-audit|refutation-pass, stakes=highest) → fable (escalation only — REQ-2).
+**Files changed:**
+- `.renmark/memory/routing.md`
+**Do not change:**
+- Learned overrides section is append-only via memory.append_routing — never hand-edit.
+
+## [2026-06-11] — README executor row
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Orchestrate row reads Haiku / Codex / Sonnet / Opus / Fable, wave-parallel.
+**Files changed:**
+- `README.md`
+**Do not change:**
+- None.
+
+## [2026-06-11] — templates — fable mirror blocks
+**Request:** Doc-sync per REQ-2 amendment (part 2); template mirror pair in one commit.
+**Built:** CLAUDE template: dispatch rule + tooling row + preferences row. AGENTS template: tooling row (only anchor).
+**Files changed:**
+- `plugin/templates/CLAUDE.md.template`
+- `plugin/templates/AGENTS.md.template`
+**Do not change:**
+- Templates mirror the root pair — keep shared wording byte-identical when editing either.
+
+## [2026-06-11] — CLAUDE.md + AGENTS.md — fable rule blocks
+**Request:** Doc-sync per REQ-2 amendment (part 2); mirror pair lands in one commit.
+**Built:** CLAUDE.md gains the fable dispatch rule (Agent call WITH model override), Frontier-reasoning preferences row, and Opus/Fable tooling row. AGENTS.md mirrors the tooling row byte-identically; dispatch/preferences blocks don't exist there (add-nothing-without-anchor honored). Task 8's agent died at the session limit AFTER applying all edits — verified complete on resume. Task 9 verifier deviation: plan's lowercase grep can't match the capitalized-only anchor; verified with grep -qi.
+**Files changed:**
+- `CLAUDE.md`
+- `AGENTS.md`
+**Do not change:**
+- CLAUDE.md and AGENTS.md are a mirror pair — shared blocks stay byte-identical, same commit.
+
+## [2026-06-11] — check-plan skill — heavy-read mirror
+**Request:** Doc-sync per REQ-2 amendment (part 2): mirror of part 1's _HEAVY_READ_BLOCK_EXECUTORS change.
+**Built:** Check 4 doc reads sonnet|opus|fable; report example appends fable×e.
+**Files changed:**
+- `plugin/skills/check-plan/SKILL.md`
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1–2.5 — change both sides + tests together (v0.10.0 guard).
+
+## [2026-06-11] — audit skill — fable escalation note
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Step 2b: adversarial/delta re-runs SHOULD route refutation subagents to fable (REQ-2 designated adversarial-audit tier); audit stays read-only.
+**Files changed:**
+- `plugin/skills/audit/SKILL.md`
+**Do not change:**
+- Audit remains read-only and artifact-bounded.
+
+## [2026-06-11] — codereview skill — fable escalation note
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Additive note: highest-stakes diffs MAY dispatch fable refutation subagents; codex sandbox pass + bounded summary contract unchanged.
+**Files changed:**
+- `plugin/skills/codereview/SKILL.md`
+**Do not change:**
+- Frontmatter description untouched (quoted; strict-YAML gate).
+
+## [2026-06-11] — brainstorm skill + shim — Fable ideator
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** 'using Opus' → 'using the session's top reasoning tier (Fable 5 when available, Opus otherwise)' in both files, byte-synced.
+**Files changed:**
+- `plugin/skills/brainstorm/SKILL.md`
+- `plugin/commands/brainstorm.md`
+**Do not change:**
+- Skill/shim descriptions stay byte-identical.
+
+## [2026-06-11] — orchestrate skill — fable dispatch
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Dispatch table gains fable row (Agent tool with model: "fable" override — the one executor with explicit override); ledger comment + prose enumerations extended.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+**Do not change:**
+- Fable must never dispatch as a codex subprocess; codex RED-FLAG rule unchanged.
+
+## [2026-06-11] — plan skill + shim — fable tier
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Routing table fable row (escalation only, never default), $0.030/kT cost row, REQ-2 complexity clause; command-shim description byte-synced.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`
+- `plugin/commands/plan.md`
+**Do not change:**
+- Skill frontmatter description and command shim description stay byte-identical (audit description-drift pass).
+
+## [2026-06-11] — codereview fix — dry-run fable pricing
+**Request:** Codex review major: fable tasks without est_cost_usd showed as free in dry-run previews.
+**Built:** Added "fable": 0.030 to the engine's inline cost_per_kt table + quota note; test pins a fable task at $0.060/2k tokens, never 'free'.
+**Files changed:**
+- `renmark/cli/_engine.py`
+- `tests/test_engine_budget_and_rollback.py`
+**Do not change:**
+- Cost-rate knowledge is intentionally duplicated in roadmap.COST_PER_KT and _engine's inline table — shared-table refactor deferred; keep both in sync when adding tiers.
+
+## [2026-06-11] — codereview fix — roadmap fable billing
+**Request:** Codex review major: fable usage rows billed as $0.0.
+**Built:** Added a fable branch to _estimate_cost() (descending-price precedence, no substring shadowing); tests pin 'fable' and 'claude-fable-5' at 0.030/kT direct + end-to-end.
+**Files changed:**
+- `renmark/roadmap.py`
+- `tests/test_roadmap.py`
+**Do not change:**
+- Match precedence in _estimate_cost is descending-price — new tiers must slot by price order or cheaper substrings shadow them.
+
+## [2026-06-11] — roadmap cost test
+**Request:** Test-pin the fable cost row and tier ordering.
+**Built:** Added test_cost_per_kt_has_fable_tier pinning COST_PER_KT['fable'] == 0.030 and fable > opus (tier ordering guard). Includes routing.md ledger append from the engine run.
+**Files changed:**
+- `tests/test_roadmap.py` — task 9 artifact
+- `.renmark/memory/routing.md` — task 9 artifact
+**Do not change:**
+- COST_PER_KT['fable'] must stay strictly greater than opus — ordering is the tier guard.
+
+## [2026-06-11] — plan_lint fable tests
+**Request:** Test-pin the G5 heavy-read BLOCK for the fable tier.
+**Built:** Added test_heavy_read_fable_block (fable heavy-read BLOCKs like sonnet/opus) and test_executor_fable_lints_clean (well-formed fable plan lints clean). 38 tests now.
+**Files changed:**
+- `tests/test_plan_lint.py` — task 8 artifact
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1–2.5 — change engine + tests together.
+
+## [2026-06-11] — dispatch grouping test
+**Request:** Test-pin that fable tasks route to the Agent path, never the codex subprocess.
+**Built:** New test builds a mixed wave (fable + codex) and asserts is_claude_executor('fable') and the wave partition puts the fable task in claude_tasks.
+**Files changed:**
+- `tests/test_dispatch.py` — task 7 artifact
+**Do not change:**
+- Fable must never route to the codex subprocess path — this test is the guard.
+
+## [2026-06-11] — parser acceptance test
+**Request:** Test-pin the parser's fable acceptance.
+**Built:** Added fable to the claude-models acceptance loop and a dedicated test asserting executor: fable parses while unknown executors still raise PlanError naming the allowlist.
+**Files changed:**
+- `tests/test_parser.py` — task 6 artifact
+**Do not change:**
+- test_executor_fable_accepted_and_unknown_rejected pins the PlanError allowlist wording — change parser message + test together.
+
+## [2026-06-11] — loop blend-rate comment
+**Request:** Doc-truth fix on the per-model rate enumeration.
+**Built:** Extended the rate comment with fable 0.030; blended constant value unchanged.
+**Files changed:**
+- `renmark/loop.py` — Extended the rate comment with fable 0.030; blended constant value unchanged.
+**Do not change:**
+- COST_PER_KTOKEN_USD blended value itself is intentionally NOT retuned here.
+
+## [2026-06-11] — roadmap cost table
+**Request:** Price the fable tier in cost previews.
+**Built:** Added "fable": 0.030 to COST_PER_KT after opus, with 2x-opus pricing rationale comment.
+**Files changed:**
+- `renmark/roadmap.py` — Added "fable": 0.030 to COST_PER_KT after opus, with 2x-opus pricing rationale comment.
+**Do not change:**
+- Legacy "nim": 0.0 row stays — historical usage rows still reference it.
+
+## [2026-06-11] — plan_lint heavy-read tier set
+**Request:** Extend the G5 heavy-read BLOCK to the most expensive tier.
+**Built:** Added "fable" to _HEAVY_READ_BLOCK_EXECUTORS alongside sonnet/opus.
+**Files changed:**
+- `renmark/plan_lint.py` — Added "fable" to _HEAVY_READ_BLOCK_EXECUTORS alongside sonnet/opus.
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1–2.5 — change both sides + tests together.
+
+## [2026-06-11] — CLAUDE_EXECUTORS constant
+**Request:** Route fable through the Claude Agent dispatch path.
+**Built:** Appended "fable" last in CLAUDE_EXECUTORS (capability order) and updated the AgentDispatch.model comment.
+**Files changed:**
+- `renmark/providers/claude_agent.py` — Appended "fable" last in CLAUDE_EXECUTORS (capability order) and updated the AgentDispatch.model comment.
+**Do not change:**
+- CLAUDE_EXECUTORS stays in lowest→highest capability order; fable must remain last.
+
+## [2026-06-11] — parser executor allowlist
+**Request:** Register fable as a valid plan executor token.
+**Built:** Extended executor allowlist tuple with "fable" and updated the PlanError message to match.
+**Files changed:**
+- `renmark/parser.py` — Extended executor allowlist tuple with "fable" and updated the PlanError message to match.
+**Do not change:**
+- Existing executor tokens keep their order — error-message wording is test-pinned downstream (task 6).
+
+## [2026-06-10] — PRD updated (REQ-2 amendment: Fable executor tier)
+**Request:** `/renmark:feature fable-integration` flagged PRD drift (Fable absent from the routed executor set); reconcile the Fable tier into the PRD before planning.
+**Built:** Reconciled the Goals multi-LLM bullet and REQ-2 of `PRD.md`; bumped `last_reviewed` to 2026-06-10. Routed executor set is now Haiku / Codex / Sonnet / Opus / Fable (`claude-fable-5`, $10/$50 per MTok, 1M context). Approval recorded via the `/renmark:approve` surface (REQ-18 flow), gate cleared by prd after the write.
+**Files changed:**
+- `PRD.md` — Goals bullet + REQ-2 extension + revision note; `last_reviewed` bump
+**Do not change:**
+- Fable is an **escalation target, not a default**: reserved for ideation (brainstorm), strategy (plan/prd/blueprint), and adversarial audit/review passes — never mechanical or bulk work. The REQ-2 cheapest-capable-model rule still governs all routing.
+- PRD.md is human-owned. Automated stages may PROPOSE edits but never write without explicit approval.
+
 ## [2026-06-10] — v0.10.0 — deterministic planning and verification hardening
 **Request:** One-thing minor release via the full /renmark:feature pipeline: move check-plan's structural validation into deterministic Python, rewire both surfaces onto one engine, test-pin everything, release as v0.10.0.
 **Built:** `renmark/plan_lint.py` — the single authoritative implementation of check-plan's 8 checks (severities behavior-preserved: 1–6 BLOCK incl. the `test -f`→WARN refinement, 7–8 WARN; sanity extras WARN-only), composing `parser.parse_plan`, never raising (PlanError → graceful BLOCK), with `lint_plan()` API + CLI (`python -m renmark.plan_lint`, exit 0 PASS/WARN, 1 BLOCK). `/renmark:check-plan` collapses its manual Steps 1–2.5 into the engine invocation (bounded report passed through verbatim; judgment smells stay advisory); `/renmark:orchestrate` pre-flight runs the SAME engine — a text-pin test asserts both surfaces reference it so they can never drift. 36 tests pin every check + CLI exit codes. Doc rows updated in CLAUDE/AGENTS/templates/help.

@@ -203,7 +203,7 @@ def test_executor_invalid_rejected(tmp_path: Path) -> None:
 
 
 def test_executor_claude_models_accepted(tmp_path: Path) -> None:
-    for ex in ("haiku", "sonnet", "opus"):
+    for ex in ("haiku", "sonnet", "opus", "fable"):
         plan = _write(
             tmp_path,
             "# X\n\n## Tasks\n\n"
@@ -217,6 +217,39 @@ def test_executor_claude_models_accepted(tmp_path: Path) -> None:
         )
         tasks = parse_plan(plan)
         assert tasks[0].executor == ex
+
+
+def test_executor_fable_accepted_and_unknown_rejected(tmp_path: Path) -> None:
+    accepted = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: fable task\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **executor:** fable\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    tasks = parse_plan(accepted)
+    assert tasks[0].executor == "fable"
+
+    rejected = _write(
+        tmp_path,
+        "# X\n\n## Tasks\n\n"
+        "### Task 1: unknown executor\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **executor:** frontier\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n",
+    )
+    with pytest.raises(
+        PlanError,
+        match="haiku, codex, sonnet, opus, fable",
+    ):
+        parse_plan(rejected)
 
 
 def test_executor_nim_rejected(tmp_path: Path) -> None:

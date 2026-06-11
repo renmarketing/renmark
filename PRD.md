@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-06-09
+last_reviewed: 2026-06-10
 status: draft
 ---
 
@@ -45,7 +45,8 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 - A plain-English entry point that hides the pipeline for newcomers and exposes
   it for experts.
 - Multi-LLM orchestration that routes each task to the cheapest model that can
-  do it (Haiku / Codex / Sonnet / Opus), with a cost preview before spend.
+  do it (Haiku / Codex / Sonnet / Opus / Fable), with a cost preview before
+  spend.
 - Workflows that **survive context death** — interruption, `/clear`, `/compact`,
   executor crash, new session — via persisted lifecycle + pipeline state.
 - A single, human-owned product source of truth (`PRD.md`) and persistent
@@ -74,7 +75,13 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 1. `REQ-1` A user can go from a plain-English idea to working, committed code
    through a guided pipeline without prior knowledge of specs, plans, or executors.
 2. `REQ-2` Each unit of work is routed to the most cost-appropriate model, and
-   the user sees a cost preview before tokens are spent.
+   the user sees a cost preview before tokens are spent. The routed executor
+   set is Haiku / Codex / Sonnet / Opus / Fable (`claude-fable-5`, top
+   capability tier above Opus, 1M context, $10/$50 per MTok). Fable is an
+   escalation target reserved for the highest-reasoning roles — ideation
+   (brainstorm), strategy (plan / prd / blueprint), and adversarial
+   audit / review passes — never a default for mechanical or bulk work; cost
+   previews and sizing tables MUST reflect its pricing.
 3. `REQ-3` Any multi-step workflow is resumable after interruption, `/clear`,
    `/compact`, executor failure, or a new session — recovery reads persisted
    state, never reconstructs from conversation.
@@ -261,3 +268,12 @@ updated Scope boundaries to include `audit`, `inventory`, and `approve`;
 removed ghost command `secure` from the in-scope list (never implemented).
 These commands ship in 0.9.0. The full diff was reviewed and explicitly
 approved by the project owner on 2026-06-09.
+
+**Revision note (2026-06-10, human-approved diff):** Amended REQ-2 and the
+multi-LLM Goals bullet to extend the routed executor set with **Fable**
+(`claude-fable-5`, top capability tier above Opus, 1M context, $10/$50 per
+MTok), reserved as an escalation target for the highest-reasoning roles
+(ideation, strategy, adversarial audit/review) — never a default for
+mechanical or bulk work. Proposed by the fable-integration feature's
+PRD-alignment gate; diff reviewed and explicitly approved by the project
+owner on 2026-06-10 via `/renmark:approve`.

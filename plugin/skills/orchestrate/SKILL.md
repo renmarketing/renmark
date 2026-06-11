@@ -13,6 +13,7 @@ Dispatches plan tasks in waves with **strict task isolation** (G11). Within a `p
 |---|---|---|
 | `codex` | Bash call to `renmark-execute` (subprocess) | Codex account (OpenAI subscription) |
 | `haiku`, `sonnet`, `opus` | Agent tool calls (no model override) | Claude Code account (Anthropic subscription) |
+| `fable` | Agent tool call with `model: "fable"` override | Claude Code account (Anthropic subscription) |
 
 After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (the per-task `SubagentOutput` dicts) and commits passing tasks serially in task-index order.
 
@@ -133,9 +134,9 @@ renmark-execute <plan>
 
 `renmark-execute` returns one JSON line per task with the `SubagentOutput` shape. The orchestrator passes each through `dispatch.parse_subagent_response()`, which raises `IsolationViolation` on any extra field.
 
-For `executor: haiku | sonnet | opus` tasks:
+For `executor: haiku | sonnet | opus | fable` tasks:
 
-Plain `Agent` call — no `model` override. Build the subagent prompt from `dispatch.build_subagent_input(task, dependency_summaries=...)`. The Agent prompt MUST instruct the subagent:
+Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `executor: fable`, pass `model: "fable"` on the Agent call. Build the subagent prompt from `dispatch.build_subagent_input(task, dependency_summaries=...)`. The Agent prompt MUST instruct the subagent:
 
 > "Your final response MUST be valid JSON matching this shape:
 > ```json
@@ -157,7 +158,7 @@ from renmark.roadmap import AGENT_OVERHEAD_TOKENS
 state.log_agent_call(
     repo,
     task_id=task.index,
-    model=task.executor,                            # 'haiku' | 'sonnet' | 'opus'
+    model=task.executor,                            # 'haiku' | 'sonnet' | 'opus' | 'fable'
     tokens_in=AGENT_OVERHEAD_TOKENS,                # ~10k system + spec overhead per call
     tokens_out=out.token_count,                     # SubagentOutput.token_count
     run_id=<run_id>,

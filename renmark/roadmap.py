@@ -30,6 +30,7 @@ COST_PER_KT = {
     "codex": 0.05,
     "sonnet": 0.003,
     "opus": 0.015,  # Anthropic output pricing, rough rule-of-thumb
+    "fable": 0.030,  # 2x opus — Fable 5 lists at $10/$50 per MTok vs Opus's $5/$25
     "nim": 0.0,  # legacy: NIM removed in v0.2.0
 }
 
@@ -181,6 +182,8 @@ def _estimate_cost(model_str: str, tokens: int) -> float:
     m = model_str.lower()
     if "codex" in m:
         return (tokens / 1000.0) * COST_PER_KT["codex"]
+    if "fable" in m:
+        return (tokens / 1000.0) * COST_PER_KT["fable"]
     if "opus" in m:
         return (tokens / 1000.0) * COST_PER_KT["opus"]
     if "sonnet" in m:
