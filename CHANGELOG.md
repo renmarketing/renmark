@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — check-plan doc mirror
+**Request:** fable-routing part 1 wave 2.
+**Built:** Checks list gains the two fable BLOCK rows; lead-in count corrected 8→10.
+**Files changed:**
+- `plugin/skills/check-plan/SKILL.md`
+**Do not change:**
+- Doc rows 9-10 mirror plan_lint._check_fable_declared/_check_fable_mechanical exactly.
+
 ## [2026-06-11] — preamble tier hint
 **Request:** fable-routing part 1 wave 2.
 **Built:** skill_preamble surfaces 'declared top tier: fable — … (/model fable)' for brainstorm/plan/prd/blueprint when declared; composes with cross-domain hint via ' | '.

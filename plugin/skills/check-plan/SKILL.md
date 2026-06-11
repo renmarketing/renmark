@@ -46,7 +46,7 @@ python -m renmark.plan_lint <plan>
 
 Run this via the venv (e.g. `source .venv/bin/activate && python -m renmark.plan_lint <plan>`). Pass its bounded stdout through to the user unchanged — the format is the contract.
 
-The engine implements exactly these 8 checks (severities are fixed — do not re-derive them):
+The engine implements exactly these 10 checks (severities are fixed — do not re-derive them):
 
 1. Task count ≤ 15 → **BLOCK**
 2. Non-empty verifier per task → **BLOCK**; `test -f` alone → **WARN**
@@ -56,6 +56,8 @@ The engine implements exactly these 8 checks (severities are fixed — do not re
 6. No dependency reference to a prior task’s full output without an artifact path (G11) → **BLOCK**
 7. No unbounded `cat`/`find`/`git diff`/`git log` in verifier without a cap (G3) → **WARN**
 8. Spec length ≤ 80 lines → **WARN**
+9. No `executor: fable` task in a project without a declared `top_tier: fable` (.renmark/memory/routing.md ## Model tiers) → **BLOCK**
+10. No `executor: fable` task with `complexity: simple` (mechanical/bulk — REQ-2 unconditional prohibition) → **BLOCK**
 
 **Advisory (LLM only, never verdict-changing):** Judgment-only smells — naming sanity, spec quality, coherence — remain the LLM’s job and are strictly advisory; they never change the engine’s PASS/WARN/BLOCK verdict.
 
