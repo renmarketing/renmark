@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-09 @ bb6abbe -->
+<!-- Last refreshed: 2026-06-11 @ afc41ea -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=84
+**Languages:** python=86
 
 ## Directory tree
 
@@ -26,23 +26,23 @@ ai-system/
 | `renmark/analytics.py` | Analytics event ledgers + Python aggregation (REQ-15). | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `record_loop_run` |
 | `renmark/lifecycle.py` | Lifecycle state for renmark features — enforces G12 (lifecycle persistence) and  | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
+| `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `no_raw_jsonl`, `disclaimer_present`, `shim_thinness` |
 | `renmark/release.py` | Version-file drift detection — Layer 1 guardrail. | `VersionFile`, `package_basename`, `build_package`, `build_version_snapshot`, `current_version`, `check_drift` |
 | `tests/test_modularity.py` | Unit tests for renmark.modularity — the advisory code-health analyzer. | `test_module_loc_just_over_warn_is_warn`, `test_module_loc_just_over_major_is_danger`, `test_module_loc_just_under_warn_is_clean`, `test_func_loc_exactly_warn_is_warn`, `test_func_loc_just_over_warn_is_warn`, `test_func_loc_exactly_major_is_danger` |
 | `renmark/loop.py` | Loop Mode state machine — the deterministic core of renmark's bounded, verified, | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
 | `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
-| `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `shim_thinness`, `description_drift`, `AuditReport` |
+| `tests/test_plan_lint.py` | --- artifact_type: renmark_task_output schema_version: 1 created_at: 2026-06-11T | `test_valid_plan_pass`, `test_valid_plan_cli_exit_0`, `test_missing_verifier_block`, `test_too_many_tasks_block`, `test_duplicate_target_same_group_block`, `test_same_target_different_groups_pass` |
+| `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `validate_limits`, `validate_analytics_summary` |
 | `renmark/lint.py` | Plugin contract linter — checks that SKILL.md files, command shims, and CLAUDE.m | `parse_frontmatter`, `lint_skill_files`, `lint_next_steps_citation`, `lint_command_shims`, `validate_rule_markers`, `iter_rule_blocks` |
 | `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
-| `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
-| `renmark/backlog.py` | Backlog item state — the deterministic, persistent ledger of work items that ren | `BacklogItem`, `backlog_dir`, `next_id`, `read_item`, `write_item`, `list_items` |
-| `renmark/usage.py` | Usage-status engine (REQ-15/REQ-16). | `read_limits`, `percent_used`, `build_usage_view`, `classify_usage_pause`, `render_usage_md` |
+| `tests/test_audit.py` | Tests for renmark.audit — deterministic plugin/registry audit engine. | `test_inventory_harvest_real_repo`, `test_registry_sync_real_repo_clean`, `test_registry_sync_detects_ghost`, `test_registry_sync_detects_missing`, `test_shim_thinness_flags_fat_shim`, `test_shim_thinness_flags_unwired_shim` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
-| `renmark/sizing.py` | Proportional-pipeline tier classifier — deterministic, zero-LLM, stdlib-only. | `classify_plan`, `classify_diff`, `resolve_override` |
+| `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | `PlanLintReport`, `lint_plan`, `main` |
 | `renmark/modularity.py` | Modularity / scalability health lens — pure stdlib ``ast``, zero-dep, never-rais | `analyze` |
-| `tests/test_sizing.py` | Unit tests for renmark.sizing — the proportional-pipeline tier classifier. | — |
+| `renmark/sizing.py` | Proportional-pipeline tier classifier — deterministic, zero-LLM, stdlib-only. | — |
 
 ## Commands (user-facing)
 
@@ -54,7 +54,7 @@ ai-system/
 | `/renmark:backlog` | Use to triage and approve backlog items — `/renmark:backlog` opens an interactive list, then a per-item detail view; 'Ap |
 | `/renmark:blueprint` | "Use when the user wants a visual blueprint of the project — typed as /renmark:blueprint or phrases like \"diagram this  |
 | `/renmark:brainstorm` | Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's  |
-| `/renmark:check-plan` | Use before executing a renmark plan — validates task count, verifier presence, and parallel group safety. |
+| `/renmark:check-plan` | "Use before executing a renmark plan — deterministic validation via renmark.plan_lint engine (shared with orchestrate pr |
 | `/renmark:codereview` | "Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like \"review this\", \"review  |
 | `/renmark:debug` | Use when the user reports a bug or unexpected behavior — typed as /renmark:debug or phrases like "debug this", "why is X |
 | `/renmark:doctor` | Use when `/renmark:*` commands aren't appearing, the plugin seems broken, or the user just wants a sanity check on the i |
