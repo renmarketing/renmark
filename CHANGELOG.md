@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — parser executor allowlist
+**Request:** Register fable as a valid plan executor token.
+**Built:** Extended executor allowlist tuple with "fable" and updated the PlanError message to match.
+**Files changed:**
+- `renmark/parser.py` — Extended executor allowlist tuple with "fable" and updated the PlanError message to match.
+**Do not change:**
+- Existing executor tokens keep their order — error-message wording is test-pinned downstream (task 6).
+
 ## [2026-06-10] — PRD updated (REQ-2 amendment: Fable executor tier)
 **Request:** `/renmark:feature fable-integration` flagged PRD drift (Fable absent from the routed executor set); reconcile the Fable tier into the PRD before planning.
 **Built:** Reconciled the Goals multi-LLM bullet and REQ-2 of `PRD.md`; bumped `last_reviewed` to 2026-06-10. Routed executor set is now Haiku / Codex / Sonnet / Opus / Fable (`claude-fable-5`, $10/$50 per MTok, 1M context). Approval recorded via the `/renmark:approve` surface (REQ-18 flow), gate cleared by prd after the write.
