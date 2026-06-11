@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — dispatch grouping test
+**Request:** Test-pin that fable tasks route to the Agent path, never the codex subprocess.
+**Built:** New test builds a mixed wave (fable + codex) and asserts is_claude_executor('fable') and the wave partition puts the fable task in claude_tasks.
+**Files changed:**
+- `tests/test_dispatch.py` — task 7 artifact
+**Do not change:**
+- Fable must never route to the codex subprocess path — this test is the guard.
+
 ## [2026-06-11] — parser acceptance test
 **Request:** Test-pin the parser's fable acceptance.
 **Built:** Added fable to the claude-models acceptance loop and a dedicated test asserting executor: fable parses while unknown executors still raise PlanError naming the allowlist.
