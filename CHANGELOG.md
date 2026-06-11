@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-11] — CLAUDE.md + AGENTS.md — fable rule blocks
+**Request:** Doc-sync per REQ-2 amendment (part 2); mirror pair lands in one commit.
+**Built:** CLAUDE.md gains the fable dispatch rule (Agent call WITH model override), Frontier-reasoning preferences row, and Opus/Fable tooling row. AGENTS.md mirrors the tooling row byte-identically; dispatch/preferences blocks don't exist there (add-nothing-without-anchor honored). Task 8's agent died at the session limit AFTER applying all edits — verified complete on resume. Task 9 verifier deviation: plan's lowercase grep can't match the capitalized-only anchor; verified with grep -qi.
+**Files changed:**
+- `CLAUDE.md`
+- `AGENTS.md`
+**Do not change:**
+- CLAUDE.md and AGENTS.md are a mirror pair — shared blocks stay byte-identical, same commit.
+
 ## [2026-06-11] — check-plan skill — heavy-read mirror
 **Request:** Doc-sync per REQ-2 amendment (part 2): mirror of part 1's _HEAVY_READ_BLOCK_EXECUTORS change.
 **Built:** Check 4 doc reads sonnet|opus|fable; report example appends fable×e.

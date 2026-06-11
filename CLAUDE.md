@@ -85,6 +85,7 @@ Never read generated file contents into the conversation. Only per-task summarie
 - `executor: codex` → `renmark-execute` (Bash subprocess). Never dispatch a codex
   task as an Agent call — that runs it on the parent model and burns Claude Code quota.
 - `executor: haiku / sonnet / opus` → Agent tool calls, no model override.
+- `executor: fable` → Agent tool call WITH `model: "fable"` override — the only executor that always passes an explicit model override. Escalation tier (REQ-2): ideation, strategy synthesis, adversarial audit/review only — never mechanical or bulk work.
 <!-- END:executor-dispatch-rule -->
 
 <!-- BEGIN:root-cause-rule -->
@@ -369,7 +370,7 @@ owns merges and releases.
 | `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |
 | `/renmark:plan <spec>` | Decompose a spec into atomic, executor-tagged tasks |
 | `/renmark:check-plan <plan>` | Validate a plan deterministically (renmark.plan_lint — same engine as orchestrate pre-flight); PASS/WARN/BLOCK |
-| `/renmark:orchestrate <plan>` | Execute a plan — routes tasks to Haiku / Codex / Sonnet / Opus |
+| `/renmark:orchestrate <plan>` | Execute a plan — routes tasks to Haiku / Codex / Sonnet / Opus / Fable |
 | `/renmark:verify` | Confirm feature goal was achieved after orchestrate |
 | `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
 | `/renmark:loop "<goal>"` | Bounded, resumable agentic loop (iterate until verified or budget hit) |
@@ -410,6 +411,7 @@ Defaults:
 - Test scaffolding, single well-defined file → `codex`
 - Well-scoped algorithms, refactors → `sonnet`
 - State machines, DOM APIs, cross-file reasoning → `opus`
+- Frontier reasoning — ideation, strategy synthesis, adversarial audit/review escalation → `fable` (escalation only, never default)
 
 ## Code conventions
 
