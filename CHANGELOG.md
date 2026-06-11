@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-11] — plan skill + shim — fable tier
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Routing table fable row (escalation only, never default), $0.030/kT cost row, REQ-2 complexity clause; command-shim description byte-synced.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`
+- `plugin/commands/plan.md`
+**Do not change:**
+- Skill frontmatter description and command shim description stay byte-identical (audit description-drift pass).
+
 ## [2026-06-11] — codereview fix — dry-run fable pricing
 **Request:** Codex review major: fable tasks without est_cost_usd showed as free in dry-run previews.
 **Built:** Added "fable": 0.030 to the engine's inline cost_per_kt table + quota note; test pins a fable task at $0.060/2k tokens, never 'free'.
