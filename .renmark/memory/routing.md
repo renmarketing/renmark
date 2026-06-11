@@ -21,6 +21,7 @@ When entries conflict for the same signature, the newest dated entry wins.
 - (target=`*.json`, complexity=simple) → haiku
 - (target=`tests/**`) → codex
 - (signal=canvas|DOM|state-machine|coord-math|threading) → opus
+- (signal=ideation|strategy-synthesis|adversarial-audit|refutation-pass, stakes=highest) → fable (escalation only — REQ-2)
 - (complexity=medium, refactor) → sonnet
 
 ## Learned overrides

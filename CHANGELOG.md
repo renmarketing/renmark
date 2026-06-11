@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — routing.md fable default
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Defaults gain: (signal=ideation|strategy-synthesis|adversarial-audit|refutation-pass, stakes=highest) → fable (escalation only — REQ-2).
+**Files changed:**
+- `.renmark/memory/routing.md`
+**Do not change:**
+- Learned overrides section is append-only via memory.append_routing — never hand-edit.
+
 ## [2026-06-11] — README executor row
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** Orchestrate row reads Haiku / Codex / Sonnet / Opus / Fable, wave-parallel.
