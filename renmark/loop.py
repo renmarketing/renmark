@@ -54,7 +54,7 @@ DEFAULT_BUDGET_TOKENS: int = 300_000
 #: the ``$`` figure is only an *estimate* shown to the human. A renmark loop is
 #: orchestrated by Sonnet/Opus but does the bulk emit on Codex, so the realised
 #: blend sits between the per-model rates in ``roadmap.COST_PER_KT``
-#: (haiku 0.0001 · sonnet 0.003 · opus 0.015 · codex 0.05 per 1k). We assume a
+#: (haiku 0.0001 · sonnet 0.003 · opus 0.015 · fable 0.030 · codex 0.05 per 1k). We assume a
 #: single conservative blended rate of **$0.01 / 1k tokens** — deliberately on
 #: the high side so a ``$`` budget never under-buys iterations and the estimate
 #: errs toward caution. Tune as the realised mix / pricing shifts.

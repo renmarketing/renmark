@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — loop blend-rate comment
+**Request:** Doc-truth fix on the per-model rate enumeration.
+**Built:** Extended the rate comment with fable 0.030; blended constant value unchanged.
+**Files changed:**
+- `renmark/loop.py` — Extended the rate comment with fable 0.030; blended constant value unchanged.
+**Do not change:**
+- COST_PER_KTOKEN_USD blended value itself is intentionally NOT retuned here.
+
 ## [2026-06-11] — roadmap cost table
 **Request:** Price the fable tier in cost previews.
 **Built:** Added "fable": 0.030 to COST_PER_KT after opus, with 2x-opus pricing rationale comment.
