@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — orchestrate skill — fable dispatch
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Dispatch table gains fable row (Agent tool with model: "fable" override — the one executor with explicit override); ledger comment + prose enumerations extended.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+**Do not change:**
+- Fable must never dispatch as a codex subprocess; codex RED-FLAG rule unchanged.
+
 ## [2026-06-11] — plan skill + shim — fable tier
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** Routing table fable row (escalation only, never default), $0.030/kT cost row, REQ-2 complexity clause; command-shim description byte-synced.
