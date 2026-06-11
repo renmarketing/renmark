@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — preamble tier hint
+**Request:** fable-routing part 1 wave 2.
+**Built:** skill_preamble surfaces 'declared top tier: fable — … (/model fable)' for brainstorm/plan/prd/blueprint when declared; composes with cross-domain hint via ' | '.
+**Files changed:**
+- `renmark/lifecycle.py`
+**Do not change:**
+- skill_preamble still returns one bounded string or None — callers depend on that contract.
+
 ## [2026-06-11] — engine preview + env knob
 **Request:** fable-routing part 1 wave 2.
 **Built:** Dry-run maps executors through capabilities.effective_executor; undeclared fable rows render 'fable→opus' at opus rate; Config gains validated top_tier field.

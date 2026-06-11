@@ -181,6 +181,17 @@ AUX_SKILLS: frozenset[str] = frozenset(
     }
 )
 
+# Synthesis skills — ideation/strategy-heavy stages that benefit from running
+# the session on the declared top reasoning tier (Fable 5 when available).
+SYNTHESIS_SKILLS: frozenset[str] = frozenset(
+    {
+        "brainstorm",
+        "plan",
+        "prd",
+        "blueprint",
+    }
+)
+
 # Per-skill local follow-ups for class 3 (up to 2 surfaced). Resume-pipeline is
 # always the recommended option; these are the domain-appropriate alternates.
 AUX_LOCAL_ACTIONS: dict[str, list[str]] = {
@@ -578,13 +589,29 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
     verdict = _state.context_budget_check(repo, skill, domain)
     _state.record_skill_invocation(repo, skill, domain)
 
+    fragments: list[str] = []
     if verdict == "clear":
-        return (
+        fragments.append(
             f"context: cross-domain transition into `{domain}` — consider `/clear` "
             "before continuing (`.renmark/memory/` survives clears)"
         )
-    if verdict == "compact":
-        return "context: approaching budget — consider `/compact` before continuing"
+    elif verdict == "compact":
+        fragments.append(
+            "context: approaching budget — consider `/compact` before continuing"
+        )
+
+    if skill in SYNTHESIS_SKILLS:
+        # Imported lazily to keep capability resolution off the module-load path.
+        from . import capabilities as _capabilities
+
+        if _capabilities.top_tier(Path(repo)) == "fable":
+            fragments.append(
+                "declared top tier: fable — for best ideation/strategy results "
+                "run this session on Fable 5 (/model fable)"
+            )
+
+    if fragments:
+        return " | ".join(fragments)
     return None
 
 
