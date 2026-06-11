@@ -1,10 +1,25 @@
-"""Tests for renmark.plan_lint — pin every check defined in SKILL.md.
+"""---
+artifact_type: renmark_task_output
+schema_version: 1
+created_at: 2026-06-11T00:00:00-04:00
+source_sha: 560cd4392c9c4a23dafc1d650a0ab9c9836613a9
+related_plan: "Task 8: plan_lint fable tests (mode B edit)"
+generator: codex
+dependency_refs:
+  - tests/test_plan_lint.py
+---
+Tests for renmark.plan_lint — pin every check defined in SKILL.md.
 
 Fixture style mirrors tests/test_parser.py: _write() creates a minimal valid
 plan file in tmp_path; each test case builds the minimal plan that exercises
 one check and asserts on the PlanLintReport verdict / issues.
 
 CLI exit-code tests run a subprocess so they test the __main__ path.
+
+## Summary
+- Added `test_heavy_read_fable_block` to pin the heavy-read BLOCK rule for `fable`.
+- Added `test_executor_fable_lints_clean` to prove `executor: fable` parses and lints cleanly.
+- Reused the existing `_task()` helper and heavy-read `Path.cwd()` patch pattern.
 """
 
 from __future__ import annotations
@@ -318,6 +333,31 @@ def test_heavy_read_sonnet_block(tmp_path: Path) -> None:
     assert any("heavy" in issue.lower() or "G5" in issue for issue in report.issues)
 
 
+def test_heavy_read_fable_block(tmp_path: Path) -> None:
+    ctx_file = tmp_path / "big_context.md"
+    ctx_file.write_text("\n".join(f"line {i}" for i in range(201)), encoding="utf-8")
+
+    plan_body = (
+        _BASE_HEADER + "### Task 1: heavy read fable\n"
+        "- **mode:** A\n"
+        "- **target:** a.py\n"
+        "- **executor:** fable\n"
+        "- **context_files:** [big_context.md]\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  noop\n"
+    )
+    plan = _write(tmp_path, plan_body)
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert report.verdict == "BLOCK"
+    assert any("heavy" in issue.lower() or "G5" in issue for issue in report.issues)
+
+
 def test_heavy_read_haiku_no_block(tmp_path: Path) -> None:
     """haiku is exempt from the heavy-read check."""
     ctx_file = tmp_path / "big_context.md"
@@ -439,6 +479,13 @@ def test_executor_counts_populated(tmp_path: Path) -> None:
     report = lint_plan(plan)
     assert report.executor_counts.get("haiku") == 2
     assert report.executor_counts.get("sonnet") == 1
+
+
+def test_executor_fable_lints_clean(tmp_path: Path) -> None:
+    plan = _write(tmp_path, _BASE_HEADER + _task(executor="fable"))
+    report = lint_plan(plan)
+    assert report.verdict == "PASS"
+    assert report.issues == []
 
 
 # ---------------------------------------------------------------------------

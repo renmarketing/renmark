@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — plan_lint fable tests
+**Request:** Test-pin the G5 heavy-read BLOCK for the fable tier.
+**Built:** Added test_heavy_read_fable_block (fable heavy-read BLOCKs like sonnet/opus) and test_executor_fable_lints_clean (well-formed fable plan lints clean). 38 tests now.
+**Files changed:**
+- `tests/test_plan_lint.py` — task 8 artifact
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1–2.5 — change engine + tests together.
+
 ## [2026-06-11] — dispatch grouping test
 **Request:** Test-pin that fable tasks route to the Agent path, never the codex subprocess.
 **Built:** New test builds a mixed wave (fable + codex) and asserts is_claude_executor('fable') and the wave partition puts the fable task in claude_tasks.
