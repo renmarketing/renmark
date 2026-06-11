@@ -70,7 +70,7 @@ _MAX_EST_TOKENS = 200_000
 _MAX_EST_COST_USD = 50.0
 
 # Executors that BLOCK on heavy-read (G5); codex/haiku are exempt.
-_HEAVY_READ_BLOCK_EXECUTORS = frozenset({"sonnet", "opus"})
+_HEAVY_READ_BLOCK_EXECUTORS = frozenset({"sonnet", "opus", "fable"})
 
 # Transcript-leak denylist — verbatim from check-plan SKILL.md §2.5.
 _TRANSCRIPT_LEAK_PHRASES = (

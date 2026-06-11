@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — plan_lint heavy-read tier set
+**Request:** Extend the G5 heavy-read BLOCK to the most expensive tier.
+**Built:** Added "fable" to _HEAVY_READ_BLOCK_EXECUTORS alongside sonnet/opus.
+**Files changed:**
+- `renmark/plan_lint.py` — Added "fable" to _HEAVY_READ_BLOCK_EXECUTORS alongside sonnet/opus.
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1–2.5 — change both sides + tests together.
+
 ## [2026-06-11] — CLAUDE_EXECUTORS constant
 **Request:** Route fable through the Claude Agent dispatch path.
 **Built:** Appended "fable" last in CLAUDE_EXECUTORS (capability order) and updated the AgentDispatch.model comment.
