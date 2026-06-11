@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-11] — brainstorm skill + shim — Fable ideator
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** 'using Opus' → 'using the session's top reasoning tier (Fable 5 when available, Opus otherwise)' in both files, byte-synced.
+**Files changed:**
+- `plugin/skills/brainstorm/SKILL.md`
+- `plugin/commands/brainstorm.md`
+**Do not change:**
+- Skill/shim descriptions stay byte-identical.
+
 ## [2026-06-11] — orchestrate skill — fable dispatch
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** Dispatch table gains fable row (Agent tool with model: "fable" override — the one executor with explicit override); ledger comment + prose enumerations extended.

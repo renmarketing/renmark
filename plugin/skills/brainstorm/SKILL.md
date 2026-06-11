@@ -1,13 +1,13 @@
 ---
 name: brainstorm
-description: Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's brainstorm this", "I have an idea", "help me think through X". Asks one question at a time using Opus, researches best practices and prior art (similar software, live GitHub repos) before proposing approaches, establishes the shared scope contract, and writes a design doc at the end. Bootstraps fresh projects by creating CLAUDE.md, AGENTS.md, and .renmark/ when invoked in an empty folder.
+description: Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's brainstorm this", "I have an idea", "help me think through X". Asks one question at a time using the session's top reasoning tier (Fable 5 when available, Opus otherwise), researches best practices and prior art (similar software, live GitHub repos) before proposing approaches, establishes the shared scope contract, and writes a design doc at the end. Bootstraps fresh projects by creating CLAUDE.md, AGENTS.md, and .renmark/ when invoked in an empty folder.
 ---
 
 # brainstorm
 
 ## Overview
 
-One-question-at-a-time spec discovery, Opus-driven, **research-backed**. Output: a design doc at `.renmark/specs/YYYY-MM-DD-<topic>.spec.md` that `/renmark:plan` consumes next.
+One-question-at-a-time spec discovery, driven by the session's top reasoning tier (Fable 5 when available, Opus otherwise), **research-backed**. Output: a design doc at `.renmark/specs/YYYY-MM-DD-<topic>.spec.md` that `/renmark:plan` consumes next.
 
 Brainstorm does two things `plan` does not: it **researches prior art** (best practices, software that solves the same problem, reference implementations on GitHub) so the design is informed rather than invented, and it **establishes the scope contract** (stack / deployment / MVP boundary) using the shared source of truth at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md`. Because brainstorm writes the scope records, `/renmark:plan` detects them and skips re-asking — the two skills never double-question you.
 
