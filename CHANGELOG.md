@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — parser acceptance test
+**Request:** Test-pin the parser's fable acceptance.
+**Built:** Added fable to the claude-models acceptance loop and a dedicated test asserting executor: fable parses while unknown executors still raise PlanError naming the allowlist.
+**Files changed:**
+- `tests/test_parser.py` — task 6 artifact
+**Do not change:**
+- test_executor_fable_accepted_and_unknown_rejected pins the PlanError allowlist wording — change parser message + test together.
+
 ## [2026-06-11] — loop blend-rate comment
 **Request:** Doc-truth fix on the per-model rate enumeration.
 **Built:** Extended the rate comment with fable 0.030; blended constant value unchanged.
