@@ -51,7 +51,7 @@ The engine implements exactly these 8 checks (severities are fixed — do not re
 1. Task count ≤ 15 → **BLOCK**
 2. Non-empty verifier per task → **BLOCK**; `test -f` alone → **WARN**
 3. No duplicate target within a `parallel_group` → **BLOCK**
-4. No context_file > 200 lines with `executor: sonnet|opus` (G5) → **BLOCK**
+4. No context_file > 200 lines with `executor: sonnet|opus|fable` (G5) → **BLOCK**
 5. No transcript-leak phrase in `spec:` (7-phrase denylist, G11) → **BLOCK**
 6. No dependency reference to a prior task’s full output without an artifact path (G11) → **BLOCK**
 7. No unbounded `cat`/`find`/`git diff`/`git log` in verifier without a cap (G3) → **WARN**
@@ -63,7 +63,7 @@ The engine implements exactly these 8 checks (severities are fixed — do not re
 
 ```
 check-plan: <plan-name>
-Tasks: N  Executors: haiku×a codex×b sonnet×c opus×d
+Tasks: N  Executors: haiku×a codex×b sonnet×c opus×d fable×e
 
 BLOCK (must fix before running):
 - Task N: <reason>

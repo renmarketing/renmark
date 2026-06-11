@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — check-plan skill — heavy-read mirror
+**Request:** Doc-sync per REQ-2 amendment (part 2): mirror of part 1's _HEAVY_READ_BLOCK_EXECUTORS change.
+**Built:** Check 4 doc reads sonnet|opus|fable; report example appends fable×e.
+**Files changed:**
+- `plugin/skills/check-plan/SKILL.md`
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1–2.5 — change both sides + tests together (v0.10.0 guard).
+
 ## [2026-06-11] — audit skill — fable escalation note
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** Step 2b: adversarial/delta re-runs SHOULD route refutation subagents to fable (REQ-2 designated adversarial-audit tier); audit stays read-only.
