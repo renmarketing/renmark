@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — v0.11.0 — fable executor tier (engine + tests + doc sync)
+**Request:** Make fable (Claude Fable 5, claude-fable-5) a first-class renmark executor tier above opus per the human-approved REQ-2 amendment; full pipeline: orchestrate (2 plans, 23 tasks) → verify → codereview → fix → merge → release.
+**Built:** Engine: parser allowlist, CLAUDE_EXECUTORS Agent-path routing (fable = the only executor with an explicit model override), plan_lint G5 heavy-read BLOCK, $0.030/kT in COST_PER_KT + _estimate_cost + engine dry-run table (last two were codex-review catches). Tests: 5 fable pins across parser/dispatch/plan_lint/roadmap/engine suites. Docs: 14 prose surfaces synced (SKILLs, shims, CLAUDE/AGENTS + templates, README, routing.md) + 6 review-fix sites (escalation wording, PLAN.md dispatch truth, installers, package docstring). Reviews: part 1 — 0 critical/2 major (fixed)/2 minor; part 2 — 0 critical/3 major/3 minor (5 fixed, 1 deferred by decision).
+**Pipeline evidence:** verify 4/4 (part 1) + 4/4 (part 2); pytest 723 passed/28 skipped; ruff + format + mypy strict clean; audit --quick PASS; version parity 7/7 at 0.11.0.
+**Do not change:**
+- Fable is escalation-only under current REQ-2 — the adopted declared-capability routing strategy (.renmark/research/2026-06-11-fable-routing-strategy.md) changes this via a human-gated PRD amendment in the NEXT feature; brainstorm's "Fable 5 when available" wording is intentional under that plan.
+- Fable must never dispatch as a codex subprocess; haiku/sonnet/opus stay no-override Agent calls.
+
 ## [2026-06-11] — codereview fixes (part 2): escalation wording + missed surfaces
 **Request:** Codex part-2 review found 3 major / 3 minor; majors 2-3 + all minors fixed (major 1 deferred — see below).
 **Built:** plan SKILL+shim descriptions now say fable routes "only by explicit escalation signals, never cost routing" (byte-synced); plan SKILL executor field line includes fable-by-escalation; PLAN.md dispatch table corrected to engine reality (haiku/sonnet/opus no-override, fable the only override-based executor); install.sh + install.ps1 orchestrate rows and renmark/__init__.py docstring gain Fable.

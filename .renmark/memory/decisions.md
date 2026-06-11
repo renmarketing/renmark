@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-023 — Finished feature fable-integration
+
+**Date:** 2026-06-11
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch feature/fable-integration reached stage ready-to-release
+
+---
+
 Architecture Decision Records. Newest at top. Each ADR captures: context (why we needed to decide), the decision, alternatives considered, and consequences. Updated by `/renmark:brainstorm` and `/renmark:plan` when they make non-trivial calls; hand-editable.
 
 
