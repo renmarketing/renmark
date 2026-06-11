@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases like "write a plan", "decompose this", "create the plan for X". Opus reads the spec, splits it into atomic single-file tasks, scores complexity, auto-routes each task to the cheapest model that can do it (haiku, codex, sonnet, opus, fable), groups tasks for parallel execution, and emits a cost preview.
+description: Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases like "write a plan", "decompose this", "create the plan for X". Opus reads the spec, splits it into atomic single-file tasks, scores complexity, auto-routes each task to the cheapest model that can do it (haiku, codex, sonnet, opus; fable only by explicit escalation signals, never cost routing), groups tasks for parallel execution, and emits a cost preview.
 ---
 
 # plan
@@ -12,7 +12,7 @@ Reads a spec (from `/renmark:brainstorm` or any markdown file) and emits a renma
 - `mode` — A (new file) or B (edit existing)
 - `target` — exactly one file path
 - `complexity` — simple / medium / hard
-- `executor` — opus / codex / sonnet / haiku (auto-assigned, ordered by capability)
+- `executor` — opus / codex / sonnet / haiku, plus fable by explicit escalation only (auto-assigned, ordered by capability)
 - `parallel_group` — tasks sharing a group run concurrently
 - `verifier` — shell command that exits 0 when the task is done
 - `serves` — optional one-line traceability note such as `REQ-3` or `new`; best-effort only when a `PRD.md` exists, using requirement IDs already surfaced by alignment/spec work

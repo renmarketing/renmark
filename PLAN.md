@@ -97,7 +97,8 @@ Executor values: `nim` | `codex` | `opus` | `sonnet` | `<provider>/<model>` for 
 |---|---|---|
 | `nim` | nim-execute CLI (existing, unchanged) | Bundled in one Bash call per wave |
 | `codex` | codex_exec module (existing, unchanged) | Bundled in same Bash call per wave |
-| `opus` / `sonnet` | Agent tool with model override | Bundled in one Agent batch per wave |
+| `haiku` / `sonnet` / `opus` | Agent tool call (no model override) | Bundled in one Agent batch per wave |
+| `fable` | Agent tool call with `model: "fable"` override — the only override-based executor | Escalation only (REQ-2): ideation, strategy, adversarial review |
 | `<litellm>/<model>` | LiteLLM call inside renmark-execute | Bundled in same Bash call per wave |
 
 **One Bash call per wave** for nim/codex/litellm tasks. The `renmark-execute --wave <plan> --tasks 1,3,5` command parallel-dispatches all listed tasks via Python `asyncio.gather` and returns when all done.

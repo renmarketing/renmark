@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-11, .renmark/reviews/2026-06-11-0113ee4.part2.verification.md) model `verify`: **verify-fable-integration-part2** — 4/4 doc-sync behaviors verified; session-limit interruption recovered from pipeline.json; lesson: plan verifiers for mirror tasks must be case-insensitive when the only anchor is capitalized
+
 - (2026-06-11, .renmark/reviews/2026-06-11-5fa6915.verification.md) model `verify`: **verify-fable-integration** — 4/4 behaviors verified; failed: none; regressions: 0; heavy-read G5 detector keys on context_files field, not spec prose (fixture lesson)
 
 - (2026-06-09, .renmark/reviews/2026-06-09-f2aaf16.review.md) model `codereview`: **codereview-integration-contract-drift** — Part-2 subagents writing skill-doc integration prose invented engine contracts that don't exist: a view['limit_exceeded'] field, a LifecycleState.verification_result attr, free-text verifier_result vs analytics' pass/fail vocab, status=raw-stage vs SUCCESS/BLOCKED_STATUSES, per-iteration record_loop_run vs one-row-per-loop aggregation. Gate (pytest/ruff/mypy) PASSED because the prose is markdown, not executed — only codex review + field/attr existence probes caught it. Lesson: for doc tasks that reference real APIs, verify every referenced field/attr/vocab against the engine, not just that function names exist.

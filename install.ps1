@@ -240,7 +240,7 @@ Write-Host "  /renmark:init        Scan repo: project map + dev-standards/health
 Write-Host "  /renmark:brainstorm  Design a feature into a spec"
 Write-Host "  /renmark:plan        Decompose spec into atomic tasks with cost preview"
 Write-Host "  /renmark:check-plan  Validate plan before spending tokens"
-Write-Host "  /renmark:orchestrate Execute plan (Haiku / Codex / Sonnet / Opus)"
+Write-Host "  /renmark:orchestrate Execute plan (Haiku / Codex / Sonnet / Opus / Fable)"
 Write-Host "  /renmark:verify      Confirm feature goal was achieved"
 Write-Host "  /renmark:finish      Branch close — PR / merge / release"
 Write-Host "  /renmark:feature     Full pipeline with branch isolation"

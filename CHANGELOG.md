@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-11] — codereview fixes (part 2): escalation wording + missed surfaces
+**Request:** Codex part-2 review found 3 major / 3 minor; majors 2-3 + all minors fixed (major 1 deferred — see below).
+**Built:** plan SKILL+shim descriptions now say fable routes "only by explicit escalation signals, never cost routing" (byte-synced); plan SKILL executor field line includes fable-by-escalation; PLAN.md dispatch table corrected to engine reality (haiku/sonnet/opus no-override, fable the only override-based executor); install.sh + install.ps1 orchestrate rows and renmark/__init__.py docstring gain Fable.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`, `plugin/commands/plan.md` — escalation-only wording, synced
+- `PLAN.md` — dispatch table truth fix
+- `install.sh`, `install.ps1`, `renmark/__init__.py` — missed-surface enumerations
+**Do not change:**
+- Major 1 (brainstorm "Fable 5 when available" vs escalation-only PRD wording) is DEFERRED BY DECISION, not missed: the adopted fable-routing strategy (.renmark/research/2026-06-11-fable-routing-strategy.md) resolves it via a human-gated REQ-2 amendment making Fable the declared default for ideation/strategy. Do not reword brainstorm back to Opus-default.
+- PLAN.md is a historical architecture doc with broader staleness (nim/litellm rows) — only the flagged dispatch row was corrected; full refresh is hygiene work, out of scope.
+
 ## [2026-06-11] — routing.md fable default
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** Defaults gain: (signal=ideation|strategy-synthesis|adversarial-audit|refutation-pass, stakes=highest) → fable (escalation only — REQ-2).
