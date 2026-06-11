@@ -21,7 +21,7 @@ from pathlib import Path
 
 from ..parser import Task
 
-CLAUDE_EXECUTORS = ("haiku", "sonnet", "opus")
+CLAUDE_EXECUTORS = ("haiku", "sonnet", "opus", "fable")
 
 
 @dataclass
@@ -30,7 +30,7 @@ class AgentDispatch:
 
     task_index: int
     title: str
-    model: str  # "opus" or "sonnet" (the Agent tool's model param)
+    model: str  # "haiku", "sonnet", "opus", or "fable" (the Agent tool's model param)
     target: str
     verifier: str
     description: str  # short description for the Agent tool's `description` param

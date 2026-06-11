@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — CLAUDE_EXECUTORS constant
+**Request:** Route fable through the Claude Agent dispatch path.
+**Built:** Appended "fable" last in CLAUDE_EXECUTORS (capability order) and updated the AgentDispatch.model comment.
+**Files changed:**
+- `renmark/providers/claude_agent.py` — Appended "fable" last in CLAUDE_EXECUTORS (capability order) and updated the AgentDispatch.model comment.
+**Do not change:**
+- CLAUDE_EXECUTORS stays in lowest→highest capability order; fable must remain last.
+
 ## [2026-06-11] — parser executor allowlist
 **Request:** Register fable as a valid plan executor token.
 **Built:** Extended executor allowlist tuple with "fable" and updated the PlanError message to match.
