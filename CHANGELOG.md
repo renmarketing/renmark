@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — audit skill — fable escalation note
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Step 2b: adversarial/delta re-runs SHOULD route refutation subagents to fable (REQ-2 designated adversarial-audit tier); audit stays read-only.
+**Files changed:**
+- `plugin/skills/audit/SKILL.md`
+**Do not change:**
+- Audit remains read-only and artifact-bounded.
+
 ## [2026-06-11] — codereview skill — fable escalation note
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** Additive note: highest-stakes diffs MAY dispatch fable refutation subagents; codex sandbox pass + bounded summary contract unchanged.

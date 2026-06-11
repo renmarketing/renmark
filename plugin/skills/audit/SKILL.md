@@ -60,6 +60,19 @@ artifacts. Present a prioritized ≤10-line findings digest:
 
 On a `PASS` verdict, skip this step entirely — no digest, no LLM.
 
+### 2b. Adversarial / delta re-runs — route refutation to Fable
+
+When re-running an audit against a prior report's findings (the
+"refute each finding" delta-audit pattern, as used for the v0.9.0 delta
+audit), refutation subagents SHOULD be dispatched via the Agent tool with
+`model: "fable"` — Fable is the designated adversarial-audit tier per REQ-2.
+Each refutation subagent receives one finding plus the relevant file paths,
+attempts to refute it against the live tree (read-only), and returns a
+bounded confirmed/refuted verdict (≤ 5 lines). This is a routing
+recommendation only: the audit remains read-only and artifact-bounded, and
+all writes stay inside `.renmark/audits/` — no behavior change beyond where
+refutation passes run.
+
 ### 3. Hand off
 
 audit is an **aux / terminal skill** (class 3 in
