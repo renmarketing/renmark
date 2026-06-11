@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — engine preview + env knob
+**Request:** fable-routing part 1 wave 2.
+**Built:** Dry-run maps executors through capabilities.effective_executor; undeclared fable rows render 'fable→opus' at opus rate; Config gains validated top_tier field.
+**Files changed:**
+- `renmark/cli/_engine.py`
+**Do not change:**
+- Config() construction now requires top_tier kwarg — from_env is the only constructor site.
+
 ## [2026-06-11] — plan_lint fable gates
 **Request:** fable-routing part 1 wave 2.
 **Built:** Checks 9-10: BLOCK executor:fable in undeclared projects; BLOCK fable on simple/mechanical tasks (unconditional REQ-2).
