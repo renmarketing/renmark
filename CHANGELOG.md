@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-11] — codereview skill — fable escalation note
+**Request:** Doc-sync per REQ-2 amendment (part 2).
+**Built:** Additive note: highest-stakes diffs MAY dispatch fable refutation subagents; codex sandbox pass + bounded summary contract unchanged.
+**Files changed:**
+- `plugin/skills/codereview/SKILL.md`
+**Do not change:**
+- Frontmatter description untouched (quoted; strict-YAML gate).
+
 ## [2026-06-11] — brainstorm skill + shim — Fable ideator
 **Request:** Doc-sync per REQ-2 amendment (part 2).
 **Built:** 'using Opus' → 'using the session's top reasoning tier (Fable 5 when available, Opus otherwise)' in both files, byte-synced.

@@ -75,6 +75,13 @@ tier-override flag:
 - **`standard` / `full` tier, OR `--full` on any tier** → run the full codex pass
   below.
 
+**Adversarial escalation (REQ-2 — highest-stakes diffs only).** For release-gating,
+security-sensitive, or engine/state code, adversarial verification subagents MAY be
+dispatched on `fable` (Agent tool, `model: "fable"`) to attempt to refute the review's
+findings before they ship. This is an escalation tier, never the default review path —
+the codex read-only sandbox pass and the bounded severity-summary contract (Opus reads
+only the summary, never the diff body) are unchanged.
+
 For the full codex pass, the agent selects one of three prompt blocks below based on
 the parsed focus, then pipes it to `codex exec --sandbox read-only -`.
 
