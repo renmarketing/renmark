@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — project scope: claude-doc-slimming
+**Request:** Terse-rewrite CLAUDE/AGENTS templates + this repo's root docs to ≤200 lines each, in place.
+**Scope contract:** Stack unchanged (renmark Python plugin). Deployment unchanged. MVP boundary: documentation-density compression only — preserve every rule-block name/marker/load-bearing clause; compress non-block sections to memory pointers. OUT: two-tier governance-doc split, block consolidation/rename, any rule-semantics change.
+**Files changed:**
+- `.renmark/specs/2026-06-12-claude-doc-slimming.spec.md` — design doc
+**Do not change:**
+- This is density-only — no governance rule may lose its enforcement clause; markers + block names are preserved so merge/lint/audit/tests stay green.
+
 ## [2026-06-12] — v0.14.1 — PRD template enrichment (surgical)
 **Request:** Analyze an external 17-section PRD-generator framework against renmark's PRD, harvest only the genuinely-additive pieces, and improve the PRD output without regressing renmark's altitude separation.
 **Built:** Finding: ~70% of the external template already lives in renmark's pipeline (plan/verify/brainstorm/decisions.md/reuse-check), so wholesale adoption was REFUSED as a regression. Imported the 5 additive pieces: PRD.md.template gains OPTIONAL requirement sub-groups (incl. an AI/Agent slot), [blocking|deferrable] question tags + Constraints & dependencies section, a PRD-local Decision log (distinct from decisions.md), a Recommendation verdict, and a top anti-completion guard routing build-plan/testing/risk/reversibility/asset concerns to their owning surfaces. prd SKILL CREATE now runs the reuse-check, surfaces contradictions, opens with a context-recovery/missing-info preamble, and both CREATE+UPDATE end with an advisory Final Recommendation verdict.
