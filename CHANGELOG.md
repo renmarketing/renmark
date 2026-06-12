@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — v0.14.0 — Cowork-alignment agent disciplines
+**Request:** Port the four gaps surfaced by comparing renmark against an external "Claude Cowork" operating-instructions doc: don't-reinvent-the-wheel, push-back-by-default, surface-contradictions, re-interview-on-change.
+**Built:** (1) NEW reuse-check subagent contract (plugin/skills/_shared/reuse-check.md) — cheap subagent searches loaded skills/commands, MCP tools, prior specs/plans, and features.md before brainstorm/plan propose a custom build; bounded reuse:found|none verdict; default to reuse. (2) Push-back-by-default + no-sycophancy stance added to the shared reasoning contract, carried by every dispatched agent. (3) Contradiction-reconcile reflex: plan's CHANGELOG 'Do not change' read and orchestrate's pre-flight now stop-and-reconcile on a contradicting guarded decision (orchestrate strengthened to 5 entries + decisions.md + semantic contradictions). (4) Re-interview-on-premise-change guard in brainstorm (re-establish scope) and feature (router detects drift → re-runs PRD alignment → dispatches the scope-owning skill).
+**Pipeline evidence:** PRD alignment aligned; plan PASS; verify 4/4; codex review 0 critical / 4 major / 1 minor — all 5 fixed (orchestrate↔plan parity, feature router-purity, AGENTS template mirror, pointer-propagation invariant). 746 tests, audit PASS, parity 7/7 at 0.14.0.
+**Do not change:**
+- Consumers cite the reuse-check and reasoning-contract blockquotes BY POINTER, never paste — so contract updates propagate (the pointer-propagation invariant).
+- feature stays a router — scope re-establishment is always delegated to brainstorm/plan.
+- The reuse check defaults to REUSE; custom builds need a stated reason.
+
 ## [2026-06-12] — codereview fixes (cowork-alignment)
 **Request:** Codex review found 0 critical / 4 major / 1 minor — consistency + scope-ownership issues; fix all 5.
 **Built:** orchestrate pre-flight contradiction check strengthened to match plan (last 5 CHANGELOG entries + decisions.md + semantic contradictions, not just file overlap); feature re-entry guard reworded to router-only (detect drift → re-run PRD alignment → dispatch the scope-owning skill, never re-interview itself); AGENTS.md.template gains the reuse-check + push-back bullets (mirror parity with root AGENTS.md); brainstorm Step-4 citation confirmed pointer-form + stance clause added; reasoning-contract.md header now states the pointer-propagation invariant (all 7 consumers cite by pointer, none paste).
