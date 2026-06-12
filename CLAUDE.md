@@ -412,7 +412,7 @@ Defaults:
 - Test scaffolding, single well-defined file → `codex`
 - Well-scoped algorithms, refactors → `sonnet`
 - State machines, DOM APIs, cross-file reasoning → `opus`
-- Frontier reasoning — ideation, strategy synthesis, adversarial audit/review escalation → `fable` (escalation only, never default)
+- Frontier reasoning — ideation, strategy synthesis, adversarial audit/review escalation → `fable` (escalation only, never default) — default for those roles when `top_tier: fable` is declared in `.renmark/memory/routing.md` (## Model tiers); escalation-only otherwise
 
 ## Code conventions
 

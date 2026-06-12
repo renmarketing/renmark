@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — preferences pointer pair
+**Request:** fable-routing part 2 wave 2.
+**Built:** Frontier-reasoning row in root CLAUDE.md + template now states fable is the default for ideation/strategy/adversarial roles when declared, escalation-only otherwise. AGENTS.md had no anchor row — nothing added (task 13 SKIP by rule).
+**Files changed:**
+- `CLAUDE.md`
+- `plugin/templates/CLAUDE.md.template`
+**Do not change:**
+- Root and template rows stay byte-identical; AGENTS.md gains the row only if a future sync adds the preferences block there.
+
 ## [2026-06-12] — Model tiers declarations
 **Request:** fable-routing part 2 wave 2.
 **Built:** Template ships top_tier: opus with fable opt-in comments; this repo declares top_tier: fable (owner-confirmed). capabilities.is_top_tier_declared(Path('.')) now True here — synthesis-skill tier hints and fable plan acceptance are live.
