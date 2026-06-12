@@ -46,6 +46,12 @@ Reads the plan's intent paragraph via `parser.parse_plan()`, extracts stated use
 
 **Context hygiene (G3, G5):** the orchestrator NEVER reads source files. Only command output, bounded at 3 lines per command. The full verification artifact lives at `.renmark/reviews/YYYY-MM-DD-<sha>.verification.md`; the orchestrator emits only the pointer summary.
 
+### Fable QA review (optional, declared projects)
+
+In projects where `capabilities.top_tier == "fable"` (per `renmark.capabilities.top_tier(repo)`), the hand-off MAY offer a **fable QA-review subagent**: an implementation review against the plan goal + acceptance criteria, plus regression-risk and edge-case review. Dispatch it per the reasoning/output-discipline contract — *include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every dispatched subagent prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed.* The subagent returns a bounded ≤5-line verdict with each issue marked **blocking vs deferrable**; full evidence goes to a `.renmark/reviews/` artifact, never into chat.
+
+State it plainly: **deterministic smoke remains the always-run default** — the fable pass is additive and never replaces verifiers (REQ-7).
+
 ## When to Use
 
 - **Automatically by `/renmark:orchestrate`** after a fully clean run (v0.3.3+) — orchestrate clears pipeline state, sets stage `created`, then invokes this. You rarely run it by hand.
@@ -297,6 +303,10 @@ When `--bootstrap` modifies `--qa`, the goal is **not** to verify one feature �
 6. **If browser QA cannot run** (no channel connected / degrade-to-shell), still create the documented candidate flows in `qa-flows.md`, each marked **UNVERIFIED** (no baseline screenshots yet) so a later `--qa` can verify and upgrade them.
 
 Bootstrap honors the same context-hygiene contract: chat sees only a bounded summary (flows created + verified/UNVERIFIED counts + the `qa-flows.md` path); screenshots and dumps stay on disk.
+
+### Subagent browser-access instruction (applies to `--qa` and `--deep-qa`)
+
+When subagents participate in QA in any capacity (e.g. a fable QA-review pass), their dispatch prompt MUST explicitly tell them they have **browser automation access via the Chrome DevTools MCP**, and that **UI-bearing acceptance criteria MUST NOT be validated by static code inspection alone** — a PASS on a UI criterion never exercised in a live browser is a G9 violation (`validation_status: unvalidated`). See the browser-validation clause in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`. This does not change the singleton-browser design: flows still run serially in the main agent; subagents that need rendered evidence coordinate through the same single browser session, never parallel pages.
 
 ### Context-hygiene contract (non-negotiable)
 

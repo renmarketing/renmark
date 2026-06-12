@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — optional fable QA review lane + browser-access instruction
+**Request:** agent-routing-policy wave 2.
+**Built:** Declared projects may add a fable QA-review subagent (blocking-vs-deferrable verdict); deterministic smoke stays the always-run default (REQ-7). QA subagents are told they have Chrome DevTools MCP access — no static-only UI validation.
+**Files changed:**
+- `plugin/skills/verify/SKILL.md`
+
 ## [2026-06-12] — dispatch prompts carry the reasoning contract
 **Request:** agent-routing-policy wave 2.
 **Built:** Agent-path AND codex ad-hoc dispatch prompts must include the reasoning-contract blockquote (cited, never pasted).
