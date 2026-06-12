@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-06-12] — prd SKILL — interview wiring + recommendation
+**Request:** prd-template-enrichment task 2 — wire the prd skill to the new template + just-shipped disciplines.
+**Built:** CREATE mode now runs the reuse-check before drafting, surfaces contradictions instead of silently overwriting, and opens with a context-recovery + missing-info preamble; both CREATE and UPDATE end with an advisory Final Recommendation verdict (build-now|revise-scope|discovery-first|do-not-build-yet) alongside the approval gate; optional template sections documented as populate-when-relevant.
+**Files changed:**
+- `plugin/skills/prd/SKILL.md` — interview wiring + recommendation rendering
+**Do not change:**
+- The Final Recommendation is ADVISORY — the human still owns every PRD write (REQ-4); the human gate, context-hygiene, and altitude sections are untouched.
+
+## [2026-06-12] — PRD template enrichment
+**Request:** Surgically enrich the product-PRD template with additive pieces from an external PRD-generator framework, without importing pipeline-duplicating sections.
+**Built:** plugin/templates/PRD.md.template gains 5 OPTIONAL pieces — requirement sub-groups (incl. AI/Agent slot), [blocking|deferrable] question tags + Constraints & dependencies section, PRD-local Decision log, Recommendation verdict — plus a top anti-completion guard comment routing build-plan/testing/risk/reversibility/asset concerns to their owning surfaces.
+**Files changed:**
+- `plugin/templates/PRD.md.template` — additive optional structure
+**Do not change:**
+- All additions are OPTIONAL — a flat lean PRD stays valid. The anti-completion guard is load-bearing: do not add build-plan/testing/full-risk sections (they live in plan/verify/brainstorm).
+
 ## [2026-06-12] — v0.14.0 — Cowork-alignment agent disciplines
 **Request:** Port the four gaps surfaced by comparing renmark against an external "Claude Cowork" operating-instructions doc: don't-reinvent-the-wheel, push-back-by-default, surface-contradictions, re-interview-on-change.
 **Built:** (1) NEW reuse-check subagent contract (plugin/skills/_shared/reuse-check.md) — cheap subagent searches loaded skills/commands, MCP tools, prior specs/plans, and features.md before brainstorm/plan propose a custom build; bounded reuse:found|none verdict; default to reuse. (2) Push-back-by-default + no-sycophancy stance added to the shared reasoning contract, carried by every dispatched agent. (3) Contradiction-reconcile reflex: plan's CHANGELOG 'Do not change' read and orchestrate's pre-flight now stop-and-reconcile on a contradicting guarded decision (orchestrate strengthened to 5 entries + decisions.md + semantic contradictions). (4) Re-interview-on-premise-change guard in brainstorm (re-establish scope) and feature (router detects drift → re-runs PRD alignment → dispatches the scope-owning skill).

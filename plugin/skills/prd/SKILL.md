@@ -57,9 +57,22 @@ Stop asking once you can state the product in 2–3 paragraphs with a confirmed 
 
 **Then, in both sub-paths:**
 
-1. **Present the full draft for EXPLICIT approval.** Show the complete proposed PRD content in the conversation and ask the user to approve, edit, or reject section by section. Do NOT write the file until the user explicitly approves. (This skill's own invocation is the one place the full PRD body legitimately lives in context.)
-2. **On approval, write `PRD.md`** at the project root from the template at `${CLAUDE_PLUGIN_ROOT}/templates/PRD.md.template`, substituting `{{PROJECT_NAME}}` and `{{DATE}}` (today). Keep the provenance metadata header the template carries (so downstream alignment checks can read freshness without reading the body). Set `last_reviewed` to today.
-3. **Append a CHANGELOG entry:**
+1. **Run the reuse check before drafting a new product capability.** Before presenting a draft that proposes a new capability, dispatch the reuse-check subagent so a "we already have this" finding surfaces *before* the PRD enshrines a redundant capability as a product requirement.
+
+   > *Before proposing any custom build, dispatch the reuse-check subagent from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`: Agent tool call (`model: haiku`; `sonnet` for a large search surface), passing ONLY `request_description`. The subagent searches loaded skills/commands, session MCP tools, `.renmark/specs/` + `.renmark/plans/`, and `.renmark/memory/features.md` in its own context, and returns ONLY the ≤5-line `reuse: found | none` verdict (+ a one-line pointer when found). Surface the verdict and default to reuse; do NOT read the searched bodies in the orchestrator context (REQ-5).*
+
+   > *Include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in the dispatched subagent prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed; stance of pushing back by default (no sycophancy).*
+
+   On `reuse: found`, surface the pointer and ask whether the new capability should instead point at the existing one rather than be drafted as a fresh product requirement.
+
+2. **Surface contradictions before presenting the draft.** If the draft conflicts with an existing non-goal, a recorded decision (`.renmark/memory/decisions.md`, the Decision log, or a prior CHANGELOG "Do not change" guard), or a previously stated scope boundary, **name the contradiction explicitly and reconcile it** rather than silently overwriting. State the conflicting pair (what the draft says vs. what is on file), then ask the human which one wins — never resolve it by quietly dropping the older decision.
+
+3. **Lead the draft with a context-recovery preamble.** Open the presented draft with a short (≤5-line) preamble that states: what was recovered from disk (which files synthesized, or that this is a fresh interview), the reuse verdict, any contradiction surfaced above, and — critically — **what is still missing or unconfirmed.** State the gaps explicitly instead of guessing past them (reasoning-contract discipline: missing context is named, not papered over). This preamble is orientation, not the PRD body.
+
+4. **Present the full draft for EXPLICIT approval.** Show the complete proposed PRD content in the conversation and ask the user to approve, edit, or reject section by section. Do NOT write the file until the user explicitly approves. (This skill's own invocation is the one place the full PRD body legitimately lives in context.)
+5. **End with a Final Recommendation verdict.** Alongside the approval gate, surface a one-line **Final Recommendation** — exactly one of `build-now | revise-scope | discovery-first | do-not-build-yet` — followed by one sentence of why (this is the value the template's `## Recommendation` section captures). The verdict is **ADVISORY**: it informs the human's decision but does not grant it. The human still owns the write (REQ-4) — do NOT treat any verdict, including `build-now`, as approval to write the file.
+6. **On approval, write `PRD.md`** at the project root from the template at `${CLAUDE_PLUGIN_ROOT}/templates/PRD.md.template`, substituting `{{PROJECT_NAME}}` and `{{DATE}}` (today). Keep the provenance metadata header the template carries (so downstream alignment checks can read freshness without reading the body). Set `last_reviewed` to today.
+7. **Append a CHANGELOG entry:**
    ```
    ## [YYYY-MM-DD] — PRD created
    **Request:** <user's ask in 1–2 plain sentences>
@@ -69,7 +82,7 @@ Stop asking once you can state the product in 2–3 paragraphs with a confirmed 
    **Do not change:**
    - PRD.md is human-owned. Automated stages may PROPOSE edits but never write it without approval.
    ```
-4. **Pointer, not import.** Ensure `CLAUDE.md` / `AGENTS.md` reference the PRD as **plain text** (e.g. "Product source of truth: see `PRD.md`"), NEVER as an `@import` — an import would auto-load the full PRD into every session's context and defeat the whole hygiene contract. If you add or touch that pointer, keep it plain text and mirror it across both files.
+8. **Pointer, not import.** Ensure `CLAUDE.md` / `AGENTS.md` reference the PRD as **plain text** (e.g. "Product source of truth: see `PRD.md`"), NEVER as an `@import` — an import would auto-load the full PRD into every session's context and defeat the whole hygiene contract. If you add or touch that pointer, keep it plain text and mirror it across both files.
 
 ### UPDATE mode
 
@@ -80,8 +93,9 @@ Stop asking once you can state the product in 2–3 paragraphs with a confirmed 
 
    **Fable lane (declared projects only).** In projects whose capability declaration says `capabilities.top_tier == "fable"`, this reconcile-and-diff analysis — ambiguity detection, dependency mapping, conflict checks against existing non-goals/capabilities — MAY be dispatched as **one non-interactive fable subagent**: a single bounded call carrying the full PRD body plus the requested change, returning the proposed diff and a ≤5-line rationale, which this skill then presents at step 3 exactly as it would its own analysis. The DIFF presentation, the human approval gate, and the write flow are completely unchanged — fable proposes, the human still approves, this skill still writes. This lane is for the analysis step only: interactive CREATE interviews stay on the session brain — never per-checkpoint fable calls. *Include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in the dispatched fable prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed.*
 3. **Present a DIFF** of the proposed change in the conversation — old vs. new for each touched section — and ask for explicit approval. Do NOT write until the user approves.
-4. **On approval, write `PRD.md`** with the reconciled content. **Bump `last_reviewed`** in the metadata header to today.
-5. **Append a CHANGELOG entry:**
+4. **End with a Final Recommendation verdict.** Alongside the DIFF and the approval gate, surface a one-line **Final Recommendation** — exactly one of `build-now | revise-scope | discovery-first | do-not-build-yet` — plus one sentence of why (the value the template's `## Recommendation` section captures; update it if the edit changes the verdict). The verdict is **ADVISORY** and does not grant approval: the human still owns the write (REQ-4) — never treat any verdict as license to write the file.
+5. **On approval, write `PRD.md`** with the reconciled content. **Bump `last_reviewed`** in the metadata header to today.
+6. **Append a CHANGELOG entry:**
    ```
    ## [YYYY-MM-DD] — PRD updated
    **Request:** <user's ask in 1–2 plain sentences>
@@ -91,6 +105,16 @@ Stop asking once you can state the product in 2–3 paragraphs with a confirmed 
    **Do not change:**
    - <any non-goal/invariant the edit reaffirmed or newly pinned>
    ```
+
+### Optional template sections (populate when relevant)
+
+The template at `${CLAUDE_PLUGIN_ROOT}/templates/PRD.md.template` carries several structures the skill populates **only when the project benefits** — every one is OPTIONAL, and a lean PRD that omits all of them is fully valid. Never add an empty section to satisfy a checklist; absence is a legitimate signal that the project doesn't need it.
+
+- **Requirement sub-categories** — the flat `REQ-n` list MAY be clustered under optional headings: *Functional* (what it does), *Non-functional* (quality / security / performance / portability), *Data & Schema* (entities, contracts, persistence, migration shape), *UI-UX* (surfaces, flows, accessibility), and *AI-Agent* (for agentic builds: role, allowed + forbidden tools, output contract, when-to-stop conditions). Use them when grouping aids clarity; a flat, ungrouped list stays valid.
+- **`[blocking | deferrable]` tags on Open questions** — each open question MAY be tagged: `[blocking]` must be resolved before build starts, `[deferrable]` can be answered later without stalling work. Tag only where the distinction matters.
+- **`## Constraints & dependencies`** — optional section for external/internal constraints (platforms, APIs, libraries, deadlines, budgets, upstream teams, regulatory limits), each tagged `[blocking | deferrable | unknown]`. Omit entirely for a PRD with no notable constraints.
+- **`## Decision log`** — optional PRD-*authoring* history (scope cuts, requirement framing, target-user calls) captured as decision · why · alternatives · tradeoff. This is product-authoring memory, DISTINCT from the architectural ADRs in `.renmark/memory/decisions.md` — cross-reference an ADR by path, never duplicate it here.
+- **`## Recommendation`** — the one-line advisory verdict (`build-now | revise-scope | discovery-first | do-not-build-yet` + one sentence) produced at the approval gate above. Persist the surfaced verdict here so the written PRD records it.
 
 ### Altitude — what acceptance criteria are (and are NOT)
 
