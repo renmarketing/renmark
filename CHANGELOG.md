@@ -1,5 +1,184 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (fable-routing): repricing, parsing edges, design pins
+**Request:** Codex review found 0 critical / 3 major / 2 minor / 1 nit on 9b49afd..HEAD; fix the real ones, pin the by-design ones.
+**Built:** Engine: downgraded fable→opus preview rows now reprice at the effective rate even with explicit est_cost_usd (major 3). Capabilities: indented headings terminate the Model tiers block; env/file tier values normalize case (minor 4 + nit 6). Design pins with REQ-2 citations: RENMARK_TOP_TIER=fable IS a per-user declaration (lint passes, hint fires — majors 1-2 ruled by-design) and env=opus on a declared repo BLOCKs fable (collaborator protection). Plan SKILL routing row clarifies env counts as declaration. Deferred: plan_lint's Path.cwd() repo_root (minor 5) — pre-existing convention shared with check 4; cross-checkout linting is a separate refactor.
+**Files changed:**
+- `renmark/capabilities.py`, `tests/test_capabilities.py` — parsing + case fixes, 3 new tests
+- `renmark/cli/_engine.py`, `tests/test_engine_budget_and_rollback.py` — downgrade repricing + regression
+- `tests/test_plan_lint.py`, `tests/test_lifecycle.py` — 3 REQ-2 design-pin tests
+- `plugin/skills/plan/SKILL.md` — env-counts-as-declaration clarification
+**Do not change:**
+- Env precedence (RENMARK_TOP_TIER > routing.md > opus) is test-pinned in BOTH directions — changing it breaks the REQ-2 per-user override contract.
+- Downgraded preview rows always reprice; explicit est_cost_usd wins only when the executor is NOT downgraded.
+
+## [2026-06-12] — preferences pointer pair
+**Request:** fable-routing part 2 wave 2.
+**Built:** Frontier-reasoning row in root CLAUDE.md + template now states fable is the default for ideation/strategy/adversarial roles when declared, escalation-only otherwise. AGENTS.md had no anchor row — nothing added (task 13 SKIP by rule).
+**Files changed:**
+- `CLAUDE.md`
+- `plugin/templates/CLAUDE.md.template`
+**Do not change:**
+- Root and template rows stay byte-identical; AGENTS.md gains the row only if a future sync adds the preferences block there.
+
+## [2026-06-12] — Model tiers declarations
+**Request:** fable-routing part 2 wave 2.
+**Built:** Template ships top_tier: opus with fable opt-in comments; this repo declares top_tier: fable (owner-confirmed). capabilities.is_top_tier_declared(Path('.')) now True here — synthesis-skill tier hints and fable plan acceptance are live.
+**Files changed:**
+- `plugin/templates/memory/routing.md.template`
+- `.renmark/memory/routing.md`
+**Do not change:**
+- The Model tiers block is hand-curated — memory.append_routing never edits it; init never overwrites an existing block.
+
+## [2026-06-12] — codereview + audit declaration wording
+**Request:** fable-routing part 2 wave 1.
+**Built:** Both adversarial-escalation notes now condition fable routing on declared top_tier with documented opus fallback.
+**Files changed:**
+- `plugin/skills/codereview/SKILL.md`
+- `plugin/skills/audit/SKILL.md`
+**Do not change:**
+- Both notes share the same gate language — keep them in sync.
+
+## [2026-06-12] — doctor declaration report
+**Request:** fable-routing part 2 wave 1.
+**Built:** Advisory check row resolves top_tier via renmark.capabilities and flags env overrides; remediation points at /renmark:init.
+**Files changed:**
+- `plugin/skills/doctor/SKILL.md`
+**Do not change:**
+- Advisory only — doctor --fix does not write the declaration.
+
+## [2026-06-12] — init declaration question
+**Request:** fable-routing part 2 wave 1.
+**Built:** New step writes the ## Model tiers block above Learned overrides on first run; idempotent; non-interactive defaults to opus; setup inherits via delegation.
+**Files changed:**
+- `plugin/skills/init/SKILL.md`
+**Do not change:**
+- Existing Model tiers blocks are NEVER overwritten — init reports them instead.
+
+## [2026-06-12] — prd-alignment haiku pin
+**Request:** fable-routing part 2 wave 1.
+**Built:** Default model: haiku; sonnet when PRD.md > ~800 lines; the citable dispatch blockquote carries the pin so callers can't drift.
+**Files changed:**
+- `plugin/skills/_shared/prd-alignment.md`
+**Do not change:**
+- ≤5-line verdict contract unchanged; callers re-copy the blockquote verbatim.
+
+## [2026-06-12] — blueprint bulk demotion
+**Request:** fable-routing part 2 wave 1.
+**Built:** Session brain writes the design spec; codex bulk-emits via renmark-execute --task into .renmark/state/blueprint/ staging, then the splice proceeds as before. Schematic stays inline with a never-escalate note.
+**Files changed:**
+- `plugin/skills/blueprint/SKILL.md`
+**Do not change:**
+- Marker-splice + no-invented-nodes contracts unchanged; staging dir is sanctioned scratch.
+
+## [2026-06-12] — brainstorm research demotion
+**Request:** fable-routing part 2 wave 1.
+**Built:** Step 3 web research demoted off the top tier: parallel model:sonnet subagents, angle-suffixed research artifacts, ≤5-line summaries; synthesis stays on the session brain. Step 0 surfaces the declared-tier hint.
+**Files changed:**
+- `plugin/skills/brainstorm/SKILL.md`
+**Do not change:**
+- One-question-at-a-time interactive flow unchanged — no per-checkpoint fable Agent calls (judge-pinned).
+
+## [2026-06-12] — plan SKILL declaration rows
+**Request:** fable-routing part 2 wave 1.
+**Built:** Routing row, complexity clause, and cost-table note now reference the declaration gate and fable→opus preview render.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`
+**Do not change:**
+- Frontmatter description untouched — reconciled 2026-06-11.
+
+## [2026-06-12] — orchestrate fable→opus fallback
+**Request:** fable-routing part 2 wave 1.
+**Built:** Fable Agent-dispatch errors retry once with no override; ledgered via append_routing + wave-summary marker. Complementary to (not touching) the codex reroute-first rule.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+**Do not change:**
+- Exactly ONE retry; second failure is ordinary FAIL. Fallback ledger uses model=opus, never task.executor.
+
+## [2026-06-12] — default-forward + codex-reroute owner rules
+**Request:** Owner (2026-06-11): 'if codex is blocked assign to sonnet and continue; if no answer, move on' — implement in renmark itself.
+**Built:** handoff-menu.md rule 8 rewritten: reversible hand-offs default-forward to the (Recommended) option after one restated unanswered ask; dispatch gates default-forward only with validated plan + visible cost preview; REQ-12 gates never default. orchestrate SKILL Tier-2 gains reroute-first: codex usage-limited non-bulk tasks re-route to sonnet Agent calls (ledgered via append_routing + wave-summary note, no double-counting); Claude-side limits still pause. CLAUDE.md + template executor-dispatch blocks carry the exception line.
+**Files changed:**
+- `plugin/skills/_shared/handoff-menu.md` — rule 8 default-forward policy
+- `plugin/skills/orchestrate/SKILL.md` — reroute-first on codex limits
+- `CLAUDE.md`, `plugin/templates/CLAUDE.md.template` — dispatch-rule exception line
+**Do not change:**
+- REQ-12 gates (merge/release/PRD/budget/destructive) NEVER default-forward — silence is a no.
+- Reroutes are always ledgered; bulk-emission waves never re-route to sonnet.
+
+## [2026-06-12] — preamble hint tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** Synthesis-skill hint presence/absence + both-fire ' | ' composition pinned; lifecycle.py hunk is ruff-format-only.
+**Files changed:**
+- `tests/test_lifecycle.py`
+- `renmark/lifecycle.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
+## [2026-06-12] — engine preview fallback tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** Undeclared repo renders fable→opus at 0.015; declared renders fable at 0.030.
+**Files changed:**
+- `tests/test_engine_budget_and_rollback.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
+## [2026-06-12] — plan_lint fable-gate tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** Undeclared BLOCK, declared pass, mechanical BLOCK-even-declared; test_executor_fable_lints_clean fixture now declares top_tier (expected-red resolved).
+**Files changed:**
+- `tests/test_plan_lint.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
+## [2026-06-12] — capabilities tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** 7 behaviors pinned: absent/declared/explicit/garbage file values, env override + invalid-env fallthrough, executor passthrough, heading-bounded parsing.
+**Files changed:**
+- `tests/test_capabilities.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
+## [2026-06-11] — check-plan doc mirror
+**Request:** fable-routing part 1 wave 2.
+**Built:** Checks list gains the two fable BLOCK rows; lead-in count corrected 8→10.
+**Files changed:**
+- `plugin/skills/check-plan/SKILL.md`
+**Do not change:**
+- Doc rows 9-10 mirror plan_lint._check_fable_declared/_check_fable_mechanical exactly.
+
+## [2026-06-11] — preamble tier hint
+**Request:** fable-routing part 1 wave 2.
+**Built:** skill_preamble surfaces 'declared top tier: fable — … (/model fable)' for brainstorm/plan/prd/blueprint when declared; composes with cross-domain hint via ' | '.
+**Files changed:**
+- `renmark/lifecycle.py`
+**Do not change:**
+- skill_preamble still returns one bounded string or None — callers depend on that contract.
+
+## [2026-06-11] — engine preview + env knob
+**Request:** fable-routing part 1 wave 2.
+**Built:** Dry-run maps executors through capabilities.effective_executor; undeclared fable rows render 'fable→opus' at opus rate; Config gains validated top_tier field.
+**Files changed:**
+- `renmark/cli/_engine.py`
+**Do not change:**
+- Config() construction now requires top_tier kwarg — from_env is the only constructor site.
+
+## [2026-06-11] — plan_lint fable gates
+**Request:** fable-routing part 1 wave 2.
+**Built:** Checks 9-10: BLOCK executor:fable in undeclared projects; BLOCK fable on simple/mechanical tasks (unconditional REQ-2).
+**Files changed:**
+- `renmark/plan_lint.py`
+**Do not change:**
+- plan_lint severities mirror check-plan SKILL §1-2.5 (now 10 checks) — change both sides + tests together. NOTE: test_executor_fable_lints_clean is expected-red until task 7 (same run) declares top_tier in its fixture.
+
+## [2026-06-11] — capabilities module
+**Request:** fable-routing part 1 task 1 — the declared-capability resolver.
+**Built:** renmark/capabilities.py: read_tiers parses the ## Model tiers block from .renmark/memory/routing.md; top_tier resolves RENMARK_TOP_TIER env > file > opus; effective_executor maps fable->opus when undeclared, passes everything else through.
+**Files changed:**
+- `renmark/capabilities.py` — new pure-function stdlib module
+**Do not change:**
+- Resolution order is env > file > opus and unknown values fall through (never raise) — plan_lint/engine/lifecycle all depend on this being side-effect-free.
+
 ## [2026-06-11] — PRD updated (REQ-2: declared-capability Fable routing)
 **Request:** Adopt the fable-routing strategy decided 2026-06-11: make Fable the default for ideation/strategy synthesis when a project declares `top_tier: fable`.
 **Built:** Reconciled REQ-2 of `PRD.md`: Fable is the DEFAULT for ideation/strategy-synthesis/adversarial-review roles in projects with a committed `top_tier: fable` declaration (`.renmark/memory/routing.md`, `RENMARK_TOP_TIER` override); undeclared projects keep escalation-only, byte-identical behavior; availability declared never detected; mechanical/bulk prohibition absolute + deterministically enforced; Fable→Opus fallback single-retry and logged. Bumped `last_reviewed` to 2026-06-11; appended revision note. Approved via the `/renmark:prd` UPDATE diff gate.

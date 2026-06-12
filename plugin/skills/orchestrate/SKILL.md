@@ -13,7 +13,7 @@ Dispatches plan tasks in waves with **strict task isolation** (G11). Within a `p
 |---|---|---|
 | `codex` | Bash call to `renmark-execute` (subprocess) | Codex account (OpenAI subscription) |
 | `haiku`, `sonnet`, `opus` | Agent tool calls (no model override) | Claude Code account (Anthropic subscription) |
-| `fable` | Agent tool call with `model: "fable"` override | Claude Code account (Anthropic subscription) |
+| `fable` | Agent tool call with `model: "fable"` override (one-shot fallback to no override — opus tier — if fable is unavailable; see Step 3b) | Claude Code account (Anthropic subscription) |
 
 After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (the per-task `SubagentOutput` dicts) and commits passing tasks serially in task-index order.
 
@@ -150,6 +150,14 @@ Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `exe
 
 After the Agent returns, parse its response through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark the task as FAIL with reason "subagent leaked forbidden fields" — do not retry.
 
+**Fable-unavailable fallback (defense-in-depth).** If an Agent call with `model: "fable"` errors **on dispatch** — the model is unavailable or the override is rejected by the harness — retry the task **exactly once** with no `model` override (the opus tier, same as `executor: opus`). Requirements (all mandatory — degradation is never silent):
+
+- record `fallback: fable→opus` in that task's wave-summary entry — in `dependency_notes` or a dedicated note field — so downstream waves and `/renmark:verify` see what actually ran;
+- log the fallback via `memory.append_routing(repo, signature=<task signature>, executor="opus", outcome=<"passed"|"failed">)` so repeated fable fallbacks accumulate as routing evidence in `.renmark/memory/routing.md`;
+- ledger the fallback call with `model="opus"` (not `task.executor`) so spend attribution matches what ran.
+
+One retry only: if the no-override retry also fails, that is an ordinary task FAIL — no further reroutes, no second fallback tier. Note that orchestrate's pre-flight `plan_lint` fable gates (checks 9–10: undeclared `top_tier: fable`, fable-on-mechanical) make an undeclared fable dispatch unreachable in the normal flow — this fallback is defense-in-depth for harness-side unavailability, not a routing surface. It is distinct from and complementary to the codex-side "Reroute-first on codex limits" rule in Step 5: that rule handles usage limits on the subprocess path; this one handles model availability on the Agent path.
+
 **Ledger the call.** Immediately after parsing each successful Agent return, log the spend so `/renmark:roadmap` reports honestly:
 
 ```python
@@ -248,6 +256,20 @@ analytics.record_event(repo, ts=state.now_iso(),
 ```
 
 Surface: *"Provider usage limit hit at task <index> — paused (not failed). Resume with `/renmark:orchestrate --resume` after `resume_after`."* The PauseState's `resume_after` follows the same fallback rule as the preflight pause (provider reset → next local window → now+60min).
+
+**Reroute-first on codex limits (owner rule, 2026-06-11).** When the usage signal is
+CODEX-side and the blocked tasks are non-bulk (test scaffolding, single-file emissions —
+the typical codex wave), do NOT stop by default. Offer the pause-vs-reroute choice; on no
+answer, default-forward (handoff-menu.md rule 8) **re-routes the blocked codex tasks to
+`sonnet` Agent calls and continues the wave**. Reroute requirements (all mandatory):
+- ledger each reroute via `memory.append_routing(...)` (signature: codex→sonnet, reason: usage_limit) — degradation is never silent;
+- mark the wave-summary entry `executor: sonnet (rerouted: codex usage-limit)`;
+- `state.log_agent_call` the sonnet spend (reroutes bill Anthropic; never also ledger codex for the same task — no double counting).
+
+Claude-side limits still pause — there is no cheaper tier to re-route onto. Pausing also
+remains correct when the user explicitly chooses it or the blocked codex work is
+bulk-heavy (> 5 tasks or > ~3k est_tokens each): bulk emission is codex's role and
+shifting it to sonnet burns the user's Claude quota against REQ-2's intent.
 
 ### 6. Update memory
 

@@ -43,6 +43,7 @@ from .commands import cmd_analytics, cmd_logs, cmd_roadmap, cmd_task, cmd_usage
 class Config:
     prefer_small_model: str
     big_model: str
+    top_tier: str
     max_tokens_per_run: int
     max_minutes_per_run: int
     max_tasks_per_run: int
@@ -53,9 +54,13 @@ class Config:
 
     @classmethod
     def from_env(cls) -> Config:
+        top_tier = os.environ.get("RENMARK_TOP_TIER", "").strip()
+        if top_tier not in ("fable", "opus"):
+            top_tier = ""  # defer to capabilities file resolution
         return cls(
             prefer_small_model=os.environ.get("RENMARK_PREFER_SMALL_MODEL", ""),
             big_model=os.environ.get("RENMARK_BIG_MODEL", ""),
+            top_tier=top_tier,
             max_tokens_per_run=int(os.environ.get("RENMARK_MAX_TOKENS_PER_RUN", "50000")),
             max_minutes_per_run=int(os.environ.get("RENMARK_MAX_MINUTES_PER_RUN", "30")),
             max_tasks_per_run=int(os.environ.get("RENMARK_MAX_TASKS_PER_RUN", "15")),
@@ -392,6 +397,7 @@ def execute_plan(
     )
 
     if dry_run:
+        from .. import capabilities as _caps
         from .. import dispatch as _d
 
         waves = _d.group_tasks_by_wave(tasks)
@@ -406,8 +412,14 @@ def execute_plan(
             for t in w:
                 mark = "DONE" if t.index in done else "TODO"
                 tok = t.est_tokens or _default_tokens_for_complexity(t.complexity)
-                ex = t.executor
-                cost = t.est_cost_usd
+                # Resolve declared-tier fallback (fable→opus when undeclared) so
+                # the preview prices and labels what will actually run.
+                ex = _caps.effective_executor(t.executor, repo)
+                ex_display = f"{t.executor}→{ex}" if ex != t.executor else ex
+                # A downgraded executor (e.g. fable→opus) invalidates any prefilled
+                # est_cost_usd — it was estimated at the wrong tier. Reprice from
+                # the effective executor's rate so display matches what's charged.
+                cost = t.est_cost_usd if ex == t.executor else None
                 if cost is None:
                     # Infer from executor.
                     rate = cost_per_kt.get(ex, 0.0)
@@ -416,7 +428,7 @@ def execute_plan(
                     cost = (tok / 1000.0) * rate
                 cost_str = f"${cost:.3f}" if cost > 0 else "free"
                 _print(
-                    f"    [{mark}] task {t.index} {ex:<8} {t.complexity:<6} "
+                    f"    [{mark}] task {t.index} {ex_display:<8} {t.complexity:<6} "
                     f"~{tok:>5} tok  {cost_str:>8}  → {t.target}  ({t.title})"
                 )
                 total_tokens += tok

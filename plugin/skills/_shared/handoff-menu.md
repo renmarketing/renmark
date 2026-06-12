@@ -117,11 +117,24 @@ contextual:
    Prefer the interactive picker (rule 6) whenever `AskUserQuestion` is available
    — this printed list is the fallback, not the primary presentation.
 
-8. **A choice is always required — never auto-proceed.** Whether via the picker
-   or the fallback, end on the question and wait for an explicit selection. Never
-   assume a default or act on an empty answer — every hand-off is a decision the
-   user must make. (`AskUserQuestion` enforces this by construction; in the text
-   fallback, if the answer matches no option, re-show the list and ask again.)
+8. **A choice is required — with a bounded default-forward (owner rule,
+   2026-06-11).** End on the question and wait for a selection — but renmark
+   favors pipeline momentum over gate ceremony, so silence is handled by
+   decision class:
+   - **Reversible hand-offs** (quality-gate menus, what's-next pickers, resume
+     hints): if the picker is declined/aborted **without an alternative
+     instruction** (accidental declines happen — e.g. exiting dictation mode),
+     or the text fallback sits unanswered, restate the question once; if still
+     unanswered, **proceed with the option labeled `(Recommended)`**, stating
+     plainly: *"no answer — proceeding with <option> (default-forward rule)."*
+     A decline that comes WITH instructions is an answer — follow the
+     instructions instead.
+   - **Dispatch gates** (token spend begins): default-forward is allowed ONLY
+     when the plan is validated AND the cost preview was displayed in the same
+     hand-off; otherwise keep waiting.
+   - **REQ-12 gates NEVER default:** merge, release, `PRD.md` writes, budget
+     escalation, and branch-destructive operations always require an explicit
+     yes — silence is a no. (`/renmark:approve` remains the only grant surface.)
 
    > **Note on `[o]` and `[fix]` codes:** `[o] Open` (open the review file) and
    > `[fix] Fix` (kick off a plan from the findings) are codereview-lite-lane

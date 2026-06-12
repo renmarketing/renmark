@@ -14,6 +14,10 @@ Example: `- (2026-06-09) \`target=tests/**, complexity=medium, mode=A\` → **co
 
 When entries conflict for the same signature, the newest dated entry wins.
 
+## Model tiers
+top_tier: fable
+declared_at: 2026-06-12
+
 ## Defaults (until experience accumulates)
 
 - (target=`.gitignore`, complexity=simple) → haiku
@@ -25,6 +29,8 @@ When entries conflict for the same signature, the newest dated entry wins.
 - (complexity=medium, refactor) → sonnet
 
 ## Learned overrides
+
+- (2026-06-12) `codex tasks blocked by provider usage limit (non-bulk)` → **sonnet** (owner rule 2026-06-11: reroute-first, ledgered; codex retry also valid after reset, run=20260612-124500-fr1)
 
 - (2026-06-11) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260611-142135-bcc2)
 

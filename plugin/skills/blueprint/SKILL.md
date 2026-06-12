@@ -9,7 +9,7 @@ description: Use when the user wants a visual blueprint of the project — typed
 
 `/renmark:blueprint` turns the project's recorded architecture into two visual artifacts at the repo root: a **SCHEMATIC.md** (a Container-granularity Mermaid flowchart of the system) and — only when the build has a user interface — a **PROTOTYPE.html** (a self-contained HTML/CSS mockup body). It is a **touchpoint, not a lifecycle stage**: you can run it at any point once the project map exists, as often as you like.
 
-This skill **orchestrates**; it does not implement the splice. The marker grammar, idempotent block replacement, and the "never clobber human content" guard all live in `renmark/blueprint.py`. The skill's job is the LLM-side synthesis (the Mermaid graph, the mockup body) plus the gates (freshness, UI) and the write-boundary contract. Architecture is read from **one source only** — `.renmark/memory/project-map.md` — and is **never** reconstructed by rescanning the repo.
+This skill **orchestrates**; it does not implement the splice. The marker grammar, idempotent block replacement, and the "never clobber human content" guard all live in `renmark/blueprint.py`. The skill's job is the session-brain synthesis (the Mermaid graph inline, plus a ~10-line design spec that codex expands into the mockup body via `renmark-execute --task`) plus the gates (freshness, UI) and the write-boundary contract. Architecture is read from **one source only** — `.renmark/memory/project-map.md` — and is **never** reconstructed by rescanning the repo.
 
 ## When to Use
 
@@ -31,7 +31,7 @@ The map and the visuals have **disjoint, single-writer ownership** — do not cr
 - `/renmark:init` writes **only** `.renmark/memory/project-map.md` and `.renmark/memory/stack.md`. It never touches the visuals.
 - `/renmark:blueprint` is the **SOLE writer** of `SCHEMATIC.md` and `PROTOTYPE.html`. It never writes the map or stack; it only **reads** them.
 
-Blueprint treats `project-map.md` as read-only upstream truth and the two root visuals as its exclusive downstream output. Any write outside `SCHEMATIC.md` / `PROTOTYPE.html` from this skill is a bug.
+Blueprint treats `project-map.md` as read-only upstream truth and the two root visuals as its exclusive downstream output. Any **root or memory** write outside `SCHEMATIC.md` / `PROTOTYPE.html` from this skill is a bug. (Runtime staging under `.renmark/state/blueprint/` — the prototype design spec and codex's staged emission, see Step 3b — is permitted scratch state, not a root write; the root `PROTOTYPE.html` is still only ever written through the Step 4 splice.)
 
 ## Steps
 
@@ -73,18 +73,34 @@ Branch on the result:
 
 The schematic is **always** produced (assuming the freshness gate passed). Only the prototype is gated on UI.
 
-### Step 3 — Synthesize (LLM-side)
+### Step 3 — Synthesize (schematic inline; prototype split spec → codex)
 
-From `project-map.md` alone, the LLM produces:
+#### Step 3a — Schematic (inline, session brain)
 
-- **Schematic** — a **Container-granularity** Mermaid `flowchart`/`graph` (NOT a full 4-level C4 model). One node per major container/module/service the map records, edges for the data/control flow between them. Keep it to the system's real top-level structure — do not invent components the map doesn't list.
-- **Prototype** (only when UI confirmed in Step 2) — a **self-contained** HTML/CSS mockup **body** (markup + inline styles, no external assets, no JS dependencies) representing the primary UI surface the project describes.
+From `project-map.md` alone, the session LLM produces the **schematic** — a **Container-granularity** Mermaid `flowchart`/`graph` (NOT a full 4-level C4 model). One node per major container/module/service the map records, edges for the data/control flow between them. Keep it to the system's real top-level structure — do not invent components the map doesn't list.
 
-These are the only two pieces of content the LLM generates; everything else is mechanics in `blueprint.py`.
+This step stays **inline**: it is sonnet-grade work over an already-distilled `project-map.md` — no repo reads, no bulk emission. **Never escalate this step to the top tier** — the map already did the distillation, so a bigger model adds cost, not signal.
+
+#### Step 3b — Prototype (only when UI confirmed in Step 2)
+
+The prototype path splits by routing defaults: **design judgment stays on the session brain; bulk markup is codex's designated role.**
+
+1. **Design spec (session brain, ~10 lines).** Write a compact design spec covering: layout (grid/columns, responsive intent), the page's sections in order, information architecture (primary vs. secondary surfaces, nav structure), and palette tokens (3–5 named colors + a typography note). Save it to `.renmark/state/blueprint/prototype-spec.md`. This spec is the only design judgment in the prototype path — keep it ~10 lines; if it grows much past that, you're doing codex's job.
+
+2. **Bulk HTML/CSS emission (codex).** Dispatch as a Bash subprocess — never as an Agent call (executor dispatch rules):
+
+   ```bash
+   renmark-execute --task .renmark/state/blueprint/prototype-spec.md \
+                   --output .renmark/state/blueprint/PROTOTYPE.html
+   ```
+
+   Codex consumes the spec and emits the **self-contained** HTML/CSS mockup **body** (markup + inline styles, no external assets, no JS dependencies) to the staged artifact path. The command prints SubagentOutput JSON to stdout — read ONLY its status fields (`completion_state`, `validation_status`, artifact path); never read the emitted HTML body into the conversation. On `failed`, report honestly and skip the prototype splice — do NOT fall back to hand-writing the bulk markup inline.
+
+The schematic body (3a) and the ~10-line design spec (3b.1) are the only content the session LLM generates; bulk markup belongs to codex, and everything else is mechanics in `blueprint.py`.
 
 ### Step 4 — Splice & write (mechanics in `renmark/blueprint.py`)
 
-For **each** artifact to write — `SCHEMATIC.md`, and `PROTOTYPE.html` when UI — apply this decision per root file. Use the marker-id constants `blueprint.MARKER_SCHEMATIC` (`"SCHEMATIC"`) and `blueprint.MARKER_PROTOTYPE` (`"PROTOTYPE"`). The `source_sha` is the project-map.md sha captured in Step 1.
+For **each** artifact to write — `SCHEMATIC.md`, and `PROTOTYPE.html` when UI — apply this decision per root file. Use the marker-id constants `blueprint.MARKER_SCHEMATIC` (`"SCHEMATIC"`) and `blueprint.MARKER_PROTOTYPE` (`"PROTOTYPE"`). The `source_sha` is the project-map.md sha captured in Step 1. For the schematic, `generated_content` is the Mermaid body from Step 3a; for the prototype, it is the staged codex artifact at `.renmark/state/blueprint/PROTOTYPE.html` — load it inside the Python splice call (file → variable → splice), never by pasting it into the conversation. The splice contract below is unchanged either way.
 
 1. **Root file absent** → create it from the template (`${CLAUDE_PLUGIN_ROOT}/templates/SCHEMATIC.md.template` / `${CLAUDE_PLUGIN_ROOT}/templates/PROTOTYPE.html.template`), substituting `{{PROJECT_NAME}}` / `{{DATE}}`. The template already carries the `RENMARK:GENERATED:<id>:START…END` markers around its `## Current Architecture` block, so after creating it you splice the generated content into those markers exactly as in case 2.
 2. **Root file exists WITH markers** → splice in place, replacing only the generated block and preserving every human-owned section:
@@ -149,12 +165,12 @@ final step still records artifact pointers with **no `stage=`** argument.
 |---|---|---|
 | G2 | Canonical state | Architecture truth lives on disk in `.renmark/memory/project-map.md`; the two visuals are durable root files; the artifact pointers persist in `.renmark/state/lifecycle.json`. Nothing relies on conversation memory. |
 | G3 | Summary boundary | Only a ≤5-line verdict (paths + node counts + source-sha + skip/created/spliced) crosses into the conversation. The Mermaid graph, the HTML body, and full file contents are NEVER read into chat. |
-| G5 | Executor isolation | Heavy reads (`project-map.md`, `stack.md`, templates) happen inside this dedicated invocation; the orchestrator never loads diagram or markup bodies. |
+| G5 | Executor isolation | Heavy reads (`project-map.md`, `stack.md`, templates) happen inside this dedicated invocation. Bulk HTML/CSS emission runs in a Codex subprocess (`renmark-execute --task`, Step 3b) — the session brain authors only the Mermaid body and the ~10-line design spec; the orchestrator never loads markup bodies. |
 | G6 | Artifact governance | Every generated block is provenance-stamped via `source-sha=<project-map.md sha>` on its start marker through `splice_generated_block(..., source_sha=...)`. The templates carry `artifact_type` / `schema_version` / `created_at` headers and `source-sha=PENDING` placeholders that get filled on first splice. |
 | G7 | Compact semantics | The map, the templates, and the spliced files are on disk; after `/compact` mid-skill the freshness gate + UI gate + splice can be re-derived from files with no transcript dependency. |
 | G9 | Failure transparency | A missing/stale map HALTS and routes to `/renmark:init` rather than fabricating architecture. A marker-free human file ABORTS (caught `MarkerNotFoundError`) rather than clobbering. A skipped prototype is reported honestly, never claimed written. |
 | G10 | Workflow recovery | Idempotent and self-locating: re-running re-detects the map state and re-splices the generated block in place without duplicating human content; the source-sha stamp makes re-runs verifiable. |
-| G11 | Task isolation | This skill runs first-person (its reads are in-invocation, no subagent fan-out); the splice mechanics are a deterministic library call (`renmark/blueprint.py`), not delegated reasoning. |
+| G11 | Task isolation | This skill runs first-person for its reads and the schematic (no Agent fan-out); the prototype's bulk emission is an isolated Codex subprocess that returns only an artifact path + SubagentOutput status JSON, and the splice mechanics are a deterministic library call (`renmark/blueprint.py`), not delegated reasoning. |
 | G12 | Lifecycle persistence | Records artifact pointers via `lifecycle.write_lifecycle(repo, artifact_update=...)` with **no `stage=`** — blueprint is a touchpoint, so it never advances the canonical lifecycle stage. |
 
 *Mirror any rule-affecting change to this skill in `AGENTS.md`/`CLAUDE.md` guidance per the workspace sync convention.*

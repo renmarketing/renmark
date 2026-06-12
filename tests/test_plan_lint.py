@@ -18,7 +18,9 @@ CLI exit-code tests run a subprocess so they test the __main__ path.
 
 ## Summary
 - Added `test_heavy_read_fable_block` to pin the heavy-read BLOCK rule for `fable`.
-- Added `test_executor_fable_lints_clean` to prove `executor: fable` parses and lints cleanly.
+- Added declared/undeclared `top_tier: fable` coverage for the new fable routing gate.
+- Added a mechanical-task BLOCK test for `executor: fable` with `complexity: simple`.
+- Updated `test_executor_fable_lints_clean` to declare `top_tier: fable` in the fixture repo.
 - Reused the existing `_task()` helper and heavy-read `Path.cwd()` patch pattern.
 """
 
@@ -87,6 +89,16 @@ def _run_cli(plan_path: Path) -> subprocess.CompletedProcess[str]:
         [sys.executable, "-m", "renmark.plan_lint", str(plan_path)],
         capture_output=True,
         text=True,
+    )
+
+
+def _declare_top_tier(tmp_path: Path, top_tier: str) -> None:
+    """Write a minimal routing.md model-tier declaration under tmp_path."""
+    routing = tmp_path / ".renmark" / "memory" / "routing.md"
+    routing.parent.mkdir(parents=True, exist_ok=True)
+    routing.write_text(
+        f"# Routing\n\n## Model tiers\n\ntop_tier: {top_tier}\n",
+        encoding="utf-8",
     )
 
 
@@ -358,6 +370,116 @@ def test_heavy_read_fable_block(tmp_path: Path) -> None:
     assert any("heavy" in issue.lower() or "G5" in issue for issue in report.issues)
 
 
+def test_fable_undeclared_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** medium\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert report.verdict == "BLOCK"
+    assert any("top_tier" in issue for issue in report.issues)
+
+
+def test_fable_declared_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _declare_top_tier(tmp_path, "fable")
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** medium\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert not any("fable" in issue.lower() or "top_tier" in issue for issue in report.issues)
+
+
+def test_fable_mechanical_blocks_even_when_declared(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _declare_top_tier(tmp_path, "fable")
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** simple\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert report.verdict == "BLOCK"
+    assert any("fable" in issue.lower() and "simple" in issue.lower() for issue in report.issues)
+
+
+def test_fable_env_declaration_passes_lint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """BY DESIGN (PRD REQ-2): `RENMARK_TOP_TIER` is a legitimate PER-USER declaration —
+    "a committed `## Model tiers` block…, per-user overridable with `RENMARK_TOP_TIER`".
+    An undeclared repo (no routing.md block) + RENMARK_TOP_TIER=fable counts as declared;
+    this is NOT a bypass of the fable gate."""
+    monkeypatch.setenv("RENMARK_TOP_TIER", "fable")
+    # No _declare_top_tier() call — the repo itself stays undeclared.
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** medium\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert not any("fable" in issue.lower() or "top_tier" in issue for issue in report.issues)
+
+
+def test_fable_env_opus_override_blocks_on_declared_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """BY DESIGN (PRD REQ-2): the per-user env override wins in BOTH directions.
+    A repo that commits `top_tier: fable` but a collaborator running with
+    RENMARK_TOP_TIER=opus (no Fable access) must still BLOCK fable tasks —
+    the collaborator-without-Fable protection."""
+    monkeypatch.setenv("RENMARK_TOP_TIER", "opus")
+    _declare_top_tier(tmp_path, "fable")
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** medium\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert report.verdict == "BLOCK"
+    assert any("top_tier" in issue for issue in report.issues)
+
+
 def test_heavy_read_haiku_no_block(tmp_path: Path) -> None:
     """haiku is exempt from the heavy-read check."""
     ctx_file = tmp_path / "big_context.md"
@@ -482,8 +604,15 @@ def test_executor_counts_populated(tmp_path: Path) -> None:
 
 
 def test_executor_fable_lints_clean(tmp_path: Path) -> None:
+    # The clean acceptance path must declare fable as the repo top tier now
+    # that lint_plan gates executor:fable tasks on routing.md / env state.
+    _declare_top_tier(tmp_path, "fable")
     plan = _write(tmp_path, _BASE_HEADER + _task(executor="fable"))
-    report = lint_plan(plan)
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
     assert report.verdict == "PASS"
     assert report.issues == []
 

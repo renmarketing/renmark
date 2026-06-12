@@ -23,6 +23,13 @@ When entries conflict for the same signature, the newest dated entry wins.
 - (signal=canvas|DOM|state-machine|coord-math|threading) → opus
 - (complexity=medium, refactor) → sonnet
 
+## Model tiers
+
+top_tier: opus
+declared_at: {{DATE}}
+<!-- Set top_tier: fable if this project's sessions have Claude Fable 5 access; -->
+<!-- /renmark:init asks this once. Hand-curated — append_routing never edits it. -->
+
 ## Learned overrides
 
 (Empty — will fill as runs complete.)

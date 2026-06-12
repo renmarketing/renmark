@@ -66,6 +66,8 @@ When re-running an audit against a prior report's findings (the
 "refute each finding" delta-audit pattern, as used for the v0.9.0 delta
 audit), refutation subagents SHOULD be dispatched via the Agent tool with
 `model: "fable"` — Fable is the designated adversarial-audit tier per REQ-2.
+This applies in projects with a declared `top_tier: fable`
+(renmark.capabilities); undeclared projects run the same passes on opus.
 Each refutation subagent receives one finding plus the relevant file paths,
 attempts to refute it against the live tree (read-only), and returns a
 bounded confirmed/refuted verdict (≤ 5 lines). This is a routing
