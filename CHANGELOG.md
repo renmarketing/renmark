@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — doctor declaration report
+**Request:** fable-routing part 2 wave 1.
+**Built:** Advisory check row resolves top_tier via renmark.capabilities and flags env overrides; remediation points at /renmark:init.
+**Files changed:**
+- `plugin/skills/doctor/SKILL.md`
+**Do not change:**
+- Advisory only — doctor --fix does not write the declaration.
+
 ## [2026-06-12] — init declaration question
 **Request:** fable-routing part 2 wave 1.
 **Built:** New step writes the ## Model tiers block above Learned overrides on first run; idempotent; non-interactive defaults to opus; setup inherits via delegation.

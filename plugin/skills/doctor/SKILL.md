@@ -33,6 +33,37 @@ The script returns:
 
 It prints a checklist with ✓ / ✗ / ! glyphs and a `fix:` line for any failure that has a known remediation.
 
+**Step 1b — Append the Model tiers declaration row (advisory).**
+
+Report the project's current Model tiers declaration as one extra row in the
+same check-row format. Resolve it via `renmark.capabilities.top_tier(repo)`
+(precedence: `RENMARK_TOP_TIER` env var → `## Model tiers` block in
+`.renmark/memory/routing.md` → default `opus`):
+
+```bash
+python -c "
+import os
+from pathlib import Path
+from renmark.capabilities import top_tier, read_tiers
+repo = Path.cwd()
+eff = top_tier(repo)
+declared = read_tiers(repo).get('top_tier', '').strip()
+env = os.environ.get('RENMARK_TOP_TIER', '').strip()
+overriding = env in ('fable', 'opus') and env != (declared or 'opus')
+print(f'effective={eff} declared={declared or \"(undeclared -> opus)\"} env_override={overriding}')
+"
+```
+
+Render the result as one of:
+
+- `✓ Model tiers — top_tier: fable` or `✓ Model tiers — top_tier: opus` — declared in `routing.md`, no env override
+- `! Model tiers — top_tier: (undeclared → opus)` with `fix: run /renmark:init to answer the one-time Fable-access declaration question`
+- `! Model tiers — top_tier: <env value> (RENMARK_TOP_TIER overriding file value: <declared|undeclared>)` — when the env var differs from the file declaration
+
+This row is **advisory only**: it never fails the run, and `--fix` does NOT
+write the declaration. The sole remediation is the one-time declaration
+question in `/renmark:init`.
+
 **Step 2 — Offer auto-fix if any failures are flagged `auto_fixable`.**
 
 The output's final line will say something like:
