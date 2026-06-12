@@ -13,7 +13,7 @@ Dispatches plan tasks in waves with **strict task isolation** (G11). Within a `p
 |---|---|---|
 | `codex` | Bash call to `renmark-execute` (subprocess) | Codex account (OpenAI subscription) |
 | `haiku`, `sonnet`, `opus` | Agent tool calls (no model override) | Claude Code account (Anthropic subscription) |
-| `fable` | Agent tool call with `model: "fable"` override | Claude Code account (Anthropic subscription) |
+| `fable` | Agent tool call with `model: "fable"` override (one-shot fallback to no override — opus tier — if fable is unavailable; see Step 3b) | Claude Code account (Anthropic subscription) |
 
 After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (the per-task `SubagentOutput` dicts) and commits passing tasks serially in task-index order.
 
@@ -149,6 +149,14 @@ Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `exe
 > The generated code goes in the artifact file at `<artifact_path>`, NOT in your response. Do not paste code or diffs back. If you cannot complete with the inputs provided, return `status: FAIL` with a one-line reason."
 
 After the Agent returns, parse its response through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark the task as FAIL with reason "subagent leaked forbidden fields" — do not retry.
+
+**Fable-unavailable fallback (defense-in-depth).** If an Agent call with `model: "fable"` errors **on dispatch** — the model is unavailable or the override is rejected by the harness — retry the task **exactly once** with no `model` override (the opus tier, same as `executor: opus`). Requirements (all mandatory — degradation is never silent):
+
+- record `fallback: fable→opus` in that task's wave-summary entry — in `dependency_notes` or a dedicated note field — so downstream waves and `/renmark:verify` see what actually ran;
+- log the fallback via `memory.append_routing(repo, signature=<task signature>, executor="opus", outcome=<"passed"|"failed">)` so repeated fable fallbacks accumulate as routing evidence in `.renmark/memory/routing.md`;
+- ledger the fallback call with `model="opus"` (not `task.executor`) so spend attribution matches what ran.
+
+One retry only: if the no-override retry also fails, that is an ordinary task FAIL — no further reroutes, no second fallback tier. Note that orchestrate's pre-flight `plan_lint` fable gates (checks 9–10: undeclared `top_tier: fable`, fable-on-mechanical) make an undeclared fable dispatch unreachable in the normal flow — this fallback is defense-in-depth for harness-side unavailability, not a routing surface. It is distinct from and complementary to the codex-side "Reroute-first on codex limits" rule in Step 5: that rule handles usage limits on the subprocess path; this one handles model availability on the Agent path.
 
 **Ledger the call.** Immediately after parsing each successful Agent return, log the spend so `/renmark:roadmap` reports honestly:
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — orchestrate fable→opus fallback
+**Request:** fable-routing part 2 wave 1.
+**Built:** Fable Agent-dispatch errors retry once with no override; ledgered via append_routing + wave-summary marker. Complementary to (not touching) the codex reroute-first rule.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+**Do not change:**
+- Exactly ONE retry; second failure is ordinary FAIL. Fallback ledger uses model=opus, never task.executor.
+
 ## [2026-06-12] — default-forward + codex-reroute owner rules
 **Request:** Owner (2026-06-11): 'if codex is blocked assign to sonnet and continue; if no answer, move on' — implement in renmark itself.
 **Built:** handoff-menu.md rule 8 rewritten: reversible hand-offs default-forward to the (Recommended) option after one restated unanswered ask; dispatch gates default-forward only with validated plan + visible cost preview; REQ-12 gates never default. orchestrate SKILL Tier-2 gains reroute-first: codex usage-limited non-bulk tasks re-route to sonnet Agent calls (ledgered via append_routing + wave-summary note, no double-counting); Claude-side limits still pause. CLAUDE.md + template executor-dispatch blocks carry the exception line.
