@@ -11,6 +11,15 @@ status: draft
      intentional and exempt from the generated-artifact provenance fields
      (source_sha, generator, dependency_refs) required of machine-emitted artifacts. -->
 
+<!-- WHAT THIS PRD DELIBERATELY DOES NOT INCLUDE (anti-completion guard — do not bloat):
+       - Build plan / task breakdown      → /renmark:plan (emits .renmark/plans/…)
+       - Testing strategy & verification  → /renmark:verify (goal-backward + --qa/--deep-qa)
+       - Full risk catalog                → brainstorm spec + /renmark:brainstorm --deep-qa
+       - Reversibility / rollback design  → REQ-12 human-approval gates + /careful
+       - Asset / reuse inventory          → reuse-check + .renmark/memory/project-map.md
+     The PRD says WHAT and WHY at product level. Mechanism, sequencing, and proof live in
+     the artifacts above — cross-reference them, don't reproduce them here. -->
+
 # {{PROJECT_NAME}} — Product Requirements Document
 
 ## Vision / Problem
@@ -31,6 +40,17 @@ status: draft
 Each requirement MAY carry an optional **acceptance** line — a single indented `- *Acceptance:*` bullet holding 1–3 semicolon-separated "done when…" clauses, each a short, plain-English, product-level outcome (NOT task/implementation steps, NOT Gherkin). Omit the line entirely when the outcome is self-evident.
 <!-- Acceptance criteria are per-REQ "done when…" outcomes that confirm THAT requirement is met;
      Success metrics (below) are project-wide signals of overall success. Don't conflate the two. -->
+<!-- OPTIONAL sub-grouping: when a project benefits, REQ-n MAY be clustered under headings:
+       - Functional        — what the product does
+       - Non-functional    — quality, security, performance, portability
+       - Data & Schema     — entities, contracts, persistence, migration shape
+       - UI-UX             — surfaces, flows, accessibility
+       - AI-Agent          — for agentic builds: role, allowed + forbidden tools,
+                             output contract, and when-to-stop conditions
+     These are OPTIONAL groupings of the same REQ-n list, NOT required headers. A flat,
+     ungrouped REQ list stays fully valid. The AI-Agent group is the genuinely new slot —
+     renmark builds AI plugins, and agent role/tool-boundaries/output-contract/stop-rules
+     are first-class requirements there, not implementation detail. -->
 
 1. `REQ-1` (Describe the first required behavior or outcome in user-facing or business-facing terms.)
    - *Acceptance:* done when (an observable product outcome); done when (another).
@@ -45,3 +65,24 @@ Each requirement MAY carry an optional **acceptance** line — a single indented
 
 ## Open questions
 (List unresolved decisions, assumptions to validate, or information still needed.)
+Each question MAY be tagged `[blocking]` or `[deferrable]` — a `[blocking]` question must be resolved before build starts; a `[deferrable]` one can be answered later without stalling work.
+
+## Constraints & dependencies
+<!-- OPTIONAL section. External and internal constraints/dependencies the build must respect:
+     platforms, APIs, libraries, deadlines, budgets, upstream teams, regulatory limits. -->
+(List each constraint or dependency tagged `[blocking | deferrable | unknown]` — `[blocking]` must be satisfied before build, `[deferrable]` can wait, `[unknown]` needs investigation to classify. Omit this section for a lean PRD with no notable constraints.)
+
+## Decision log
+<!-- OPTIONAL section. PRD-AUTHORING history: decisions made WHILE writing or revising THIS
+     document (scope cuts, requirement framing, target-user calls). This is PRODUCT-level
+     authoring memory — DISTINCT from project-wide architectural decision records in
+     .renmark/memory/decisions.md (ADRs about implementation). Cross-reference an ADR by
+     path when relevant; do NOT duplicate it here. Omit for a lean PRD. -->
+(Capture each authoring decision as: decision · why · alternatives considered · tradeoff accepted.)
+
+| Decision | Why | Alternatives considered | Tradeoff |
+|---|---|---|---|
+| (what was decided) | (the driving reason) | (what else was weighed) | (what was given up) |
+
+## Recommendation
+(A one-line verdict on whether to proceed: `build-now | revise-scope | discovery-first | do-not-build-yet` — followed by one sentence of why.)
