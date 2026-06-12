@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — prd SKILL — interview wiring + recommendation
+**Request:** prd-template-enrichment task 2 — wire the prd skill to the new template + just-shipped disciplines.
+**Built:** CREATE mode now runs the reuse-check before drafting, surfaces contradictions instead of silently overwriting, and opens with a context-recovery + missing-info preamble; both CREATE and UPDATE end with an advisory Final Recommendation verdict (build-now|revise-scope|discovery-first|do-not-build-yet) alongside the approval gate; optional template sections documented as populate-when-relevant.
+**Files changed:**
+- `plugin/skills/prd/SKILL.md` — interview wiring + recommendation rendering
+**Do not change:**
+- The Final Recommendation is ADVISORY — the human still owns every PRD write (REQ-4); the human gate, context-hygiene, and altitude sections are untouched.
+
 ## [2026-06-12] — PRD template enrichment
 **Request:** Surgically enrich the product-PRD template with additive pieces from an external PRD-generator framework, without importing pipeline-duplicating sections.
 **Built:** plugin/templates/PRD.md.template gains 5 OPTIONAL pieces — requirement sub-groups (incl. AI/Agent slot), [blocking|deferrable] question tags + Constraints & dependencies section, PRD-local Decision log, Recommendation verdict — plus a top anti-completion guard comment routing build-plan/testing/risk/reversibility/asset concerns to their owning surfaces.
