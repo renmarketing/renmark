@@ -290,7 +290,7 @@ def test_judge_lane_and_rollback_in_lane_is_noop(tmp_path):
 
 def test_dry_run_fable_task_without_est_cost_is_not_free(tmp_path, capsys):
     """A fable task with no est_cost_usd must get a non-zero inferred cost in the
-    dry-run preview (rate $0.030/kT), not show as 'free' / drop out of the total."""
+    dry-run preview, not show as 'free' / drop out of the total."""
     plan = tmp_path / "plan.md"
     plan.write_text(
         "### Task 1: fable task\n"
@@ -308,7 +308,67 @@ def test_dry_run_fable_task_without_est_cost_is_not_free(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "free" not in out, "fable task must not be estimated as free"
-    # 2000 tok * $0.030/kT = $0.060 — on the task line and in the total.
+    # Undeclared repos fall back fable->opus, so 2000 tok * $0.015/kT = $0.030.
+    assert "fable→opus" in out
+    assert "$0.030" in out
+    assert "TOTAL estimate" in out
+    assert "~$0.030" in out
+
+
+def test_dry_run_fable_undeclared_renders_fallback(tmp_path, monkeypatch, capsys):
+    """An undeclared repo previews fable tasks as fable->opus and prices them at
+    the opus rate, never the full fable rate and never free."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        "### Task 1: fable task\n"
+        "- **mode:** A\n"
+        "- **target:** out/file1.txt\n"
+        "- **executor:** fable\n"
+        "- **est_tokens:** 2000\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  make file 1\n"
+    )
+
+    rc = _engine.execute_plan(str(plan), repo=tmp_path, dry_run=True)
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "free" not in out
+    assert "fable→opus" in out
+    assert "$0.030" in out
+    assert "$0.060" not in out
+    assert "TOTAL estimate" in out
+    assert "~$0.030" in out
+
+
+def test_dry_run_fable_declared_prices_full(tmp_path, monkeypatch, capsys):
+    """A repo declaring top_tier: fable previews the executor unchanged and uses
+    the full fable rate."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    routing = tmp_path / ".renmark" / "memory" / "routing.md"
+    routing.parent.mkdir(parents=True)
+    routing.write_text("## Model tiers\n\ntop_tier: fable\n")
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        "### Task 1: fable task\n"
+        "- **mode:** A\n"
+        "- **target:** out/file1.txt\n"
+        "- **executor:** fable\n"
+        "- **est_tokens:** 2000\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  make file 1\n"
+    )
+
+    rc = _engine.execute_plan(str(plan), repo=tmp_path, dry_run=True)
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "free" not in out
+    assert "fable→opus" not in out
+    assert "fable" in out
     assert "$0.060" in out
     assert "TOTAL estimate" in out
     assert "~$0.060" in out

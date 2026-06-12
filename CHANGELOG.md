@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — engine preview fallback tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** Undeclared repo renders fable→opus at 0.015; declared renders fable at 0.030.
+**Files changed:**
+- `tests/test_engine_budget_and_rollback.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
 ## [2026-06-12] — plan_lint fable-gate tests
 **Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
 **Built:** Undeclared BLOCK, declared pass, mechanical BLOCK-even-declared; test_executor_fable_lints_clean fixture now declares top_tier (expected-red resolved).
