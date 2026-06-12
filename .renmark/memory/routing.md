@@ -26,6 +26,8 @@ declared_at: 2026-06-12
 - (target=`tests/**`) → codex
 - (signal=canvas|DOM|state-machine|coord-math|threading) → opus
 - (signal=ideation|strategy-synthesis|adversarial-audit|refutation-pass, stakes=highest) → fable (escalation only — REQ-2)
+- (signal=normal-coding|planning|dispatch|implementation|documentation, effort=medium) → session default (opus/medium) — do not overthink dispatch unless routing itself is uncertain
+- (signal=qa-review|regression-review|edge-case-review|acceptance-validation|release-readiness|adversarial-qa, stakes=high) → fable subagent (declared projects; reasoning-contract applies)
 - (complexity=medium, refactor) → sonnet
 
 ## Learned overrides

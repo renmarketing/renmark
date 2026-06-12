@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — effort-policy default rows
+**Request:** agent-routing-policy wave 2.
+**Built:** Session default (opus/medium) for normal work; fable subagent for QA/adversarial signals in declared projects.
+**Files changed:**
+- `.renmark/memory/routing.md`
+
 ## [2026-06-12] — non-interactive fable lanes
 **Request:** agent-routing-policy wave 2.
 **Built:** PRD reconcile and brainstorm Step-4 synthesis may dispatch ONE bounded fable subagent in declared projects; interactive loops never dispatch (judge-pinned). Human gates unchanged.
