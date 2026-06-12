@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — plan_lint fable-gate tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** Undeclared BLOCK, declared pass, mechanical BLOCK-even-declared; test_executor_fable_lints_clean fixture now declares top_tier (expected-red resolved).
+**Files changed:**
+- `tests/test_plan_lint.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
 ## [2026-06-12] — capabilities tests
 **Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
 **Built:** 7 behaviors pinned: absent/declared/explicit/garbage file values, env override + invalid-env fallthrough, executor passthrough, heading-bounded parsing.
