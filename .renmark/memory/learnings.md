@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-12, .renmark/reviews/2026-06-12-4c59169.pte.verification.md) model `verify`: **verify-prd-template-enrichment** — 4/4 verified; surgical PRD enrichment (5 additive pieces, anti-completion guard) rather than wholesale 17-section import — preserved altitude separation
+
 - (2026-06-12, .renmark/reviews/2026-06-12-4c8ab91.ca.verification.md) model `verify`: **verify-cowork-alignment** — 4/4 verified; reuse-check + pushback stance + contradiction-reconcile + re-interview-on-change all wired; ported from external Cowork operating-instructions exercise
 
 - (2026-06-12, .renmark/reviews/2026-06-12-c7f1aa6.arp.verification.md) model `verify`: **verify-agent-routing-policy** — 4/4 verified; haiku-pinned prd-alignment subagent ignored the bounded-return format on first run (verdict correct) — bounded-format wording may need hardening for haiku
