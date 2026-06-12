@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — contradiction overlap pauses for reconcile
+**Request:** cowork-alignment wave 2.
+**Built:** Pre-flight changelog check escalates a contradicting overlap from a note to a stop-and-reconcile before dispatch.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+
 ## [2026-06-12] — reuse check + contradiction-reconcile reflex
 **Request:** cowork-alignment wave 2.
 **Built:** Reuse-check before decomposition; the CHANGELOG 'Do not change' read is now a stop-and-reconcile when a task would contradict a guarded decision.
