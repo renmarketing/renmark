@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — reuse-check + push-back pointers
+**Request:** cowork-alignment wave 2.
+**Built:** Same two pointer lines in the CLAUDE template; AGENTS template had no anchor (nothing added there).
+**Files changed:**
+- `plugin/templates/CLAUDE.md.template`
+
 ## [2026-06-12] — reuse-check + push-back pointers, AGENTS mirror
 **Request:** cowork-alignment wave 2.
 **Built:** Two standing rules: run the reuse check before custom builds; dispatched agents push back and skip sycophancy. Mirrored byte-identical into AGENTS.md.
