@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — reasoning contract (shared)
+**Request:** agent-routing-policy task 1 — the owner's required reasoning instruction as a single-source contract.
+**Built:** plugin/skills/_shared/reasoning-contract.md: canonical multi-perspective→assumptions→synthesis instruction, output discipline mapped to G9 fields, browser-validation clause (Chrome DevTools MCP), citable dispatch blockquote.
+**Files changed:**
+- `plugin/skills/_shared/reasoning-contract.md` — new shared reference
+**Do not change:**
+- The canonical instruction text lives ONLY here — skills cite the blockquote, never paste the body.
+
 ## [2026-06-12] — v0.12.0 — declared-capability Fable routing
 **Request:** Implement the adopted fable-routing strategy (per amended REQ-2 and the 2026-06-11 decision record): Fable as declared default for ideation/strategy synthesis, busy-work demoted to cheap tiers, deterministic gates; full pipeline across 2 plans (23 tasks), surviving a dual provider-limit interruption.
 **Built:** NEW renmark/capabilities.py (env RENMARK_TOP_TIER > routing.md ## Model tiers > opus; case-normalized; heading-bounded parsing); plan_lint checks 9-10 (fable undeclared/mechanical BLOCKs, doc-mirrored); engine dry-run prices via effective_executor with fable→opus render + downgrade repricing; skill_preamble declared-tier hint for synthesis skills; busy-work demotions (brainstorm research → parallel sonnet subagents, prd-alignment → haiku w/ sonnet large-PRD escalation, blueprint HTML → codex split); init one-time declaration question + doctor report row; this repo declares top_tier: fable; owner rules implemented (handoff default-forward rule 8, codex usage-limit reroute-first); 23 new tests (746 total).
