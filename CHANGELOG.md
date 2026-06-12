@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — terse AGENTS.md 133->92, mirror
+**Request:** claude-doc-slimming task 4.
+**Built:** repo AGENTS.md rewritten to mirror the terse AGENTS template + shared CLAUDE rule wording; marker-free; non-block sections → memory pointers; real renmark specifics kept.
+**Files changed:**
+- `AGENTS.md` — terse mirror (92 lines)
+
 ## [2026-06-12] — terse AGENTS.md.template 113->92, prose mirror
 **Request:** claude-doc-slimming wave 2.
 **Built:** AGENTS template rewritten to mirror the terse CLAUDE rule wording; stays marker-free (0-block invariant); non-block sections → memory pointers.
