@@ -48,7 +48,7 @@ Reads the plan's intent paragraph via `parser.parse_plan()`, extracts stated use
 
 ### Fable QA review (optional, declared projects)
 
-In projects where `capabilities.top_tier == "fable"` (per `renmark.capabilities.top_tier(repo)`), the hand-off MAY offer a **fable QA-review subagent**: an implementation review against the plan goal + acceptance criteria, plus regression-risk and edge-case review. Dispatch it per the reasoning/output-discipline contract — *include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every dispatched subagent prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed.* The subagent returns a bounded ≤5-line verdict with each issue marked **blocking vs deferrable**; full evidence goes to a `.renmark/reviews/` artifact, never into chat.
+In projects where `capabilities.top_tier == "fable"` (per `renmark.capabilities.top_tier(repo)`), the hand-off offers a **fable QA-review subagent** via the verify-lane **extension code `[fr] Fable review`** — the same pattern codereview uses for its `[o]`/`[fix]` extension codes. Extension codes are NOT in `handoff-menu.md`'s canonical master list; `[fr]` appears only in the combined menu this skill builds for its own hand-off, and only in declared projects. Choosing `[fr]` dispatches an implementation review against the plan goal + acceptance criteria, plus regression-risk and edge-case review. Dispatch it per the reasoning/output-discipline contract — *include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every dispatched subagent prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed.* The subagent returns a bounded ≤5-line verdict with each issue marked **blocking vs deferrable**; full evidence goes to a `.renmark/reviews/` artifact, never into chat.
 
 State it plainly: **deterministic smoke remains the always-run default** — the fable pass is additive and never replaces verifiers (REQ-7).
 
@@ -202,6 +202,7 @@ Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu
 - **Show `[dq] Deep QA`** only if a passing `.qa.md` exists for the current sha.
 - **Show `[c] Code review`** unconditionally.
 - **Show `[d] Debug`** only if any smoke test failed.
+- **Show `[fr] Fable review`** only in declared projects (`capabilities.top_tier == "fable"`) — a verify-lane extension code (see *Fable QA review* above), present in this combined menu only, never in handoff-menu.md's canonical master list.
 - **Show `[f] Finish`** and `[n] Nothing` unconditionally.
 
 Prefix the menu with `N/M requirements verified. Artifact: PATH.` and end with `What's next?`.
@@ -306,7 +307,7 @@ Bootstrap honors the same context-hygiene contract: chat sees only a bounded sum
 
 ### Subagent browser-access instruction (applies to `--qa` and `--deep-qa`)
 
-When subagents participate in QA in any capacity (e.g. a fable QA-review pass), their dispatch prompt MUST explicitly tell them they have **browser automation access via the Chrome DevTools MCP**, and that **UI-bearing acceptance criteria MUST NOT be validated by static code inspection alone** — a PASS on a UI criterion never exercised in a live browser is a G9 violation (`validation_status: unvalidated`). See the browser-validation clause in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`. This does not change the singleton-browser design: flows still run serially in the main agent; subagents that need rendered evidence coordinate through the same single browser session, never parallel pages.
+When subagents participate in QA in any capacity (e.g. a fable QA-review pass), their dispatch prompt MUST explicitly tell them they have **browser automation access via the active browser channel** (Chrome DevTools MCP or native Claude-in-Chrome, per the channel-selection rules above), and that **UI-bearing acceptance criteria MUST NOT be validated by static code inspection alone** — a PASS on a UI criterion never exercised in a live browser is a G9 violation (`validation_status: unvalidated`). See the browser-validation clause in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`. This does not change the singleton-browser design: flows still run serially in the main agent; subagents that need rendered evidence coordinate through the same single browser session, never parallel pages.
 
 ### Context-hygiene contract (non-negotiable)
 
@@ -396,6 +397,7 @@ Render the menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`:
 - **Show `[dq] Deep QA`** only if QA passed (a complete `.qa.md` for the current sha now exists).
 - **Show `[c] Code review`** unconditionally.
 - **Show `[d] Debug`** only if QA failed; pass the failed-step symptom and the artifact pointer to debug.
+- **Show `[fr] Fable review`** only in declared projects (`capabilities.top_tier == "fable"`) — verify-lane extension code, see *Fable QA review* above.
 - **Show `[f] Finish`** and `[n] Nothing` unconditionally.
 
 ---
@@ -532,10 +534,11 @@ Render the menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`:
 - **Show `[s] Smoke`** and `[qa] QA` (re-test from other lenses if a fix lands).
 - **Show `[c] Code review`** unconditionally.
 - **Show `[d] Debug`** only if any edge case failed; pass the failed-case symptom to debug.
+- **Show `[fr] Fable review`** only in declared projects (`capabilities.top_tier == "fable"`) — verify-lane extension code, see *Fable QA review* above.
 - **Show `[f] Finish`** and `[n] Nothing` unconditionally.
 
 ---
 
 ## Governance compliance
 
-Upholds G2/G3/G6/G7/G8/G9/G10/G12 — see `CLAUDE.md` governance rules for definitions. Skill-specific load-bearing behavior: G8 compounding is the differentiator — every run (any mode) appends to `learnings.md`, every fail to `bugs.md`, and the next verify reads `bugs.md` to expand its regression set. Output is bounded via `summary.verifier_tail(tail_lines=3)` for smoke, and a strict ≤5-line verdict block for `--qa` / `--deep-qa` (G3); all artifacts carry full metadata (G6). G5 holds for all modes — source files are never read into chat. G11 is N/A for smoke (local shell), and held by construction for `--qa` / `--deep-qa` (the browser MCP session lives in the main agent; no subagent dispatch).
+Upholds G2/G3/G6/G7/G8/G9/G10/G12 — see `CLAUDE.md` governance rules for definitions. Skill-specific load-bearing behavior: G8 compounding is the differentiator — every run (any mode) appends to `learnings.md`, every fail to `bugs.md`, and the next verify reads `bugs.md` to expand its regression set. Output is bounded via `summary.verifier_tail(tail_lines=3)` for smoke, and a strict ≤5-line verdict block for `--qa` / `--deep-qa` (G3); all artifacts carry full metadata (G6). G5 holds for all modes — source files are never read into chat. G11 is N/A for smoke (local shell), and held for `--qa` / `--deep-qa`: the browser session itself is a singleton that lives in the main agent — never handed to subagents — while the only dispatch these modes may make is the optional declared-project `[fr]` fable QA-review subagent, which runs isolated per G11 (task spec + artifact pointers in, bounded ≤5-line verdict back; full evidence to a `.renmark/reviews/` artifact, never into chat).

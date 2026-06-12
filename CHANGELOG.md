@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (agent-routing-policy): contract rollout completed
+**Request:** Codex review found 0 critical / 8 major / 2 minor — all consistency gaps; fix all 10.
+**Built:** Contract rollout completed (codereview/audit/brainstorm-research lanes now carry the verbatim Dispatch-reference blockquote — the universal-coverage claim is now true); verify gains the [fr] Fable review extension code in its hand-off menus (codereview [o]/[fix] pattern), channel-neutral browser wording, and an honest G11 row; prd G11 row describes the optional fable reconcile dispatch; finish uses the verbatim blockquote; orchestrate names the exact contract section; routing.md QA row reworded 'MAY escalate … never default'.
+**Files changed:**
+- `plugin/skills/{verify,prd,finish,orchestrate,codereview,audit,brainstorm}/SKILL.md`
+- `plugin/skills/_shared/reasoning-contract.md`, `.renmark/memory/routing.md`
+**Do not change:**
+- [fr] is a verify-lane extension code, NOT in handoff-menu.md's canonical list (same precedent as codereview's [o]/[fix]).
+- The fable QA route is MAY-escalate, never default — wording is load-bearing against the escalation-only rule.
+
 ## [2026-06-12] — preferences carry the reasoning-contract pointer
 **Request:** agent-routing-policy wave 2.
 **Built:** Root and template lines byte-identical; AGENTS.md has no preferences block.

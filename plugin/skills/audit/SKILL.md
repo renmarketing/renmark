@@ -75,6 +75,12 @@ recommendation only: the audit remains read-only and artifact-bounded, and
 all writes stay inside `.renmark/audits/` — no behavior change beyond where
 refutation passes run.
 
+> *Include the reasoning/output-discipline contract from
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> dispatched subagent prompt: multi-perspective decomposition → explicit
+> assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
+> recommendations; evidence preserved; missing context stated, never guessed.*
+
 ### 3. Hand off
 
 audit is an **aux / terminal skill** (class 3 in

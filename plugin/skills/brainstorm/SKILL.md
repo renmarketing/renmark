@@ -102,6 +102,8 @@ Before proposing approaches, research the problem space so the design is informe
 
 **Dispatch — parallel `model: sonnet` subagents, never inline queries.** Do NOT run the research queries in this session's context: brainstorm runs on the session's top reasoning tier, so inline web busywork burns top-tier tokens at session price for zero reasoning gain. Instead, split the research angles (best practices / prior art / reference repos) across 2–4 subagents and dispatch them as **single-message multiple `Agent` tool calls with `model: sonnet`** (per the parallelism rule — sequential dispatch is the slow path). Brief each subagent with: a one-line problem statement + the confirmed stack, its single research angle, the focused queries to run (`WebSearch` for best-practices and prior-art discovery; `WebFetch` to read a specific doc/README/repo page; `Context7` if available for authoritative library/framework docs — 2–4 focused queries total across the dispatch, not a broad sweep), and the artifact path it must write.
 
+Every research subagent prompt MUST also carry the Dispatch-reference blockquote from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` (the same citable blockquote Step 4 carries) — research dispatches are subagent dispatches; the contract applies here too.
+
 **Context hygiene (G3/G6 — this is critical):** the session brain never sees raw search results or fetched pages. Each subagent writes its full findings into the `.renmark/research/` artifact and returns ONLY a ≤5-line summary. Give each parallel subagent its own angle-suffixed file (e.g. `.renmark/research/YYYY-MM-DD-<topic>-<angle>.research.md`) — two parallel agents must never share a write scope. Each subagent persists via:
 
 ```python

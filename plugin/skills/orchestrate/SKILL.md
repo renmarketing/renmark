@@ -148,7 +148,7 @@ Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `exe
 > ```
 > The generated code goes in the artifact file at `<artifact_path>`, NOT in your response. Do not paste code or diffs back. If you cannot complete with the inputs provided, return `status: FAIL` with a one-line reason."
 
-The Agent prompt MUST also include the reasoning/output-discipline blockquote from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` — read it from that file at dispatch time and append it verbatim to the subagent prompt. This applies to BOTH dispatch paths: Agent-path dispatches above AND codex ad-hoc task specs (`renmark-execute --task`).
+The Agent prompt MUST also include the canonical reasoning instruction blockquote — the one under "The canonical reasoning instruction (verbatim — single source)" in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`, NOT the skill-author "Dispatch reference" blockquote — read it from that file at dispatch time and append it verbatim to the subagent prompt. This applies to BOTH dispatch paths: Agent-path dispatches above AND codex ad-hoc task specs (`renmark-execute --task`).
 
 After the Agent returns, parse its response through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark the task as FAIL with reason "subagent leaked forbidden fields" — do not retry.
 

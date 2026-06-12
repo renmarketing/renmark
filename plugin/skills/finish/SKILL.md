@@ -51,7 +51,13 @@ What the subagent receives — pointers only, never bodies into the orchestrator
 
 What it hunts for: subtle logic flaws, orchestration failure points, hidden coupling, dead/orphan code.
 
-Dispatch per the canonical reasoning instruction — cite the blockquote in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`; do not paste or paraphrase it. The subagent returns a bounded **≤5-line verdict**, each finding tagged `blocking:` or `deferrable:`.
+*Include the reasoning/output-discipline contract from
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+dispatched subagent prompt: multi-perspective decomposition → explicit
+assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
+recommendations; evidence preserved; missing context stated, never guessed.*
+
+The subagent returns a bounded **≤5-line verdict**, each finding tagged `blocking:` or `deferrable:`.
 
 Routing the verdict:
 - **Blocking findings** stop the release path — do not present or execute [r]; route to `/renmark:debug` with the finding as the symptom.
