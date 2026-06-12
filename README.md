@@ -1,4 +1,4 @@
-# renmark v0.14.0
+# renmark v0.14.1
 
 A Claude Code plugin that turns Claude into a guided build assistant. Type `/renmark:start`, describe what you want to build, and renmark handles stack selection, scope, best practices, and the full build pipeline — no prior knowledge of specs, plans, or executors needed.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — v0.14.1 — PRD template enrichment (surgical)
+**Request:** Analyze an external 17-section PRD-generator framework against renmark's PRD, harvest only the genuinely-additive pieces, and improve the PRD output without regressing renmark's altitude separation.
+**Built:** Finding: ~70% of the external template already lives in renmark's pipeline (plan/verify/brainstorm/decisions.md/reuse-check), so wholesale adoption was REFUSED as a regression. Imported the 5 additive pieces: PRD.md.template gains OPTIONAL requirement sub-groups (incl. an AI/Agent slot), [blocking|deferrable] question tags + Constraints & dependencies section, a PRD-local Decision log (distinct from decisions.md), a Recommendation verdict, and a top anti-completion guard routing build-plan/testing/risk/reversibility/asset concerns to their owning surfaces. prd SKILL CREATE now runs the reuse-check, surfaces contradictions, opens with a context-recovery/missing-info preamble, and both CREATE+UPDATE end with an advisory Final Recommendation verdict.
+**Pipeline evidence:** PRD alignment aligned; plan PASS (lite tier); verify 4/4; lite-lane cheap /review 0 findings. 746 tests, audit PASS, parity 7/7 at 0.14.1.
+**Do not change:**
+- All template additions are OPTIONAL — a flat lean PRD stays valid; the anti-completion guard is load-bearing (don't add build-plan/testing/risk sections — they live in plan/verify/brainstorm).
+- The Final Recommendation verdict is ADVISORY — never treat 'build-now' as approval to write PRD.md (REQ-4 human-owns-write).
+
 ## [2026-06-12] — prd SKILL — interview wiring + recommendation
 **Request:** prd-template-enrichment task 2 — wire the prd skill to the new template + just-shipped disciplines.
 **Built:** CREATE mode now runs the reuse-check before drafting, surfaces contradictions instead of silently overwriting, and opens with a context-recovery + missing-info preamble; both CREATE and UPDATE end with an advisory Final Recommendation verdict (build-now|revise-scope|discovery-first|do-not-build-yet) alongside the approval gate; optional template sections documented as populate-when-relevant.
