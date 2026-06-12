@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — plan SKILL declaration rows
+**Request:** fable-routing part 2 wave 1.
+**Built:** Routing row, complexity clause, and cost-table note now reference the declaration gate and fable→opus preview render.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`
+**Do not change:**
+- Frontmatter description untouched — reconciled 2026-06-11.
+
 ## [2026-06-12] — orchestrate fable→opus fallback
 **Request:** fable-routing part 2 wave 1.
 **Built:** Fable Agent-dispatch errors retry once with no override; ledgered via append_routing + wave-summary marker. Complementary to (not touching) the codex reroute-first rule.

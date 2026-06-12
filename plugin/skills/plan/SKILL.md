@@ -102,13 +102,13 @@ Default routing (override if `.renmark/memory/routing.md` says otherwise):
 
 | Signal | Executor |
 |---|---|
-| frontier reasoning: ideation/strategy synthesis, adversarial audit/review passes, architecture where opus is insufficient — escalation only, never default | `fable` |
+| frontier reasoning: ideation/strategy synthesis, adversarial audit/review passes, architecture where opus is insufficient — escalation only, never default — only in projects with a declared `top_tier: fable` (plan_lint BLOCKs it otherwise) | `fable` |
 | hard / state machines / coord math / DOM APIs / cross-file reasoning / architecture | `opus` |
 | `tests/**`, fixtures, scaffolding, single well-defined file with verifier | `codex` |
 | well-scoped algorithms, refactors, moderate domain logic | `sonnet` |
 | simple, mechanical (config, JSON, `.gitignore`, plain HTML, simple CSS) | `haiku` |
 
-Complexity → executor mapping: `hard` → opus, `medium` → codex (file-write + verifier) or sonnet (reasoning-heavy), `simple` → haiku; `fable` is never auto-assigned by complexity alone — only by explicit escalation signals (REQ-2).
+Complexity → executor mapping: `hard` → opus, `medium` → codex (file-write + verifier) or sonnet (reasoning-heavy), `simple` → haiku; `fable` is never auto-assigned by complexity alone — only by explicit escalation signals (REQ-2); and never assigned at all in undeclared projects (capabilities.top_tier).
 
 ### 5. Assign parallel_group
 
@@ -124,7 +124,7 @@ For each task, compute **total spend** = `(output_tokens + agent_overhead) × $/
 | `codex`  | $0.01–$0.05 | none | runs as `renmark-execute` subprocess |
 | `sonnet` | $0.003  | + 10k tokens | |
 | `opus`   | $0.015  | + 10k tokens | Anthropic billing — NOT "in-context free" |
-| `fable`  | $0.030  | + 10k tokens | top reasoning tier — 2× opus; escalation only |
+| `fable`  | $0.030  | + 10k tokens | top reasoning tier — 2× opus; escalation only; renders fable→opus when undeclared |
 
 **Agent overhead is real spend.** Every haiku/sonnet/opus task receives ~10k tokens of system prompt + task spec on top of its output, and that overhead bills to the user's Claude Code quota. Earlier renmark versions footnoted this; that broke vibe-coder trust when "$0.02 estimated" became "$0.20 actual." Bake the overhead into the displayed total. No footnotes.
 
