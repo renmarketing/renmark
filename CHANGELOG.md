@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — terse CLAUDE.md 450->177, blocks byte-identical to template
+**Request:** claude-doc-slimming wave 2.
+**Built:** Repo CLAUDE.md compressed to 177 lines; all 23 rule blocks reproduced byte-for-byte from the terse template (verified zero drift); real project description kept; non-block sections → memory pointers.
+**Files changed:**
+- `CLAUDE.md`
+
 ## [2026-06-12] — terse CLAUDE template
 **Request:** claude-doc-slimming task 1 — compress the authoritative CLAUDE template to ≤200 lines.
 **Built:** plugin/templates/CLAUDE.md.template 426->167 lines; all 23 rule blocks kept (names/markers/order intact), every load-bearing clause grep-verified (codex RED-FLAG, fable override + reroute, 5-line/300-tok + 60/80% caps, G11 three-lists, lifecycle separation, provenance fields, write-boundary, contract/reuse pointers); non-block sections compressed to memory pointers.
