@@ -59,7 +59,7 @@ def read_tiers(repo: Path) -> dict[str, str]:
 
     tiers: dict[str, str] = {}
     for raw_line in lines[start_index + 1 :]:
-        if raw_line.startswith(_SECTION_PREFIX):
+        if raw_line.lstrip().startswith(_SECTION_PREFIX):
             break
         line = raw_line.strip()
         if not line or ":" not in line:
@@ -75,11 +75,11 @@ def read_tiers(repo: Path) -> dict[str, str]:
 
 def top_tier(repo: Path) -> str:
     """Return the effective top-tier model, defaulting to ``opus``."""
-    env_value = os.environ.get("RENMARK_TOP_TIER", "").strip()
+    env_value = os.environ.get("RENMARK_TOP_TIER", "").strip().lower()
     if env_value in _VALID_TOP_TIERS:
         return env_value
 
-    declared = read_tiers(repo).get("top_tier", "").strip()
+    declared = read_tiers(repo).get("top_tier", "").strip().lower()
     if declared in _VALID_TOP_TIERS:
         return declared
     return "opus"

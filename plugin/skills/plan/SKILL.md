@@ -102,7 +102,7 @@ Default routing (override if `.renmark/memory/routing.md` says otherwise):
 
 | Signal | Executor |
 |---|---|
-| frontier reasoning: ideation/strategy synthesis, adversarial audit/review passes, architecture where opus is insufficient — escalation only, never default — only in projects with a declared `top_tier: fable` (plan_lint BLOCKs it otherwise) | `fable` |
+| frontier reasoning: ideation/strategy synthesis, adversarial audit/review passes, architecture where opus is insufficient — escalation only, never default — only with a declared `top_tier: fable` — routing.md block or per-user `RENMARK_TOP_TIER` env (REQ-2); plan_lint BLOCKs it otherwise | `fable` |
 | hard / state machines / coord math / DOM APIs / cross-file reasoning / architecture | `opus` |
 | `tests/**`, fixtures, scaffolding, single well-defined file with verifier | `codex` |
 | well-scoped algorithms, refactors, moderate domain logic | `sonnet` |

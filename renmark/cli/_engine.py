@@ -416,7 +416,10 @@ def execute_plan(
                 # the preview prices and labels what will actually run.
                 ex = _caps.effective_executor(t.executor, repo)
                 ex_display = f"{t.executor}→{ex}" if ex != t.executor else ex
-                cost = t.est_cost_usd
+                # A downgraded executor (e.g. fable→opus) invalidates any prefilled
+                # est_cost_usd — it was estimated at the wrong tier. Reprice from
+                # the effective executor's rate so display matches what's charged.
+                cost = t.est_cost_usd if ex == t.executor else None
                 if cost is None:
                     # Infer from executor.
                     rate = cost_per_kt.get(ex, 0.0)

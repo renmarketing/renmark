@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-12, .renmark/reviews/2026-06-12-4eb8166.verification.md) model `verify`: **verify-fable-routing** — 6/6 behaviors verified; declaration gate fires both directions; env override + preview pricing live; dual provider-limit interruption recovered via pause state + codex retry
+
 - (2026-06-11, .renmark/reviews/2026-06-11-0113ee4.part2.verification.md) model `verify`: **verify-fable-integration-part2** — 4/4 doc-sync behaviors verified; session-limit interruption recovered from pipeline.json; lesson: plan verifiers for mirror tasks must be case-insensitive when the only anchor is capitalized
 
 - (2026-06-11, .renmark/reviews/2026-06-11-5fa6915.verification.md) model `verify`: **verify-fable-integration** — 4/4 behaviors verified; failed: none; regressions: 0; heavy-read G5 detector keys on context_files field, not spec prose (fixture lesson)

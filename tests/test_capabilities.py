@@ -28,6 +28,8 @@ section-bounded parsing, and `effective_executor` handling for `fable`.
 - Pins `effective_executor` pass-through behavior for non-`fable` executors.
 - Confirms `fable` stays `fable` only when the repo declares that top tier.
 - Asserts parsing stops at the next `## ` heading and ignores lower sections.
+- Asserts an indented `## ` heading still terminates the Model tiers block.
+- Verifies mixed-case tier values normalize for both env and file paths.
 """
 
 from __future__ import annotations
@@ -122,3 +124,37 @@ def test_model_tiers_parsing_stops_at_next_heading(monkeypatch, tmp_path) -> Non
     assert capabilities.read_tiers(tmp_path) == {"top_tier": "fable"}
     assert capabilities.top_tier(tmp_path) == "fable"
     assert capabilities.is_top_tier_declared(tmp_path) is True
+
+
+def test_model_tiers_parsing_stops_at_indented_heading(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_routing(
+        tmp_path,
+        "# Routing\n\n## Model tiers\ntop_tier: opus\n  ## Learned overrides\ntop_tier: fable\n",
+    )
+
+    assert capabilities.read_tiers(tmp_path) == {"top_tier": "opus"}
+    assert capabilities.top_tier(tmp_path) == "opus"
+    assert capabilities.is_top_tier_declared(tmp_path) is False
+
+
+def test_mixed_case_env_value_normalizes(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("RENMARK_TOP_TIER", "FABLE")
+    assert capabilities.top_tier(tmp_path) == "fable"
+    assert capabilities.is_top_tier_declared(tmp_path) is True
+
+    monkeypatch.setenv("RENMARK_TOP_TIER", "  Opus  ")
+    assert capabilities.top_tier(tmp_path) == "opus"
+    assert capabilities.is_top_tier_declared(tmp_path) is False
+
+
+def test_mixed_case_file_value_normalizes(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_routing(
+        tmp_path,
+        "## Model tiers\ntop_tier: Fable\n",
+    )
+
+    assert capabilities.top_tier(tmp_path) == "fable"
+    assert capabilities.is_top_tier_declared(tmp_path) is True
+    assert capabilities.effective_executor("fable", tmp_path) == "fable"

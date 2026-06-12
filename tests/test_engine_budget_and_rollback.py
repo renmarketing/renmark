@@ -372,3 +372,34 @@ def test_dry_run_fable_declared_prices_full(tmp_path, monkeypatch, capsys):
     assert "$0.060" in out
     assert "TOTAL estimate" in out
     assert "~$0.060" in out
+
+
+def test_dry_run_fable_downgrade_reprices_explicit_est_cost(tmp_path, monkeypatch, capsys):
+    """A downgraded fable task with an explicit est_cost_usd must be repriced at
+    the effective (opus) rate — the prefilled cost was estimated at the wrong
+    tier and must not leak into the row or the total."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        "### Task 1: fable task\n"
+        "- **mode:** A\n"
+        "- **target:** out/file1.txt\n"
+        "- **executor:** fable\n"
+        "- **est_tokens:** 1000\n"
+        "- **est_cost_usd:** 0.030\n"
+        "- **verifier:** true\n"
+        "- **spec:**\n"
+        "  make file 1\n"
+    )
+
+    rc = _engine.execute_plan(str(plan), repo=tmp_path, dry_run=True)
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "free" not in out
+    assert "fable→opus" in out
+    # 1000 tok at the opus rate ($0.015/kT) = $0.015 — not the stale $0.030.
+    assert "$0.015" in out
+    assert "$0.030" not in out
+    assert "TOTAL estimate" in out
+    assert "~$0.015" in out

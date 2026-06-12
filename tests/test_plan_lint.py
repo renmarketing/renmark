@@ -431,6 +431,55 @@ def test_fable_mechanical_blocks_even_when_declared(tmp_path: Path, monkeypatch:
     assert any("fable" in issue.lower() and "simple" in issue.lower() for issue in report.issues)
 
 
+def test_fable_env_declaration_passes_lint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """BY DESIGN (PRD REQ-2): `RENMARK_TOP_TIER` is a legitimate PER-USER declaration —
+    "a committed `## Model tiers` block…, per-user overridable with `RENMARK_TOP_TIER`".
+    An undeclared repo (no routing.md block) + RENMARK_TOP_TIER=fable counts as declared;
+    this is NOT a bypass of the fable gate."""
+    monkeypatch.setenv("RENMARK_TOP_TIER", "fable")
+    # No _declare_top_tier() call — the repo itself stays undeclared.
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** medium\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert not any("fable" in issue.lower() or "top_tier" in issue for issue in report.issues)
+
+
+def test_fable_env_opus_override_blocks_on_declared_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """BY DESIGN (PRD REQ-2): the per-user env override wins in BOTH directions.
+    A repo that commits `top_tier: fable` but a collaborator running with
+    RENMARK_TOP_TIER=opus (no Fable access) must still BLOCK fable tasks —
+    the collaborator-without-Fable protection."""
+    monkeypatch.setenv("RENMARK_TOP_TIER", "opus")
+    _declare_top_tier(tmp_path, "fable")
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            executor="fable",
+            extra_fields="- **complexity:** medium\n",
+        ),
+    )
+
+    import unittest.mock as mock
+
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert report.verdict == "BLOCK"
+    assert any("top_tier" in issue for issue in report.issues)
+
+
 def test_heavy_read_haiku_no_block(tmp_path: Path) -> None:
     """haiku is exempt from the heavy-read check."""
     ctx_file = tmp_path / "big_context.md"

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (fable-routing): repricing, parsing edges, design pins
+**Request:** Codex review found 0 critical / 3 major / 2 minor / 1 nit on 9b49afd..HEAD; fix the real ones, pin the by-design ones.
+**Built:** Engine: downgraded fable→opus preview rows now reprice at the effective rate even with explicit est_cost_usd (major 3). Capabilities: indented headings terminate the Model tiers block; env/file tier values normalize case (minor 4 + nit 6). Design pins with REQ-2 citations: RENMARK_TOP_TIER=fable IS a per-user declaration (lint passes, hint fires — majors 1-2 ruled by-design) and env=opus on a declared repo BLOCKs fable (collaborator protection). Plan SKILL routing row clarifies env counts as declaration. Deferred: plan_lint's Path.cwd() repo_root (minor 5) — pre-existing convention shared with check 4; cross-checkout linting is a separate refactor.
+**Files changed:**
+- `renmark/capabilities.py`, `tests/test_capabilities.py` — parsing + case fixes, 3 new tests
+- `renmark/cli/_engine.py`, `tests/test_engine_budget_and_rollback.py` — downgrade repricing + regression
+- `tests/test_plan_lint.py`, `tests/test_lifecycle.py` — 3 REQ-2 design-pin tests
+- `plugin/skills/plan/SKILL.md` — env-counts-as-declaration clarification
+**Do not change:**
+- Env precedence (RENMARK_TOP_TIER > routing.md > opus) is test-pinned in BOTH directions — changing it breaks the REQ-2 per-user override contract.
+- Downgraded preview rows always reprice; explicit est_cost_usd wins only when the executor is NOT downgraded.
+
 ## [2026-06-12] — preferences pointer pair
 **Request:** fable-routing part 2 wave 2.
 **Built:** Frontier-reasoning row in root CLAUDE.md + template now states fable is the default for ideation/strategy/adversarial roles when declared, escalation-only otherwise. AGENTS.md had no anchor row — nothing added (task 13 SKIP by rule).

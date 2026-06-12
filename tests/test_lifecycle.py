@@ -303,6 +303,20 @@ def test_skill_preamble_undeclared_repo_brainstorm_omits_tier_hint(
     assert "declared top tier: fable" not in (hint or "")
 
 
+def test_preamble_hint_fires_on_env_declaration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """BY DESIGN (PRD REQ-2): `RENMARK_TOP_TIER` is a legitimate PER-USER declaration
+    form — "a committed `## Model tiers` block…, per-user overridable with
+    `RENMARK_TOP_TIER`". An undeclared repo (no routing.md) + RENMARK_TOP_TIER=fable
+    IS declared, so the tier hint must fire; this is not a bypass."""
+    monkeypatch.setenv("RENMARK_TOP_TIER", "fable")
+    # No _write_declared_fable_routing() call — the repo itself stays undeclared.
+
+    hint = lifecycle.skill_preamble(tmp_path, "brainstorm")
+
+    assert hint is not None
+    assert "declared top tier: fable" in hint
+
+
 def test_skill_preamble_cross_domain_and_tier_hints_joined(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     _write_declared_fable_routing(tmp_path)
