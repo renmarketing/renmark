@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-12] — preferences carry the reasoning-contract pointer
+**Request:** agent-routing-policy wave 2.
+**Built:** Root and template lines byte-identical; AGENTS.md has no preferences block.
+**Files changed:**
+- `CLAUDE.md`
+- `plugin/templates/CLAUDE.md.template`
+
 ## [2026-06-12] — effort-policy default rows
 **Request:** agent-routing-policy wave 2.
 **Built:** Session default (opus/medium) for normal work; fable subagent for QA/adversarial signals in declared projects.

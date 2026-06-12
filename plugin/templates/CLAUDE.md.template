@@ -411,6 +411,7 @@ Defaults:
 - Well-scoped algorithms, refactors → `sonnet`
 - State machines, DOM APIs, cross-file reasoning → `opus`
 - Frontier reasoning — ideation, strategy synthesis, adversarial audit/review escalation → `fable` (escalation only, never default) — default for those roles when `top_tier: fable` is declared in `.renmark/memory/routing.md` (## Model tiers); escalation-only otherwise
+- Subagent dispatch prompts carry the reasoning/output-discipline contract — see plugin/skills/_shared/reasoning-contract.md (multi-perspective → assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations).
 
 ## Code conventions
 
