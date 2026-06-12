@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — reuse check before approaches + re-establish scope on premise change
+**Request:** cowork-alignment wave 2.
+**Built:** Reuse-check subagent (internal counterpart to external prior-art) before Step 4; re-establish the scope contract when the premise shifts instead of continuing from persisted spec.
+**Files changed:**
+- `plugin/skills/brainstorm/SKILL.md`
+
 ## [2026-06-12] — pushback stance
 **Request:** cowork-alignment wave 1.
 **Built:** Reasoning contract gains a Stance clause (disagree when off-strategy/wrong/inconsistent; no hollow affirmation) carried by every dispatched agent via the citable blockquote.
