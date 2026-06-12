@@ -249,6 +249,20 @@ analytics.record_event(repo, ts=state.now_iso(),
 
 Surface: *"Provider usage limit hit at task <index> — paused (not failed). Resume with `/renmark:orchestrate --resume` after `resume_after`."* The PauseState's `resume_after` follows the same fallback rule as the preflight pause (provider reset → next local window → now+60min).
 
+**Reroute-first on codex limits (owner rule, 2026-06-11).** When the usage signal is
+CODEX-side and the blocked tasks are non-bulk (test scaffolding, single-file emissions —
+the typical codex wave), do NOT stop by default. Offer the pause-vs-reroute choice; on no
+answer, default-forward (handoff-menu.md rule 8) **re-routes the blocked codex tasks to
+`sonnet` Agent calls and continues the wave**. Reroute requirements (all mandatory):
+- ledger each reroute via `memory.append_routing(...)` (signature: codex→sonnet, reason: usage_limit) — degradation is never silent;
+- mark the wave-summary entry `executor: sonnet (rerouted: codex usage-limit)`;
+- `state.log_agent_call` the sonnet spend (reroutes bill Anthropic; never also ledger codex for the same task — no double counting).
+
+Claude-side limits still pause — there is no cheaper tier to re-route onto. Pausing also
+remains correct when the user explicitly chooses it or the blocked codex work is
+bulk-heavy (> 5 tasks or > ~3k est_tokens each): bulk emission is codex's role and
+shifting it to sonnet burns the user's Claude quota against REQ-2's intent.
+
 ### 6. Update memory
 
 Use `renmark.memory` helpers — do NOT hand-edit memory files directly:

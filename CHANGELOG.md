@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-12] — default-forward + codex-reroute owner rules
+**Request:** Owner (2026-06-11): 'if codex is blocked assign to sonnet and continue; if no answer, move on' — implement in renmark itself.
+**Built:** handoff-menu.md rule 8 rewritten: reversible hand-offs default-forward to the (Recommended) option after one restated unanswered ask; dispatch gates default-forward only with validated plan + visible cost preview; REQ-12 gates never default. orchestrate SKILL Tier-2 gains reroute-first: codex usage-limited non-bulk tasks re-route to sonnet Agent calls (ledgered via append_routing + wave-summary note, no double-counting); Claude-side limits still pause. CLAUDE.md + template executor-dispatch blocks carry the exception line.
+**Files changed:**
+- `plugin/skills/_shared/handoff-menu.md` — rule 8 default-forward policy
+- `plugin/skills/orchestrate/SKILL.md` — reroute-first on codex limits
+- `CLAUDE.md`, `plugin/templates/CLAUDE.md.template` — dispatch-rule exception line
+**Do not change:**
+- REQ-12 gates (merge/release/PRD/budget/destructive) NEVER default-forward — silence is a no.
+- Reroutes are always ledgered; bulk-emission waves never re-route to sonnet.
+
 ## [2026-06-12] — preamble hint tests
 **Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
 **Built:** Synthesis-skill hint presence/absence + both-fire ' | ' composition pinned; lifecycle.py hunk is ruff-format-only.

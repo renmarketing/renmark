@@ -86,6 +86,7 @@ Never read generated file contents into the conversation. Only per-task summarie
   task as an Agent call — that runs it on the parent model and burns Claude Code quota.
 - `executor: haiku / sonnet / opus` → Agent tool calls, no model override.
 - `executor: fable` → Agent tool call WITH `model: "fable"` override — the only executor that always passes an explicit model override. Escalation tier (REQ-2): ideation, strategy synthesis, adversarial audit/review only — never mechanical or bulk work.
+- Exception — usage-limit reroute (owner rule, 2026-06-11): when codex is usage-limited mid-wave, blocked NON-BULK codex tasks MAY be re-routed to sonnet Agent calls to keep the pipeline moving — always ledgered (append_routing + wave-summary note), never silent, never for bulk-emission waves.
 <!-- END:executor-dispatch-rule -->
 
 <!-- BEGIN:root-cause-rule -->
