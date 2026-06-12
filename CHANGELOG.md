@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — init declaration question
+**Request:** fable-routing part 2 wave 1.
+**Built:** New step writes the ## Model tiers block above Learned overrides on first run; idempotent; non-interactive defaults to opus; setup inherits via delegation.
+**Files changed:**
+- `plugin/skills/init/SKILL.md`
+**Do not change:**
+- Existing Model tiers blocks are NEVER overwritten — init reports them instead.
+
 ## [2026-06-12] — prd-alignment haiku pin
 **Request:** fable-routing part 2 wave 1.
 **Built:** Default model: haiku; sonnet when PRD.md > ~800 lines; the citable dispatch blockquote carries the pin so callers can't drift.

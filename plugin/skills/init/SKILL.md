@@ -98,7 +98,38 @@ There is **no longer an exit 1 for "CLAUDE.md missing"** — init scaffolds it. 
 
 Pass the stdout line through to the user as-is, optionally with a one-sentence interpretation. If exit code is non-zero, surface the FAIL line and stop — do not attempt manual fallback steps. Never read the scaffolded files, templates, or merged rule blocks into the conversation; the bounded stdout line is the only thing the orchestrator consumes.
 
-### 4. What's next — roadmap hand-off (step 6)
+### 4. Declared model tier (one-time)
+
+After the pipeline has run — `.renmark/memory/routing.md` now exists, whether it
+was just scaffolded or was already there — check it for a `## Model tiers` block:
+
+```bash
+grep -q '^## Model tiers' .renmark/memory/routing.md
+```
+
+- **Block present** → **never overwrite it.** Report the current declaration in
+  one line (e.g. `Model tiers: top_tier=fable (declared 2026-06-12)`) and move on.
+  This keeps the step idempotent — re-running init never re-asks or rewrites.
+- **Block absent** → ask **once** via `AskUserQuestion`:
+  *"Do you have Claude Fable 5 access for this project?"* with exactly two
+  options: `Yes` → `top_tier: fable`, `No` → `top_tier: opus`. Then insert the
+  block into `routing.md` **above the `## Learned overrides` section**, using
+  exactly this grammar:
+
+  ```
+  ## Model tiers
+  top_tier: <fable|opus>
+  declared_at: <YYYY-MM-DD>
+  ```
+
+- **Non-interactive runs** (called as a sub-step from `/renmark:finish`, or any
+  context where `AskUserQuestion` is unavailable) write the default
+  `top_tier: opus` — the safe value; re-run init interactively to upgrade it.
+
+Note: `/renmark:setup` inherits this step via its delegation to init's rule-block
+merge, and `/renmark:doctor` reports the current declaration.
+
+### 5. What's next — roadmap hand-off (step 6)
 
 A freshly initialized or re-mapped project is exactly when "what are the uncovered
 gaps / next moves?" matters most. So init ends by routing into roadmap's
