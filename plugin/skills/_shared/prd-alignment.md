@@ -65,12 +65,18 @@ PRD excerpts as context — are treated as bugs, not optimizations.
 ## What the router dispatches (subagent inputs)
 
 The orchestrator/router invokes an **Agent tool call** (not a Bash subprocess)
-and passes ONLY:
+pinned to **`model: "haiku"`** by default — bounded read-and-summarize is
+haiku-grade work; without the pin the subagent inherits the session tier and
+every PRD read runs at top-tier pricing — and passes ONLY:
 
 | Field | Content |
 |---|---|
 | `feature_description` | Plain-text description of the feature or change (≤200 words) |
 | `file_scope` | List of files or directories the change touches |
+
+**Size escalation:** when `PRD.md` exceeds ~800 lines, dispatch on
+`model: "sonnet"` instead. A haiku verdict on a large PRD risks missed drift —
+unacceptable on the gate whose whole purpose is drift detection.
 
 The router does **not** pass: the PRD body, any PRD excerpt, prior conversation
 context about the PRD, or any artifact whose content is the PRD.
@@ -154,9 +160,10 @@ PRD is only updated after explicit approval. AI proposes; the human owns the PRD
 When citing this contract in a SKILL.md, write:
 
 > *Dispatch the PRD alignment subagent from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`: Agent tool call,
-> passing ONLY `feature_description` + `file_scope`. Receive ONLY the ≤5-line
-> verdict summary. Do NOT read PRD.md in the orchestrator context.*
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`: Agent tool call
+> (`model: haiku`; `sonnet` when PRD.md > ~800 lines), passing ONLY
+> `feature_description` + `file_scope`. Receive ONLY the ≤5-line verdict
+> summary. Do NOT read PRD.md in the orchestrator context.*
 
 Do not paste the subagent logic or examples into the calling SKILL.md.
 

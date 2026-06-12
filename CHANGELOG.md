@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — prd-alignment haiku pin
+**Request:** fable-routing part 2 wave 1.
+**Built:** Default model: haiku; sonnet when PRD.md > ~800 lines; the citable dispatch blockquote carries the pin so callers can't drift.
+**Files changed:**
+- `plugin/skills/_shared/prd-alignment.md`
+**Do not change:**
+- ≤5-line verdict contract unchanged; callers re-copy the blockquote verbatim.
+
 ## [2026-06-12] — blueprint bulk demotion
 **Request:** fable-routing part 2 wave 1.
 **Built:** Session brain writes the design spec; codex bulk-emits via renmark-execute --task into .renmark/state/blueprint/ staging, then the splice proceeds as before. Schematic stays inline with a never-escalate note.
