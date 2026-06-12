@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — terse AGENTS.md.template 113->92, prose mirror
+**Request:** claude-doc-slimming wave 2.
+**Built:** AGENTS template rewritten to mirror the terse CLAUDE rule wording; stays marker-free (0-block invariant); non-block sections → memory pointers.
+**Files changed:**
+- `plugin/templates/AGENTS.md.template`
+
 ## [2026-06-12] — terse CLAUDE.md 450->177, blocks byte-identical to template
 **Request:** claude-doc-slimming wave 2.
 **Built:** Repo CLAUDE.md compressed to 177 lines; all 23 rule blocks reproduced byte-for-byte from the terse template (verified zero drift); real project description kept; non-block sections → memory pointers.
