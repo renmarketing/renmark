@@ -81,6 +81,14 @@ Open the spec file. Also read `.renmark/memory/INDEX.md` (cheap) and pull any of
 
 If `CHANGELOG.md` exists at the project root, read the last 5 entries. Use the "Do not change" guards to avoid re-introducing removed approaches and to populate each task's spec with known constraints.
 
+**Contradiction-reconcile reflex (do not silently proceed).** The "Do not change" guards and recorded decisions in `CHANGELOG.md` (and `.renmark/memory/decisions.md` if present) are binding constraints, not background reading. When any task you are about to plan would **contradict** a "Do not change" guard or a recorded decision — re-introduce a removed approach, reverse a locked stack/scope choice, or rebuild something a decision rejected — do NOT decompose around it silently. Name the conflict to the user and reconcile before writing the plan:
+
+> This is different from what's on file: [the proposed task] contradicts [the "Do not change" guard / recorded decision, quoted]. Reconcile — should I honor the existing guard, or are you overriding it for this plan?
+
+Resolve the conflict (honor the guard, or get an explicit override) before proceeding to decomposition. Do not treat silence or an ambiguous reply as an override.
+
+**Reuse check — before decomposition (don't re-decompose an existing build).** Before splitting the spec into a custom task list, dispatch the reuse-check subagent from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`: Agent tool call (`model: haiku`; `sonnet` for a large search surface), passing ONLY `request_description`. The subagent searches loaded skills/commands, session MCP tools, `.renmark/specs/` + `.renmark/plans/`, and `.renmark/memory/features.md` in its own context, and returns ONLY the ≤5-line `reuse: found | none` verdict (+ a one-line pointer when found). On `reuse: found`, surface the `pointer` and **default to reuse** — recommend the existing skill / MCP tool / spec / feature instead of re-decomposing a custom build, unless there is a clear, stated reason it doesn't fit. Do NOT read the searched bodies in the orchestrator context (REQ-5).
+
 ### 2. Decompose into atomic tasks
 
 Rules:

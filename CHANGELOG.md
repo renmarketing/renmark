@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — reuse check + contradiction-reconcile reflex
+**Request:** cowork-alignment wave 2.
+**Built:** Reuse-check before decomposition; the CHANGELOG 'Do not change' read is now a stop-and-reconcile when a task would contradict a guarded decision.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`
+
 ## [2026-06-12] — reuse check before approaches + re-establish scope on premise change
 **Request:** cowork-alignment wave 2.
 **Built:** Reuse-check subagent (internal counterpart to external prior-art) before Step 4; re-establish the scope contract when the premise shifts instead of continuing from persisted spec.
