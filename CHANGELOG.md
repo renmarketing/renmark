@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — codereview + audit declaration wording
+**Request:** fable-routing part 2 wave 1.
+**Built:** Both adversarial-escalation notes now condition fable routing on declared top_tier with documented opus fallback.
+**Files changed:**
+- `plugin/skills/codereview/SKILL.md`
+- `plugin/skills/audit/SKILL.md`
+**Do not change:**
+- Both notes share the same gate language — keep them in sync.
+
 ## [2026-06-12] — doctor declaration report
 **Request:** fable-routing part 2 wave 1.
 **Built:** Advisory check row resolves top_tier via renmark.capabilities and flags env overrides; remediation points at /renmark:init.

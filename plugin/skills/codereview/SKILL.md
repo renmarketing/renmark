@@ -78,7 +78,9 @@ tier-override flag:
 **Adversarial escalation (REQ-2 — highest-stakes diffs only).** For release-gating,
 security-sensitive, or engine/state code, adversarial verification subagents MAY be
 dispatched on `fable` (Agent tool, `model: "fable"`) to attempt to refute the review's
-findings before they ship. This is an escalation tier, never the default review path —
+findings before they ship. Fable dispatch applies in projects with a declared
+`top_tier: fable` (renmark.capabilities); undeclared projects run the same refutation
+passes on opus. This is an escalation tier, never the default review path —
 the codex read-only sandbox pass and the bounded severity-summary contract (Opus reads
 only the summary, never the diff body) are unchanged.
 
