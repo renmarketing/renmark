@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — re-interview guard on mid-feature premise change
+**Request:** cowork-alignment wave 2.
+**Built:** Router re-runs PRD alignment + re-establishes scope when the premise materially changes, instead of silently continuing the pipeline.
+**Files changed:**
+- `plugin/skills/feature/SKILL.md`
+
 ## [2026-06-12] — contradiction overlap pauses for reconcile
 **Request:** cowork-alignment wave 2.
 **Built:** Pre-flight changelog check escalates a contradicting overlap from a note to a stop-and-reconcile before dispatch.
