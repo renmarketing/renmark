@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — v0.12.0 — declared-capability Fable routing
+**Request:** Implement the adopted fable-routing strategy (per amended REQ-2 and the 2026-06-11 decision record): Fable as declared default for ideation/strategy synthesis, busy-work demoted to cheap tiers, deterministic gates; full pipeline across 2 plans (23 tasks), surviving a dual provider-limit interruption.
+**Built:** NEW renmark/capabilities.py (env RENMARK_TOP_TIER > routing.md ## Model tiers > opus; case-normalized; heading-bounded parsing); plan_lint checks 9-10 (fable undeclared/mechanical BLOCKs, doc-mirrored); engine dry-run prices via effective_executor with fable→opus render + downgrade repricing; skill_preamble declared-tier hint for synthesis skills; busy-work demotions (brainstorm research → parallel sonnet subagents, prd-alignment → haiku w/ sonnet large-PRD escalation, blueprint HTML → codex split); init one-time declaration question + doctor report row; this repo declares top_tier: fable; owner rules implemented (handoff default-forward rule 8, codex usage-limit reroute-first); 23 new tests (746 total).
+**Pipeline evidence:** PRD alignment aligned; both plans PASS lint; verify 6/6 goal-backward; codex review 0 critical / 3 major / 2 minor / 1 nit — 3 fixed (repricing, parsing, case), 2 ruled by-design with REQ-2 test pins (env IS a per-user declaration, both directions pinned), 1 deferred (plan_lint cwd repo_root — pre-existing convention). Dual usage-limit interruption (codex + Claude session, 2026-06-11) recovered via Tier-2 pause state + next-day codex retry.
+**Do not change:**
+- Env precedence (RENMARK_TOP_TIER > file > opus) is test-pinned in both directions — the REQ-2 per-user override contract.
+- The Model tiers block is hand-curated; append_routing and init never overwrite an existing block.
+- REQ-12 gates never default-forward; reroute-first applies only to non-bulk codex waves and is always ledgered.
+
 ## [2026-06-12] — codereview fixes (fable-routing): repricing, parsing edges, design pins
 **Request:** Codex review found 0 critical / 3 major / 2 minor / 1 nit on 9b49afd..HEAD; fix the real ones, pin the by-design ones.
 **Built:** Engine: downgraded fable→opus preview rows now reprice at the effective rate even with explicit est_cost_usd (major 3). Capabilities: indented headings terminate the Model tiers block; env/file tier values normalize case (minor 4 + nit 6). Design pins with REQ-2 citations: RENMARK_TOP_TIER=fable IS a per-user declaration (lint passes, hint fires — majors 1-2 ruled by-design) and env=opus on a declared repo BLOCKs fable (collaborator protection). Plan SKILL routing row clarifies env counts as declaration. Deferred: plan_lint's Path.cwd() repo_root (minor 5) — pre-existing convention shared with check 4; cross-checkout linting is a separate refactor.
