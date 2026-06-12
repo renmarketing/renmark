@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — v0.13.0 — agent reasoning + routing policy
+**Request:** Codify the owner's AGENT REASONING + ROUTING POLICY: required reasoning instruction for all agents, fable sub-agent lanes for the four role groups, effort defaults, browser-validation discipline.
+**Built:** NEW shared reasoning/output-discipline contract (plugin/skills/_shared/reasoning-contract.md — multi-perspective → assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated; confidence ≠ completion) carried by EVERY dispatch surface (orchestrate Agent+codex paths, verify, finish, prd, brainstorm, codereview, audit). Declaration-gated optional fable lanes: verify [fr] QA review extension code, finish release-readiness adversarial pass (blocking stops [r]), prd non-interactive reconcile, brainstorm Step-4 synthesis. Effort-policy routing rows (session default opus/medium for normal work; MAY-escalate fable for QA/adversarial signals — never default). Browser-access instruction for QA subagents (active channel; no static-only UI validation).
+**Pipeline evidence:** PRD alignment aligned (haiku-pinned subagent's first run); plan PASS; verify 4/4; codex review 0 critical / 8 major / 2 minor — all 10 fixed (contract rollout completed, honest G11 rows, MAY-escalate wording); 746 tests, audit PASS, parity 7/7 at 0.13.0.
+**Do not change:**
+- The canonical reasoning instruction lives ONLY in reasoning-contract.md — skills cite, never paste.
+- Interactive loops (brainstorm discovery, prd CREATE interview) never dispatch per-checkpoint fable calls.
+- The fable QA route is MAY-escalate, never default.
+
 ## [2026-06-12] — codereview fixes (agent-routing-policy): contract rollout completed
 **Request:** Codex review found 0 critical / 8 major / 2 minor — all consistency gaps; fix all 10.
 **Built:** Contract rollout completed (codereview/audit/brainstorm-research lanes now carry the verbatim Dispatch-reference blockquote — the universal-coverage claim is now true); verify gains the [fr] Fable review extension code in its hand-off menus (codereview [o]/[fix] pattern), channel-neutral browser wording, and an honest G11 row; prd G11 row describes the optional fable reconcile dispatch; finish uses the verbatim blockquote; orchestrate names the exact contract section; routing.md QA row reworded 'MAY escalate … never default'.
