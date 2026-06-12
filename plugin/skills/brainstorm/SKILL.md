@@ -129,6 +129,14 @@ Cite the artifact paths to the user. The session brain reads ONLY the returned �
 
 With trade-offs, **informed by the research**. Lead with your recommendation and name the prior art / best practice that backs it.
 
+**Optional fable synthesis lane (declared projects only).** In projects where `capabilities.top_tier == "fable"` AND the session is NOT already running on Fable (the user didn't run `/model fable`), this step's approach synthesis — architecture options, alternative implementation paths, risk/opportunity discovery — MAY be dispatched as **one** non-interactive fable subagent: a single `Agent` tool call with `model: "fable"`. Inputs: the Step 2 answers summary + the Step 3 research summaries (the ≤5-line summaries, never the artifact bodies). Output: 2-3 approaches with trade-offs + risks, bounded to ≤10 lines. The session brain then presents and discusses the approaches with the user — the fable subagent never talks to the user directly. When the session IS Fable, synthesize inline as today — no dispatch. The one-question-at-a-time discovery loop (Step 2) is NEVER dispatched — no per-checkpoint fable calls; this lane fires at most once per brainstorm, here.
+
+> *Include the reasoning/output-discipline contract from
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> dispatched subagent prompt: multi-perspective decomposition → explicit
+> assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
+> recommendations; evidence preserved; missing context stated, never guessed.*
+
 ### 5. Present the design
 
 In sections, scaled to complexity. Get approval per section. Cover: architecture, components, data flow, error handling, testing.

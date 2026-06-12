@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-12] — non-interactive fable lanes
+**Request:** agent-routing-policy wave 2.
+**Built:** PRD reconcile and brainstorm Step-4 synthesis may dispatch ONE bounded fable subagent in declared projects; interactive loops never dispatch (judge-pinned). Human gates unchanged.
+**Files changed:**
+- `plugin/skills/prd/SKILL.md`
+- `plugin/skills/brainstorm/SKILL.md`
+
 ## [2026-06-12] — optional fable release-readiness adversarial pass
 **Request:** agent-routing-policy wave 2.
 **Built:** Recommended before release-tagged closes in declared projects; blocking findings stop the [r] path, deferrable → bugs.md.
