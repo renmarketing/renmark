@@ -161,7 +161,8 @@ With trade-offs, **informed by the research**. Lead with your recommendation and
 > `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
 > dispatched subagent prompt: multi-perspective decomposition → explicit
 > assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
-> recommendations; evidence preserved; missing context stated, never guessed.*
+> recommendations; evidence preserved; missing context stated, never guessed;
+> stance of pushing back by default (no sycophancy).*
 
 ### 5. Present the design
 

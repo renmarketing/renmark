@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (cowork-alignment)
+**Request:** Codex review found 0 critical / 4 major / 1 minor — consistency + scope-ownership issues; fix all 5.
+**Built:** orchestrate pre-flight contradiction check strengthened to match plan (last 5 CHANGELOG entries + decisions.md + semantic contradictions, not just file overlap); feature re-entry guard reworded to router-only (detect drift → re-run PRD alignment → dispatch the scope-owning skill, never re-interview itself); AGENTS.md.template gains the reuse-check + push-back bullets (mirror parity with root AGENTS.md); brainstorm Step-4 citation confirmed pointer-form + stance clause added; reasoning-contract.md header now states the pointer-propagation invariant (all 7 consumers cite by pointer, none paste).
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`, `plugin/skills/feature/SKILL.md`
+- `plugin/templates/AGENTS.md.template`, `plugin/skills/brainstorm/SKILL.md`, `plugin/skills/_shared/reasoning-contract.md`
+**Do not change:**
+- feature stays a router — scope re-establishment is always delegated to brainstorm/plan, never done in the router.
+- Consumers cite the reasoning/reuse blockquotes BY POINTER (never paste) so contract updates propagate — the pointer-propagation invariant is load-bearing.
+
 ## [2026-06-12] — reuse-check + push-back pointers
 **Request:** cowork-alignment wave 2.
 **Built:** Same two pointer lines in the CLAUDE template; AGENTS template had no anchor (nothing added there).

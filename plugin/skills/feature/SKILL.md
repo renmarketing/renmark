@@ -92,20 +92,23 @@ full bounded-return format and examples.
 already-open branch with a persisted pipeline. If the user signals the premise changed
 ("things changed", "actually I want…", or a description that is *materially different*
 from what the branch was opened for), the router does NOT silently resume the persisted
-pipeline against a stale premise. Instead it:
+pipeline against a stale premise. Its job is to **detect** the drift and **hand off** to
+the scope-owning skill — it never re-establishes scope itself. It:
 
-1. **Surface the shift** — state in one line how the new description differs from the
+1. **Detect the shift** — state in one line how the new description differs from the
    feature identity recorded in `lifecycle.json` (the `feature`/`branch` the branch was
    opened for).
-2. **Re-run PRD alignment and re-establish scope** — re-dispatch the Step 2 PRD-alignment
-   subagent with the *new* `feature_description` + `file_scope`, then reconcile the verdict
-   exactly as above (`aligned` → proceed; `drift` → human-gated `/renmark:prd` update).
-3. **Then proceed** down the normal pipeline (Step 3 onward) on the reconciled scope.
+2. **Re-run PRD alignment** — re-dispatch the Step 2 PRD-alignment subagent with the *new*
+   `feature_description` + `file_scope`, then reconcile the verdict exactly as above
+   (`aligned` → continue; `drift` → human-gated `/renmark:prd` update).
+3. **Dispatch the scope-owning skill** — hand off to `/renmark:brainstorm` (re-interview /
+   re-spec) or `/renmark:plan` (re-decompose) to re-establish scope. Scope
+   re-interview and the reconciled-scope write belong to that skill, not the router.
+   Lifecycle is updated only **after** the scope-owning skill returns.
 
-The router stays a router — it does NOT plan, code, or re-interview the user beyond
-confirming the shift. This is a re-entry guard, not a new stage: it reuses the Step 2
-subagent and writes the reconciled identity/scope back to `lifecycle.json` before
-handing off to Plan. When the premise is unchanged, skip this guard and resume normally.
+The router stays a router — it does NOT plan, code, re-interview the user, or write scope.
+This is a re-entry guard, not a new stage: it reuses the Step 2 subagent, then routes to
+the scope owner. When the premise is unchanged, skip this guard and resume normally.
 
 ### 3. Plan
 

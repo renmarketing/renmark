@@ -5,7 +5,8 @@ dispatch), `verify` (QA subagents), `codereview` / `audit` (refutation
 subagents), `finish` (release-readiness pass), and `prd` / `brainstorm`
 (non-interactive fable lanes and brainstorm's parallel research subagents). This is the one place the reasoning instruction
 and its output-discipline mapping live, so dispatch prompts can't drift. Skills
-cite the blockquote below; they do not paste or paraphrase the body.
+cite by pointer (this file's path) — never paste the canonical blockquote — so
+edits here (e.g. the stance clause) propagate to every consumer automatically.
 
 ---
 
