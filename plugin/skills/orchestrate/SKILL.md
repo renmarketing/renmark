@@ -72,7 +72,7 @@ state.write_pipeline_state(repo, current_phase="orchestrate", current_plan=<plan
 2. Checkpoint commit: `git -c user.name="renmark-orchestrate" -c user.email="orchestrate@renmark.local" commit --allow-empty -m "chore: checkpoint before <plan name>"`.
 3. Baseline each affected verifier — if any fails now, **stop**: do not orchestrate into a broken baseline.
 
-**Changelog check** — read the last 3 entries in `CHANGELOG.md`; flag any "Do not change" guards that overlap with the plan's target files.
+**Changelog / decisions check** — read the last 5 entries in `CHANGELOG.md`, and when `.renmark/memory/decisions.md` is present, also read its decision titles + guard text (titles and guards only — never full bodies; REQ-5). Flag any "Do not change" guard or recorded decision the plan would contradict. A contradiction is **semantic**: the plan would undo or overwrite a guarded decision — and this binds even when there is **no target-file overlap** (a plan can violate a decision without touching the same file). On any such contradiction, surface it and **PAUSE for reconciliation** before dispatching; never silently overwrite a recorded decision.
 
 **Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost. Ask: *"Proceed? [y/N]"*
 

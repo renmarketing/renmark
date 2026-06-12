@@ -30,6 +30,8 @@ If the current directory has no `CLAUDE.md`, no `AGENTS.md`, and no `.renmark/`,
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'brainstorm')`. If it returns a non-None hint, surface as a one-line note. (Domain is resolved from `DOMAIN_BY_SKILL` — do not pass it manually.) For synthesis skills like brainstorm, `skill_preamble` now also surfaces a declared-tier hint (e.g. *"declared top tier: fable — … `/model fable`"*) — surface it verbatim, exactly like any other preamble hint.
 
+**Premise-change re-entry.** If the user signals the premise changed — "things changed", "scope is different now", "we pivoted", a new constraint that contradicts the persisted spec/stack — do NOT continue from the persisted spec or `.renmark/memory/stack.md` as if it still holds. **Re-establish the scope contract first:** name the conflict between what's on disk and what the user just said, then re-ask the changed Q1–Q3 (stack / deployment / MVP boundary) from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md` and reconcile before resuming discovery. Re-establishing the contract takes priority over picking up where the persisted artifacts left off.
+
 **Final step — Lifecycle update.** After the spec is written to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`, call `lifecycle.write_lifecycle(repo, stage='brainstorm-complete', feature=<topic>, artifact_update=('spec', <spec-path>))`. This is what makes `/renmark:resume` work after `/clear`.
 
 ### 1. Empty-folder bootstrap (only if needed)
@@ -127,6 +129,28 @@ summary.write_artifact(
 
 Cite the artifact paths to the user. The session brain reads ONLY the returned ≤5-line summaries and synthesizes them in Step 4 — gathering ran on sonnet; synthesis stays on the top tier. Let the findings shape the approaches — call out explicitly when research changed your recommendation (e.g. "an existing library covers 80% of this, so the plan should wrap it, not rebuild it").
 
+### 3b. Reuse check (internal/in-reach prior art — before proposing any build)
+
+Step 3 researches **external** prior art (the web, GitHub). This step is its
+**internal/in-reach counterpart**: before proposing a custom build, check whether
+the capability *already exists right here* — a loaded skill/command, a session
+MCP tool, a prior spec/plan, or a shipped feature.
+
+> *Before proposing any custom build, dispatch the reuse-check subagent from
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`: Agent tool call
+> (`model: haiku`; `sonnet` for a large search surface), passing ONLY
+> `request_description`. The subagent searches loaded skills/commands, session
+> MCP tools, `.renmark/specs/` + `.renmark/plans/`, and
+> `.renmark/memory/features.md` in its own context, and returns ONLY the ≤5-line
+> `reuse: found | none` verdict (+ a one-line pointer when found). Surface the
+> verdict and default to reuse; do NOT read the searched bodies in the
+> orchestrator context (REQ-5).*
+
+Surface the bounded verdict. If `reuse: found`, **lead with the existing
+skill / MCP tool / spec / feature** named in the pointer and require a clear,
+stated reason it doesn't fit before proposing a custom build in Step 4. If
+`reuse: none`, proceed to propose the custom build as normal.
+
 ### 4. Propose 2-3 approaches
 
 With trade-offs, **informed by the research**. Lead with your recommendation and name the prior art / best practice that backs it.
@@ -137,7 +161,8 @@ With trade-offs, **informed by the research**. Lead with your recommendation and
 > `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
 > dispatched subagent prompt: multi-perspective decomposition → explicit
 > assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
-> recommendations; evidence preserved; missing context stated, never guessed.*
+> recommendations; evidence preserved; missing context stated, never guessed;
+> stance of pushing back by default (no sycophancy).*
 
 ### 5. Present the design
 

@@ -88,6 +88,28 @@ and file scope to the subagent and receives only the bounded `verdict`.
 `prd-alignment` is the contract key for this gate — see the shared file for the
 full bounded-return format and examples.
 
+**Re-entry guard — premise changed mid-feature.** This router can be re-entered on an
+already-open branch with a persisted pipeline. If the user signals the premise changed
+("things changed", "actually I want…", or a description that is *materially different*
+from what the branch was opened for), the router does NOT silently resume the persisted
+pipeline against a stale premise. Its job is to **detect** the drift and **hand off** to
+the scope-owning skill — it never re-establishes scope itself. It:
+
+1. **Detect the shift** — state in one line how the new description differs from the
+   feature identity recorded in `lifecycle.json` (the `feature`/`branch` the branch was
+   opened for).
+2. **Re-run PRD alignment** — re-dispatch the Step 2 PRD-alignment subagent with the *new*
+   `feature_description` + `file_scope`, then reconcile the verdict exactly as above
+   (`aligned` → continue; `drift` → human-gated `/renmark:prd` update).
+3. **Dispatch the scope-owning skill** — hand off to `/renmark:brainstorm` (re-interview /
+   re-spec) or `/renmark:plan` (re-decompose) to re-establish scope. Scope
+   re-interview and the reconciled-scope write belong to that skill, not the router.
+   Lifecycle is updated only **after** the scope-owning skill returns.
+
+The router stays a router — it does NOT plan, code, re-interview the user, or write scope.
+This is a re-entry guard, not a new stage: it reuses the Step 2 subagent, then routes to
+the scope owner. When the premise is unchanged, skip this guard and resume normally.
+
 ### 3. Plan
 
 Invoke `/renmark:plan <description or spec-path>`. The plan skill runs the Scope Contract discovery (Q1–Q3), writes CHANGELOG + stack.md, then decomposes into tasks.

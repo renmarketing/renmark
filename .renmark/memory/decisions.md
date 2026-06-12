@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-026 — Finished feature cowork-alignment
+
+**Date:** 2026-06-12
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/cowork-alignment reached stage ready-to-release
+
+---
+
 ## ADR-025 — Finished feature agent-routing-policy
 
 **Date:** 2026-06-12

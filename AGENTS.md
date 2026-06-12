@@ -62,6 +62,8 @@
 - Changelog: `CHANGELOG.md` — persistent project history
 - Tests: run via command in `CLAUDE.md` § Testing
 - Source of truth: `PRD.md`. For new features/changes, dispatch a subagent to read `PRD.md` + docs and return a bounded alignment/drift summary — never load the full PRD into the orchestrator.
+- Before proposing a custom build, run the reuse check — see plugin/skills/_shared/reuse-check.md (check loaded skills, MCP connectors, prior specs/plans, features.md; default to reuse).
+- Dispatched agents push back by default and skip sycophancy — see plugin/skills/_shared/reasoning-contract.md.
 
 ## Tooling — renmark workflow
 

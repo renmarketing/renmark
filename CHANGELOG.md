@@ -1,5 +1,68 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (cowork-alignment)
+**Request:** Codex review found 0 critical / 4 major / 1 minor — consistency + scope-ownership issues; fix all 5.
+**Built:** orchestrate pre-flight contradiction check strengthened to match plan (last 5 CHANGELOG entries + decisions.md + semantic contradictions, not just file overlap); feature re-entry guard reworded to router-only (detect drift → re-run PRD alignment → dispatch the scope-owning skill, never re-interview itself); AGENTS.md.template gains the reuse-check + push-back bullets (mirror parity with root AGENTS.md); brainstorm Step-4 citation confirmed pointer-form + stance clause added; reasoning-contract.md header now states the pointer-propagation invariant (all 7 consumers cite by pointer, none paste).
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`, `plugin/skills/feature/SKILL.md`
+- `plugin/templates/AGENTS.md.template`, `plugin/skills/brainstorm/SKILL.md`, `plugin/skills/_shared/reasoning-contract.md`
+**Do not change:**
+- feature stays a router — scope re-establishment is always delegated to brainstorm/plan, never done in the router.
+- Consumers cite the reasoning/reuse blockquotes BY POINTER (never paste) so contract updates propagate — the pointer-propagation invariant is load-bearing.
+
+## [2026-06-12] — reuse-check + push-back pointers
+**Request:** cowork-alignment wave 2.
+**Built:** Same two pointer lines in the CLAUDE template; AGENTS template had no anchor (nothing added there).
+**Files changed:**
+- `plugin/templates/CLAUDE.md.template`
+
+## [2026-06-12] — reuse-check + push-back pointers, AGENTS mirror
+**Request:** cowork-alignment wave 2.
+**Built:** Two standing rules: run the reuse check before custom builds; dispatched agents push back and skip sycophancy. Mirrored byte-identical into AGENTS.md.
+**Files changed:**
+- `CLAUDE.md`
+- `AGENTS.md`
+
+## [2026-06-12] — re-interview guard on mid-feature premise change
+**Request:** cowork-alignment wave 2.
+**Built:** Router re-runs PRD alignment + re-establishes scope when the premise materially changes, instead of silently continuing the pipeline.
+**Files changed:**
+- `plugin/skills/feature/SKILL.md`
+
+## [2026-06-12] — contradiction overlap pauses for reconcile
+**Request:** cowork-alignment wave 2.
+**Built:** Pre-flight changelog check escalates a contradicting overlap from a note to a stop-and-reconcile before dispatch.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+
+## [2026-06-12] — reuse check + contradiction-reconcile reflex
+**Request:** cowork-alignment wave 2.
+**Built:** Reuse-check before decomposition; the CHANGELOG 'Do not change' read is now a stop-and-reconcile when a task would contradict a guarded decision.
+**Files changed:**
+- `plugin/skills/plan/SKILL.md`
+
+## [2026-06-12] — reuse check before approaches + re-establish scope on premise change
+**Request:** cowork-alignment wave 2.
+**Built:** Reuse-check subagent (internal counterpart to external prior-art) before Step 4; re-establish the scope contract when the premise shifts instead of continuing from persisted spec.
+**Files changed:**
+- `plugin/skills/brainstorm/SKILL.md`
+
+## [2026-06-12] — pushback stance
+**Request:** cowork-alignment wave 1.
+**Built:** Reasoning contract gains a Stance clause (disagree when off-strategy/wrong/inconsistent; no hollow affirmation) carried by every dispatched agent via the citable blockquote.
+**Files changed:**
+- `plugin/skills/_shared/reasoning-contract.md`
+**Do not change:**
+- The canonical reasoning + stance text is single-sourced in this file — skills cite, never paste.
+
+## [2026-06-12] — reuse-check contract
+**Request:** cowork-alignment wave 1.
+**Built:** Cheap subagent searches loaded skills/commands, MCP tools, prior specs/plans, features.md before a custom build; bounded reuse:found|none verdict; default to reuse.
+**Files changed:**
+- `plugin/skills/_shared/reuse-check.md`
+**Do not change:**
+- Orchestrator reads only the ≤5-line verdict (REQ-5), never the searched bodies; canonical dispatch blockquote lives here, skills cite it.
+
 ## [2026-06-12] — v0.13.0 — agent reasoning + routing policy
 **Request:** Codify the owner's AGENT REASONING + ROUTING POLICY: required reasoning instruction for all agents, fable sub-agent lanes for the four role groups, effort defaults, browser-validation discipline.
 **Built:** NEW shared reasoning/output-discipline contract (plugin/skills/_shared/reasoning-contract.md — multi-perspective → assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated; confidence ≠ completion) carried by EVERY dispatch surface (orchestrate Agent+codex paths, verify, finish, prd, brainstorm, codereview, audit). Declaration-gated optional fable lanes: verify [fr] QA review extension code, finish release-readiness adversarial pass (blocking stops [r]), prd non-interactive reconcile, brainstorm Step-4 synthesis. Effort-policy routing rows (session default opus/medium for normal work; MAY-escalate fable for QA/adversarial signals — never default). Browser-access instruction for QA subagents (active channel; no static-only UI validation).

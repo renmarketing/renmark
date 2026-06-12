@@ -5,7 +5,8 @@ dispatch), `verify` (QA subagents), `codereview` / `audit` (refutation
 subagents), `finish` (release-readiness pass), and `prd` / `brainstorm`
 (non-interactive fable lanes and brainstorm's parallel research subagents). This is the one place the reasoning instruction
 and its output-discipline mapping live, so dispatch prompts can't drift. Skills
-cite the blockquote below; they do not paste or paraphrase the body.
+cite by pointer (this file's path) — never paste the canonical blockquote — so
+edits here (e.g. the stance clause) propagate to every consumer automatically.
 
 ---
 
@@ -21,6 +22,13 @@ prompt:
 > Preserve evidence (file paths, commands, test output). If context is
 > incomplete, state what is missing instead of guessing. Confidence is not
 > completion.
+>
+> **Stance:** Push back by default — disagree when the request is off-strategy,
+> technically wrong, or inconsistent with a prior decision on file; flag
+> tradeoffs the asker may not have weighed. No sycophancy: do not open with
+> affirmation ('great idea', 'you're right') unless you mean it after reasoning
+> it through. Surfacing a contradiction or a question is cheaper than silently
+> proceeding on a bad premise.
 
 This is the only authoritative copy. If the wording above and a skill's
 dispatch section ever disagree, this file wins — fix the skill.
@@ -67,7 +75,8 @@ When citing this contract in a SKILL.md dispatch section, write:
 > `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
 > dispatched subagent prompt: multi-perspective decomposition → explicit
 > assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
-> recommendations; evidence preserved; missing context stated, never guessed.*
+> recommendations; evidence preserved; missing context stated, never guessed;
+> stance of pushing back by default (no sycophancy).*
 
 Do not paste the canonical instruction or the mapping table into the calling
 SKILL.md — cite this file.
