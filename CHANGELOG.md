@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — Model tiers declarations
+**Request:** fable-routing part 2 wave 2.
+**Built:** Template ships top_tier: opus with fable opt-in comments; this repo declares top_tier: fable (owner-confirmed). capabilities.is_top_tier_declared(Path('.')) now True here — synthesis-skill tier hints and fable plan acceptance are live.
+**Files changed:**
+- `plugin/templates/memory/routing.md.template`
+- `.renmark/memory/routing.md`
+**Do not change:**
+- The Model tiers block is hand-curated — memory.append_routing never edits it; init never overwrites an existing block.
+
 ## [2026-06-12] — codereview + audit declaration wording
 **Request:** fable-routing part 2 wave 1.
 **Built:** Both adversarial-escalation notes now condition fable routing on declared top_tier with documented opus fallback.

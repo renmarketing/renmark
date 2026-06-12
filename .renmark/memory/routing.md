@@ -14,6 +14,10 @@ Example: `- (2026-06-09) \`target=tests/**, complexity=medium, mode=A\` → **co
 
 When entries conflict for the same signature, the newest dated entry wins.
 
+## Model tiers
+top_tier: fable
+declared_at: 2026-06-12
+
 ## Defaults (until experience accumulates)
 
 - (target=`.gitignore`, complexity=simple) → haiku
