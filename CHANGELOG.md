@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — dispatch prompts carry the reasoning contract
+**Request:** agent-routing-policy wave 2.
+**Built:** Agent-path AND codex ad-hoc dispatch prompts must include the reasoning-contract blockquote (cited, never pasted).
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+
 ## [2026-06-12] — reasoning contract (shared)
 **Request:** agent-routing-policy task 1 — the owner's required reasoning instruction as a single-source contract.
 **Built:** plugin/skills/_shared/reasoning-contract.md: canonical multi-perspective→assumptions→synthesis instruction, output discipline mapped to G9 fields, browser-validation clause (Chrome DevTools MCP), citable dispatch blockquote.
