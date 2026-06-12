@@ -596,9 +596,7 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
             "before continuing (`.renmark/memory/` survives clears)"
         )
     elif verdict == "compact":
-        fragments.append(
-            "context: approaching budget — consider `/compact` before continuing"
-        )
+        fragments.append("context: approaching budget — consider `/compact` before continuing")
 
     if skill in SYNTHESIS_SKILLS:
         # Imported lazily to keep capability resolution off the module-load path.

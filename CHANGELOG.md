@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — preamble hint tests
+**Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
+**Built:** Synthesis-skill hint presence/absence + both-fire ' | ' composition pinned; lifecycle.py hunk is ruff-format-only.
+**Files changed:**
+- `tests/test_lifecycle.py`
+- `renmark/lifecycle.py`
+**Do not change:**
+- Tests monkeypatch.delenv RENMARK_TOP_TIER — the env override is global state; new tests must do the same.
+
 ## [2026-06-12] — engine preview fallback tests
 **Request:** fable-routing part 1 wave 3 (codex retry after usage pause).
 **Built:** Undeclared repo renders fable→opus at 0.015; declared renders fable at 0.030.

@@ -266,6 +266,56 @@ def test_cross_domain_transition() -> None:
     assert lifecycle.is_cross_domain_transition("debug", "verify") is True
 
 
+def _write_declared_fable_routing(repo: Path) -> None:
+    routing = repo / ".renmark" / "memory" / "routing.md"
+    routing.parent.mkdir(parents=True, exist_ok=True)
+    routing.write_text("## Model tiers\n\ntop_tier: fable\n")
+
+
+def test_skill_preamble_declared_repo_brainstorm_adds_tier_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_declared_fable_routing(tmp_path)
+
+    hint = lifecycle.skill_preamble(tmp_path, "brainstorm")
+
+    assert hint is not None
+    assert "declared top tier: fable" in hint
+
+
+def test_skill_preamble_declared_repo_verify_omits_tier_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_declared_fable_routing(tmp_path)
+
+    hint = lifecycle.skill_preamble(tmp_path, "verify")
+
+    assert "declared top tier: fable" not in (hint or "")
+
+
+def test_skill_preamble_undeclared_repo_brainstorm_omits_tier_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+
+    hint = lifecycle.skill_preamble(tmp_path, "brainstorm")
+
+    assert "declared top tier: fable" not in (hint or "")
+
+
+def test_skill_preamble_cross_domain_and_tier_hints_joined(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_declared_fable_routing(tmp_path)
+    lifecycle.skill_preamble(tmp_path, "debug")
+
+    hint = lifecycle.skill_preamble(tmp_path, "brainstorm")
+
+    assert hint is not None
+    assert "context: cross-domain transition" in hint
+    assert "declared top tier: fable" in hint
+    assert " | " in hint
+
+
 def test_corrupt_lifecycle_returns_none(tmp_path: Path) -> None:
     state_dir = tmp_path / ".renmark" / "state"
     state_dir.mkdir(parents=True)
