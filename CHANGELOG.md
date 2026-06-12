@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — reuse-check contract
+**Request:** cowork-alignment wave 1.
+**Built:** Cheap subagent searches loaded skills/commands, MCP tools, prior specs/plans, features.md before a custom build; bounded reuse:found|none verdict; default to reuse.
+**Files changed:**
+- `plugin/skills/_shared/reuse-check.md`
+**Do not change:**
+- Orchestrator reads only the ≤5-line verdict (REQ-5), never the searched bodies; canonical dispatch blockquote lives here, skills cite it.
+
 ## [2026-06-12] — v0.13.0 — agent reasoning + routing policy
 **Request:** Codify the owner's AGENT REASONING + ROUTING POLICY: required reasoning instruction for all agents, fable sub-agent lanes for the four role groups, effort defaults, browser-validation discipline.
 **Built:** NEW shared reasoning/output-discipline contract (plugin/skills/_shared/reasoning-contract.md — multi-perspective → assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated; confidence ≠ completion) carried by EVERY dispatch surface (orchestrate Agent+codex paths, verify, finish, prd, brainstorm, codereview, audit). Declaration-gated optional fable lanes: verify [fr] QA review extension code, finish release-readiness adversarial pass (blocking stops [r]), prd non-interactive reconcile, brainstorm Step-4 synthesis. Effort-policy routing rows (session default opus/medium for normal work; MAY-escalate fable for QA/adversarial signals — never default). Browser-access instruction for QA subagents (active channel; no static-only UI validation).
