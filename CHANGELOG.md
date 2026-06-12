@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — brainstorm research demotion
+**Request:** fable-routing part 2 wave 1.
+**Built:** Step 3 web research demoted off the top tier: parallel model:sonnet subagents, angle-suffixed research artifacts, ≤5-line summaries; synthesis stays on the session brain. Step 0 surfaces the declared-tier hint.
+**Files changed:**
+- `plugin/skills/brainstorm/SKILL.md`
+**Do not change:**
+- One-question-at-a-time interactive flow unchanged — no per-checkpoint fable Agent calls (judge-pinned).
+
 ## [2026-06-12] — plan SKILL declaration rows
 **Request:** fable-routing part 2 wave 1.
 **Built:** Routing row, complexity clause, and cost-table note now reference the declaration gate and fable→opus preview render.

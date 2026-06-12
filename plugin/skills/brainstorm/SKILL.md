@@ -28,7 +28,7 @@ If the current directory has no `CLAUDE.md`, no `AGENTS.md`, and no `.renmark/`,
 
 ## Steps
 
-**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'brainstorm')`. If it returns a non-None hint, surface as a one-line note. (Domain is resolved from `DOMAIN_BY_SKILL` — do not pass it manually.)
+**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'brainstorm')`. If it returns a non-None hint, surface as a one-line note. (Domain is resolved from `DOMAIN_BY_SKILL` — do not pass it manually.) For synthesis skills like brainstorm, `skill_preamble` now also surfaces a declared-tier hint (e.g. *"declared top tier: fable — … `/model fable`"*) — surface it verbatim, exactly like any other preamble hint.
 
 **Final step — Lifecycle update.** After the spec is written to `.renmark/specs/YYYY-MM-DD-<topic>.spec.md`, call `lifecycle.write_lifecycle(repo, stage='brainstorm-complete', feature=<topic>, artifact_update=('spec', <spec-path>))`. This is what makes `/renmark:resume` work after `/clear`.
 
@@ -91,7 +91,7 @@ Ask the user questions ONE at a time. Prefer multiple-choice when possible. **Ca
 
 Stop asking once you can describe what's being built in 2-3 paragraphs AND you have a confirmed stack / deployment / MVP boundary.
 
-### 3. Research prior art (context-bounded)
+### 3. Research prior art (context-bounded, parallel sonnet subagents)
 
 Before proposing approaches, research the problem space so the design is informed, not invented. Scale effort to novelty: skip for trivial/throwaway work; research thoroughly for anything novel, public-facing, or where you're unsure of the idiomatic approach.
 
@@ -100,17 +100,17 @@ Before proposing approaches, research the problem space so the design is informe
 - **Prior art** — existing software/libraries that already solve this problem (build-vs-reuse signal).
 - **Reference implementations** — live GitHub repos doing something similar, to learn structure and avoid reinventing.
 
-**Tools:** `WebSearch` for best-practices and prior-art discovery; `WebFetch` to read a specific doc/README/repo page; `Context7` (if available) for authoritative library/framework docs. Prefer 2–4 focused queries over a broad sweep.
+**Dispatch — parallel `model: sonnet` subagents, never inline queries.** Do NOT run the research queries in this session's context: brainstorm runs on the session's top reasoning tier, so inline web busywork burns top-tier tokens at session price for zero reasoning gain. Instead, split the research angles (best practices / prior art / reference repos) across 2–4 subagents and dispatch them as **single-message multiple `Agent` tool calls with `model: sonnet`** (per the parallelism rule — sequential dispatch is the slow path). Brief each subagent with: a one-line problem statement + the confirmed stack, its single research angle, the focused queries to run (`WebSearch` for best-practices and prior-art discovery; `WebFetch` to read a specific doc/README/repo page; `Context7` if available for authoritative library/framework docs — 2–4 focused queries total across the dispatch, not a broad sweep), and the artifact path it must write.
 
-**Context hygiene (G3/G6 — this is critical):** do NOT dump search results or fetched pages into the conversation. Write findings to a research artifact and surface only a bounded summary:
+**Context hygiene (G3/G6 — this is critical):** the session brain never sees raw search results or fetched pages. Each subagent writes its full findings into the `.renmark/research/` artifact and returns ONLY a ≤5-line summary. Give each parallel subagent its own angle-suffixed file (e.g. `.renmark/research/YYYY-MM-DD-<topic>-<angle>.research.md`) — two parallel agents must never share a write scope. Each subagent persists via:
 
 ```python
 from renmark import summary
 summary.write_artifact(
-    ".renmark/research/YYYY-MM-DD-<topic>.research.md",
+    ".renmark/research/YYYY-MM-DD-<topic>-<angle>.research.md",
     artifact_type="research",
     body=full_findings,                # sources, quotes, repo links, notes
-    summary_lines=[                    # ≤5 lines — the ONLY thing the conversation sees
+    summary_lines=[                    # ≤5 lines — the ONLY thing returned to the session
         "best practice: <one-liner>",
         "prior art: <tool/lib> — reuse vs build: <call>",
         "reference repo: <owner/name> — <what to borrow>",
@@ -123,7 +123,7 @@ summary.write_artifact(
 )
 ```
 
-Cite the artifact path to the user. Let the findings shape the approaches in Step 4 — call out explicitly when research changed your recommendation (e.g. "an existing library covers 80% of this, so the plan should wrap it, not rebuild it").
+Cite the artifact paths to the user. The session brain reads ONLY the returned ≤5-line summaries and synthesizes them in Step 4 — gathering ran on sonnet; synthesis stays on the top tier. Let the findings shape the approaches — call out explicitly when research changed your recommendation (e.g. "an existing library covers 80% of this, so the plan should wrap it, not rebuild it").
 
 ### 4. Propose 2-3 approaches
 
