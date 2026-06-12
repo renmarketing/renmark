@@ -1,0 +1,21 @@
+{
+  "feature": "fable-routing",
+  "branch": "feature/fable-routing",
+  "sha": "bcd04cb477633fac5d7bac9fb8fbfd447f9df512",
+  "version_path": "",
+  "release_link": "",
+  "verification": "6/6 behaviors verified (feature level, parts 1+2)",
+  "codereview": ".renmark/reviews/2026-06-12-4eb8166.review.md",
+  "files_changed": 31,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-06-12T13:36:56+00:00"
+}

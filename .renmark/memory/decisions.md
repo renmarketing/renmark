@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-024 — Finished feature fable-routing
+
+**Date:** 2026-06-12
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/fable-routing reached stage ready-to-release
+
+---
+
 ## ADR-023 — Finished feature fable-integration
 
 **Date:** 2026-06-11
