@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — blueprint bulk demotion
+**Request:** fable-routing part 2 wave 1.
+**Built:** Session brain writes the design spec; codex bulk-emits via renmark-execute --task into .renmark/state/blueprint/ staging, then the splice proceeds as before. Schematic stays inline with a never-escalate note.
+**Files changed:**
+- `plugin/skills/blueprint/SKILL.md`
+**Do not change:**
+- Marker-splice + no-invented-nodes contracts unchanged; staging dir is sanctioned scratch.
+
 ## [2026-06-12] — brainstorm research demotion
 **Request:** fable-routing part 2 wave 1.
 **Built:** Step 3 web research demoted off the top tier: parallel model:sonnet subagents, angle-suffixed research artifacts, ≤5-line summaries; synthesis stays on the session brain. Step 0 surfaces the declared-tier hint.
