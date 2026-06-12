@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — terse CLAUDE template
+**Request:** claude-doc-slimming task 1 — compress the authoritative CLAUDE template to ≤200 lines.
+**Built:** plugin/templates/CLAUDE.md.template 426->167 lines; all 23 rule blocks kept (names/markers/order intact), every load-bearing clause grep-verified (codex RED-FLAG, fable override + reroute, 5-line/300-tok + 60/80% caps, G11 three-lists, lifecycle separation, provenance fields, write-boundary, contract/reuse pointers); non-block sections compressed to memory pointers.
+**Files changed:**
+- `plugin/templates/CLAUDE.md.template` — terse-rewrite (authoritative block source)
+**Do not change:**
+- This template's block bodies are now the byte-verbatim source merge_rule_blocks back-fills — the live CLAUDE.md (task 2) must match them exactly.
+
 ## [2026-06-12] — project scope: claude-doc-slimming
 **Request:** Terse-rewrite CLAUDE/AGENTS templates + this repo's root docs to ≤200 lines each, in place.
 **Scope contract:** Stack unchanged (renmark Python plugin). Deployment unchanged. MVP boundary: documentation-density compression only — preserve every rule-block name/marker/load-bearing clause; compress non-block sections to memory pointers. OUT: two-tier governance-doc split, block consolidation/rename, any rule-semantics change.
