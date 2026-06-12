@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-12] — pushback stance
+**Request:** cowork-alignment wave 1.
+**Built:** Reasoning contract gains a Stance clause (disagree when off-strategy/wrong/inconsistent; no hollow affirmation) carried by every dispatched agent via the citable blockquote.
+**Files changed:**
+- `plugin/skills/_shared/reasoning-contract.md`
+**Do not change:**
+- The canonical reasoning + stance text is single-sourced in this file — skills cite, never paste.
+
 ## [2026-06-12] — reuse-check contract
 **Request:** cowork-alignment wave 1.
 **Built:** Cheap subagent searches loaded skills/commands, MCP tools, prior specs/plans, features.md before a custom build; bounded reuse:found|none verdict; default to reuse.
