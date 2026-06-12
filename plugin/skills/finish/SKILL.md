@@ -41,6 +41,24 @@ if s:
 
 Run each task's verifier from the plan, or `npm test` / `pytest -q` if a test suite exists. If any fail: **stop**, report which ones, route to `/renmark:debug`.
 
+### 1.2 Release-readiness adversarial pass (optional — fable projects)
+
+In projects with a declared `top_tier: fable` (`renmark.capabilities.top_tier(repo) == "fable"`), a fable subagent MAY run an adversarial release-readiness review before the [r] Release path executes. **Recommended (not automatic) for release-tagged closes** — offer it when the user is heading toward [r]; skip silently for PR/merge/nothing closes unless asked.
+
+What the subagent receives — pointers only, never bodies into the orchestrator:
+- the branch diff **summary** (`git diff --stat <base>..HEAD` output)
+- **paths** to the verification artifact (`.renmark/reviews/*.verification.md`) and any codereview artifact for this branch
+
+What it hunts for: subtle logic flaws, orchestration failure points, hidden coupling, dead/orphan code.
+
+Dispatch per the canonical reasoning instruction — cite the blockquote in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`; do not paste or paraphrase it. The subagent returns a bounded **≤5-line verdict**, each finding tagged `blocking:` or `deferrable:`.
+
+Routing the verdict:
+- **Blocking findings** stop the release path — do not present or execute [r]; route to `/renmark:debug` with the finding as the symptom.
+- **Deferrable findings** are logged via `memory.log_bug()` and do not block; note them in the step 3 report.
+
+No findings → proceed. This pass adds a gate in front of [r] only; the merge/release gates and the step 3 menu themselves are unchanged.
+
 ### 1.5 Refresh the project map
 
 Now that verifiers pass and the branch is in its final shape, refresh the codebase map:

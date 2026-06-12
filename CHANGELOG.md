@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — optional fable release-readiness adversarial pass
+**Request:** agent-routing-policy wave 2.
+**Built:** Recommended before release-tagged closes in declared projects; blocking findings stop the [r] path, deferrable → bugs.md.
+**Files changed:**
+- `plugin/skills/finish/SKILL.md`
+
 ## [2026-06-12] — optional fable QA review lane + browser-access instruction
 **Request:** agent-routing-policy wave 2.
 **Built:** Declared projects may add a fable QA-review subagent (blocking-vs-deferrable verdict); deterministic smoke stays the always-run default (REQ-7). QA subagents are told they have Chrome DevTools MCP access — no static-only UI validation.
