@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-025 — Finished feature agent-routing-policy
+
+**Date:** 2026-06-12
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/agent-routing-policy reached stage ready-to-release
+
+---
+
 ## ADR-024 — Finished feature fable-routing
 
 **Date:** 2026-06-12

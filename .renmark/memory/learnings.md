@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-12, .renmark/reviews/2026-06-12-c7f1aa6.arp.verification.md) model `verify`: **verify-agent-routing-policy** — 4/4 verified; haiku-pinned prd-alignment subagent ignored the bounded-return format on first run (verdict correct) — bounded-format wording may need hardening for haiku
+
 - (2026-06-12, .renmark/reviews/2026-06-12-4eb8166.verification.md) model `verify`: **verify-fable-routing** — 6/6 behaviors verified; declaration gate fires both directions; env override + preview pricing live; dual provider-limit interruption recovered via pause state + codex retry
 
 - (2026-06-11, .renmark/reviews/2026-06-11-0113ee4.part2.verification.md) model `verify`: **verify-fable-integration-part2** — 4/4 doc-sync behaviors verified; session-limit interruption recovered from pipeline.json; lesson: plan verifiers for mirror tasks must be case-insensitive when the only anchor is capitalized

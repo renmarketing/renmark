@@ -84,6 +84,12 @@ passes on opus. This is an escalation tier, never the default review path —
 the codex read-only sandbox pass and the bounded severity-summary contract (Opus reads
 only the summary, never the diff body) are unchanged.
 
+> *Include the reasoning/output-discipline contract from
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> dispatched subagent prompt: multi-perspective decomposition → explicit
+> assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
+> recommendations; evidence preserved; missing context stated, never guessed.*
+
 For the full codex pass, the agent selects one of three prompt blocks below based on
 the parsed focus, then pipes it to `codex exec --sandbox read-only -`.
 

@@ -1,5 +1,61 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (agent-routing-policy): contract rollout completed
+**Request:** Codex review found 0 critical / 8 major / 2 minor — all consistency gaps; fix all 10.
+**Built:** Contract rollout completed (codereview/audit/brainstorm-research lanes now carry the verbatim Dispatch-reference blockquote — the universal-coverage claim is now true); verify gains the [fr] Fable review extension code in its hand-off menus (codereview [o]/[fix] pattern), channel-neutral browser wording, and an honest G11 row; prd G11 row describes the optional fable reconcile dispatch; finish uses the verbatim blockquote; orchestrate names the exact contract section; routing.md QA row reworded 'MAY escalate … never default'.
+**Files changed:**
+- `plugin/skills/{verify,prd,finish,orchestrate,codereview,audit,brainstorm}/SKILL.md`
+- `plugin/skills/_shared/reasoning-contract.md`, `.renmark/memory/routing.md`
+**Do not change:**
+- [fr] is a verify-lane extension code, NOT in handoff-menu.md's canonical list (same precedent as codereview's [o]/[fix]).
+- The fable QA route is MAY-escalate, never default — wording is load-bearing against the escalation-only rule.
+
+## [2026-06-12] — preferences carry the reasoning-contract pointer
+**Request:** agent-routing-policy wave 2.
+**Built:** Root and template lines byte-identical; AGENTS.md has no preferences block.
+**Files changed:**
+- `CLAUDE.md`
+- `plugin/templates/CLAUDE.md.template`
+
+## [2026-06-12] — effort-policy default rows
+**Request:** agent-routing-policy wave 2.
+**Built:** Session default (opus/medium) for normal work; fable subagent for QA/adversarial signals in declared projects.
+**Files changed:**
+- `.renmark/memory/routing.md`
+
+## [2026-06-12] — non-interactive fable lanes
+**Request:** agent-routing-policy wave 2.
+**Built:** PRD reconcile and brainstorm Step-4 synthesis may dispatch ONE bounded fable subagent in declared projects; interactive loops never dispatch (judge-pinned). Human gates unchanged.
+**Files changed:**
+- `plugin/skills/prd/SKILL.md`
+- `plugin/skills/brainstorm/SKILL.md`
+
+## [2026-06-12] — optional fable release-readiness adversarial pass
+**Request:** agent-routing-policy wave 2.
+**Built:** Recommended before release-tagged closes in declared projects; blocking findings stop the [r] path, deferrable → bugs.md.
+**Files changed:**
+- `plugin/skills/finish/SKILL.md`
+
+## [2026-06-12] — optional fable QA review lane + browser-access instruction
+**Request:** agent-routing-policy wave 2.
+**Built:** Declared projects may add a fable QA-review subagent (blocking-vs-deferrable verdict); deterministic smoke stays the always-run default (REQ-7). QA subagents are told they have Chrome DevTools MCP access — no static-only UI validation.
+**Files changed:**
+- `plugin/skills/verify/SKILL.md`
+
+## [2026-06-12] — dispatch prompts carry the reasoning contract
+**Request:** agent-routing-policy wave 2.
+**Built:** Agent-path AND codex ad-hoc dispatch prompts must include the reasoning-contract blockquote (cited, never pasted).
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md`
+
+## [2026-06-12] — reasoning contract (shared)
+**Request:** agent-routing-policy task 1 — the owner's required reasoning instruction as a single-source contract.
+**Built:** plugin/skills/_shared/reasoning-contract.md: canonical multi-perspective→assumptions→synthesis instruction, output discipline mapped to G9 fields, browser-validation clause (Chrome DevTools MCP), citable dispatch blockquote.
+**Files changed:**
+- `plugin/skills/_shared/reasoning-contract.md` — new shared reference
+**Do not change:**
+- The canonical instruction text lives ONLY here — skills cite the blockquote, never paste the body.
+
 ## [2026-06-12] — v0.12.0 — declared-capability Fable routing
 **Request:** Implement the adopted fable-routing strategy (per amended REQ-2 and the 2026-06-11 decision record): Fable as declared default for ideation/strategy synthesis, busy-work demoted to cheap tiers, deterministic gates; full pipeline across 2 plans (23 tasks), surviving a dual provider-limit interruption.
 **Built:** NEW renmark/capabilities.py (env RENMARK_TOP_TIER > routing.md ## Model tiers > opus; case-normalized; heading-bounded parsing); plan_lint checks 9-10 (fable undeclared/mechanical BLOCKs, doc-mirrored); engine dry-run prices via effective_executor with fable→opus render + downgrade repricing; skill_preamble declared-tier hint for synthesis skills; busy-work demotions (brainstorm research → parallel sonnet subagents, prd-alignment → haiku w/ sonnet large-PRD escalation, blueprint HTML → codex split); init one-time declaration question + doctor report row; this repo declares top_tier: fable; owner rules implemented (handoff default-forward rule 8, codex usage-limit reroute-first); 23 new tests (746 total).

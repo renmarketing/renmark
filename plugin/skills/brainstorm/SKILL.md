@@ -102,6 +102,8 @@ Before proposing approaches, research the problem space so the design is informe
 
 **Dispatch — parallel `model: sonnet` subagents, never inline queries.** Do NOT run the research queries in this session's context: brainstorm runs on the session's top reasoning tier, so inline web busywork burns top-tier tokens at session price for zero reasoning gain. Instead, split the research angles (best practices / prior art / reference repos) across 2–4 subagents and dispatch them as **single-message multiple `Agent` tool calls with `model: sonnet`** (per the parallelism rule — sequential dispatch is the slow path). Brief each subagent with: a one-line problem statement + the confirmed stack, its single research angle, the focused queries to run (`WebSearch` for best-practices and prior-art discovery; `WebFetch` to read a specific doc/README/repo page; `Context7` if available for authoritative library/framework docs — 2–4 focused queries total across the dispatch, not a broad sweep), and the artifact path it must write.
 
+Every research subagent prompt MUST also carry the Dispatch-reference blockquote from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` (the same citable blockquote Step 4 carries) — research dispatches are subagent dispatches; the contract applies here too.
+
 **Context hygiene (G3/G6 — this is critical):** the session brain never sees raw search results or fetched pages. Each subagent writes its full findings into the `.renmark/research/` artifact and returns ONLY a ≤5-line summary. Give each parallel subagent its own angle-suffixed file (e.g. `.renmark/research/YYYY-MM-DD-<topic>-<angle>.research.md`) — two parallel agents must never share a write scope. Each subagent persists via:
 
 ```python
@@ -128,6 +130,14 @@ Cite the artifact paths to the user. The session brain reads ONLY the returned �
 ### 4. Propose 2-3 approaches
 
 With trade-offs, **informed by the research**. Lead with your recommendation and name the prior art / best practice that backs it.
+
+**Optional fable synthesis lane (declared projects only).** In projects where `capabilities.top_tier == "fable"` AND the session is NOT already running on Fable (the user didn't run `/model fable`), this step's approach synthesis — architecture options, alternative implementation paths, risk/opportunity discovery — MAY be dispatched as **one** non-interactive fable subagent: a single `Agent` tool call with `model: "fable"`. Inputs: the Step 2 answers summary + the Step 3 research summaries (the ≤5-line summaries, never the artifact bodies). Output: 2-3 approaches with trade-offs + risks, bounded to ≤10 lines. The session brain then presents and discusses the approaches with the user — the fable subagent never talks to the user directly. When the session IS Fable, synthesize inline as today — no dispatch. The one-question-at-a-time discovery loop (Step 2) is NEVER dispatched — no per-checkpoint fable calls; this lane fires at most once per brainstorm, here.
+
+> *Include the reasoning/output-discipline contract from
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> dispatched subagent prompt: multi-perspective decomposition → explicit
+> assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
+> recommendations; evidence preserved; missing context stated, never guessed.*
 
 ### 5. Present the design
 

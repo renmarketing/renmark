@@ -1,0 +1,21 @@
+{
+  "feature": "agent-routing-policy",
+  "branch": "feature/agent-routing-policy",
+  "sha": "13cbf07570e756c2288071bb18f2c2e637145e4b",
+  "version_path": "",
+  "release_link": "",
+  "verification": "4/4 behaviors verified",
+  "codereview": ".renmark/reviews/2026-06-12-c7f1aa6.arp.review.md",
+  "files_changed": 16,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-06-12T17:44:46+00:00"
+}
