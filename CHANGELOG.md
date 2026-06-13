@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-13] — installer: symlink renmark-browser onto PATH (REQ-19 follow-up)
+**Request:** Close the v0.15.0 gap surfaced by `/renmark:roadmap --gaps` — `bin/renmark-browser` existed but wasn't on PATH after install.
+**Built:** `install.sh` now symlinks `bin/renmark-browser` → `~/.local/bin/renmark-browser` (mirroring renmark-execute) and removes it on `--uninstall`. Verified: `renmark-browser list` resolves on PATH and exits 0. `install.ps1` unchanged — it has no `~/.local/bin` CLI-symlink step (Windows invokes via `python -m renmark.browser_cli`). No version bump — v0.15.0 was local-only; this rides into the next release; the 7 version locations stay consistent (no drift).
+**Files changed:**
+- `install.sh` — renmark-browser CLI symlink + uninstall cleanup
+**Do not change:**
+- Keep renmark-browser's CLI symlink mirroring renmark-execute's (safe-symlink guard + uninstall removal).
+
 ## [2026-06-13] — v0.15.0 — Playwright browser layer with session memory
 **Request:** Ship the playwright-browser-control feature (REQ-19) as a release.
 **Built:** Bumped all 7 version locations 0.14.3 → 0.15.0. Feature: an OPTIONAL Playwright browser-control layer with session memory — `renmark-browser login <profile>` saves storageState under gitignored `.renmark/state/browser-sessions/`, reused by deterministic Python flows AND an opt-in `@playwright/mcp` live channel; auto-detects Playwright and falls back to the Chrome DevTools MCP when absent. Core runtime stays stdlib-only. Shipped via the full pipeline: PRD REQ-19 (human-approved) → spec → 9-task plan → orchestrate (9/9) → verify (9/9 goal-backward) → codex review (1 Critical + 6 Major + 1 Minor, ALL fixed + independently verified) → merge. 780 tests pass.

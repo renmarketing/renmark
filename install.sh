@@ -23,6 +23,7 @@ done
 if [[ "${1:-}" == "--uninstall" ]]; then
     rm -f "$CLAUDE_PLUGINS_DIR/renmark"
     rm -f "$LOCAL_BIN_DIR/renmark-execute"
+    rm -f "$LOCAL_BIN_DIR/renmark-browser"
     # Remove from settings.json + installed_plugins.json + cache symlink
     python3 - <<'PY' || echo "Settings cleanup: skipped (python3 not available or settings.json missing)"
 import json, pathlib, shutil, sys
@@ -89,6 +90,18 @@ fi
 ln -s "$INSTALL_DIR/bin/renmark-execute" "$cli_link"
 chmod +x "$INSTALL_DIR/bin/renmark-execute"
 echo "CLI:     $cli_link → $INSTALL_DIR/bin/renmark-execute"
+
+# ── browser CLI symlink (optional Playwright session-memory layer) ─────────────
+browser_link="$LOCAL_BIN_DIR/renmark-browser"
+if [ -L "$browser_link" ]; then
+    rm "$browser_link"
+elif [ -e "$browser_link" ]; then
+    echo "ERROR: $browser_link exists and is not a symlink. Move it aside and re-run." >&2
+    exit 1
+fi
+ln -s "$INSTALL_DIR/bin/renmark-browser" "$browser_link"
+chmod +x "$INSTALL_DIR/bin/renmark-browser"
+echo "CLI:     $browser_link → $INSTALL_DIR/bin/renmark-browser"
 
 # ── Python package (editable) ─────────────────────────────────────────────────
 if command -v pip3 >/dev/null 2>&1; then
