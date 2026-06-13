@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-029 — Finished feature playwright-browser-control
+
+**Date:** 2026-06-13
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch feature/playwright-browser-control reached stage ready-to-release
+
+---
+
 ## ADR-028 — Finished feature doc-slimming-fixes
 
 **Date:** 2026-06-12
