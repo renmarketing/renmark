@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-13] — playwright-browser-control wave 2: core module (task 3)
+**Request:** Execute the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 3 — `renmark/browser.py`: the optional browser layer's core. Lazy/guarded `playwright` import (module imports cleanly with playwright absent — verified); `is_playwright_available()`, `resolve_channel()` (precedence arg > `RENMARK_BROWSER` > auto; auto → playwright else chrome-devtools), storageState save/load + sidecar meta (`saved_at`/`browser`/`mode`), `is_stale()`, `validate_storage_state()` (rejects foreign schema), `activate()` (copies profile → active.json, refuses stale). ruff clean.
+**Files changed:**
+- `renmark/browser.py` — core channel + session module (new)
+**Do not change:**
+- The `playwright` import MUST stay lazy/guarded — `import renmark.browser` must succeed on a stdlib-only install (verifier + functional check enforce this).
+- storageState is the parallelism-safe default; session bytes/cookies never logged or printed.
+
 ## [2026-06-13] — playwright-browser-control wave 1: config (tasks 1–2)
 **Request:** Execute waves of the playwright-browser-control plan (serves REQ-19).
 **Built:** Task 1 — added `browser = ["playwright>=1.40.0"]` to `[project.optional-dependencies]` (`pip install renmark[browser]`; core deps untouched). Task 2 — created `.mcp.json` registering the opt-in `@playwright/mcp` server (`--isolated --storage-state=.renmark/state/browser-sessions/active.json`), additive alongside the global Chrome DevTools MCP.
