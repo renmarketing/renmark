@@ -1,19 +1,19 @@
 # renmark — guided build assistant (Claude Code plugin) — agent guide
 
 > For non-Claude AI agents (Codex, Cursor, etc.). Mirror of `CLAUDE.md`, shorter.
-> CLAUDE.md and AGENTS.md hold the same rule set in parallel. Mirror any rule change across both files in the same commit.
+> AGENTS.md summarizes the rule set; CLAUDE.md is authoritative for full clause text — each rule below points to its CLAUDE.md § for the complete contract. Mirror any rule change across both files in the same commit.
 
 ## What this project is
 
-`renmark` is a Claude Code plugin (v0.10.0) — a guided build assistant that runs a full pipeline (`/renmark:start` → brainstorm → plan → check-plan → orchestrate → verify → finish). It routes each task to the cheapest capable executor (Haiku / Codex / Sonnet / Opus / Fable), keeps orchestrator context lean, and persists all state to disk so workflows survive `/clear`. Newer iteration than `legacy-plugin`; prefer it for new work. Python >=3.10 required for `renmark-execute`; Codex CLI optional. Doctrine: probabilistic AI for reasoning, deterministic code for execution; the orchestrator coordinates and never accumulates implementation context.
+`renmark` is a Claude Code plugin — a guided build assistant that runs a full pipeline (`/renmark:start` → brainstorm → plan → check-plan → orchestrate → verify → finish). It routes each task to the cheapest capable executor (Haiku / Codex / Sonnet / Opus / Fable), keeps orchestrator context lean, and persists all state to disk so workflows survive `/clear`. Newer iteration than `legacy-plugin`; prefer it for new work. Python >=3.10 required for `renmark-execute`; Codex CLI optional. Doctrine: probabilistic AI for reasoning, deterministic code for execution; the orchestrator coordinates and never accumulates implementation context.
 
 ## Core rules
 
-**Parallelize large plans.** For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
+**Parallelize large plans.** For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work, never after. Long-running probes → background `Bash` with `run_in_background: true`. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
 
 **Stay on main for small changes.** Hotfixes, config edits, and single-file changes land directly on `main`. Use `/renmark:feature` for new features or significant refactors — it branches, runs the full pipeline, and offers PR on finish.
 
-**Commit per chunk, not per session.** Commit as soon as a logical chunk passes its check. One commit per logical fix/feature; commit before the next agent dispatch; each commit must pass lint; messages name the change, not the session ("fix(auth): handle 401").
+**Commit per chunk, not per session.** Commit as soon as a logical chunk passes its check. One commit per logical fix/feature; commit before the next agent dispatch; each commit must compile and pass lint; messages name the change, not the session ("fix(auth): handle 401").
 
 **Check and update CHANGELOG.md on every task.** Before any task, read the last 5 `CHANGELOG.md` entries for prior decisions and "Do not change" guards. After completing a task, append an entry with: date + title, Request, Built, Files changed, Do not change. The changelog is the project's persistent memory — keep it honest and current.
 
@@ -45,7 +45,7 @@
 
 **`/compact` is not truncation.** A compact MUST preserve operational continuity. Preserve: active goals, unresolved blockers, pipeline state, artifact references, verification status. Discard: stale reasoning, duplicate discussion, obsolete branches. After `/compact`, every workflow must still be resumable from `.renmark/state/`. See `CLAUDE.md` § `compact-semantics-rule`.
 
-**Artifact existence ≠ artifact correctness.** All executor outputs MUST expose: `completion_state`, `confidence`, `validation_status`, `retry_count`, `parser_success`, `schema_compliance`. Prefer explicit uncertainty over silent success. A subagent returning an artifact path without these is treated as `confidence: low, validation_status: unvalidated` and flagged for review. See `CLAUDE.md` § `failure-transparency-rule`.
+**Artifact existence ≠ artifact correctness.** All executor outputs MUST expose: `completion_state` (`complete|partial|failed`), `confidence` (`low|medium|high`), `validation_status` (`validated|unvalidated|failed`), `retry_count` (integer, monotonically increasing per attempt), `parser_success`, `schema_compliance`. Prefer explicit uncertainty over silent success. A subagent returning an artifact path without these is treated as `confidence: low, validation_status: unvalidated` and flagged for review. See `CLAUDE.md` § `failure-transparency-rule`.
 
 **Every multi-step workflow is resumable.** Orchestration MUST survive interruption, partial completion, executor failure, `/clear` mid-pipeline, and orchestrator restart. Recovery depends on persisted state at `.renmark/state/pipeline.json`, never conversational reconstruction. Every skill running >1 step MUST update pipeline state before returning. See `CLAUDE.md` § `workflow-recovery-rule`.
 

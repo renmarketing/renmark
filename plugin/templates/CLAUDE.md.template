@@ -15,7 +15,7 @@
 <!-- PROJECT-ARCHITECTURE: add core constraints after brainstorm (component boundaries, invariants, removed patterns). -->
 <!-- BEGIN:parallelism-rule -->
 ## Parallelize large plans
-For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
+For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work, **never after**. Long-running probes → background `Bash` with `run_in_background: true`. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
 <!-- END:parallelism-rule -->
 <!-- BEGIN:single-branch-rule -->
 ## Stay on main for small changes
@@ -23,7 +23,7 @@ Hotfixes, config edits, and single-file changes land directly on `main`. Use `/r
 <!-- END:single-branch-rule -->
 <!-- BEGIN:commit-cadence-rule -->
 ## Commit per chunk, not per session
-Commit as soon as a logical chunk passes its check. One commit per logical fix/feature; commit before the next agent dispatch; each commit must pass lint; messages name the change, not the session ("fix(auth): handle 401").
+Commit as soon as a logical chunk passes its check. One commit per logical fix/feature; commit before the next agent dispatch; each commit must compile and pass lint; messages name the change, not the session ("fix(auth): handle 401").
 <!-- END:commit-cadence-rule -->
 <!-- BEGIN:changelog-rule -->
 ## Check and update CHANGELOG.md on every task
@@ -34,7 +34,7 @@ Before any task, read the last 5 `CHANGELOG.md` entries for prior decisions and 
 Before any change touching >3 files or tagged "refactor"/"migrate"/"restructure":
 (1) confirm clean tree (`git status`); (2) checkpoint with an empty commit;
 (3) run verifier/tests as baseline — if failing now, **stop and report**;
-(4) change, re-run, compare pass counts. If tests regress, revert targeted files.
+(4) change, re-run, compare pass counts. If tests regress: `git diff HEAD~1`, identify cause, revert targeted files only.
 <!-- END:refactor-safety-rule -->
 <!-- BEGIN:context-hygiene-rule -->
 ## Context hygiene
@@ -63,7 +63,7 @@ Treat orchestrator context as a degrading resource, not durable memory; quality 
 <!-- BEGIN:canonical-state-rule -->
 ## Canonical state lives outside the conversation
 Conversation history is NOT authoritative. Canonical state lives in `.renmark/` artifacts (specs/reviews/memory), pipeline state files, memory logs
-(`features.md`, `bugs.md`, `decisions.md`, `learnings.md`), and artifact metadata.
+(`features.md`, `bugs.md`, `decisions.md`, `learnings.md`), structured summaries inside artifact files, and machine-readable metadata on every artifact.
 Any cross-phase workflow MUST persist state to disk, not rely on "what was said".
 <!-- END:canonical-state-rule -->
 <!-- BEGIN:prd-delegation-rule -->
@@ -91,9 +91,8 @@ verify, finish, feature, prd, blueprint, backlog, loop); `audit` (audit, invento
 <!-- BEGIN:artifact-governance-rule -->
 ## Artifacts carry provenance and freshness metadata
 Every artifact a renmark skill writes MUST carry machine-readable top metadata:
-`artifact_type`, `schema_version`, `created_at`, `source_sha`, `related_plan`,
-`generator`, `stale_after` (optional), `dependency_refs`. Artifacts without
-freshness/provenance metadata are untrusted as upstream context. Prefer invalidation over silent drift; don't solve context rot with artifact rot.
+`artifact_type`, `schema_version: 1`, `created_at: ISO8601`, `source_sha` (git sha at generation), `related_plan`, `generator` (codex|opus|sonnet|haiku|<skill>), `stale_after: ISO8601` (optional), `dependency_refs` (upstream paths). Artifacts without
+freshness/provenance metadata are untrusted as upstream context. Track stale artifacts; prefer invalidation over silent drift; don't solve context rot with artifact rot.
 <!-- END:artifact-governance-rule -->
 <!-- BEGIN:compact-semantics-rule -->
 ## `/compact` is not truncation
@@ -102,8 +101,7 @@ A compact MUST preserve operational continuity. Preserve: active goals, unresolv
 <!-- END:compact-semantics-rule -->
 <!-- BEGIN:failure-transparency-rule -->
 ## Artifact existence ≠ artifact correctness
-All executor outputs MUST expose: `completion_state`, `confidence`,
-`validation_status`, `retry_count`, `parser_success`, `schema_compliance`.
+All executor outputs MUST expose: `completion_state` (`complete|partial|failed`), `confidence` (`low|medium|high`), `validation_status` (`validated|unvalidated|failed`), `retry_count` (integer, monotonically increasing per attempt), `parser_success`, `schema_compliance`.
 Prefer explicit uncertainty over silent success. A subagent returning an artifact path without these is treated as `confidence: low, validation_status: unvalidated` and flagged for review.
 <!-- END:failure-transparency-rule -->
 <!-- BEGIN:workflow-recovery-rule -->
@@ -134,6 +132,7 @@ Orchestrator runs on Sonnet 200k; the window degrades before it fills, so act ea
 Every workflow stage transition MUST write `.renmark/state/lifecycle.json` before the skill returns; skills that don't are bugs. Canonical stage order:
 `init → brainstorm-complete → plan-drafted → plan-validated → created → verified
 → reviewed → documented → ready-to-release → released`.
+**Cold-start recovery:** after `/clear`, run `/renmark:resume` — it reads lifecycle.json (≤ 1KB), prints the next command, exits. Zero LLM calls.
 **Separation:** lifecycle.json carries WORKFLOW state only (identity, stage,
 artifact pointers, approval gates); RUNTIME state (wave indices, retry counts, pids) lives in `pipeline.json`. Over ~1KB is a bug (`LifecycleBloatError`).
 **Human gates:** lifecycle.json carries `human_review_required`,
@@ -155,7 +154,7 @@ Full command list and usage → run `/renmark:help`. Typical order: start → br
 
 ## Executor preferences
 
-Per-task-signature routing history → see `.renmark/memory/routing.md` (generated by `/renmark:init`). Defaults: haiku (mechanical), codex (test scaffolding/single file), sonnet (algorithms/ refactors), opus (state machines, cross-file). `fable` is frontier reasoning — ideation, strategy synthesis, adversarial review escalation — escalation-only, never default (default for those roles only when `top_tier: fable` is declared). Dispatch prompts carry the reasoning/output-discipline contract → see
+Per-task-signature routing history → see `.renmark/memory/routing.md` (generated by `/renmark:init`). Defaults: haiku (mechanical), codex (test scaffolding/single file), sonnet (algorithms/refactors), opus (state machines, cross-file). `fable` is frontier reasoning — ideation, strategy synthesis, adversarial review escalation — escalation-only, never default (default for those roles only when `top_tier: fable` is declared). Dispatch prompts carry the reasoning/output-discipline contract → see
 `plugin/skills/_shared/reasoning-contract.md` (push back, skip sycophancy).
 Before any custom build, run the reuse check → see
 `plugin/skills/_shared/reuse-check.md`.
