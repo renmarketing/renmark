@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-12, .renmark/reviews/2026-06-12-718b577.cds.verification.md) model `verify`: **verify-claude-doc-slimming** — 5/5 verified; 4 onboarding docs halved (1122->528) via terse-rewrite; block byte-identity template<->CLAUDE.md preserved so merge/audit see no drift; all governance clauses grep-intact
+
 - (2026-06-12, .renmark/reviews/2026-06-12-4c59169.pte.verification.md) model `verify`: **verify-prd-template-enrichment** — 4/4 verified; surgical PRD enrichment (5 additive pieces, anti-completion guard) rather than wholesale 17-section import — preserved altitude separation
 
 - (2026-06-12, .renmark/reviews/2026-06-12-4c8ab91.ca.verification.md) model `verify`: **verify-cowork-alignment** — 4/4 verified; reuse-check + pushback stance + contradiction-reconcile + re-interview-on-change all wired; ported from external Cowork operating-instructions exercise

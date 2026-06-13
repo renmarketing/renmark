@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-027 — Finished feature claude-doc-slimming
+
+**Date:** 2026-06-12
+**Status:** Accepted
+
+**Context.** Completed stages: plan-validated, created, verified
+
+**Decision.** Branch feature/claude-doc-slimming reached ready-to-release
+
+---
+
 ## ADR-026 — Finished feature cowork-alignment
 
 **Date:** 2026-06-12

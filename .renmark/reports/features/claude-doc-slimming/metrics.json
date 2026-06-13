@@ -1,0 +1,21 @@
+{
+  "feature": "claude-doc-slimming",
+  "branch": "feature/claude-doc-slimming",
+  "sha": "32f9d56b3264f831547f162448cefa94b9d8394c",
+  "version_path": "",
+  "release_link": "",
+  "verification": "5/5 behaviors verified",
+  "codereview": ".renmark/reviews/2026-06-12-c7f1aa6.arp.review.md",
+  "files_changed": 10,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-06-13T01:29:07+00:00"
+}
