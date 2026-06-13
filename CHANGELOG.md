@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-13] — playwright-browser-control wave 4: verify + tests + docs (tasks 6–9)
+**Request:** Execute the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 6 — `plugin/skills/verify/SKILL.md`: documented channel resolution (`resolve_channel`: `--browser` > `RENMARK_BROWSER` > auto), `activate(<profile>)` → `active.json` before `@playwright/mcp`, graceful Chrome DevTools MCP fallback, REQ-5 bounded-output reaffirmed. Task 7 — `tests/test_browser.py` (codex): 13 unit tests (availability, channel precedence, storageState roundtrip + meta, schema validation, staleness, activate) — run WITHOUT playwright. Tasks 8/9 — `CLAUDE.md` + `AGENTS.md`: added `bin/renmark-browser` entry point + an identical "Optional browser layer" line (mirror parity verified byte-identical).
+**Verification:** Full suite 759 passed (746 baseline + 13 new), 28 skipped — no regression. ruff clean on all new Python. Codex (task 7) again self-reported `partial`; orchestrator ran the tests independently (13 passed) — trust from evidence, not self-claim.
+**Files changed:**
+- `plugin/skills/verify/SKILL.md`, `tests/test_browser.py` (new), `CLAUDE.md`, `AGENTS.md`
+**Do not change:**
+- CLAUDE.md ↔ AGENTS.md "Optional browser layer" line + entry-point line must stay byte-identical (mirror convention).
+- Tests must keep running without playwright installed (hermetic, mocked).
+
 ## [2026-06-13] — playwright-browser-control wave 3: CLI + wrapper (tasks 4–5)
 **Request:** Execute the playwright-browser-control plan (serves REQ-19).
 **Built:** Task 4 — `renmark/browser_cli.py` (codex): `login`/`list`/`status`/`forget` subcommands; playwright imported only inside `login`; `login` without playwright prints the `pip install renmark[browser]` + `python -m playwright install chromium` remediation and exits 1; never prints session secrets. Task 5 — `bin/renmark-browser` (haiku): bash wrapper mirroring `bin/renmark-execute`, execs `python -m renmark.browser_cli`.

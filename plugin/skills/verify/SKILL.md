@@ -237,6 +237,43 @@ Opt-in live-browser end-to-end check. Proves the feature works from rendered sta
 
    Record the chosen channel in local state and name it once in the verdict header (e.g. `verify --qa: <feature> (1 E2E flow, live browser — Chrome DevTools MCP)`). Everything below — flow derivation, pass criteria, evidence handling, and the context-hygiene contract — is **identical regardless of channel**; only the connection differs.
 
+### Playwright session-memory channel (optional)
+
+When Playwright is available, verify can start the browser authenticated by loading a named profile's saved session — eliminating cold-start login flows. This is an additive capability layered on top of channel selection; it does not replace or reorder the Chrome DevTools MCP / native Claude-in-Chrome precedence above.
+
+**Channel resolution via `renmark.browser.resolve_channel`.** Before opening any browser, call:
+
+```python
+from renmark.browser import resolve_channel
+channel = resolve_channel(repo, args)
+# Precedence (first match wins):
+#   1. --browser <name>  — explicit flag passed to /renmark:verify
+#   2. RENMARK_BROWSER   — environment variable (e.g. export RENMARK_BROWSER=playwright)
+#   3. auto             — Playwright when available, else Chrome DevTools MCP
+```
+
+`resolve_channel` returns one of `"playwright"`, `"chrome-devtools-mcp"`, or `"native"`. The `--browser` arg and `RENMARK_BROWSER` env override auto-detection; when both are absent, `auto` probes for Playwright and falls through to Chrome DevTools MCP if it is absent.
+
+**Loading a named profile's saved session (Playwright channel only).** When `channel == "playwright"`, call `renmark.browser.activate(<profile>)` before driving the `@playwright/mcp` server (which must be registered in `.mcp.json`):
+
+```python
+from renmark.browser import activate
+activate(repo, profile=profile_name)
+# Writes .renmark/state/browser-sessions/active.json with the resolved session
+# credentials/cookies for the named profile — the @playwright/mcp server reads
+# this file on startup so the browser launches already authenticated.
+```
+
+`active.json` is a runtime file (gitignored under `.renmark/state/`). The Playwright MCP server reads it when the session starts; verify never reads its contents into conversation (see REQ-5 below).
+
+**Graceful fallback when Playwright is absent.** If `auto` resolves to Playwright but `@playwright/mcp` is not installed or the server fails to start, degrade immediately to Chrome DevTools MCP — the same cold-session behavior as today — and emit exactly one note:
+
+> *"session memory unavailable (Playwright not installed) — falling back to Chrome DevTools MCP"*
+
+There is NO other change in behavior: the flow continues, the same pass criteria apply, and no regression is introduced. The note appears in the bounded verdict block; it does NOT count as a failure.
+
+**Bounded-output contract (REQ-5 — non-negotiable).** Session bytes, cookies, profile tokens, and raw page content MUST NEVER enter orchestrator context. `active.json` is written to disk and consumed by the Playwright MCP server; it is never read back into the conversation. The verify verdict remains ≤5 lines regardless of channel or session state. Any session-related detail beyond the one-line fallback note lives in the artifact body on disk, not in chat.
+
 ### Server lifecycle
 
 E2E needs the app running:
