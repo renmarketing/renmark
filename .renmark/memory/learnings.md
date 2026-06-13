@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-13, .renmark/reviews/2026-06-13-2c5cf111597215352754aba861a15434848fbe58.verification.md) model `verify`: **verify-playwright-browser-control** — 7/7 goal-backward behaviors verified (guarded/fallback path; playwright not in env); failed: none; full suite 759 passed
+
 - (2026-06-12, .renmark/reviews/2026-06-12-6152a1e.dsf.verification.md) model `verify`: **verify-doc-slimming-fixes** — 6/6; restored 7 over-compressed governance clauses + fixed 1-of-4 mirror drift + stale version + honest changelog; lesson: compression review must diff EVERY block in EVERY mirror file, not just the file the reviewer was pointed at
 
 - (2026-06-12, .renmark/reviews/2026-06-12-718b577.cds.verification.md) model `verify`: **verify-claude-doc-slimming** — 5/5 verified; 4 onboarding docs halved (1122->528) via terse-rewrite; block byte-identity template<->CLAUDE.md preserved so merge/audit see no drift; all governance clauses grep-intact
