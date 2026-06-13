@@ -5,15 +5,15 @@
 
 ## What this project is
 
-`renmark` is a Claude Code plugin (v0.10.0) — a guided build assistant that runs a full pipeline (`/renmark:start` → brainstorm → plan → check-plan → orchestrate → verify → finish). It routes each task to the cheapest capable executor (Haiku / Codex / Sonnet / Opus / Fable), keeps orchestrator context lean, and persists all state to disk so workflows survive `/clear`. Newer iteration than `legacy-plugin`; prefer it for new work. Python >=3.10 required for `renmark-execute`; Codex CLI optional. Doctrine: probabilistic AI for reasoning, deterministic code for execution; the orchestrator coordinates and never accumulates implementation context.
+`renmark` is a Claude Code plugin — a guided build assistant that runs a full pipeline (`/renmark:start` → brainstorm → plan → check-plan → orchestrate → verify → finish). It routes each task to the cheapest capable executor (Haiku / Codex / Sonnet / Opus / Fable), keeps orchestrator context lean, and persists all state to disk so workflows survive `/clear`. Newer iteration than `legacy-plugin`; prefer it for new work. Python >=3.10 required for `renmark-execute`; Codex CLI optional. Doctrine: probabilistic AI for reasoning, deterministic code for execution; the orchestrator coordinates and never accumulates implementation context.
 
 ## Core rules
 
-**Parallelize large plans.** For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
+**Parallelize large plans.** For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work, never after. Long-running probes → background `Bash` with `run_in_background: true`. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
 
 **Stay on main for small changes.** Hotfixes, config edits, and single-file changes land directly on `main`. Use `/renmark:feature` for new features or significant refactors — it branches, runs the full pipeline, and offers PR on finish.
 
-**Commit per chunk, not per session.** Commit as soon as a logical chunk passes its check. One commit per logical fix/feature; commit before the next agent dispatch; each commit must pass lint; messages name the change, not the session ("fix(auth): handle 401").
+**Commit per chunk, not per session.** Commit as soon as a logical chunk passes its check. One commit per logical fix/feature; commit before the next agent dispatch; each commit must compile and pass lint; messages name the change, not the session ("fix(auth): handle 401").
 
 **Check and update CHANGELOG.md on every task.** Before any task, read the last 5 `CHANGELOG.md` entries for prior decisions and "Do not change" guards. After completing a task, append an entry with: date + title, Request, Built, Files changed, Do not change. The changelog is the project's persistent memory — keep it honest and current.
 

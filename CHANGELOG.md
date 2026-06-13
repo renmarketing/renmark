@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-12] — AGENTS.md mirror + version stamp
+**Request:** doc-slimming-fixes task 4.
+**Built:** repo AGENTS.md: restored compile gate + background-Bash probe + 'never after' clause (now present in all 4 onboarding files, fixing the 1-of-4 drift); dropped stale (v0.10.0); 114 lines.
+**Files changed:**
+- `AGENTS.md`
+
 ## [2026-06-12] — v0.14.2 metrics correction
 **Request:** A post-ship review found the v0.14.2 doc-slimming changelog/audit numbers were overstated; record the honest figures.
 **Built:** Verified token figures (chars/4): CLAUDE.md.template 5226→3270 (-37%); CLAUDE.md 5502→3602 (-35%, ~58% by lines — the genuine per-session Claude win). The AGENTS pair did NOT shrink — both GREW in tokens: AGENTS.md.template 2410→2677 (+11%), AGENTS.md 2576→3434 (+33%); only their line counts fell (newline-joining). AGENTS.md is not loaded by Claude Code, so per-session Claude impact = the CLAUDE.md reduction only. The earlier "all four onboarding docs ~halved" and "~7.2k→~3.5k halved" framings were optimistic: lines roughly halved for the CLAUDE pair, tokens dropped ~35%. The v0.14.2 entry also omitted its "Files changed:" field.
