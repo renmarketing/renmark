@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-06-12] — project scope: playwright-browser-control
+**Request:** Add Playwright-based browser control with session memory (brainstorm → spec).
+**Stack:** Python ≥3.10 runtime + OPTIONAL `playwright>=1.40.0` extra (`pip install renmark[browser]`; browser binaries via separate `python -m playwright install chromium`); Node `@playwright/mcp` MCP server (opt-in) added alongside the existing Chrome DevTools MCP; core runtime stays stdlib-only.
+**Deployment:** Claude Code plugin — no server/host; session artifacts on-disk under gitignored `.renmark/state/browser-sessions/`.
+**MVP boundary:** Full hybrid — `renmark-browser login <profile>` bootstrap (save storageState, opt-up user-data-dir) + Python scripted reuse + `@playwright/mcp` live-QA reuse + auto-detect/override channel selection (`--browser=playwright|mcp|auto` / `RENMARK_BROWSER`) + `/renmark:verify` integration + graceful fallback to Chrome DevTools MCP when Playwright absent.
+**Out of scope:** cookie injection into the CDP/Chrome DevTools MCP channel; remote/CI/cloud session caches; credential storage; silent binary auto-install.
+**Spec:** `.renmark/specs/2026-06-12-playwright-browser-control.spec.md` · serves `REQ-19`.
+**Do not change:**
+- Playwright is OPTIONAL; core runtime stays stdlib-only; absent Playwright → Chrome DevTools MCP fallback with no regression.
+- Session artifacts (storageState/user-data-dir) hold live auth — gitignored under `.renmark/state/`, never logged, never inline to subagents, never in orchestrator context (REQ-5), excluded from release zips.
+- storageState is the parallelism-safe default; user-data-dir is single-process opt-up only (Chromium SingletonLock).
+
+## [2026-06-12] — PRD updated (playwright-browser-control alignment gate)
+**Request:** The `/renmark:feature playwright-browser-control` PRD-alignment gate flagged drift — adding Playwright (a third-party runtime dependency) conflicts with the stdlib-only non-goal. Reconcile by allowing Playwright as an OPTIONAL, opt-in dependency with fallback to the existing Chrome DevTools MCP channel.
+**Built:** Reconciled the Goals & Non-goals, Requirements, and Scope boundaries sections of PRD.md; bumped last_reviewed to 2026-06-12. Added REQ-19 (optional Playwright browser-automation layer with persisted session state — cookies/localStorage/storageState — resuming across verify runs, falling back to Chrome DevTools MCP when Playwright is absent). Amended the "No third-party runtime dependencies" non-goal to "...in the core": the core runtime stays stdlib-only while capability layers MAY require optional, opt-in external tools (Codex CLI, Playwright). Added the optional Playwright layer to the in-scope list. Appended a human-approved revision note.
+**Files changed:**
+- `PRD.md` — REQ-19 added; non-goal amended (core stays stdlib-only, optional opt-in capability deps permitted); in-scope clause + revision note; last_reviewed bumped
+**Do not change:**
+- Playwright is OPTIONAL and never required — the core Python runtime stays stdlib-only; when Playwright is absent renmark falls back to the Chrome DevTools MCP channel used by `/renmark:verify --qa`.
+- Persisted browser session state stays inside `.renmark/` (REQ-6) and never enters orchestrator context (REQ-5).
+
 ## [2026-06-12] — v0.14.3 — doc-slimming regression repair
 **Request:** A multi-lens post-ship review found v0.14.2's doc-slimming silently dropped governance clauses, created mirror drift, and oversold its numbers; fix all of it.
 **Built:** Restored 7 mandates the v0.14.2 terse-rewrite dropped from CLAUDE.md.template (+ re-synced CLAUDE.md byte-for-byte): background-Bash `run_in_background` probe, lifecycle cold-start `/renmark:resume`, commit `compile` gate, refactor-safety `git diff HEAD~1`+`only`, failure-transparency field enums + retry monotonicity, canonical-state "structured summaries", artifact-governance "track stale". Fixed the "never after" parallelism clause to be present in ALL 4 docs (was 1 — the v0.14.2 fix-pass had inverted the mirror). Dropped stale "(v0.10.0)" stamps from both root docs. AGENTS pair: added the Codex-emitted SubagentOutput field-value contract inline + softened the sync-note to "AGENTS summarizes; CLAUDE.md authoritative" (honest pointered-summary). Corrected the v0.14.2 metrics claims (CLAUDE ~35% tok/~58% lines; AGENTS pair GREW in tokens). Fixed an `algorithms/ refactors` typo.

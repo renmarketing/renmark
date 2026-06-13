@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-06-11
+last_reviewed: 2026-06-12
 status: draft
 ---
 
@@ -61,8 +61,10 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   it never ships or hosts a model.
 - **Not a replacement for Claude Code or for the human.** AI may generate code;
   the human owns merges and releases (approval gates are load-bearing).
-- **No third-party runtime dependencies.** The Python runtime is stdlib-only;
-  Codex CLI is an optional executor, never required.
+- **No third-party runtime dependencies in the core.** The Python runtime is
+  stdlib-only; *capability layers* MAY require optional, opt-in external tools
+  (Codex CLI as an executor; Playwright for browser automation) that are never
+  required for core operation and degrade gracefully to a built-in path when absent.
 - **Not `legacy-plugin`.** renmark is the public vibe-coder variant; the
   legacy-plugin-employee variant is a separate plugin, not a rename — features are not
   dual-written.
@@ -173,6 +175,14 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     set it. The consuming skill (e.g. prd, finish, backlog) clears the gate
     after acting on the approval. All human approval gates (release, merge,
     security override) route through it.
+19. `REQ-19` renmark MAY drive a live browser through an **OPTIONAL Playwright
+    layer** that persists session state (cookies, localStorage, `storageState`)
+    so authenticated/stateful flows resume across verify runs without re-login.
+    Playwright is opt-in and never required: the core runtime stays stdlib-only
+    (per the amended non-goal), and when Playwright is unavailable renmark falls
+    back to the existing Chrome DevTools MCP browser channel used by
+    `/renmark:verify --qa`. Persisted browser session state lives inside
+    `.renmark/` (REQ-6) and never enters orchestrator context (REQ-5).
 
 ## Success metrics
 
@@ -201,7 +211,9 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   for loops and orchestrated runs); the self-audit surface (`/renmark:audit`,
   `/renmark:inventory`) and the human-approval gate surface (`/renmark:approve`);
   the Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
-  `.renmark/` state and memory; cross-platform install.
+  `.renmark/` state and memory; cross-platform install; the OPTIONAL Playwright
+  browser-automation + session-persistence layer (opt-in, falls back to the
+  Chrome DevTools MCP channel).
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
@@ -297,3 +309,12 @@ deterministically enforced; Fable→Opus fallback is single-retry and logged.
 Strategy evidence: `.renmark/research/2026-06-11-fable-routing-strategy.md`
 (9-agent design workflow). Diff reviewed and explicitly approved by the
 project owner on 2026-06-11 via the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-06-12, human-approved diff):** Added REQ-19 (optional
+Playwright browser-automation layer with persisted session state, falling back
+to the Chrome DevTools MCP channel) and amended the "no third-party runtime
+dependencies" non-goal to clarify that the *core* stays stdlib-only while
+*capability layers* may require optional, opt-in external tools (Codex CLI,
+Playwright). Proposed by the playwright-browser-control feature's PRD-alignment
+gate; reviewed and approved by the project owner on 2026-06-12 via the
+`/renmark:prd` UPDATE gate.
