@@ -1,5 +1,80 @@
 # Changelog
 
+## [2026-06-13] — playwright-browser-control: codereview fixes (1 Critical + 6 Major + 1 Minor)
+**Request:** Resolve the codex review findings before finishing the feature.
+**Built:**
+- **Critical** — path traversal: `renmark/browser.py` now rejects profile names not matching `^[A-Za-z0-9._-]+$` (and bare `.`/`..`) via `_safe_profile_name`, with a resolve-check that paths stay under the sessions root; `browser_cli forget` validates names at the CLI boundary. Verified: `forget '../../tmp/sentinel'` exits 1 and deletes nothing outside the sessions dir.
+- **Major** — `is_stale()` now treats missing/invalid/naive/non-string `saved_at` as stale (catches TypeError too), never raises; `activate()` calls `validate_storage_state()` before copying and refuses foreign/malformed JSON; channel API reconciled to the canonical contract `resolve_channel(override=None) → playwright|chrome-devtools|native` (accepts `auto` + `mcp` back-compat alias → playwright; auto → playwright if available else chrome-devtools); path helpers default to `_repo_root()` (nearest `.git`/`.renmark`) not `cwd`; `browser_cli login` catches Playwright launch errors → remediation + exit 1; verify SKILL.md examples corrected to the real signatures.
+- **Minor** — `tests/test_browser.py` aligned to the canonical channel contract + added negative/edge tests (traversal names, malformed `saved_at`, foreign-schema `activate`). 13 → 34 tests.
+**Verification:** Each fix independently/adversarially verified by the orchestrator (not trusting executor self-claims). Full suite 780 passed, 28 skipped; ruff + plugin lint clean.
+**Files changed:**
+- `renmark/browser.py`, `renmark/browser_cli.py`, `plugin/skills/verify/SKILL.md`, `tests/test_browser.py`
+- `.renmark/plans/2026-06-13-playwright-browser-control-review-fixes.plan.md` (fix plan)
+**Do not change:**
+- Profile names are basename-safe-only; all session paths must stay under `.renmark/state/browser-sessions/` (path-traversal guard is security-load-bearing).
+- Canonical channels are `playwright|chrome-devtools|native`; `mcp` is a back-compat alias for `playwright`. Keep code ↔ verify SKILL.md in sync on this contract.
+
+## [2026-06-13] — playwright-browser-control wave 4: verify + tests + docs (tasks 6–9)
+**Request:** Execute the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 6 — `plugin/skills/verify/SKILL.md`: documented channel resolution (`resolve_channel`: `--browser` > `RENMARK_BROWSER` > auto), `activate(<profile>)` → `active.json` before `@playwright/mcp`, graceful Chrome DevTools MCP fallback, REQ-5 bounded-output reaffirmed. Task 7 — `tests/test_browser.py` (codex): 13 unit tests (availability, channel precedence, storageState roundtrip + meta, schema validation, staleness, activate) — run WITHOUT playwright. Tasks 8/9 — `CLAUDE.md` + `AGENTS.md`: added `bin/renmark-browser` entry point + an identical "Optional browser layer" line (mirror parity verified byte-identical).
+**Verification:** Full suite 759 passed (746 baseline + 13 new), 28 skipped — no regression. ruff clean on all new Python. Codex (task 7) again self-reported `partial`; orchestrator ran the tests independently (13 passed) — trust from evidence, not self-claim.
+**Files changed:**
+- `plugin/skills/verify/SKILL.md`, `tests/test_browser.py` (new), `CLAUDE.md`, `AGENTS.md`
+**Do not change:**
+- CLAUDE.md ↔ AGENTS.md "Optional browser layer" line + entry-point line must stay byte-identical (mirror convention).
+- Tests must keep running without playwright installed (hermetic, mocked).
+
+## [2026-06-13] — playwright-browser-control wave 3: CLI + wrapper (tasks 4–5)
+**Request:** Execute the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 4 — `renmark/browser_cli.py` (codex): `login`/`list`/`status`/`forget` subcommands; playwright imported only inside `login`; `login` without playwright prints the `pip install renmark[browser]` + `python -m playwright install chromium` remediation and exits 1; never prints session secrets. Task 5 — `bin/renmark-browser` (haiku): bash wrapper mirroring `bin/renmark-execute`, execs `python -m renmark.browser_cli`.
+**Verification note:** Codex self-reported `partial`/`validation_status: failed`, but the orchestrator independently verified Task 4 PASS (py_compile + import-without-playwright + functional `list`/`login` checks); one ruff UP035 fix applied. Trust came from independent evidence, not the executor's self-claim.
+**Files changed:**
+- `renmark/browser_cli.py` — CLI (new)
+- `bin/renmark-browser` — bash wrapper (new, executable)
+**Do not change:**
+- browser_cli.py must import without playwright — keep all playwright imports inside `login`.
+- `login` must never download binaries silently; it prints remediation and exits non-zero when playwright is unavailable.
+
+## [2026-06-13] — playwright-browser-control wave 2: core module (task 3)
+**Request:** Execute the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 3 — `renmark/browser.py`: the optional browser layer's core. Lazy/guarded `playwright` import (module imports cleanly with playwright absent — verified); `is_playwright_available()`, `resolve_channel()` (precedence arg > `RENMARK_BROWSER` > auto; auto → playwright else chrome-devtools), storageState save/load + sidecar meta (`saved_at`/`browser`/`mode`), `is_stale()`, `validate_storage_state()` (rejects foreign schema), `activate()` (copies profile → active.json, refuses stale). ruff clean.
+**Files changed:**
+- `renmark/browser.py` — core channel + session module (new)
+**Do not change:**
+- The `playwright` import MUST stay lazy/guarded — `import renmark.browser` must succeed on a stdlib-only install (verifier + functional check enforce this).
+- storageState is the parallelism-safe default; session bytes/cookies never logged or printed.
+
+## [2026-06-13] — playwright-browser-control wave 1: config (tasks 1–2)
+**Request:** Execute waves of the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 1 — added `browser = ["playwright>=1.40.0"]` to `[project.optional-dependencies]` (`pip install renmark[browser]`; core deps untouched). Task 2 — created `.mcp.json` registering the opt-in `@playwright/mcp` server (`--isolated --storage-state=.renmark/state/browser-sessions/active.json`), additive alongside the global Chrome DevTools MCP.
+**Files changed:**
+- `pyproject.toml` — optional `browser` extra
+- `.mcp.json` — opt-in Playwright MCP server (new)
+**Do not change:**
+- `.mcp.json` adds an opt-in MCP server Claude Code launches via `npx @playwright/mcp@latest`; it is the approved REQ-19 live-QA channel — do not silently remove, but it is user-opt-in (only runs when MCP is used).
+- Core runtime stays stdlib-only; `playwright` is an optional extra, binaries via separate `python -m playwright install chromium`.
+
+## [2026-06-12] — project scope: playwright-browser-control
+**Request:** Add Playwright-based browser control with session memory (brainstorm → spec).
+**Stack:** Python ≥3.10 runtime + OPTIONAL `playwright>=1.40.0` extra (`pip install renmark[browser]`; browser binaries via separate `python -m playwright install chromium`); Node `@playwright/mcp` MCP server (opt-in) added alongside the existing Chrome DevTools MCP; core runtime stays stdlib-only.
+**Deployment:** Claude Code plugin — no server/host; session artifacts on-disk under gitignored `.renmark/state/browser-sessions/`.
+**MVP boundary:** Full hybrid — `renmark-browser login <profile>` bootstrap (save storageState, opt-up user-data-dir) + Python scripted reuse + `@playwright/mcp` live-QA reuse + auto-detect/override channel selection (`--browser=playwright|mcp|auto` / `RENMARK_BROWSER`) + `/renmark:verify` integration + graceful fallback to Chrome DevTools MCP when Playwright absent.
+**Out of scope:** cookie injection into the CDP/Chrome DevTools MCP channel; remote/CI/cloud session caches; credential storage; silent binary auto-install.
+**Spec:** `.renmark/specs/2026-06-12-playwright-browser-control.spec.md` · serves `REQ-19`.
+**Do not change:**
+- Playwright is OPTIONAL; core runtime stays stdlib-only; absent Playwright → Chrome DevTools MCP fallback with no regression.
+- Session artifacts (storageState/user-data-dir) hold live auth — gitignored under `.renmark/state/`, never logged, never inline to subagents, never in orchestrator context (REQ-5), excluded from release zips.
+- storageState is the parallelism-safe default; user-data-dir is single-process opt-up only (Chromium SingletonLock).
+
+## [2026-06-12] — PRD updated (playwright-browser-control alignment gate)
+**Request:** The `/renmark:feature playwright-browser-control` PRD-alignment gate flagged drift — adding Playwright (a third-party runtime dependency) conflicts with the stdlib-only non-goal. Reconcile by allowing Playwright as an OPTIONAL, opt-in dependency with fallback to the existing Chrome DevTools MCP channel.
+**Built:** Reconciled the Goals & Non-goals, Requirements, and Scope boundaries sections of PRD.md; bumped last_reviewed to 2026-06-12. Added REQ-19 (optional Playwright browser-automation layer with persisted session state — cookies/localStorage/storageState — resuming across verify runs, falling back to Chrome DevTools MCP when Playwright is absent). Amended the "No third-party runtime dependencies" non-goal to "...in the core": the core runtime stays stdlib-only while capability layers MAY require optional, opt-in external tools (Codex CLI, Playwright). Added the optional Playwright layer to the in-scope list. Appended a human-approved revision note.
+**Files changed:**
+- `PRD.md` — REQ-19 added; non-goal amended (core stays stdlib-only, optional opt-in capability deps permitted); in-scope clause + revision note; last_reviewed bumped
+**Do not change:**
+- Playwright is OPTIONAL and never required — the core Python runtime stays stdlib-only; when Playwright is absent renmark falls back to the Chrome DevTools MCP channel used by `/renmark:verify --qa`.
+- Persisted browser session state stays inside `.renmark/` (REQ-6) and never enters orchestrator context (REQ-5).
+
 ## [2026-06-12] — v0.14.3 — doc-slimming regression repair
 **Request:** A multi-lens post-ship review found v0.14.2's doc-slimming silently dropped governance clauses, created mirror drift, and oversold its numbers; fix all of it.
 **Built:** Restored 7 mandates the v0.14.2 terse-rewrite dropped from CLAUDE.md.template (+ re-synced CLAUDE.md byte-for-byte): background-Bash `run_in_background` probe, lifecycle cold-start `/renmark:resume`, commit `compile` gate, refactor-safety `git diff HEAD~1`+`only`, failure-transparency field enums + retry monotonicity, canonical-state "structured summaries", artifact-governance "track stale". Fixed the "never after" parallelism clause to be present in ALL 4 docs (was 1 — the v0.14.2 fix-pass had inverted the mirror). Dropped stale "(v0.10.0)" stamps from both root docs. AGENTS pair: added the Codex-emitted SubagentOutput field-value contract inline + softened the sync-note to "AGENTS summarizes; CLAUDE.md authoritative" (honest pointered-summary). Corrected the v0.14.2 metrics claims (CLAUDE ~35% tok/~58% lines; AGENTS pair GREW in tokens). Fixed an `algorithms/ refactors` typo.

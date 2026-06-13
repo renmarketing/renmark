@@ -12,6 +12,14 @@ What this project depends on and how it runs. Updated by `/renmark:brainstorm` i
 | Library | Version | Purpose |
 |---|---|---|
 | python-dotenv | ≥1.0 | Runtime — `.env` file loading for optional local config; `requests` was removed in 0.9.0 (stdlib `urllib` used instead) |
+| playwright | ≥1.40.0 | **OPTIONAL** browser-control extra (`pip install renmark[browser]`) — session-memory QA layer; core runtime stays stdlib-only and degrades to the Chrome DevTools MCP channel when absent. Browser binaries via separate `python -m playwright install chromium`. First optional runtime dep (per amended PRD non-goal). |
+
+## MCP servers (opt-in)
+
+| Server | Purpose | Notes |
+|---|---|---|
+| chrome-devtools | live-browser QA (`/renmark:verify --qa`), perf trace, Lighthouse | pre-existing; the absent-Playwright fallback channel (no session memory) |
+| @playwright/mcp | live LLM-driven QA that starts authenticated from a saved session | **opt-in (Node)**; launched `--isolated --storage-state=<profile>`; additive, does not replace chrome-devtools |
 
 ## Development dependencies
 
@@ -61,3 +69,10 @@ only, no prototype, for renmark itself.
   `renmark/loop.py` driver + `usage_by_run_id` helper are stdlib; reuses
   `state.py` (usage.jsonl), verify/orchestrate/resume skills, plan cost model.
   Loop runtime state in `.renmark/loops/<id>/loop.json` (not lifecycle.json).
+- 2026-06-12 (`playwright-browser-control` brainstorm): **first optional runtime
+  dep + first opt-in MCP server.** Adds `playwright>=1.40.0` as an OPTIONAL extra
+  and `@playwright/mcp` as an opt-in Node MCP server (alongside chrome-devtools).
+  Core runtime stays stdlib-only; both degrade gracefully when absent (PRD
+  REQ-19, amended non-goal). New `renmark/browser.py` (lazy/guarded import) +
+  `renmark-browser` CLI. Session state in `.renmark/state/browser-sessions/`
+  (gitignored, secret-bearing).
