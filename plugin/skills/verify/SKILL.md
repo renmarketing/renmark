@@ -245,20 +245,22 @@ When Playwright is available, verify can start the browser authenticated by load
 
 ```python
 from renmark.browser import resolve_channel
-channel = resolve_channel(repo, args)
+# Signature: resolve_channel(override=None) → "playwright" | "chrome-devtools" | "native"
+channel = resolve_channel()  # auto-detect
 # Precedence (first match wins):
-#   1. --browser <name>  — explicit flag passed to /renmark:verify
+#   1. --browser <name>  — explicit flag passed to /renmark:verify (override param)
 #   2. RENMARK_BROWSER   — environment variable (e.g. export RENMARK_BROWSER=playwright)
-#   3. auto             — Playwright when available, else Chrome DevTools MCP
+#   3. auto             — Playwright when available, else Chrome DevTools
 ```
 
-`resolve_channel` returns one of `"playwright"`, `"chrome-devtools-mcp"`, or `"native"`. The `--browser` arg and `RENMARK_BROWSER` env override auto-detection; when both are absent, `auto` probes for Playwright and falls through to Chrome DevTools MCP if it is absent.
+`resolve_channel` returns one of `"playwright"`, `"chrome-devtools"`, or `"native"`. The `--browser` arg and `RENMARK_BROWSER` env override auto-detection; when both are absent, `auto` probes for Playwright and falls through to Chrome DevTools if it is absent.
 
 **Loading a named profile's saved session (Playwright channel only).** When `channel == "playwright"`, call `renmark.browser.activate(<profile>)` before driving the `@playwright/mcp` server (which must be registered in `.mcp.json`):
 
 ```python
 from renmark.browser import activate
-activate(repo, profile=profile_name)
+# Signature: activate(name: str, repo_root: str | Path | None = None) → Path
+activate(profile_name)  # optionally: activate(profile_name, repo_root=repo)
 # Writes .renmark/state/browser-sessions/active.json with the resolved session
 # credentials/cookies for the named profile — the @playwright/mcp server reads
 # this file on startup so the browser launches already authenticated.

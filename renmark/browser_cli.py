@@ -4,15 +4,15 @@ schema_version: 1
 created_at: 2026-06-13T13:35:00-04:00
 source_sha: ad7f21141b4056d55db4f84df580d7c6cc2b62bc
 related_plan: null
-generator: codex
+generator: sonnet
 stale_after: null
 dependency_refs:
   - /home/renmark/projects/ai-system/CHANGELOG.md
   - /home/renmark/projects/ai-system/renmark/browser.py
 completion_state: complete
-confidence: medium
+confidence: high
 validation_status: validated
-retry_count: 0
+retry_count: 1
 parser_success: true
 schema_compliance: true
 ---
@@ -24,8 +24,12 @@ Argparse CLI for persisted browser-session management.
 Blocking:
 - The module must import cleanly without the optional Playwright extra, so every
   Playwright import stays inside the `login` execution path.
-- The task requires a renmark artifact wrapper *and* valid Python; the module
-  docstring carries the YAML frontmatter, bounded reasoning body, and summary.
+- repo_root must be resolved ONCE via browser._repo_root() and threaded through
+  every browser.* call so running from a subdirectory uses the correct sessions dir.
+- Playwright launch errors (missing Chromium, sandbox failures) must be caught at
+  the boundary and mapped to the documented remediation path, never a traceback.
+- Profile names from argv must be validated via browser._safe_profile_name() at
+  the CLI boundary; ValueError must be caught and turned into a clean one-line error.
 
 Deferrable:
 - The current public browser API exposes storage-state and metadata helpers, but
@@ -47,6 +51,8 @@ Deferrable:
 - Forget is idempotent: absent files/directories do not fail the command.
 - Playwright missing or Chromium not installed returns a non-zero exit after
   printing the exact remediation commands, with no auto-install side effects.
+- Invalid profile names (traversal, special chars) print a clean one-line error
+  and exit non-zero without a traceback or any file deletion.
 
 ## Recommendations
 
@@ -56,16 +62,19 @@ Deferrable:
 
 ## Summary
 
-- Keeps Playwright optional by guarding all Playwright imports inside `login`.
-- Implements `login`, `list`, `status`, and `forget` with stdlib + `renmark.browser`.
-- Saves storage state immediately after human confirmation to avoid token drift.
+- Resolves repo_root ONCE per CLI invocation and threads it through all browser.* calls.
+- Wraps Playwright chromium.launch and context creation in try/except; any launch
+  error prints remediation and exits non-zero — never a traceback.
+- Validates profile names at CLI boundary via browser._safe_profile_name(); catches
+  ValueError and prints a clean error (protects `forget` and all other commands).
+- Keeps Playwright optional: all playwright imports stay inside `login`.
 - Never prints cookie values or other session secrets.
-- Passes the requested import-safety verifier path on a stdlib-only install.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import shutil
 import sys
@@ -81,12 +90,12 @@ def _print_playwright_remediation() -> None:
     print("python -m playwright install chromium", file=sys.stderr)
 
 
-def _sessions_dir() -> Path:
-    return browser.active_path().parent
+def _sessions_dir(repo_root: Path) -> Path:
+    return browser.active_path(repo_root=repo_root).parent
 
 
-def _profile_names() -> list[str]:
-    root = _sessions_dir()
+def _profile_names(repo_root: Path) -> list[str]:
+    root = _sessions_dir(repo_root)
     if not root.exists():
         return []
 
@@ -98,8 +107,8 @@ def _profile_names() -> list[str]:
     return sorted(set(names))
 
 
-def _load_meta(name: str) -> dict[str, Any]:
-    path = browser.meta_path(name)
+def _load_meta(name: str, repo_root: Path) -> dict[str, Any]:
+    path = browser.meta_path(name, repo_root=repo_root)
     if not path.exists():
         return {}
 
@@ -113,16 +122,16 @@ def _load_meta(name: str) -> dict[str, Any]:
     return raw
 
 
-def _status_fields(name: str) -> tuple[str, str, bool]:
-    meta = _load_meta(name)
+def _status_fields(name: str, repo_root: Path) -> tuple[str, str, bool]:
+    meta = _load_meta(name, repo_root)
     saved_at = str(meta.get("saved_at", "unknown"))
     mode = str(meta.get("mode", "unknown"))
-    stale = browser.is_stale(name)
+    stale = browser.is_stale(name, repo_root=repo_root)
     return saved_at, mode, stale
 
 
-def _user_data_dir_candidates(name: str) -> list[Path]:
-    root = _sessions_dir()
+def _user_data_dir_candidates(name: str, repo_root: Path) -> list[Path]:
+    root = _sessions_dir(repo_root)
     return [
         root / name,
         root / f"{name}.user-data",
@@ -133,7 +142,18 @@ def _user_data_dir_candidates(name: str) -> list[Path]:
     ]
 
 
-def cmd_login(args: argparse.Namespace) -> int:
+def _validate_profile_name(name: str) -> str:
+    """Validate profile name at CLI boundary; print error and exit on failure."""
+    try:
+        return browser._safe_profile_name(name)
+    except ValueError as exc:
+        print(f"Invalid profile name: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
+def cmd_login(args: argparse.Namespace, repo_root: Path) -> int:
+    _validate_profile_name(args.profile)
+
     if not browser.is_playwright_available():
         _print_playwright_remediation()
         return 1
@@ -141,45 +161,66 @@ def cmd_login(args: argparse.Namespace) -> int:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as playwright:
-        launched = playwright.chromium.launch(headless=False)
-        context = launched.new_context()
-        page = context.new_page()
-        page.goto("about:blank")
         try:
+            launched = playwright.chromium.launch(headless=False)
+        except Exception as exc:
+            print(
+                f"Chromium launch failed: {exc}",
+                file=sys.stderr,
+            )
+            _print_playwright_remediation()
+            return 1
+
+        try:
+            context = launched.new_context()
+        except Exception as exc:
+            print(f"Failed to create browser context: {exc}", file=sys.stderr)
+            _print_playwright_remediation()
+            with contextlib.suppress(Exception):
+                launched.close()
+            return 1
+
+        try:
+            page = context.new_page()
+            page.goto("about:blank")
             print(
                 f"Complete login for profile {args.profile!r} in the opened Chromium window.",
                 file=sys.stderr,
             )
             input("Press Enter immediately after login is complete to save the session: ")
-            saved = browser.save_storage_state(args.profile, context)
+            saved = browser.save_storage_state(args.profile, context, repo_root=repo_root)
         finally:
-            context.close()
-            launched.close()
+            with contextlib.suppress(Exception):
+                context.close()
+            with contextlib.suppress(Exception):
+                launched.close()
 
     print(saved)
     return 0
 
 
-def cmd_list(_: argparse.Namespace) -> int:
-    names = _profile_names()
+def cmd_list(_: argparse.Namespace, repo_root: Path) -> int:
+    names = _profile_names(repo_root)
     if not names:
         print("No saved browser profiles.")
         return 0
 
     for name in names:
-        saved_at, _, stale = _status_fields(name)
+        saved_at, _, stale = _status_fields(name, repo_root)
         stale_label = "stale" if stale else "fresh"
         print(f"{name}\tsaved_at={saved_at}\t{stale_label}")
     return 0
 
 
-def cmd_status(args: argparse.Namespace) -> int:
-    profile = browser.profile_path(args.profile)
+def cmd_status(args: argparse.Namespace, repo_root: Path) -> int:
+    _validate_profile_name(args.profile)
+
+    profile = browser.profile_path(args.profile, repo_root=repo_root)
     if not profile.exists():
         print(f"Profile not found: {args.profile}", file=sys.stderr)
         return 1
 
-    saved_at, mode, stale = _status_fields(args.profile)
+    saved_at, mode, stale = _status_fields(args.profile, repo_root)
     print(f"profile={args.profile}")
     print(f"saved_at={saved_at}")
     print(f"mode={mode}")
@@ -187,15 +228,20 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_forget(args: argparse.Namespace) -> int:
+def cmd_forget(args: argparse.Namespace, repo_root: Path) -> int:
+    _validate_profile_name(args.profile)
+
     removed_any = False
 
-    for path in (browser.profile_path(args.profile), browser.meta_path(args.profile)):
+    for path in (
+        browser.profile_path(args.profile, repo_root=repo_root),
+        browser.meta_path(args.profile, repo_root=repo_root),
+    ):
         if path.exists():
             path.unlink()
             removed_any = True
 
-    for path in _user_data_dir_candidates(args.profile):
+    for path in _user_data_dir_candidates(args.profile, repo_root):
         if path.is_dir():
             shutil.rmtree(path)
             removed_any = True
@@ -237,7 +283,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if func is None:
         parser.print_help(sys.stderr)
         return 2
-    return int(func(args))
+
+    # Resolve repo root ONCE; thread it through every command.
+    repo_root = browser._repo_root()
+    return int(func(args, repo_root))
 
 
 if __name__ == "__main__":

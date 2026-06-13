@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,8 +27,51 @@ from typing import Any
 
 SESSIONS_DIR = ".renmark/state/browser-sessions"
 
-# Valid channel identifiers accepted by resolve_channel().
-_VALID_CHANNELS: frozenset[str] = frozenset({"playwright", "mcp", "auto"})
+# Valid channel identifiers accepted by resolve_channel() (excluding "auto" and
+# back-compat "mcp" alias which are resolved before returning).
+_VALID_CHANNELS: frozenset[str] = frozenset(
+    {"playwright", "chrome-devtools", "native", "auto", "mcp"}
+)
+
+# Profile name must be filesystem-safe: alphanumerics, dots, underscores, hyphens.
+_PROFILE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+# ── Safe name guard ────────────────────────────────────────────────────────────
+
+
+def _safe_profile_name(name: str) -> str:
+    """Validate *name* and return it unchanged when safe.
+
+    Raises:
+        ValueError: when *name* contains path separators, traversal sequences,
+            or characters outside ``[A-Za-z0-9._-]``.
+    """
+    if not isinstance(name, str) or not name:
+        raise ValueError(f"Profile name must be a non-empty string, got {name!r}")
+    if name in (".", ".."):
+        raise ValueError(f"Profile name must not be a bare dot sequence, got {name!r}")
+    if not _PROFILE_NAME_RE.match(name):
+        raise ValueError(
+            f"Profile name {name!r} contains invalid characters. "
+            "Only [A-Za-z0-9._-] are allowed."
+        )
+    return name
+
+
+# ── Repo-root detection ────────────────────────────────────────────────────────
+
+
+def _repo_root() -> Path:
+    """Walk upward from cwd to the nearest dir containing ``.git`` or ``.renmark``.
+
+    Falls back to ``Path.cwd()`` when no such directory is found.
+    """
+    current = Path.cwd().resolve()
+    for candidate in [current, *current.parents]:
+        if (candidate / ".git").exists() or (candidate / ".renmark").exists():
+            return candidate
+    return current
+
 
 # ── Path helpers ───────────────────────────────────────────────────────────────
 
@@ -35,20 +79,41 @@ _VALID_CHANNELS: frozenset[str] = frozenset({"playwright", "mcp", "auto"})
 def _sessions_root(repo_root: str | Path | None = None) -> Path:
     """Return the absolute sessions directory, resolved against *repo_root*.
 
-    Falls back to ``Path.cwd()`` when *repo_root* is not supplied.
+    Falls back to ``_repo_root()`` when *repo_root* is not supplied.
     """
-    base = Path(repo_root) if repo_root is not None else Path.cwd()
-    return base / SESSIONS_DIR
+    base = Path(repo_root) if repo_root is not None else _repo_root()
+    return (base / SESSIONS_DIR).resolve()
+
+
+def _check_under_sessions(path: Path, sessions: Path) -> Path:
+    """Assert *path* stays under *sessions*; raise ValueError otherwise."""
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(sessions)
+    except ValueError as exc:
+        raise ValueError(
+            f"Path {resolved!r} escapes the sessions directory {sessions!r}. "
+            "Refusing to operate on it."
+        ) from exc
+    return resolved
 
 
 def profile_path(name: str, repo_root: str | Path | None = None) -> Path:
     """Return the storageState JSON path for session *name*."""
-    return _sessions_root(repo_root) / f"{name}.json"
+    _safe_profile_name(name)
+    sessions = _sessions_root(repo_root)
+    candidate = sessions / f"{name}.json"
+    _check_under_sessions(candidate, sessions)
+    return candidate
 
 
 def meta_path(name: str, repo_root: str | Path | None = None) -> Path:
     """Return the sidecar metadata JSON path for session *name*."""
-    return _sessions_root(repo_root) / f"{name}.meta.json"
+    _safe_profile_name(name)
+    sessions = _sessions_root(repo_root)
+    candidate = sessions / f"{name}.meta.json"
+    _check_under_sessions(candidate, sessions)
+    return candidate
 
 
 def active_path(repo_root: str | Path | None = None) -> Path:
@@ -87,11 +152,18 @@ def resolve_channel(override: str | None = None) -> str:
       2. ``RENMARK_BROWSER`` environment variable
       3. ``auto`` — "playwright" if available, else "chrome-devtools"
 
-    ``mcp`` is treated as the playwright-MCP channel; it is returned as-is.
-    ``auto`` is resolved and never returned directly.
+    Accepted values:
+      - ``playwright``      — use Playwright directly
+      - ``chrome-devtools`` — use Chrome DevTools Protocol (MCP server)
+      - ``native``          — explicit native channel; never chosen by auto
+      - ``auto``            — resolved at runtime; never returned as-is
+      - ``mcp``             — back-compat alias, maps to ``"playwright"``
 
     Raises:
         ValueError: when *override* (or the env var) is not a recognised value.
+
+    Returns:
+        One of ``"playwright"``, ``"chrome-devtools"``, or ``"native"``.
     """
     raw: str | None = override or os.environ.get("RENMARK_BROWSER")
 
@@ -102,9 +174,13 @@ def resolve_channel(override: str | None = None) -> str:
                 f"Unknown browser channel {raw!r}. "
                 f"Valid values: {sorted(_VALID_CHANNELS)}"
             )
+        if normalised == "mcp":
+            # Back-compat alias: "mcp" → playwright (@playwright/mcp channel).
+            return "playwright"
         if normalised == "auto":
             return "playwright" if is_playwright_available() else "chrome-devtools"
-        return normalised  # "playwright" or "mcp" — returned as-is
+        # "playwright", "chrome-devtools", "native" returned as-is.
+        return normalised
 
     # No explicit override and no env var → auto-detect.
     return "playwright" if is_playwright_available() else "chrome-devtools"
@@ -200,17 +276,24 @@ def is_stale(
 ) -> bool:
     """Return True if session *name* is older than *max_age_hours*.
 
-    Returns True (stale) when the metadata file is missing or malformed.
+    Returns True (stale) when the metadata file is missing, malformed, or
+    contains a non-string / naive / invalid ``saved_at`` value.
     """
     mp = meta_path(name, repo_root)
     if not mp.exists():
         return True
     try:
         data = json.loads(mp.read_text(encoding="utf-8"))
-        saved_at = datetime.fromisoformat(data["saved_at"])
+        saved_at_raw = data["saved_at"]
+        if not isinstance(saved_at_raw, str):
+            return True
+        saved_at = datetime.fromisoformat(saved_at_raw)
+        # Require timezone-aware datetime; naive values are treated as stale.
+        if saved_at.tzinfo is None:
+            return True
         age = datetime.now(tz=timezone.utc) - saved_at
         return age.total_seconds() > max_age_hours * 3600
-    except (KeyError, ValueError, OSError):
+    except (KeyError, ValueError, OSError, TypeError):
         return True
 
 
@@ -276,7 +359,8 @@ def activate(
 
     Raises:
         FileNotFoundError: when the session profile does not exist.
-        ValueError: when the session is stale (caller must re-login).
+        ValueError: when the session is stale (caller must re-login) or when
+            the session file fails schema validation.
     """
     src = profile_path(name, repo_root)
     if not src.exists():
@@ -287,6 +371,9 @@ def activate(
         raise ValueError(
             f"Session {name!r} is stale. Re-login before activating."
         )
+
+    # Validate schema before copying — refuse foreign/malformed JSON.
+    validate_storage_state(src)
 
     dest = active_path(repo_root)
     dest.parent.mkdir(parents=True, exist_ok=True)

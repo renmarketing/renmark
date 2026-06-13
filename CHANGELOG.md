@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-13] — playwright-browser-control: codereview fixes (1 Critical + 6 Major + 1 Minor)
+**Request:** Resolve the codex review findings before finishing the feature.
+**Built:**
+- **Critical** — path traversal: `renmark/browser.py` now rejects profile names not matching `^[A-Za-z0-9._-]+$` (and bare `.`/`..`) via `_safe_profile_name`, with a resolve-check that paths stay under the sessions root; `browser_cli forget` validates names at the CLI boundary. Verified: `forget '../../tmp/sentinel'` exits 1 and deletes nothing outside the sessions dir.
+- **Major** — `is_stale()` now treats missing/invalid/naive/non-string `saved_at` as stale (catches TypeError too), never raises; `activate()` calls `validate_storage_state()` before copying and refuses foreign/malformed JSON; channel API reconciled to the canonical contract `resolve_channel(override=None) → playwright|chrome-devtools|native` (accepts `auto` + `mcp` back-compat alias → playwright; auto → playwright if available else chrome-devtools); path helpers default to `_repo_root()` (nearest `.git`/`.renmark`) not `cwd`; `browser_cli login` catches Playwright launch errors → remediation + exit 1; verify SKILL.md examples corrected to the real signatures.
+- **Minor** — `tests/test_browser.py` aligned to the canonical channel contract + added negative/edge tests (traversal names, malformed `saved_at`, foreign-schema `activate`). 13 → 34 tests.
+**Verification:** Each fix independently/adversarially verified by the orchestrator (not trusting executor self-claims). Full suite 780 passed, 28 skipped; ruff + plugin lint clean.
+**Files changed:**
+- `renmark/browser.py`, `renmark/browser_cli.py`, `plugin/skills/verify/SKILL.md`, `tests/test_browser.py`
+- `.renmark/plans/2026-06-13-playwright-browser-control-review-fixes.plan.md` (fix plan)
+**Do not change:**
+- Profile names are basename-safe-only; all session paths must stay under `.renmark/state/browser-sessions/` (path-traversal guard is security-load-bearing).
+- Canonical channels are `playwright|chrome-devtools|native`; `mcp` is a back-compat alias for `playwright`. Keep code ↔ verify SKILL.md in sync on this contract.
+
 ## [2026-06-13] — playwright-browser-control wave 4: verify + tests + docs (tasks 6–9)
 **Request:** Execute the playwright-browser-control plan (serves REQ-19).
 **Built:** Task 6 — `plugin/skills/verify/SKILL.md`: documented channel resolution (`resolve_channel`: `--browser` > `RENMARK_BROWSER` > auto), `activate(<profile>)` → `active.json` before `@playwright/mcp`, graceful Chrome DevTools MCP fallback, REQ-5 bounded-output reaffirmed. Task 7 — `tests/test_browser.py` (codex): 13 unit tests (availability, channel precedence, storageState roundtrip + meta, schema validation, staleness, activate) — run WITHOUT playwright. Tasks 8/9 — `CLAUDE.md` + `AGENTS.md`: added `bin/renmark-browser` entry point + an identical "Optional browser layer" line (mirror parity verified byte-identical).
