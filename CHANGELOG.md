@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — codereview fixes (doc-slimming-fixes)
+**Request:** Resolve the repair-review's 1 Major + 1 Minor before releasing v0.14.3.
+**Built:** Major — AGENTS pair now carries the execution-critical SubagentOutput field-value contract (completion_state/confidence/validation_status enums + retry_count monotonicity) that Codex agents emit; the sync-note is softened to declare AGENTS a SUMMARY with CLAUDE.md authoritative for full clause text, making the existing 'See CLAUDE.md §' pointers honest-by-design (orchestrator-facing clauses stay as pointers). Minor — fixed the 'algorithms/ refactors' typo in CLAUDE.md's non-block line (template was already correct).
+**Files changed:**
+- `plugin/templates/AGENTS.md.template`, `AGENTS.md` — retry contract + sync-note
+- `CLAUDE.md` — typo sync
+**Do not change:**
+- AGENTS is a pointered SUMMARY, not a verbatim full mirror — Codex-emitted field contracts live inline; orchestrator-facing clauses are pointers to CLAUDE.md §.
+
 ## [2026-06-12] — AGENTS.md mirror + version stamp
 **Request:** doc-slimming-fixes task 4.
 **Built:** repo AGENTS.md: restored compile gate + background-Bash probe + 'never after' clause (now present in all 4 onboarding files, fixing the 1-of-4 drift); dropped stale (v0.10.0); 114 lines.

@@ -1,7 +1,7 @@
 # renmark — guided build assistant (Claude Code plugin) — agent guide
 
 > For non-Claude AI agents (Codex, Cursor, etc.). Mirror of `CLAUDE.md`, shorter.
-> CLAUDE.md and AGENTS.md hold the same rule set in parallel. Mirror any rule change across both files in the same commit.
+> AGENTS.md summarizes the rule set; CLAUDE.md is authoritative for full clause text — each rule below points to its CLAUDE.md § for the complete contract. Mirror any rule change across both files in the same commit.
 
 ## What this project is
 
@@ -45,7 +45,7 @@
 
 **`/compact` is not truncation.** A compact MUST preserve operational continuity. Preserve: active goals, unresolved blockers, pipeline state, artifact references, verification status. Discard: stale reasoning, duplicate discussion, obsolete branches. After `/compact`, every workflow must still be resumable from `.renmark/state/`. See `CLAUDE.md` § `compact-semantics-rule`.
 
-**Artifact existence ≠ artifact correctness.** All executor outputs MUST expose: `completion_state`, `confidence`, `validation_status`, `retry_count`, `parser_success`, `schema_compliance`. Prefer explicit uncertainty over silent success. A subagent returning an artifact path without these is treated as `confidence: low, validation_status: unvalidated` and flagged for review. See `CLAUDE.md` § `failure-transparency-rule`.
+**Artifact existence ≠ artifact correctness.** All executor outputs MUST expose: `completion_state` (`complete|partial|failed`), `confidence` (`low|medium|high`), `validation_status` (`validated|unvalidated|failed`), `retry_count` (integer, monotonically increasing per attempt), `parser_success`, `schema_compliance`. Prefer explicit uncertainty over silent success. A subagent returning an artifact path without these is treated as `confidence: low, validation_status: unvalidated` and flagged for review. See `CLAUDE.md` § `failure-transparency-rule`.
 
 **Every multi-step workflow is resumable.** Orchestration MUST survive interruption, partial completion, executor failure, `/clear` mid-pipeline, and orchestrator restart. Recovery depends on persisted state at `.renmark/state/pipeline.json`, never conversational reconstruction. Every skill running >1 step MUST update pipeline state before returning. See `CLAUDE.md` § `workflow-recovery-rule`.
 
