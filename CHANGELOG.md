@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-13] — playwright-browser-control wave 3: CLI + wrapper (tasks 4–5)
+**Request:** Execute the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 4 — `renmark/browser_cli.py` (codex): `login`/`list`/`status`/`forget` subcommands; playwright imported only inside `login`; `login` without playwright prints the `pip install renmark[browser]` + `python -m playwright install chromium` remediation and exits 1; never prints session secrets. Task 5 — `bin/renmark-browser` (haiku): bash wrapper mirroring `bin/renmark-execute`, execs `python -m renmark.browser_cli`.
+**Verification note:** Codex self-reported `partial`/`validation_status: failed`, but the orchestrator independently verified Task 4 PASS (py_compile + import-without-playwright + functional `list`/`login` checks); one ruff UP035 fix applied. Trust came from independent evidence, not the executor's self-claim.
+**Files changed:**
+- `renmark/browser_cli.py` — CLI (new)
+- `bin/renmark-browser` — bash wrapper (new, executable)
+**Do not change:**
+- browser_cli.py must import without playwright — keep all playwright imports inside `login`.
+- `login` must never download binaries silently; it prints remediation and exits non-zero when playwright is unavailable.
+
 ## [2026-06-13] — playwright-browser-control wave 2: core module (task 3)
 **Request:** Execute the playwright-browser-control plan (serves REQ-19).
 **Built:** Task 3 — `renmark/browser.py`: the optional browser layer's core. Lazy/guarded `playwright` import (module imports cleanly with playwright absent — verified); `is_playwright_available()`, `resolve_channel()` (precedence arg > `RENMARK_BROWSER` > auto; auto → playwright else chrome-devtools), storageState save/load + sidecar meta (`saved_at`/`browser`/`mode`), `is_stale()`, `validate_storage_state()` (rejects foreign schema), `activate()` (copies profile → active.json, refuses stale). ruff clean.
