@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-13] — v0.15.0 — Playwright browser layer with session memory
+**Request:** Ship the playwright-browser-control feature (REQ-19) as a release.
+**Built:** Bumped all 7 version locations 0.14.3 → 0.15.0. Feature: an OPTIONAL Playwright browser-control layer with session memory — `renmark-browser login <profile>` saves storageState under gitignored `.renmark/state/browser-sessions/`, reused by deterministic Python flows AND an opt-in `@playwright/mcp` live channel; auto-detects Playwright and falls back to the Chrome DevTools MCP when absent. Core runtime stays stdlib-only. Shipped via the full pipeline: PRD REQ-19 (human-approved) → spec → 9-task plan → orchestrate (9/9) → verify (9/9 goal-backward) → codex review (1 Critical + 6 Major + 1 Minor, ALL fixed + independently verified) → merge. 780 tests pass.
+**Files changed:**
+- `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (×2), `README.md` — version bump
+- Feature code (merged): `renmark/browser.py`, `renmark/browser_cli.py`, `bin/renmark-browser`, `.mcp.json`, `tests/test_browser.py`, `plugin/skills/verify/SKILL.md`
+**Do not change:**
+- `.mcp.json` ships an opt-in `@playwright/mcp` server Claude Code launches via `npx`; it is REQ-19's live-QA channel (user-opt-in).
+- Profile names are basename-safe-only (path-traversal guard); session artifacts stay gitignored under `.renmark/state/` and excluded from release zips.
+
 ## [2026-06-13] — playwright-browser-control: codereview fixes (1 Critical + 6 Major + 1 Minor)
 **Request:** Resolve the codex review findings before finishing the feature.
 **Built:**
