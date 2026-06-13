@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-12, .renmark/reviews/2026-06-12-6152a1e.dsf.verification.md) model `verify`: **verify-doc-slimming-fixes** — 6/6; restored 7 over-compressed governance clauses + fixed 1-of-4 mirror drift + stale version + honest changelog; lesson: compression review must diff EVERY block in EVERY mirror file, not just the file the reviewer was pointed at
+
 - (2026-06-12, .renmark/reviews/2026-06-12-718b577.cds.verification.md) model `verify`: **verify-claude-doc-slimming** — 5/5 verified; 4 onboarding docs halved (1122->528) via terse-rewrite; block byte-identity template<->CLAUDE.md preserved so merge/audit see no drift; all governance clauses grep-intact
 
 - (2026-06-12, .renmark/reviews/2026-06-12-4c59169.pte.verification.md) model `verify`: **verify-prd-template-enrichment** — 4/4 verified; surgical PRD enrichment (5 additive pieces, anti-completion guard) rather than wholesale 17-section import — preserved altitude separation

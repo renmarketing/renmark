@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — v0.14.3 — doc-slimming regression repair
+**Request:** A multi-lens post-ship review found v0.14.2's doc-slimming silently dropped governance clauses, created mirror drift, and oversold its numbers; fix all of it.
+**Built:** Restored 7 mandates the v0.14.2 terse-rewrite dropped from CLAUDE.md.template (+ re-synced CLAUDE.md byte-for-byte): background-Bash `run_in_background` probe, lifecycle cold-start `/renmark:resume`, commit `compile` gate, refactor-safety `git diff HEAD~1`+`only`, failure-transparency field enums + retry monotonicity, canonical-state "structured summaries", artifact-governance "track stale". Fixed the "never after" parallelism clause to be present in ALL 4 docs (was 1 — the v0.14.2 fix-pass had inverted the mirror). Dropped stale "(v0.10.0)" stamps from both root docs. AGENTS pair: added the Codex-emitted SubagentOutput field-value contract inline + softened the sync-note to "AGENTS summarizes; CLAUDE.md authoritative" (honest pointered-summary). Corrected the v0.14.2 metrics claims (CLAUDE ~35% tok/~58% lines; AGENTS pair GREW in tokens). Fixed an `algorithms/ refactors` typo.
+**Pipeline evidence:** review-as-spec → plan (5 tasks, byte-identity-ordered) → verify 6/6 → codex review 1 Major/1 Minor, BOTH FIXED. 746 tests, lint OK, audit PASS, parity 7/7 at 0.14.3. All 4 docs still <=200 lines (166/188/92/114), CLAUDE.md blocks byte-identical to template.
+**Do not change:**
+- Compression of governance docs must diff EVERY block in EVERY mirror file against the prior version — the v0.14.2 miss happened because the branch review was scoped to one file (lesson logged).
+- AGENTS is a pointered SUMMARY (CLAUDE.md authoritative for full clause text); only Codex-emitted contracts live inline.
+- Quantitative changelog/audit claims must be recomputed from files, never estimated from a /context reading.
+
 ## [2026-06-12] — codereview fixes (doc-slimming-fixes)
 **Request:** Resolve the repair-review's 1 Major + 1 Minor before releasing v0.14.3.
 **Built:** Major — AGENTS pair now carries the execution-critical SubagentOutput field-value contract (completion_state/confidence/validation_status enums + retry_count monotonicity) that Codex agents emit; the sync-note is softened to declare AGENTS a SUMMARY with CLAUDE.md authoritative for full clause text, making the existing 'See CLAUDE.md §' pointers honest-by-design (orchestrator-facing clauses stay as pointers). Minor — fixed the 'algorithms/ refactors' typo in CLAUDE.md's non-block line (template was already correct).
