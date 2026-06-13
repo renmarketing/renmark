@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-12] — v0.14.2 metrics correction
+**Request:** A post-ship review found the v0.14.2 doc-slimming changelog/audit numbers were overstated; record the honest figures.
+**Built:** Verified token figures (chars/4): CLAUDE.md.template 5226→3270 (-37%); CLAUDE.md 5502→3602 (-35%, ~58% by lines — the genuine per-session Claude win). The AGENTS pair did NOT shrink — both GREW in tokens: AGENTS.md.template 2410→2677 (+11%), AGENTS.md 2576→3434 (+33%); only their line counts fell (newline-joining). AGENTS.md is not loaded by Claude Code, so per-session Claude impact = the CLAUDE.md reduction only. The earlier "all four onboarding docs ~halved" and "~7.2k→~3.5k halved" framings were optimistic: lines roughly halved for the CLAUDE pair, tokens dropped ~35%. The v0.14.2 entry also omitted its "Files changed:" field.
+**Files changed:**
+- `CHANGELOG.md` — honest metrics correction entry
+- (the underlying clause/version/mirror fixes are tracked in the doc-slimming-fixes feature commits)
+**Do not change:**
+- Quantitative claims in changelog/audit entries must be recomputed from the actual files, not estimated from a /context reading (the ~7.2k figure was a real-tokenizer pre-slim reading mixed with a chars/4 post figure).
+
 ## [2026-06-12] — restore dropped governance clauses (CLAUDE template)
 **Request:** doc-slimming-fixes task 1 — restore mandates the v0.14.2 slim silently dropped.
 **Built:** plugin/templates/CLAUDE.md.template (166 lines, 23 blocks intact): restored parallelism background-Bash + 'never after'; lifecycle cold-start /renmark:resume; commit 'compile and pass lint'; refactor-safety git-diff-HEAD~1 + 'only'; failure-transparency field value enums + retry monotonicity; canonical-state 'structured summaries'; artifact-governance 'track stale artifacts' + formats; fixed 'algorithms/ refactors' typo.
