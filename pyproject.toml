@@ -21,6 +21,9 @@ dev = [
     "ruff>=0.6.0",
     "mypy>=1.11",
 ]
+browser = [
+    "playwright>=1.40.0",
+]
 
 # Note: no [project.scripts] entry — the canonical CLI is the bash wrapper at
 # bin/renmark-execute, which install.sh symlinks to ~/.local/bin/. On Windows or

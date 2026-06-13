@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-13] — playwright-browser-control wave 1: config (tasks 1–2)
+**Request:** Execute waves of the playwright-browser-control plan (serves REQ-19).
+**Built:** Task 1 — added `browser = ["playwright>=1.40.0"]` to `[project.optional-dependencies]` (`pip install renmark[browser]`; core deps untouched). Task 2 — created `.mcp.json` registering the opt-in `@playwright/mcp` server (`--isolated --storage-state=.renmark/state/browser-sessions/active.json`), additive alongside the global Chrome DevTools MCP.
+**Files changed:**
+- `pyproject.toml` — optional `browser` extra
+- `.mcp.json` — opt-in Playwright MCP server (new)
+**Do not change:**
+- `.mcp.json` adds an opt-in MCP server Claude Code launches via `npx @playwright/mcp@latest`; it is the approved REQ-19 live-QA channel — do not silently remove, but it is user-opt-in (only runs when MCP is used).
+- Core runtime stays stdlib-only; `playwright` is an optional extra, binaries via separate `python -m playwright install chromium`.
+
 ## [2026-06-12] — project scope: playwright-browser-control
 **Request:** Add Playwright-based browser control with session memory (brainstorm → spec).
 **Stack:** Python ≥3.10 runtime + OPTIONAL `playwright>=1.40.0` extra (`pip install renmark[browser]`; browser binaries via separate `python -m playwright install chromium`); Node `@playwright/mcp` MCP server (opt-in) added alongside the existing Chrome DevTools MCP; core runtime stays stdlib-only.
