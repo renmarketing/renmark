@@ -288,6 +288,26 @@ def test_read_program_raises_on_dangling_completion_sha(repo: Path) -> None:
         program.read_program(repo)
 
 
+def test_read_program_raises_on_duplicate_stage_ids(repo: Path) -> None:
+    """Duplicate stage ids silently shadow later stages → corrupt → raise."""
+    path = program.program_json_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "feature": "f",
+                "stages": [
+                    {"id": "dup", "title": "A", "serves": "REQ-1", "tasks": []},
+                    {"id": "dup", "title": "B", "serves": "REQ-2", "tasks": []},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(program.ProgramStateError, match="duplicate stage id"):
+        program.read_program(repo)
+
+
 def test_write_program_leaves_no_temp_litter(repo: Path) -> None:
     """Atomic durable write cleans up after itself — no .program-*.tmp remains —
     and the round-trip still works."""

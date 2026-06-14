@@ -100,12 +100,6 @@ from renmark.summary import git_head_sha
 #: circuit-break BLOCKER (RETRY_EXHAUSTED) — not a transient failure to retry.
 MAX_TASK_RETRIES: int = 3
 
-#: Stage statuses the driver treats as RUNNABLE (selectable by :func:`next_stage`).
-#: ``pending`` / ``needed`` are not-yet-started; ``in_progress`` resumes. ``done``
-#: is skipped; ``partial`` / ``blocked`` are terminal-attention states that need a
-#: stop disposition, so they are NEVER auto-selected as the next stage.
-_RUNNABLE_STATUSES: frozenset[str] = frozenset({"pending", "needed", "in_progress"})
-
 #: The completion / validation values that count as a clean verify PASS (mirrors
 #: ``renmark.loop._COMPLETE_STATE`` / ``_PASS_VALIDATION``).
 _COMPLETE_STATE: str = "complete"

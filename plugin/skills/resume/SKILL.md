@@ -175,8 +175,14 @@ reads, no analysis.
 ```bash
 python3 -c "
 from pathlib import Path
-from renmark.program import read_program, position
-prog = read_program(Path('.'))
+from renmark.program import read_program, position, ProgramStateError
+try:
+    prog = read_program(Path('.'))
+except ProgramStateError as exc:
+    # Resume is the post-crash recovery surface — a corrupt program.json must
+    # NOT traceback here. Surface a one-line hint and keep recovering.
+    print(f'⚠  program.json is corrupt ({exc}); run /renmark:roadmap to inspect')
+    prog = None
 if prog is not None:
     # Check if any stage is not done (else program is complete).
     has_work = any(s.status != 'done' for s in prog.stages)

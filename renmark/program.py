@@ -424,6 +424,13 @@ def _parse_program(data: dict[str, Any]) -> Program:
                 f"{where}: 'stages' must be a list, got {type(raw_stages).__name__}"
             )
         stages = [_parse_stage(item, f"{where}.stages[{i}]") for i, item in enumerate(raw_stages)]
+    # Stage ids MUST be unique: mark_stage / next_stage / position all resolve a
+    # stage by first-id match, so a duplicate id silently shadows a later stage —
+    # corrupt state that fails loud here rather than mis-sequencing the driver.
+    non_empty_ids = [stage.id for stage in stages if stage.id]
+    dupes = sorted({sid for sid in non_empty_ids if non_empty_ids.count(sid) > 1})
+    if dupes:
+        raise ProgramStateError(f"{where}: duplicate stage id(s) {dupes}")
     # Referential integrity: current_stage_id and every stage_completion_sha key
     # MUST name a real stage. A dangling reference is corrupt state — failing
     # loud here is what keeps position()/the driver from silently misreporting
