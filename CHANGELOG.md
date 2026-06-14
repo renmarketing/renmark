@@ -1,5 +1,82 @@
 # Changelog
 
+## [2026-06-14] — roadmap-staged-planner: codereview fixes (5 Major)
+**Request:** Address all 5 Major findings from the codex review of HEAD~7..HEAD (0 Critical). Applied directly (not via a fresh plan) — small, well-scoped fixes with full context — each guarded by a new regression test.
+**Built:**
+- `renmark/program.py` — (1) `read_program` now wraps `UnicodeDecodeError` → `ProgramStateError` (a non-UTF8 file is corruption, not "absent"); (2) `write_program` uses a UNIQUE `mkstemp` temp + `flush`+`fsync` before `os.replace` (durable, no shared-`.tmp` clobber), cleaning up on failure; (3) `_parse_program` now raises `ProgramStateError` on a `current_stage_id` or `stage_completion_sha` key that references no real stage (dangling-ref corruption).
+- `renmark/program_driver.py` — (4) `next_stage` resumes an `in_progress` stage first, and HALTS (returns None) at an earlier `blocked`/`partial` stage instead of skipping past it to run a later stage out of order.
+- `renmark/roadmap.py` — (5) `reconcile_setup` recomputes `current_stage_id` to the first non-`done` stage (or None) so `position()` reports correctly after `--setup`.
+- Tests: +8 regressions (invalid-UTF8, dangling current_stage_id, dangling completion_sha, no-temp-litter; next_stage halt-at-blocked/partial + in_progress priority; reconcile current_stage_id repoint). Full suite 812 → 820.
+**Files changed:**
+- `renmark/program.py`, `renmark/program_driver.py`, `renmark/roadmap.py`, `tests/test_program.py`, `tests/test_program_driver.py`, `tests/test_roadmap_staged.py`
+**Do not change:**
+- `read_program` returns None ONLY for an absent file; ALL corruption (bad bytes, bad JSON, bad schema, dangling refs) raises `ProgramStateError`.
+- `next_stage` must not skip past an earlier `blocked`/`partial` stage.
+- `reconcile_setup` must leave `current_stage_id` pointing at the first unfinished stage (or None).
+
+## [2026-06-14] — roadmap-staged-planner wave 3: skill wiring (tasks 7–10)
+**Request:** Wire the staged planner into the user-facing skills.
+**Built (additive SKILL.md edits, +170 lines, plugin lint clean):**
+- `plugin/skills/roadmap/SKILL.md` — forward plan mode (PRD→program via bounded subagent, orchestrator never reads PRD body), `--setup` brownfield reconciliation (halt to `/renmark:init` when project-map stale), in-flight render via `render_program_table`. Existing retrospective table + `--gaps` unchanged.
+- `plugin/skills/resume/SKILL.md` — step 1.85 surfaces an in-flight staged program (`read_program` + `position`, zero-LLM, bounded).
+- `plugin/skills/start/SKILL.md` — feature-planner offered branch (greenfield whole-program planning); default adaptive routing intact.
+- `plugin/skills/feature/SKILL.md` — staged mode (multi-stage decomposition via the program driver); single dispatch gate preserved (feature owns it), REQ-12 hard gates intact.
+**Files changed:**
+- `plugin/skills/{roadmap,resume,start,feature}/SKILL.md`
+**Do not change:**
+- All four edits are ADDITIVE — the existing default flows (retrospective roadmap, `--gaps`, single-feature pipeline, adaptive start routing) must stay the defaults; staged/forward/feature-planner are offered branches.
+- feature stays single-dispatch-gate; staged mode must not add a second approval gate.
+
+## [2026-06-14] — roadmap-staged-planner wave 2: test suite (tasks 4–6)
+**Request:** Tests for the program model, driver, and roadmap staged modes — including the task-1 hardening and the binding next-stage-snapshot semantics.
+**Built (codex, 32 tests, all green):**
+- `tests/test_program.py` (14) — round-trip/render/position/mutators/stage_digest, plus hardening: empty `{}` valid, corrupt existing file raises `ProgramStateError`, mutators raise `ValueError` on unknown ids / invalid status.
+- `tests/test_program_driver.py` (13) — `next_stage` skip/resume/none, `evaluate_stop` structured-field-only mapping (incl. PAUSED/AWAITING not hard), `advance_on_success` asserts `stage_completion_sha == {"<next>": sha}` (keyed to NEXT stage, not completed) + persist-before-return, `drift_warning`.
+- `tests/test_roadmap_staged.py` (5) — `render_program_table`, `reconcile_setup`, `program_map_is_stale`; existing retrospective table asserted intact.
+Full suite 812 passed (780→812), ruff clean; tests excluded from mypy by project config.
+**Files changed:**
+- `tests/test_program.py`, `tests/test_program_driver.py`, `tests/test_roadmap_staged.py` — new
+**Do not change:**
+- The `advance_on_success` test pins next-stage sha keying — do not relax it; it guards the owner decision against regression.
+- Hardening tests pin `ProgramStateError`-on-corrupt + `ValueError`-on-bad-mutator-input.
+
+## [2026-06-14] — roadmap-staged-planner wave 1: roadmap staged modes (task 3)
+**Request:** Add forward staged-program rendering + brownfield reconciliation to roadmap without regressing the existing retrospective table / --gaps.
+**Built:** `renmark/roadmap.py` — `render_program_table` (zero-LLM in-flight position; absent→friendly string; corrupt program.json propagates `ProgramStateError` rather than masking it), `reconcile_setup(repo, built_signal)` (maps `built_reqs`/`partial_reqs`/`built_components` onto stage/task statuses; persists), `program_map_is_stale` (parses init's `<!-- Last refreshed: … @ <sha> -->` header vs git HEAD). Existing `build_rows`/`render_table`/`--gaps` paths untouched. ruff/mypy clean; `pytest -k roadmap` 10 passed; full suite 780.
+**Files changed:**
+- `renmark/roadmap.py` — added 3 functions, existing paths intact
+**Do not change:**
+- The retrospective table + `--gaps` paths stay as-is (do not regress).
+- `render_program_table`/`reconcile_setup` must NOT swallow `ProgramStateError` — corrupt resumable state surfaces loudly; only the absent (None) case yields the friendly "no in-flight program" string.
+- `reconcile_setup` operates on the structured `built_signal` dict only — never reads source code or the PRD body (REQ-5/G11).
+
+## [2026-06-14] — roadmap-staged-planner wave 1: program driver (task 2)
+**Request:** Build the deterministic stage-sequencing state machine above the single-item loop.
+**Built:** `renmark/program_driver.py` — `next_stage`, `StopReason` (str-Enum) + `evaluate_stop` (reads ONLY structured fields, never LLM-interpreted text), `advance_on_success`, `drift_warning`, `driver_status`, `is_hard_stop`/`HARD_STOPS`. Stop severity order (first match wins): RETRY_EXHAUSTED > PLAN_BLOCK > PRD_DRIFT > CODEREVIEW_CRITICAL > VERIFY_FAILED > AWAITING_APPROVAL > PAUSED. PAUSED + AWAITING_APPROVAL are NOT hard stops. Independently probed in a real git tmp repo: ruff/mypy clean, full suite 780 passed.
+**Files changed:**
+- `renmark/program_driver.py` — new
+**Do not change:**
+- `advance_on_success` snapshots the **NEXT** stage's sha keyed by that next stage (the drift baseline the next stage is checked against); it must NOT snapshot the completed stage; the last stage snapshots nothing. Owner decision 2026-06-13 — verified by probe.
+- `evaluate_stop` reads structured fields only (`completion_state`/`validation_status`, etc.) — never infer a pass/fail from prose.
+- State persisted via `program.write_program` BEFORE returning (resumable).
+
+## [2026-06-13] — project scope: roadmap-staged-planner (brainstorm-complete)
+**Request:** Enhance `/renmark:roadmap` into a PRD-anchored staged program planner that, after one approval, semi-autonomously drives a sequence of stages→tasks through the existing pipeline (loop + backlog), surfacing live progress and per-task summaries. Owner principle: "spend time on the beginning (PRD + roadmap), then don't deviate."
+**Built:** Spec only (no code yet) — `.renmark/specs/2026-06-13-roadmap-staged-planner.spec.md`. Confirmed reuse map (loop/backlog/orchestrate/verify/approve/roadmap) + new pieces (program.json/program.md data model, stage-to-stage driver, entry-point divergence, per-stage digest). Probe confirmed renmark has NO forward PRD→program derivation today.
+**Scope contract:**
+- **Stack:** unchanged — Python >=3.10 + Claude Code plugin (markdown skills + Python runtime). No new deps.
+- **Deployment:** in-repo plugin; no new runtime surface.
+- **MVP boundary:** program data model + planner (PRD-as-is derivation) + driver wrapping existing `loop` per stage + `program.md` checklist + roadmap renderer + entry-point divergence + resumability. Stop-on-issue from structured fields.
+- **Out of scope:** any change to `/renmark:prd` or the PRD schema; new autonomy beyond the bounded loop; multi-tree parallelism; auto-merge/-release (REQ-12 stands).
+**Files changed:**
+- `.renmark/specs/2026-06-13-roadmap-staged-planner.spec.md` (new)
+- `.renmark/specs/2026-06-13-roadmap-staged-planner.brief.md` (4 requirement refinements appended)
+- `.renmark/research/2026-06-13-roadmap-staged-planner-{reuse,bestpractice}.research.md` (new)
+**Do not change:**
+- The planner derives ordering from the PRD **as-is** — do not silently rewrite `PRD.md` or add a PRD schema in this feature.
+- Stop-on-issue must read structured artifact fields (`completion_state`/`validation_status`), never LLM-interpreted "looks done."
+- Orchestrator never ingests the PRD body, generated code, or diffs (REQ-5/G11).
+
 ## [2026-06-13] — installer: symlink renmark-browser onto PATH (REQ-19 follow-up)
 **Request:** Close the v0.15.0 gap surfaced by `/renmark:roadmap --gaps` — `bin/renmark-browser` existed but wasn't on PATH after install.
 **Built:** `install.sh` now symlinks `bin/renmark-browser` → `~/.local/bin/renmark-browser` (mirroring renmark-execute) and removes it on `--uninstall`. Verified: `renmark-browser list` resolves on PATH and exits 0. `install.ps1` unchanged — it has no `~/.local/bin` CLI-symlink step (Windows invokes via `python -m renmark.browser_cli`). No version bump — v0.15.0 was local-only; this rides into the next release; the 7 version locations stay consistent (no drift).

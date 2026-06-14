@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-14, .renmark/reviews/2026-06-14-cc2beae3572e760c98ba5cb8ef7091129b8f7e59.verification.md) model `verify`: **verify-roadmap-staged-planner** — 6/6 behaviors verified; failed: none; regressions: 1 (loop driver, no overlap); full suite 812 passed
+
 - (2026-06-13, .renmark/reviews/2026-06-13-aeacf9771d0e535f51b2fa87cebc276743aaa854.review.md) model `verify`: **verify-playwright-browser-control-postfix** — post-codereview-fix re-verify: 9/9 goal-backward behaviors green on sha 7cceadf (path-traversal Critical closed end-to-end, canary intact); full suite 780 passed; each fix adversarially verified, not trusting executor self-claims
 
 - (2026-06-13, .renmark/reviews/2026-06-13-2c5cf111597215352754aba861a15434848fbe58.verification.md) model `verify`: **verify-playwright-browser-control** — 7/7 goal-backward behaviors verified (guarded/fallback path; playwright not in env); failed: none; full suite 759 passed

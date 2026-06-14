@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-030 — Finished feature roadmap-staged-planner
+
+**Date:** 2026-06-14
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/roadmap-staged-planner reached stage ready-to-release
+
+---
+
 ## ADR-029 — Finished feature playwright-browser-control
 
 **Date:** 2026-06-13

@@ -196,6 +196,22 @@ Tell the user: *"Let me put together the build plan now..."*
 → Invoke `/renmark:brainstorm` with the confirmed description as starting context, skipping the empty-folder bootstrap question (already handled by start).
 Tell the user: *"This has a few moving parts — let me ask a couple of design questions before we start building so we get the structure right..."*
 
+**Greenfield whole-product / program — offered branch (feature-planner mode):**
+When the user's description signals a full product or multi-stage program from scratch ("build a platform", "build an entire app", "I want to create a full system", or any scope that implies ordered stages rather than a single deliverable), offer a third routing option before proceeding:
+
+> "This sounds like a full product — multiple stages, each building on the last.
+> I can plan this as a **staged program**: brainstorm the stages first, then drive
+> each stage through the normal pipeline in order, tracking progress automatically.
+>
+> 1. [a] **Staged program** — plan the whole product as an ordered program (recommended for greenfield builds)
+> 2. [b] **Single feature** — treat it as one feature and plan it now
+> 3. [c] Not sure yet — walk me through it"
+
+- If the user chooses **[a]**: invoke `/renmark:brainstorm` with the description as context, then route the brainstorm output through `/renmark:roadmap` **forward plan mode** (`plugin/skills/roadmap/SKILL.md` — forward plan mode section) to derive an ordered stage→task program and emit a `renmark.program` (persisted to `.renmark/state/program.json`). The staged driver (`renmark.program_driver`) then sequences stages; each stage runs the normal brainstorm→plan→orchestrate→verify pipeline.
+- If the user chooses **[b]** or **[c]**, or if the scope is clearly a single deliverable: fall through to the default routing above — do NOT offer this branch again.
+
+This branch is additive: the default adaptive one-question routing above remains the default for all single-feature work. Do NOT surface "staged program", "program.json", "feature-planner", or driver terminology to the user — use plain-English equivalents only ("staged plan", "step-by-step program").
+
 Do NOT mention plan files, spec files, or executor types to the user.
 
 The routing above IS the next step — defer its presentation to the shared

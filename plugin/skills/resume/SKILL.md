@@ -164,6 +164,42 @@ If `read_pause` returns `None` or `pause_kind != "usage_limit"`, this step
 prints nothing. The existing lifecycle-based resume (Steps 1–1.75 and Step 2
 onward) is **unchanged** — this is an additive surfacing branch only.
 
+### 1.85 Surface any in-flight staged program
+
+A `/renmark:roadmap` run or orchestrated stage update persists its state to
+`.renmark/state/program.json`. On resume, if a program exists AND is not fully
+done, surface it so the user knows a multi-stage build is in flight. Still
+**zero LLM calls** — pure file IO: `renmark.program.read_program`, no source
+reads, no analysis.
+
+```bash
+python3 -c "
+from pathlib import Path
+from renmark.program import read_program, position
+prog = read_program(Path('.'))
+if prog is not None:
+    # Check if any stage is not done (else program is complete).
+    has_work = any(s.status != 'done' for s in prog.stages)
+    if has_work:
+        pos = position(prog)
+        print(f'⟳  Program in flight: {prog.feature}  [{prog.mode}]')
+        print(f'   {pos}')
+        print(f'   Resume: /renmark:roadmap  (view/continue)')
+"
+```
+
+Output when a program is in flight with work remaining (≤3 lines):
+
+```
+⟳  Program in flight: <feature>  [<mode>]
+   Stage <N>/<total> · task <M>/<total> done · current: <stage-title>
+   Resume: /renmark:roadmap  (view/continue)
+```
+
+If `read_program` returns `None` or all stages are done, this step prints
+nothing. The existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward)
+is **unchanged** — this is an additive surfacing branch only.
+
 ### 2. Surface pending approval gates
 
 If `human_review_required` is true and `human_review_completed` is false, the user MUST be told about the pending gate before any other recommendation. The next action is always `/renmark:approve` until the gate is cleared.

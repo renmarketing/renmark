@@ -34,6 +34,8 @@ full signals (lite must never skip the full review on a risky change).
 **Use plain `/renmark:plan` + `/renmark:orchestrate` on main instead for:**
 - Small edits, config changes, single-file fixes
 
+**Staged mode (offered for multi-stage features):** When a feature is large enough to warrant multiple ordered stages (e.g. a migration with distinct phases, or a new subsystem with sequential build layers), `feature` may offer to decompose it into a `renmark.program` of stages and drive them via the program driver (`renmark/program_driver.py`) instead of a single-pass plan. This is an OFFERED branch — the router proposes it when the plan signals multi-stage scope; the user must opt in. The default single-feature full-pipeline flow always remains the fallback. See Step 3a.
+
 **Invocation & overrides:**
 - `/renmark:feature <name>` — classify by heuristic (default; see Step 3.5).
 - `/renmark:feature <name> --full` — force the full pipeline (branch → codex review → PR/release). `--full` ALWAYS wins (escalation is the safe direction).
@@ -120,6 +122,26 @@ auto-validation at stage `plan-validated` and returns control to this router. `f
 owns the **one** dispatch approval (Step 4). This is the mirror of the contract documented
 in `plan/SKILL.md` §8b — there must never be two dispatch gates, and orchestrate must
 never be reached without an explicit human approval.
+
+### 3a. Staged-mode offer (multi-stage features — OFFERED, not default)
+
+**When to offer:** after `plan` returns `plan-validated`, inspect the task list for signals of multi-stage scope — distinct ordered phases (e.g. schema → API → UI), explicit dependency chains where later tasks are blocked until earlier ones are fully shipped, or a task count / complexity that crosses the `full` tier with hard ordering dependencies between logical groups. If those signals are present, offer the user the staged branch before routing to Step 3.5.
+
+**What staged mode does:** instead of a single plan→orchestrate→verify pass, the router decomposes the feature into a `renmark.program` of stages (via `/renmark:roadmap --forward` — the forward-planning mode that emits a `renmark.program`; see `plugin/skills/roadmap/SKILL.md` and `renmark/program.py`) and drives them sequentially via the program driver (`renmark/program_driver.py`). Each stage runs the same per-stage plan→orchestrate→verify pipeline. The driver (`next_stage`, `evaluate_stop`, `advance_on_success`, `drift_warning`, `driver_status`) is the sole sequencing authority — the router never advances stages by hand.
+
+**Single dispatch gate is preserved.** The initial approval in Step 4 covers the ENTIRE program: surface the stage list, per-stage cost estimate, and total token band, then require one explicit human approval. After that, the driver's `advance_on_success` advances stage-to-stage deterministically — no second human gate per stage. The driver is a state machine, not a new approval surface.
+
+**Stop handling (per `renmark/program_driver.py`):**
+
+| Driver stop | Disposition |
+|---|---|
+| `HARD_STOPS` (`VERIFY_FAILED`, `PLAN_BLOCK`, `PRD_DRIFT`, `CODEREVIEW_CRITICAL`, `RETRY_EXHAUSTED`) | Halt the program; surface the `StopReason`; require human/re-plan action before resuming via `/renmark:resume`. |
+| `AWAITING_APPROVAL` (REQ-12: merge / release / destructive) | Pause and route to `/renmark:approve` (the sole approval surface). Program resumes after approval. |
+| `PAUSED` (budget / usage-limit / max-iter) | Pause; resumable automatically once the constraint clears — no approval required. |
+
+**REQ-12 hard gates are unchanged.** Any stage whose completion involves a merge, release, or destructive op MUST pass through `/renmark:approve` before the driver calls `advance_on_success`. The driver sets `AWAITING_APPROVAL`; the router surfaces it and stops. The gate is not negotiable.
+
+**Staged mode does NOT apply when:** the plan resolves to `lite` or `standard` tier without hard ordering dependencies (single-pass is cheaper and simpler); the user declines when offered; or the feature has no multi-phase structure. In those cases, skip this step and proceed directly to Step 3.5.
 
 ### 3.5. Size-tier classification (lane decision)
 
