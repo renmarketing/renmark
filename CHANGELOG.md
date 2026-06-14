@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-14] — v0.16.1 — fix: project-map freshness header wedged --setup staleness
+**Request:** Release the stale-map fix found by live-running `/renmark:roadmap --setup`.
+**Built:** Bumped 0.16.0 → 0.16.1 (7 locations, drift clean). Fixes the bug where `renmark.init.write_full_map` preserved a stale `Last refreshed @ <sha>` header on body-unchanged refreshes, so `renmark.roadmap.program_map_is_stale` wedged `True` after any structure-neutral commit and `/renmark:roadmap --setup` could never clear it via `/renmark:init`. `write_full_map` now advances the header whenever the full text differs (body still byte-skipped, still reports `unchanged`). +regression test; suite 822. Found via debug session 20260614-061609-c4c6.
+**Files changed:**
+- `renmark/init.py`, `tests/test_roadmap_staged.py` (in prior commit); VERSION + 6 version locations (this commit)
+**Do not change:**
+- The freshness header must advance independently of body-content equality — do not re-couple `write_full_map`'s header write to body diff.
+
 ## [2026-06-14] — v0.16.0 — PRD-anchored staged program planner
 **Request:** Release the `roadmap-staged-planner` feature.
 **Built:** Bumped version 0.15.0 → 0.16.0 across all 7 locations (drift gate clean). Ships: `renmark/program.py` (staged-program data model, atomic+durable persistence, strict corruption-raising read), `renmark/program_driver.py` (stage-sequencing state machine: next_stage, structured-field stop logic, next-stage sha snapshot, blocked-halt), `renmark/roadmap.py` (forward plan mode + `--setup` brownfield reconcile + in-flight render), and SKILL wiring for roadmap/resume/start/feature. Reuses loop/backlog/orchestrate/verify within the PRD's bounded-loop limits. Verified 6/6; codereview 0 Critical/5 Major (all fixed); opus-tier release-readiness pass (fable disabled) verdict SHIP with 2 deferrables (both fixed). Full suite 821 passed.
