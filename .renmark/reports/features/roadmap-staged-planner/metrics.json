@@ -1,0 +1,21 @@
+{
+  "feature": "roadmap-staged-planner",
+  "branch": "feature/roadmap-staged-planner",
+  "sha": "139ec1c986149c6c891f53b251121cbf4cc94f99",
+  "version_path": ".renmark/version/v0.9.1/",
+  "release_link": ".renmark/version/v0.9.1/",
+  "verification": "6/6 behaviors verified",
+  "codereview": ".renmark/reviews/2026-06-14-cc2beae.review.md",
+  "files_changed": 21,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-06-14T05:43:22+00:00"
+}
