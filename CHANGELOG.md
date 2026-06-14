@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-14] — v0.16.0 — PRD-anchored staged program planner
+**Request:** Release the `roadmap-staged-planner` feature.
+**Built:** Bumped version 0.15.0 → 0.16.0 across all 7 locations (drift gate clean). Ships: `renmark/program.py` (staged-program data model, atomic+durable persistence, strict corruption-raising read), `renmark/program_driver.py` (stage-sequencing state machine: next_stage, structured-field stop logic, next-stage sha snapshot, blocked-halt), `renmark/roadmap.py` (forward plan mode + `--setup` brownfield reconcile + in-flight render), and SKILL wiring for roadmap/resume/start/feature. Reuses loop/backlog/orchestrate/verify within the PRD's bounded-loop limits. Verified 6/6; codereview 0 Critical/5 Major (all fixed); opus-tier release-readiness pass (fable disabled) verdict SHIP with 2 deferrables (both fixed). Full suite 821 passed.
+**Files changed:**
+- VERSION, pyproject.toml, renmark/__init__.py, plugin/.claude-plugin/plugin.json, .claude-plugin/marketplace.json (×2), README.md — version bump
+**Do not change:**
+- Keep the 7 version locations in sync (renmark.release check enforces).
+
 ## [2026-06-14] — roadmap-staged-planner: codereview fixes (5 Major)
 **Request:** Address all 5 Major findings from the codex review of HEAD~7..HEAD (0 Critical). Applied directly (not via a fresh plan) — small, well-scoped fixes with full context — each guarded by a new regression test.
 **Built:**
