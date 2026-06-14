@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-13 @ ecd28f1 -->
+<!-- Last refreshed: 2026-06-14 @ 41b66fd -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=91
+**Languages:** python=96
 
 ## Directory tree
 
@@ -28,6 +28,7 @@ ai-system/
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
 | `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `no_raw_jsonl`, `disclaimer_present`, `shim_thinness` |
 | `tests/test_plan_lint.py` | --- artifact_type: renmark_task_output schema_version: 1 created_at: 2026-06-11T | `test_valid_plan_pass`, `test_valid_plan_cli_exit_0`, `test_missing_verifier_block`, `test_too_many_tasks_block`, `test_duplicate_target_same_group_block`, `test_same_target_different_groups_pass` |
+| `renmark/program.py` | Staged-program data model + persistence — the single source of truth for "where  | `ProgramStateError`, `program_json_path`, `program_md_path`, `TaskNode`, `StageNode`, `Program` |
 | `renmark/release.py` | Version-file drift detection — Layer 1 guardrail. | `VersionFile`, `package_basename`, `build_package`, `build_version_snapshot`, `current_version`, `check_drift` |
 | `tests/test_modularity.py` | Unit tests for renmark.modularity — the advisory code-health analyzer. | `test_module_loc_just_over_warn_is_warn`, `test_module_loc_just_over_major_is_danger`, `test_module_loc_just_under_warn_is_clean`, `test_func_loc_exactly_warn_is_warn`, `test_func_loc_just_over_warn_is_warn`, `test_func_loc_exactly_major_is_danger` |
 | `renmark/loop.py` | Loop Mode state machine — the deterministic core of renmark's bounded, verified, | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
@@ -35,14 +36,13 @@ ai-system/
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
+| `renmark/roadmap.py` | Roadmap reporter. | `RoadmapRow`, `build_rows`, `render_table`, `write_roadmap_md`, `render_program_table`, `reconcile_setup` |
 | `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `validate_limits`, `validate_analytics_summary` |
 | `renmark/lint.py` | Plugin contract linter — checks that SKILL.md files, command shims, and CLAUDE.m | `parse_frontmatter`, `lint_skill_files`, `lint_next_steps_citation`, `lint_command_shims`, `validate_rule_markers`, `iter_rule_blocks` |
-| `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
-| `tests/test_audit.py` | Tests for renmark.audit — deterministic plugin/registry audit engine. | `test_inventory_harvest_real_repo`, `test_registry_sync_real_repo_clean`, `test_registry_sync_detects_ghost`, `test_registry_sync_detects_missing`, `test_shim_thinness_flags_fat_shim`, `test_shim_thinness_flags_unwired_shim` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | `PlanLintReport`, `lint_plan`, `main` |
 | `renmark/modularity.py` | Modularity / scalability health lens — pure stdlib ``ast``, zero-dep, never-rais | `analyze` |
-| `renmark/sizing.py` | Proportional-pipeline tier classifier — deterministic, zero-LLM, stdlib-only. | — |
+| `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | — |
 
 ## Commands (user-facing)
 
