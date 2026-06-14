@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-06-13] — project scope: roadmap-staged-planner (brainstorm-complete)
+**Request:** Enhance `/renmark:roadmap` into a PRD-anchored staged program planner that, after one approval, semi-autonomously drives a sequence of stages→tasks through the existing pipeline (loop + backlog), surfacing live progress and per-task summaries. Owner principle: "spend time on the beginning (PRD + roadmap), then don't deviate."
+**Built:** Spec only (no code yet) — `.renmark/specs/2026-06-13-roadmap-staged-planner.spec.md`. Confirmed reuse map (loop/backlog/orchestrate/verify/approve/roadmap) + new pieces (program.json/program.md data model, stage-to-stage driver, entry-point divergence, per-stage digest). Probe confirmed renmark has NO forward PRD→program derivation today.
+**Scope contract:**
+- **Stack:** unchanged — Python >=3.10 + Claude Code plugin (markdown skills + Python runtime). No new deps.
+- **Deployment:** in-repo plugin; no new runtime surface.
+- **MVP boundary:** program data model + planner (PRD-as-is derivation) + driver wrapping existing `loop` per stage + `program.md` checklist + roadmap renderer + entry-point divergence + resumability. Stop-on-issue from structured fields.
+- **Out of scope:** any change to `/renmark:prd` or the PRD schema; new autonomy beyond the bounded loop; multi-tree parallelism; auto-merge/-release (REQ-12 stands).
+**Files changed:**
+- `.renmark/specs/2026-06-13-roadmap-staged-planner.spec.md` (new)
+- `.renmark/specs/2026-06-13-roadmap-staged-planner.brief.md` (4 requirement refinements appended)
+- `.renmark/research/2026-06-13-roadmap-staged-planner-{reuse,bestpractice}.research.md` (new)
+**Do not change:**
+- The planner derives ordering from the PRD **as-is** — do not silently rewrite `PRD.md` or add a PRD schema in this feature.
+- Stop-on-issue must read structured artifact fields (`completion_state`/`validation_status`), never LLM-interpreted "looks done."
+- Orchestrator never ingests the PRD body, generated code, or diffs (REQ-5/G11).
+
 ## [2026-06-13] — installer: symlink renmark-browser onto PATH (REQ-19 follow-up)
 **Request:** Close the v0.15.0 gap surfaced by `/renmark:roadmap --gaps` — `bin/renmark-browser` existed but wasn't on PATH after install.
 **Built:** `install.sh` now symlinks `bin/renmark-browser` → `~/.local/bin/renmark-browser` (mirroring renmark-execute) and removes it on `--uninstall`. Verified: `renmark-browser list` resolves on PATH and exits 0. `install.ps1` unchanged — it has no `~/.local/bin` CLI-symlink step (Windows invokes via `python -m renmark.browser_cli`). No version bump — v0.15.0 was local-only; this rides into the next release; the 7 version locations stay consistent (no drift).
