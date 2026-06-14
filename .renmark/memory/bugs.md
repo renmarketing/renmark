@@ -50,9 +50,15 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-06-14 — roadmap --setup staleness guard unclearable by /renmark:init after non-structural commit
 
+**Severity:** major
+**Symptom:** program_map_is_stale() stays True after /renmark:init when the map body is unchanged; --setup permanently halts to /renmark:init which can never clear it
+**Root cause:** init.write_full_map only rewrote project-map.md when the header-stripped BODY differed, preserving the stale Last-refreshed @ <sha> header on body-unchanged refreshes; program_map_is_stale keys freshness off that header sha vs HEAD, so any structure-neutral commit wedged staleness True with no remediation
+**Fix:** init.write_full_map now rewrites the file (advancing the freshness header) whenever the full text differs even if the body matches, still returning unchanged; +regression test test_init_advances_map_header_so_staleness_clears
+**Lesson:** A freshness marker (Last-refreshed @ sha) must advance independently of body-content equality — coupling a staleness check to a sha that only moves on body change creates an unclearable wedge. Also: test fixtures for sha-keyed checks must use VALID HEX (the header regex is [0-9a-fA-F]+).
 
-
+---
 
 ### 2026-06-09 — loop driver stalled on first failed verify + could overshoot budget + raised on bad input
 

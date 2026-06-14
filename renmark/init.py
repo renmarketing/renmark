@@ -725,6 +725,15 @@ def write_full_map(repo: Path, scan: RepoScan) -> str:
     if target.exists():
         existing = target.read_text(encoding="utf-8", errors="replace")
         if _strip_header_lines(existing) == _strip_header_lines(new_text):
+            # Body unchanged. The freshness header (`Last refreshed @ <sha>`) must
+            # STILL advance so the staleness check that reads it
+            # (renmark.roadmap.program_map_is_stale) can clear after a
+            # structure-neutral commit — otherwise the header sha freezes and
+            # `/renmark:init` can never un-stale the map. Rewrite iff the full
+            # text (header included) differs; still report "unchanged" so the
+            # body-churn semantics + stdout line stay correct.
+            if existing != new_text:
+                target.write_text(new_text, encoding="utf-8")
             return "unchanged"
         target.write_text(new_text, encoding="utf-8")
         return "refreshed"

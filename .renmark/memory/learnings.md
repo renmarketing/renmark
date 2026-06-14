@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-14, bug) **roadmap --setup staleness guard unclearable by /renmark:init after non-structural commit** — A freshness marker (Last-refreshed @ sha) must advance independently of body-content equality — coupling a staleness check to a sha that only moves on body change creates an unclearable wedge. Also: test fixtures for sha-keyed checks must use VALID HEX (the header regex is [0-9a-fA-F]+).
+
 - (2026-06-14, .renmark/reviews/2026-06-14-cc2beae3572e760c98ba5cb8ef7091129b8f7e59.verification.md) model `verify`: **verify-roadmap-staged-planner** — 6/6 behaviors verified; failed: none; regressions: 1 (loop driver, no overlap); full suite 812 passed
 
 - (2026-06-13, .renmark/reviews/2026-06-13-aeacf9771d0e535f51b2fa87cebc276743aaa854.review.md) model `verify`: **verify-playwright-browser-control-postfix** — post-codereview-fix re-verify: 9/9 goal-backward behaviors green on sha 7cceadf (path-traversal Critical closed end-to-end, canary intact); full suite 780 passed; each fix adversarially verified, not trusting executor self-claims

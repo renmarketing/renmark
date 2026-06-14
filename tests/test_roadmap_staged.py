@@ -181,6 +181,31 @@ def test_program_map_is_stale_for_missing_old_and_fresh_maps(
     assert roadmap.program_map_is_stale(tmp_path) is False
 
 
+def test_init_advances_map_header_so_staleness_clears(tmp_path: Path, monkeypatch) -> None:
+    """Regression (debug 20260614-061609-c4c6): a body-UNCHANGED init refresh must
+    still advance the project-map `Last refreshed @ <sha>` header, otherwise
+    program_map_is_stale wedges True forever after a structure-neutral commit and
+    /renmark:init can never clear it (which blocks /renmark:roadmap --setup)."""
+    import dataclasses
+
+    from renmark import init
+
+    scan = init.scan_repo(tmp_path)
+    # First write establishes the map with the old sha (valid hex — the staleness
+    # header regex only accepts [0-9a-fA-F]).
+    init.write_full_map(tmp_path, dataclasses.replace(scan, git_sha="aaa1111"))
+    # HEAD moves; the map BODY is identical (same scan) — only the sha differs.
+    result = init.write_full_map(tmp_path, dataclasses.replace(scan, git_sha="bbb2222"))
+
+    assert result == "unchanged"  # body churn semantics preserved
+    map_text = (tmp_path / ".renmark" / "memory" / "project-map.md").read_text(encoding="utf-8")
+    assert "@ bbb2222" in map_text  # header DID advance
+    assert "@ aaa1111" not in map_text
+    # …and the staleness check now clears when HEAD matches the advanced header.
+    monkeypatch.setattr(roadmap, "_git_short_sha", lambda repo: "bbb2222")
+    assert roadmap.program_map_is_stale(tmp_path) is False
+
+
 def test_legacy_render_table_path_still_runs() -> None:
     rows = [
         roadmap.RoadmapRow(
