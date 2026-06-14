@@ -18,9 +18,14 @@ Design contract (mirrors ``renmark/loop.py`` + ``renmark/lifecycle.py``):
 - **Atomic write.** ``program.json`` is written via a sibling ``.tmp`` file +
   ``os.replace`` (atomic on the same filesystem), so a crash mid-write never
   leaves a half-written program and the roadmap stays resumable.
-- **Never raises into the caller on read.** A missing / corrupt / non-dict
-  ``program.json`` degrades to ``None`` — schema drift drops unknown fields
-  and bad-typed values rather than crashing recovery.
+- **Fail loud on corruption; ``None`` ONLY when absent.** A *missing*
+  ``program.json`` yields ``None`` (there is no in-flight program). A file that
+  EXISTS but is unreadable, invalid JSON, not a JSON object, or carries invalid
+  schema / status / mode / type values raises :class:`ProgramStateError`.
+  ``program.json`` is correctness-critical resumable state — masking its
+  corruption as "no program" would let ``/renmark:resume`` skip a real
+  in-flight program and would hide broken driver behaviour, so corruption fails
+  loud rather than degrading to ``None``.
 - **Pure, deterministic renderers + accessors.** :func:`render_markdown`,
   :func:`position`, and :func:`stage_digest` are NO-LLM / NO-network string
   functions. :func:`position` and :func:`stage_digest` are the only
@@ -38,6 +43,19 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+
+# ── Errors ──────────────────────────────────────────────────────────────────────
+
+
+class ProgramStateError(Exception):
+    """Raised when ``program.json`` exists but is corrupt / malformed / invalid.
+
+    A *missing* state file is NOT an error (:func:`read_program` returns
+    ``None``). A present-but-broken file — unreadable bytes, invalid JSON, a
+    non-object payload, or invalid schema / status / mode / type values — raises
+    this so corruption of resumable state is never silently masked.
+    """
+
 
 # ── Status / mode taxonomy ─────────────────────────────────────────────────────
 
@@ -154,25 +172,33 @@ class Program:
 
 
 def read_program(repo: Path | str) -> Program | None:
-    """Return the persisted :class:`Program`, or ``None`` if absent/corrupt.
+    """Return the persisted :class:`Program`, or ``None`` IFF the state file is
+    absent.
 
-    Never raises: a missing file, unreadable bytes, invalid JSON, or a non-dict
-    payload all yield ``None``. Unknown fields are dropped and bad-typed values
-    degrade to defaults so schema drift cannot crash cold-start recovery.
+    ``None`` means exactly one thing: there is no ``program.json`` (no in-flight
+    program). A file that EXISTS but is unreadable, not valid JSON, not a JSON
+    object, or carries invalid schema / status / mode / type values raises
+    :class:`ProgramStateError`. ``program.json`` is correctness-critical
+    resumable state; masking its corruption as "no program" would let
+    ``/renmark:resume`` skip a real in-flight program and would hide broken
+    driver behaviour — so corruption fails loud.
     """
     path = program_json_path(repo)
-    try:
-        if not path.exists():
-            return None
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    if not path.exists():
         return None
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ProgramStateError(f"program.json exists but is unreadable: {exc}") from exc
+    try:
+        data = json.loads(raw)
+    except ValueError as exc:
+        raise ProgramStateError(f"program.json is not valid JSON: {exc}") from exc
     if not isinstance(data, dict):
-        return None
-    try:
-        return _coerce_program(data)
-    except (TypeError, ValueError):
-        return None
+        raise ProgramStateError(
+            f"program.json must be a JSON object, got {type(data).__name__}"
+        )
+    return _parse_program(data)
 
 
 def write_program(repo: Path | str, program: Program) -> Path:
@@ -208,143 +234,181 @@ def write_program(repo: Path | str, program: Program) -> Path:
     return json_path
 
 
-# ── Coercion (tolerant read) ─────────────────────────────────────────────────
+# ── Strict parse (loud on corruption) ───────────────────────────────────────────
+#
+# Read-side validation FAILS LOUD: a present ``program.json`` with a bad type or
+# an out-of-vocabulary status/mode raises :class:`ProgramStateError`. Genuinely
+# *absent* optional fields fall back to the dataclass default (an empty program
+# file ``{}`` is valid); only *present* values are type/enum-checked. ``where``
+# threads a JSON path (e.g. ``program.stages[0].tasks[2]``) into every message so
+# corruption is actionable.
 
 
-def _coerce_str(value: object, default: str = "") -> str:
-    """Coerce ``value`` to a str field value; ``None`` → default, else ``str``."""
-    if isinstance(value, str):
-        return value
-    if value is None:
+def _str_field(data: dict[str, Any], key: str, where: str, *, default: str = "") -> str:
+    """Read a required-string field; absent/``null`` → ``default``; wrong type raises."""
+    if key not in data or data[key] is None:
         return default
-    try:
-        return str(value)
-    except Exception:  # pragma: no cover — str() on a pathological object
-        return default
+    value = data[key]
+    if not isinstance(value, str):
+        raise ProgramStateError(
+            f"{where}: {key!r} must be a string, got {type(value).__name__}"
+        )
+    return value
 
 
-def _coerce_opt_str(value: object) -> str | None:
-    """Coerce to ``str | None`` — JSON ``null`` / missing → ``None``."""
-    if value is None:
+def _opt_str_field(data: dict[str, Any], key: str, where: str) -> str | None:
+    """Read a ``str | None`` field; absent/``null`` → ``None``; wrong type raises."""
+    if key not in data or data[key] is None:
         return None
-    if isinstance(value, str):
-        return value
-    try:
-        return str(value)
-    except Exception:  # pragma: no cover
-        return None
+    value = data[key]
+    if not isinstance(value, str):
+        raise ProgramStateError(
+            f"{where}: {key!r} must be a string or null, got {type(value).__name__}"
+        )
+    return value
 
 
-def _coerce_int(value: object, default: int = 0) -> int:
-    """Coerce ``value`` to a non-negative int; bad/garbage → ``default``."""
-    if isinstance(value, bool):  # bool is an int subclass — treat as absent.
+def _status_field(
+    data: dict[str, Any], key: str, where: str, *, default: str = "pending"
+) -> str:
+    """Read a status field; absent/``null`` → ``default``; non-str or unknown raises."""
+    if key not in data or data[key] is None:
         return default
-    if isinstance(value, int):
-        return value if value >= 0 else default
-    if isinstance(value, float):
-        try:
-            i = int(value)
-        except (ValueError, OverflowError):
-            return default
-        return i if i >= 0 else default
-    if isinstance(value, str):
-        raw = value.strip().replace("_", "").replace(",", "")
-        if not raw:
-            return default
-        try:
-            i = int(float(raw))
-        except (ValueError, OverflowError):
-            return default
-        return i if i >= 0 else default
-    return default
+    value = data[key]
+    if not isinstance(value, str) or value not in STATUSES:
+        raise ProgramStateError(
+            f"{where}: {key!r} must be one of {STATUSES}, got {value!r}"
+        )
+    return value
 
 
-def _coerce_status(value: object, default: str = "pending") -> str:
-    """Coerce ``value`` to a known status; unknown / non-str → ``default``."""
-    if isinstance(value, str) and value in STATUSES:
-        return value
-    return default
+def _mode_field(
+    data: dict[str, Any], key: str, where: str, *, default: str = "staged"
+) -> str:
+    """Read the mode field; absent/``null`` → ``default``; non-str or unknown raises."""
+    if key not in data or data[key] is None:
+        return default
+    value = data[key]
+    if not isinstance(value, str) or value not in MODES:
+        raise ProgramStateError(f"{where}: {key!r} must be one of {MODES}, got {value!r}")
+    return value
 
 
-def _coerce_mode(value: object, default: str = "staged") -> str:
-    """Coerce ``value`` to a known mode; unknown / non-str → ``default``."""
-    if isinstance(value, str) and value in MODES:
-        return value
-    return default
+def _int_field(data: dict[str, Any], key: str, where: str, *, default: int = 0) -> int:
+    """Read a non-negative int field; absent/``null`` → ``default``; non-int or
+    negative raises (``bool`` is rejected — it is not a valid count)."""
+    if key not in data or data[key] is None:
+        return default
+    value = data[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProgramStateError(
+            f"{where}: {key!r} must be an integer, got {type(value).__name__}"
+        )
+    if value < 0:
+        raise ProgramStateError(f"{where}: {key!r} must be >= 0, got {value}")
+    return value
 
 
-def _coerce_phases(value: object) -> list[str]:
-    """Coerce ``value`` to a list of phase strings; non-list → ``[]``."""
-    if not isinstance(value, list):
+def _phases_field(data: dict[str, Any], key: str, where: str) -> list[str]:
+    """Read a list-of-strings field; absent/``null`` → ``[]``; non-list or a
+    non-str element raises."""
+    if key not in data or data[key] is None:
         return []
-    return [_coerce_str(item) for item in value if item is not None]
+    value = data[key]
+    if not isinstance(value, list):
+        raise ProgramStateError(
+            f"{where}: {key!r} must be a list, got {type(value).__name__}"
+        )
+    out: list[str] = []
+    for i, item in enumerate(value):
+        if not isinstance(item, str):
+            raise ProgramStateError(
+                f"{where}: {key!r}[{i}] must be a string, got {type(item).__name__}"
+            )
+        out.append(item)
+    return out
 
 
-def _coerce_task(data: object) -> TaskNode | None:
-    """Build a :class:`TaskNode` from arbitrary JSON; non-dict → ``None``."""
+def _completion_sha_field(data: dict[str, Any], key: str, where: str) -> dict[str, str]:
+    """Read the stage-id → sha map; absent/``null`` → ``{}``; non-dict or a
+    non-string key/value raises."""
+    if key not in data or data[key] is None:
+        return {}
+    value = data[key]
+    if not isinstance(value, dict):
+        raise ProgramStateError(
+            f"{where}: {key!r} must be an object, got {type(value).__name__}"
+        )
+    out: dict[str, str] = {}
+    for k, v in value.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise ProgramStateError(f"{where}: {key!r} must map string → string")
+        out[k] = v
+    return out
+
+
+def _parse_task(data: object, where: str) -> TaskNode:
+    """Build a :class:`TaskNode` from JSON; non-object or bad field raises."""
     if not isinstance(data, dict):
-        return None
-    summary_raw = data.get("summary")
+        raise ProgramStateError(
+            f"{where}: task must be an object, got {type(data).__name__}"
+        )
     return TaskNode(
-        id=_coerce_str(data.get("id")),
-        title=_coerce_str(data.get("title")),
-        status=_coerce_status(data.get("status")),
-        retry_count=_coerce_int(data.get("retry_count")),
-        pipeline_phases=_coerce_phases(data.get("pipeline_phases")),
-        summary=_coerce_opt_str(summary_raw) if summary_raw is not None else None,
+        id=_str_field(data, "id", where),
+        title=_str_field(data, "title", where),
+        status=_status_field(data, "status", where),
+        retry_count=_int_field(data, "retry_count", where),
+        pipeline_phases=_phases_field(data, "pipeline_phases", where),
+        summary=_opt_str_field(data, "summary", where),
     )
 
 
-def _coerce_stage(data: object) -> StageNode | None:
-    """Build a :class:`StageNode` from arbitrary JSON; non-dict → ``None``."""
+def _parse_stage(data: object, where: str) -> StageNode:
+    """Build a :class:`StageNode` from JSON; non-object or bad field raises."""
     if not isinstance(data, dict):
-        return None
+        raise ProgramStateError(
+            f"{where}: stage must be an object, got {type(data).__name__}"
+        )
     raw_tasks = data.get("tasks")
     tasks: list[TaskNode] = []
-    if isinstance(raw_tasks, list):
-        for item in raw_tasks:
-            task = _coerce_task(item)
-            if task is not None:
-                tasks.append(task)
+    if raw_tasks is not None:
+        if not isinstance(raw_tasks, list):
+            raise ProgramStateError(
+                f"{where}: 'tasks' must be a list, got {type(raw_tasks).__name__}"
+            )
+        tasks = [_parse_task(item, f"{where}.tasks[{i}]") for i, item in enumerate(raw_tasks)]
     return StageNode(
-        id=_coerce_str(data.get("id")),
-        title=_coerce_str(data.get("title")),
-        serves=_coerce_str(data.get("serves")),
-        status=_coerce_status(data.get("status")),
-        pipeline_phases=_coerce_phases(data.get("pipeline_phases")),
+        id=_str_field(data, "id", where),
+        title=_str_field(data, "title", where),
+        serves=_str_field(data, "serves", where),
+        status=_status_field(data, "status", where),
+        pipeline_phases=_phases_field(data, "pipeline_phases", where),
         tasks=tasks,
     )
 
 
-def _coerce_completion_sha(value: object) -> dict[str, str]:
-    """Coerce the stage-id → sha map; non-dict / bad entries dropped."""
-    if not isinstance(value, dict):
-        return {}
-    out: dict[str, str] = {}
-    for key, val in value.items():
-        if isinstance(key, str) and isinstance(val, str):
-            out[key] = val
-    return out
+def _parse_program(data: dict[str, Any]) -> Program:
+    """Build a :class:`Program` from a JSON object, validating every field.
 
-
-def _coerce_program(data: dict[str, Any]) -> Program:
-    """Build a :class:`Program` from arbitrary JSON, coercing every field. Never
-    raises on bad types — unknown keys dropped, bad values degrade to defaults."""
+    Raises :class:`ProgramStateError` on the first invalid field — never coerces
+    a bad value into a default."""
+    where = "program"
     raw_stages = data.get("stages")
     stages: list[StageNode] = []
-    if isinstance(raw_stages, list):
-        for item in raw_stages:
-            stage = _coerce_stage(item)
-            if stage is not None:
-                stages.append(stage)
+    if raw_stages is not None:
+        if not isinstance(raw_stages, list):
+            raise ProgramStateError(
+                f"{where}: 'stages' must be a list, got {type(raw_stages).__name__}"
+            )
+        stages = [_parse_stage(item, f"{where}.stages[{i}]") for i, item in enumerate(raw_stages)]
     return Program(
-        feature=_coerce_str(data.get("feature")),
-        mode=_coerce_mode(data.get("mode")),
-        created_at=_coerce_str(data.get("created_at")) or _now(),
-        source_sha=_coerce_opt_str(data.get("source_sha")),
+        feature=_str_field(data, "feature", where),
+        mode=_mode_field(data, "mode", where),
+        created_at=_str_field(data, "created_at", where) or _now(),
+        source_sha=_opt_str_field(data, "source_sha", where),
         stages=stages,
-        stage_completion_sha=_coerce_completion_sha(data.get("stage_completion_sha")),
-        current_stage_id=_coerce_opt_str(data.get("current_stage_id")),
+        stage_completion_sha=_completion_sha_field(data, "stage_completion_sha", where),
+        current_stage_id=_opt_str_field(data, "current_stage_id", where),
     )
 
 
@@ -459,16 +523,13 @@ def stage_digest(program: Program, stage_id: str) -> str:
     body: list[str] = []
     for task in stage.tasks[:4]:  # header + ≤4 tasks == ≤5 lines
         ttitle = task.title or task.id or "(untitled task)"
-        if task.summary:
-            detail = " ".join(task.summary.split())
-        else:
-            detail = task.status
+        detail = " ".join(task.summary.split()) if task.summary else task.status
         body.append(f"  - {ttitle}: {detail}")
 
     lines = [header, *body]
     if len(stage.tasks) > 4:
         # Replace the 5th line with an overflow marker to stay ≤5 lines.
-        lines = lines[:4] + [f"  - … (+{len(stage.tasks) - 3} more tasks)"]
+        lines = [*lines[:4], f"  - … (+{len(stage.tasks) - 3} more tasks)"]
     return "\n".join(lines[:5])
 
 
@@ -485,31 +546,36 @@ def mark_task(
     """Set ``status`` (and optionally ``summary``) on a task; return ``program``.
 
     Mutates in place and returns the same object (caller persists via
-    :func:`write_program`). An unknown stage/task is a no-op. An invalid status
-    leaves the existing status untouched. A ``summary`` of ``None`` leaves any
+    :func:`write_program`). Fails loud: an unknown ``stage_id`` / ``task_id``
+    raises :class:`ValueError`, and an invalid ``status`` raises
+    :class:`ValueError` — silent no-ops would let the driver believe a state
+    transition happened when it did not. A ``summary`` of ``None`` leaves any
     existing summary in place; pass an empty string to clear it.
     """
+    if status not in STATUSES:
+        raise ValueError(f"invalid status {status!r}; must be one of {STATUSES}")
     stage = _find_stage(program, stage_id)
     if stage is None:
-        return program
+        raise ValueError(f"unknown stage id {stage_id!r}")
     task = _find_task(stage, task_id)
     if task is None:
-        return program
-    if status in STATUSES:
-        task.status = status
+        raise ValueError(f"unknown task id {task_id!r} in stage {stage_id!r}")
+    task.status = status
     if summary is not None:
         task.summary = summary
     return program
 
 
 def mark_stage(program: Program, stage_id: str, status: str) -> Program:
-    """Set a stage's ``status``; return ``program``. Unknown stage / invalid
-    status is a no-op. Mutates in place (caller persists)."""
+    """Set a stage's ``status``; return ``program``. Mutates in place (caller
+    persists). Fails loud: an unknown ``stage_id`` or an invalid ``status``
+    raises :class:`ValueError` rather than silently no-op'ing."""
+    if status not in STATUSES:
+        raise ValueError(f"invalid status {status!r}; must be one of {STATUSES}")
     stage = _find_stage(program, stage_id)
     if stage is None:
-        return program
-    if status in STATUSES:
-        stage.status = status
+        raise ValueError(f"unknown stage id {stage_id!r}")
+    stage.status = status
     return program
 
 
@@ -517,23 +583,31 @@ def bump_retry(program: Program, stage_id: str, task_id: str) -> Program:
     """Increment a task's ``retry_count`` (monotonic); return ``program``.
 
     Retry count only ever increases — a corrupt negative value is normalised to
-    0 before the increment. Unknown stage/task is a no-op. Mutates in place.
+    0 before the increment. Fails loud: an unknown ``stage_id`` / ``task_id``
+    raises :class:`ValueError`. Mutates in place.
     """
     stage = _find_stage(program, stage_id)
     if stage is None:
-        return program
+        raise ValueError(f"unknown stage id {stage_id!r}")
     task = _find_task(stage, task_id)
     if task is None:
-        return program
+        raise ValueError(f"unknown task id {task_id!r} in stage {stage_id!r}")
     current = task.retry_count if isinstance(task.retry_count, int) and task.retry_count >= 0 else 0
     task.retry_count = current + 1
     return program
 
 
 def snapshot_stage_sha(program: Program, stage_id: str, sha: str) -> Program:
-    """Record the git ``sha`` captured when ``stage_id`` completed; return
-    ``program``. Records the map entry even for an unknown stage id (the sha
-    map is keyed independently of the stages list). Mutates in place."""
+    """Record the git ``sha`` captured for ``stage_id``; return ``program``.
+
+    Fails loud: ``stage_id`` MUST name a stage present in the program — an
+    unknown stage id raises :class:`ValueError` (the sha map must not accumulate
+    keys for stages that do not exist). Mutates in place; caller persists.
+    """
+    if _find_stage(program, stage_id) is None:
+        raise ValueError(
+            f"unknown stage id {stage_id!r}; cannot snapshot sha for a stage not in the program"
+        )
     program.stage_completion_sha[stage_id] = sha
     return program
 
@@ -568,6 +642,7 @@ __all__ = [
     "STATUSES",
     "Program",
     "ProgramMode",
+    "ProgramStateError",
     "StageNode",
     "StageStatus",
     "TaskNode",
