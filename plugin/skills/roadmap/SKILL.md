@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: "Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, \"show the roadmap\", \"what's been built\", \"token usage report\". Prints a table of task | llm | status | tokens | $ | commit, synthesized from usage.jsonl and git log. Zero LLM calls (default table; --gaps dispatches bounded subagents)."
+description: "Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, \"show the roadmap\", \"what's been built\", \"token usage report\". Prints a table of task | llm | status | tokens | $ | commit, synthesized from usage.jsonl and git log. Zero LLM calls (default table; --gaps dispatches bounded subagents). Also handles forward planning (PRD → staged/whole-product program) and --setup brownfield reconciliation."
 ---
 
 # roadmap
@@ -65,6 +65,101 @@ By status: retried=1, shipped=5
 
 - Make any LLM calls. The status table is pure aggregation.
 - Modify `features.md`, `usage.jsonl`, or git history. Read-only synthesis.
+
+---
+
+## FORWARD PLAN mode (PRD present)
+
+When `PRD.md` exists and no `program.json` is on disk, `/renmark:roadmap` can
+derive and persist a staged execution program. This is the entry point for
+`staged` and `whole-product` builds.
+
+**Orchestrator-visible output is bounded (G3).** The PRD body NEVER enters the
+orchestrator context. A **bounded subagent** (G11) reads `PRD.md` in its own
+isolated context and returns only:
+
+- an ordered `stage → task` sequence (machine-readable list, ≤5 lines of prose)
+- the resolved program mode (`staged` | `whole-product`)
+
+The orchestrator passes this sequence to `renmark.program.write_program(repo,
+program)`, which persists `.renmark/state/program.json` (runtime, gitignored)
+and `.renmark/roadmap/program.md` (committed checklist). No PRD content is
+retained in orchestrator context after this step (REQ-5 / G11).
+
+**One human approval gate (REQ-18)** fires before any execution: set
+`human_review_required` in `lifecycle.json` with `human_review_for` naming the
+derived program, surface a summary table to the user, and halt. Resume only
+after `/renmark:approve` clears the gate. This gate is non-negotiable — the
+orchestrator MUST NOT proceed to execution with an unapproved program.
+
+Shared contracts to apply (read by path, never pasted inline):
+
+- `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md` — before deriving a
+  custom stage sequence, confirm no existing plan covers it.
+- `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` — governs the
+  subagent's output discipline.
+
+### Do not (forward plan mode)
+
+- Read `PRD.md` inline in the orchestrator — always dispatch the bounded subagent.
+- Write `PRD.md` or any plan file — forward plan mode is read + derive + persist only.
+- Skip the REQ-18 approval gate before execution.
+
+---
+
+## `--setup` BROWNFIELD RECONCILIATION
+
+`/renmark:roadmap --setup` is for projects where work is already partly done.
+It combines forward planning with a "what is already built" signal to produce an
+accurate current-position view.
+
+### Flow
+
+```
+/renmark:roadmap --setup
+  1. Forward-plan subagent: derive stage/task sequence from PRD.md (as above,
+     bounded G11 — PRD body stays in subagent context only).
+  2. Built-signal subagent: reads .renmark/memory/project-map.md + git history
+     + existing --gaps ALIGN logic in its own context; returns a structured
+     built_signal dict: {"built_reqs":[REQ-n…],"partial_reqs":[…],"built_components":[…]}.
+     The subagent's raw output (source scan, git log) stays in its context; only
+     the structured dict crosses the boundary (REQ-5 / G11).
+  3. Orchestrator calls renmark.roadmap.reconcile_setup(repo, built_signal)
+     which maps stage/task statuses and persists program.json.
+  4. Staleness check: if renmark.roadmap.program_map_is_stale(repo) returns
+     True, HALT and direct the user to run /renmark:init before proceeding
+     (stale project-map.md makes the built-signal unreliable).
+  5. Render: print renmark.roadmap.render_program_table(repo) — the bounded
+     position line (stage X/Y · task done/total) plus the per-stage status grid,
+     highlighting stages/tasks still needing work.
+```
+
+### Do not (`--setup`)
+
+- Load project-map.md, git log, or source-scan output into orchestrator context
+  — route to the bounded built-signal subagent (REQ-5 / G11).
+- Proceed past the staleness check — a stale project-map.md produces an
+  unreliable built signal; `/renmark:init` must run first.
+- Skip the REQ-18 approval gate that applies after program derivation (same rule
+  as forward plan mode above).
+
+---
+
+## IN-FLIGHT RENDER (program.json present)
+
+When `program.json` already exists on disk, `/renmark:roadmap` (with no flags)
+shows the current program position **in addition to** the retrospective usage
+table. Call `renmark.roadmap.render_program_table(repo)` and surface its output
+as a bounded position block (G3): the mode line (`staged` | `whole-product`),
+the position string from `renmark.program.position(program)`, and the per-stage
+status grid. This is zero-LLM, zero-network — purely deterministic read from
+`program.json`.
+
+If `program.json` is absent, skip this block silently (the function returns a
+friendly string; surface it only if the user explicitly asked for program
+status). If `program.json` is corrupt, `render_program_table` propagates
+`program.ProgramStateError` — surface the error message and direct the user to
+`/renmark:debug`.
 
 ---
 

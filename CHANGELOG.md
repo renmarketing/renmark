@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-14] — roadmap-staged-planner wave 3: skill wiring (tasks 7–10)
+**Request:** Wire the staged planner into the user-facing skills.
+**Built (additive SKILL.md edits, +170 lines, plugin lint clean):**
+- `plugin/skills/roadmap/SKILL.md` — forward plan mode (PRD→program via bounded subagent, orchestrator never reads PRD body), `--setup` brownfield reconciliation (halt to `/renmark:init` when project-map stale), in-flight render via `render_program_table`. Existing retrospective table + `--gaps` unchanged.
+- `plugin/skills/resume/SKILL.md` — step 1.85 surfaces an in-flight staged program (`read_program` + `position`, zero-LLM, bounded).
+- `plugin/skills/start/SKILL.md` — feature-planner offered branch (greenfield whole-program planning); default adaptive routing intact.
+- `plugin/skills/feature/SKILL.md` — staged mode (multi-stage decomposition via the program driver); single dispatch gate preserved (feature owns it), REQ-12 hard gates intact.
+**Files changed:**
+- `plugin/skills/{roadmap,resume,start,feature}/SKILL.md`
+**Do not change:**
+- All four edits are ADDITIVE — the existing default flows (retrospective roadmap, `--gaps`, single-feature pipeline, adaptive start routing) must stay the defaults; staged/forward/feature-planner are offered branches.
+- feature stays single-dispatch-gate; staged mode must not add a second approval gate.
+
 ## [2026-06-14] — roadmap-staged-planner wave 2: test suite (tasks 4–6)
 **Request:** Tests for the program model, driver, and roadmap staged modes — including the task-1 hardening and the binding next-stage-snapshot semantics.
 **Built (codex, 32 tests, all green):**
