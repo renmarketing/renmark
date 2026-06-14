@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-14] — roadmap-staged-planner wave 1: program driver (task 2)
+**Request:** Build the deterministic stage-sequencing state machine above the single-item loop.
+**Built:** `renmark/program_driver.py` — `next_stage`, `StopReason` (str-Enum) + `evaluate_stop` (reads ONLY structured fields, never LLM-interpreted text), `advance_on_success`, `drift_warning`, `driver_status`, `is_hard_stop`/`HARD_STOPS`. Stop severity order (first match wins): RETRY_EXHAUSTED > PLAN_BLOCK > PRD_DRIFT > CODEREVIEW_CRITICAL > VERIFY_FAILED > AWAITING_APPROVAL > PAUSED. PAUSED + AWAITING_APPROVAL are NOT hard stops. Independently probed in a real git tmp repo: ruff/mypy clean, full suite 780 passed.
+**Files changed:**
+- `renmark/program_driver.py` — new
+**Do not change:**
+- `advance_on_success` snapshots the **NEXT** stage's sha keyed by that next stage (the drift baseline the next stage is checked against); it must NOT snapshot the completed stage; the last stage snapshots nothing. Owner decision 2026-06-13 — verified by probe.
+- `evaluate_stop` reads structured fields only (`completion_state`/`validation_status`, etc.) — never infer a pass/fail from prose.
+- State persisted via `program.write_program` BEFORE returning (resumable).
+
 ## [2026-06-13] — project scope: roadmap-staged-planner (brainstorm-complete)
 **Request:** Enhance `/renmark:roadmap` into a PRD-anchored staged program planner that, after one approval, semi-autonomously drives a sequence of stages→tasks through the existing pipeline (loop + backlog), surfacing live progress and per-task summaries. Owner principle: "spend time on the beginning (PRD + roadmap), then don't deviate."
 **Built:** Spec only (no code yet) — `.renmark/specs/2026-06-13-roadmap-staged-planner.spec.md`. Confirmed reuse map (loop/backlog/orchestrate/verify/approve/roadmap) + new pieces (program.json/program.md data model, stage-to-stage driver, entry-point divergence, per-stage digest). Probe confirmed renmark has NO forward PRD→program derivation today.
