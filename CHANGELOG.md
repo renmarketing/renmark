@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-14] — roadmap-staged-planner wave 2: test suite (tasks 4–6)
+**Request:** Tests for the program model, driver, and roadmap staged modes — including the task-1 hardening and the binding next-stage-snapshot semantics.
+**Built (codex, 32 tests, all green):**
+- `tests/test_program.py` (14) — round-trip/render/position/mutators/stage_digest, plus hardening: empty `{}` valid, corrupt existing file raises `ProgramStateError`, mutators raise `ValueError` on unknown ids / invalid status.
+- `tests/test_program_driver.py` (13) — `next_stage` skip/resume/none, `evaluate_stop` structured-field-only mapping (incl. PAUSED/AWAITING not hard), `advance_on_success` asserts `stage_completion_sha == {"<next>": sha}` (keyed to NEXT stage, not completed) + persist-before-return, `drift_warning`.
+- `tests/test_roadmap_staged.py` (5) — `render_program_table`, `reconcile_setup`, `program_map_is_stale`; existing retrospective table asserted intact.
+Full suite 812 passed (780→812), ruff clean; tests excluded from mypy by project config.
+**Files changed:**
+- `tests/test_program.py`, `tests/test_program_driver.py`, `tests/test_roadmap_staged.py` — new
+**Do not change:**
+- The `advance_on_success` test pins next-stage sha keying — do not relax it; it guards the owner decision against regression.
+- Hardening tests pin `ProgramStateError`-on-corrupt + `ValueError`-on-bad-mutator-input.
+
 ## [2026-06-14] — roadmap-staged-planner wave 1: roadmap staged modes (task 3)
 **Request:** Add forward staged-program rendering + brownfield reconciliation to roadmap without regressing the existing retrospective table / --gaps.
 **Built:** `renmark/roadmap.py` — `render_program_table` (zero-LLM in-flight position; absent→friendly string; corrupt program.json propagates `ProgramStateError` rather than masking it), `reconcile_setup(repo, built_signal)` (maps `built_reqs`/`partial_reqs`/`built_components` onto stage/task statuses; persists), `program_map_is_stale` (parses init's `<!-- Last refreshed: … @ <sha> -->` header vs git HEAD). Existing `build_rows`/`render_table`/`--gaps` paths untouched. ruff/mypy clean; `pytest -k roadmap` 10 passed; full suite 780.
