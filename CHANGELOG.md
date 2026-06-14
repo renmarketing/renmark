@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-14] — roadmap-staged-planner wave 1: roadmap staged modes (task 3)
+**Request:** Add forward staged-program rendering + brownfield reconciliation to roadmap without regressing the existing retrospective table / --gaps.
+**Built:** `renmark/roadmap.py` — `render_program_table` (zero-LLM in-flight position; absent→friendly string; corrupt program.json propagates `ProgramStateError` rather than masking it), `reconcile_setup(repo, built_signal)` (maps `built_reqs`/`partial_reqs`/`built_components` onto stage/task statuses; persists), `program_map_is_stale` (parses init's `<!-- Last refreshed: … @ <sha> -->` header vs git HEAD). Existing `build_rows`/`render_table`/`--gaps` paths untouched. ruff/mypy clean; `pytest -k roadmap` 10 passed; full suite 780.
+**Files changed:**
+- `renmark/roadmap.py` — added 3 functions, existing paths intact
+**Do not change:**
+- The retrospective table + `--gaps` paths stay as-is (do not regress).
+- `render_program_table`/`reconcile_setup` must NOT swallow `ProgramStateError` — corrupt resumable state surfaces loudly; only the absent (None) case yields the friendly "no in-flight program" string.
+- `reconcile_setup` operates on the structured `built_signal` dict only — never reads source code or the PRD body (REQ-5/G11).
+
 ## [2026-06-14] — roadmap-staged-planner wave 1: program driver (task 2)
 **Request:** Build the deterministic stage-sequencing state machine above the single-item loop.
 **Built:** `renmark/program_driver.py` — `next_stage`, `StopReason` (str-Enum) + `evaluate_stop` (reads ONLY structured fields, never LLM-interpreted text), `advance_on_success`, `drift_warning`, `driver_status`, `is_hard_stop`/`HARD_STOPS`. Stop severity order (first match wins): RETRY_EXHAUSTED > PLAN_BLOCK > PRD_DRIFT > CODEREVIEW_CRITICAL > VERIFY_FAILED > AWAITING_APPROVAL > PAUSED. PAUSED + AWAITING_APPROVAL are NOT hard stops. Independently probed in a real git tmp repo: ruff/mypy clean, full suite 780 passed.
