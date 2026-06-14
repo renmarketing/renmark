@@ -102,11 +102,21 @@ Waves: (1) data model → (2) driver + roadmap modes → (3) tests → (4) skill
     `prd_drift` (ALIGN verdict == drift). Budget/max-iter/usage-limit map to a
     distinct `paused` disposition (resumable, NO approval needed) — NOT a stop.
     REQ-12 gates (merge/release/destructive) map to `awaiting_approval`.
-  - `advance_on_success(program, stage_id, repo)` — mark stage done, snapshot
-    next stage's `stage_completion_sha` (current git sha) before it runs, persist
+  - `advance_on_success(program, stage_id, repo)` — mark the just-completed
+    `stage_id` done, then **snapshot the NEXT stage's `stage_completion_sha`
+    (current git sha) keyed by that NEXT stage's id, BEFORE it runs**, and persist
     via `program.write_program` BEFORE returning (Temporal write-state-before-return).
+    OWNER DECISION (2026-06-13, binding): the sha snapshot is the baseline the
+    NEXT stage will be checked against for plan-time drift — so it MUST be keyed
+    to the next stage, NOT the completed stage. Do NOT snapshot the completed
+    stage. If a record of "tree sha when stage X finished" is also wanted, add a
+    SEPARATE explicitly-named historical field (e.g. `stage_finished_sha`) —
+    never overload `stage_completion_sha` for it. (An earlier executor pass
+    deviated here; this guidance overrides that deviation.)
+    NOTE: `program.snapshot_stage_sha` now RAISES `ValueError` on an unknown
+    stage id (task-1 hardening) — only snapshot a stage that exists in the program.
   - `drift_warning(program, stage_id, current_sha) -> str | None` — warn when the
-    snapshot sha differs from current (plan-time drift guard).
+    snapshot sha for `stage_id` differs from `current_sha` (plan-time drift guard).
   - A bounded `driver_status(program) -> str` (≤5 lines) the orchestrator reads to
     decide the next dispatch. No work happens here that needs generated-code
     context — the SKILL layer dispatches orchestrate/verify per stage and feeds
@@ -161,9 +171,16 @@ Waves: (1) data model → (2) driver + roadmap modes → (3) tests → (4) skill
   returns the bounded one-line form; `render_markdown` produces ticked checkboxes
   matching status and inlines task summaries; mutators (`mark_task`, `mark_stage`,
   `bump_retry` monotonic, `snapshot_stage_sha`) update state correctly;
-  `stage_digest` is ≤5 lines; `read_program` returns None when no program file
-  exists. Use a tmp_path repo fixture; assert program.json lands under
-  `.renmark/state/` and program.md under `.renmark/roadmap/`.
+  `stage_digest` is ≤5 lines. Use a tmp_path repo fixture; assert program.json
+  lands under `.renmark/state/` and program.md under `.renmark/roadmap/`.
+  **Hardened semantics (task-1 hardening — MUST be covered):**
+  - `read_program` returns `None` ONLY when program.json is ABSENT; an existing
+    file that is invalid JSON, a non-object, or carries an invalid status/mode or
+    a wrong-typed field RAISES `program.ProgramStateError` (use
+    `pytest.raises`). An empty object `{}` is VALID (not corrupt).
+  - `mark_task` / `mark_stage` / `bump_retry` / `snapshot_stage_sha` RAISE
+    `ValueError` on an unknown stage id, unknown task id, or invalid status —
+    they do NOT silently no-op. Valid calls still mutate + return the program.
 
 ### Task 5: tests — program driver
 - **mode:** A
