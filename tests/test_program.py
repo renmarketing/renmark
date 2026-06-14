@@ -238,3 +238,62 @@ def test_stage_digest_is_bounded_to_five_lines() -> None:
     assert "Three: blocked" in lines[3]
     assert lines[4] == "  - … (+2 more tasks)"
 
+
+# ── Hardening regressions (codereview 2026-06-14) ───────────────────────────────
+
+
+def test_read_program_raises_on_invalid_utf8(repo: Path) -> None:
+    """An existing file with invalid UTF-8 bytes is corruption → ProgramStateError,
+    NOT a leaked UnicodeDecodeError and NOT a silent None."""
+    path = program.program_json_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\xff\xfe\x00 not utf-8 \xff")
+    with pytest.raises(program.ProgramStateError, match="UTF-8"):
+        program.read_program(repo)
+
+
+def test_read_program_raises_on_dangling_current_stage_id(repo: Path) -> None:
+    """current_stage_id that names no real stage is corrupt state → raise."""
+    path = program.program_json_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "feature": "f",
+                "stages": [{"id": "s1", "title": "S", "serves": "REQ-1", "tasks": []}],
+                "current_stage_id": "ghost",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(program.ProgramStateError, match="current_stage_id"):
+        program.read_program(repo)
+
+
+def test_read_program_raises_on_dangling_completion_sha(repo: Path) -> None:
+    """stage_completion_sha keyed to a non-existent stage is corrupt → raise."""
+    path = program.program_json_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "feature": "f",
+                "stages": [{"id": "s1", "title": "S", "serves": "REQ-1", "tasks": []}],
+                "stage_completion_sha": {"ghost": "abc123"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(program.ProgramStateError, match="stage_completion_sha"):
+        program.read_program(repo)
+
+
+def test_write_program_leaves_no_temp_litter(repo: Path) -> None:
+    """Atomic durable write cleans up after itself — no .program-*.tmp remains —
+    and the round-trip still works."""
+    program.write_program(repo, _sample_program())
+    state_dir = program.program_json_path(repo).parent
+    leftovers = list(state_dir.glob(".program-*.tmp"))
+    assert leftovers == [], f"temp litter left behind: {leftovers}"
+    assert program.read_program(repo) is not None
+

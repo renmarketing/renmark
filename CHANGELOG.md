@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-14] — roadmap-staged-planner: codereview fixes (5 Major)
+**Request:** Address all 5 Major findings from the codex review of HEAD~7..HEAD (0 Critical). Applied directly (not via a fresh plan) — small, well-scoped fixes with full context — each guarded by a new regression test.
+**Built:**
+- `renmark/program.py` — (1) `read_program` now wraps `UnicodeDecodeError` → `ProgramStateError` (a non-UTF8 file is corruption, not "absent"); (2) `write_program` uses a UNIQUE `mkstemp` temp + `flush`+`fsync` before `os.replace` (durable, no shared-`.tmp` clobber), cleaning up on failure; (3) `_parse_program` now raises `ProgramStateError` on a `current_stage_id` or `stage_completion_sha` key that references no real stage (dangling-ref corruption).
+- `renmark/program_driver.py` — (4) `next_stage` resumes an `in_progress` stage first, and HALTS (returns None) at an earlier `blocked`/`partial` stage instead of skipping past it to run a later stage out of order.
+- `renmark/roadmap.py` — (5) `reconcile_setup` recomputes `current_stage_id` to the first non-`done` stage (or None) so `position()` reports correctly after `--setup`.
+- Tests: +8 regressions (invalid-UTF8, dangling current_stage_id, dangling completion_sha, no-temp-litter; next_stage halt-at-blocked/partial + in_progress priority; reconcile current_stage_id repoint). Full suite 812 → 820.
+**Files changed:**
+- `renmark/program.py`, `renmark/program_driver.py`, `renmark/roadmap.py`, `tests/test_program.py`, `tests/test_program_driver.py`, `tests/test_roadmap_staged.py`
+**Do not change:**
+- `read_program` returns None ONLY for an absent file; ALL corruption (bad bytes, bad JSON, bad schema, dangling refs) raises `ProgramStateError`.
+- `next_stage` must not skip past an earlier `blocked`/`partial` stage.
+- `reconcile_setup` must leave `current_stage_id` pointing at the first unfinished stage (or None).
+
 ## [2026-06-14] — roadmap-staged-planner wave 3: skill wiring (tasks 7–10)
 **Request:** Wire the staged planner into the user-facing skills.
 **Built (additive SKILL.md edits, +170 lines, plugin lint clean):**

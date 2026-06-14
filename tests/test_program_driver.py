@@ -151,3 +151,35 @@ def test_drift_warning_fires_on_sha_mismatch_and_is_silent_on_match() -> None:
     assert "build" in warning
     assert "abcdef12" in warning
     assert "fedcba09" in warning
+
+
+# ── next_stage ordering regressions (codereview 2026-06-14) ─────────────────────
+
+
+def test_next_stage_halts_at_earlier_blocked_stage() -> None:
+    """A blocked earlier stage must NOT be skipped past to run a later stage —
+    selection halts (None) until the attention state is resolved."""
+    program = make_program(
+        StageNode(id="plan", status="done"),
+        StageNode(id="build", status="blocked"),
+        StageNode(id="ship", status="pending"),
+    )
+    assert next_stage(program) is None
+
+
+def test_next_stage_halts_at_earlier_partial_stage() -> None:
+    program = make_program(
+        StageNode(id="plan", status="done"),
+        StageNode(id="build", status="partial"),
+        StageNode(id="ship", status="pending"),
+    )
+    assert next_stage(program) is None
+
+
+def test_next_stage_prioritizes_in_progress_over_earlier_pending() -> None:
+    """Resuming active work outranks starting an earlier not-yet-run stage."""
+    program = make_program(
+        StageNode(id="plan", status="pending"),
+        StageNode(id="build", status="in_progress"),
+    )
+    assert next_stage(program) == program.stages[1]

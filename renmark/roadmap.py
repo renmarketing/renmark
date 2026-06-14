@@ -394,6 +394,14 @@ def reconcile_setup(repo: str | Path, built_signal: dict[str, Any]) -> program.P
         for task in stage.tasks:
             program.mark_task(prog, stage.id, task.id, task_status)
 
+    # Re-point current_stage_id at the first stage still needing work (or None
+    # when everything reconciled to done). Without this, a freshly reconciled
+    # setup program could still point at None or an already-done stage and
+    # position() would report the wrong "where are we".
+    prog.current_stage_id = next(
+        (stage.id for stage in prog.stages if stage.status != "done"), None
+    )
+
     program.write_program(repo, prog)
     return prog
 

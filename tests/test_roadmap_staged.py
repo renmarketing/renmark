@@ -133,6 +133,31 @@ def test_reconcile_setup_maps_req_matches_and_persists(tmp_path: Path) -> None:
     assert [task.status for task in persisted.stages[2].tasks] == ["needed"]
 
 
+def test_reconcile_setup_repoints_current_stage_id(tmp_path: Path) -> None:
+    """After reconciliation, current_stage_id points at the first non-done stage
+    (codereview 2026-06-14) so position() reports the right "where are we"."""
+    state = program.Program(
+        feature="Brownfield",
+        mode="setup",
+        current_stage_id=None,
+        stages=[
+            program.StageNode(id="stage-1", title="A", serves="REQ-1", status="pending"),
+            program.StageNode(id="stage-2", title="B", serves="REQ-2", status="pending"),
+        ],
+    )
+    program.write_program(tmp_path, state)
+
+    # REQ-1 built → stage-1 done; first unfinished is stage-2.
+    updated = roadmap.reconcile_setup(tmp_path, {"built_reqs": ["REQ-1"]})
+    assert updated.current_stage_id == "stage-2"
+    assert program.read_program(tmp_path).current_stage_id == "stage-2"
+
+    # Everything built → no unfinished stage → current_stage_id is None.
+    all_done = roadmap.reconcile_setup(tmp_path, {"built_reqs": ["REQ-1", "REQ-2"]})
+    assert all_done.current_stage_id is None
+    assert program.read_program(tmp_path).current_stage_id is None
+
+
 def test_program_map_is_stale_for_missing_old_and_fresh_maps(
     tmp_path: Path, monkeypatch
 ) -> None:

@@ -37,8 +37,10 @@ Design contract (mirrors ``renmark/loop.py`` + ``renmark/lifecycle.py``):
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -190,6 +192,11 @@ def read_program(repo: Path | str) -> Program | None:
         raw = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ProgramStateError(f"program.json exists but is unreadable: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        # Invalid UTF-8 bytes in an existing file are corruption, not "absent".
+        # UnicodeDecodeError is a ValueError (not an OSError), so it must be
+        # caught explicitly or it would leak past read_program uncaught.
+        raise ProgramStateError(f"program.json is not valid UTF-8: {exc}") from exc
     try:
         data = json.loads(raw)
     except ValueError as exc:
@@ -218,9 +225,25 @@ def write_program(repo: Path | str, program: Program) -> Path:
     json_path.parent.mkdir(parents=True, exist_ok=True)
 
     payload = program.to_json()
-    tmp = json_path.with_suffix(json_path.suffix + ".tmp")
-    tmp.write_text(payload, encoding="utf-8")
-    os.replace(tmp, json_path)  # atomic on the same filesystem
+    # Atomic durable write: a UNIQUE temp file in the SAME dir (so os.replace is
+    # a rename, not a cross-device copy), fsync'd before the swap so a crash
+    # right after replace cannot surface a torn file. A unique name (not a shared
+    # ``.tmp``) also keeps two writers from clobbering each other's temp —
+    # defense-in-depth; the program is single-writer by design.
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(json_path.parent), prefix=".program-", suffix=".json.tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, json_path)  # atomic on the same filesystem
+    except OSError:
+        # Never leave a temp file behind on failure.
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
 
     # Re-render the committed checklist from the SAME state. Best-effort — the
     # JSON is already durable; a markdown write failure must not undo it.
@@ -401,14 +424,30 @@ def _parse_program(data: dict[str, Any]) -> Program:
                 f"{where}: 'stages' must be a list, got {type(raw_stages).__name__}"
             )
         stages = [_parse_stage(item, f"{where}.stages[{i}]") for i, item in enumerate(raw_stages)]
+    # Referential integrity: current_stage_id and every stage_completion_sha key
+    # MUST name a real stage. A dangling reference is corrupt state — failing
+    # loud here is what keeps position()/the driver from silently misreporting
+    # against a stale pointer (mirrors snapshot_stage_sha's mutator-side guard).
+    stage_ids = {stage.id for stage in stages}
+    current_stage_id = _opt_str_field(data, "current_stage_id", where)
+    if current_stage_id and current_stage_id not in stage_ids:
+        raise ProgramStateError(
+            f"{where}: current_stage_id {current_stage_id!r} does not match any stage id"
+        )
+    completion_sha = _completion_sha_field(data, "stage_completion_sha", where)
+    dangling = sorted(k for k in completion_sha if k not in stage_ids)
+    if dangling:
+        raise ProgramStateError(
+            f"{where}: stage_completion_sha references unknown stage id(s) {dangling}"
+        )
     return Program(
         feature=_str_field(data, "feature", where),
         mode=_mode_field(data, "mode", where),
         created_at=_str_field(data, "created_at", where) or _now(),
         source_sha=_opt_str_field(data, "source_sha", where),
         stages=stages,
-        stage_completion_sha=_completion_sha_field(data, "stage_completion_sha", where),
-        current_stage_id=_opt_str_field(data, "current_stage_id", where),
+        stage_completion_sha=completion_sha,
+        current_stage_id=current_stage_id,
     )
 
 

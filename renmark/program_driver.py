@@ -164,20 +164,35 @@ def is_hard_stop(reason: StopReason | None) -> bool:
 
 
 def next_stage(program: Program) -> StageNode | None:
-    """Return the next RUNNABLE stage in declared order, or ``None`` when none.
+    """Return the next RUNNABLE stage, or ``None`` when none should run now.
 
-    Walks ``program.stages`` in order and returns the first whose status is
-    ``pending`` / ``needed`` (not yet run) or ``in_progress`` (resume an
-    interrupted stage). ``done`` stages are skipped. ``partial`` / ``blocked``
-    stages are NOT auto-selected — they are terminal-attention states the SKILL
-    must resolve (re-plan / approve) before the roadmap proceeds, so they neither
-    advance nor mask later runnable stages here; selection simply skips past them
-    to the next genuinely runnable stage. ``None`` means the roadmap has no more
-    runnable stages (all ``done`` or all blocked/partial).
+    Selection policy (a roadmap is a SEQUENTIAL program, so order matters):
+
+    1. **Resume active work first.** If any stage is ``in_progress``, return it —
+       resuming an interrupted stage outranks starting a new one.
+    2. **Otherwise walk in declared order and HALT at an attention state.** Skip
+       ``done`` stages; return the first ``pending`` / ``needed`` stage. But if an
+       earlier stage is ``blocked`` / ``partial`` (terminal-attention — the SKILL
+       must re-plan / approve before the roadmap proceeds), return ``None`` rather
+       than skipping past it: a blocked earlier stage must not be silently jumped
+       so a later stage runs out of order.
+
+    ``None`` therefore means *nothing should auto-run now* — either every stage is
+    ``done``, or the next stage in line needs human attention first.
     """
+    # 1. Resume an actively in-progress stage before starting anything new.
     for stage in program.stages:
-        if stage.status in _RUNNABLE_STATUSES:
+        if stage.status == "in_progress":
             return stage
+    # 2. Walk in order; the first not-yet-run stage is next, but an attention
+    #    state halts progression instead of being skipped.
+    for stage in program.stages:
+        if stage.status == "done":
+            continue
+        if stage.status in ("pending", "needed"):
+            return stage
+        # blocked / partial → attention required before any later stage runs.
+        return None
     return None
 
 
