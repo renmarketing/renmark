@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-14] — fix(handoff): re-render the picker on hand-off continuation turns
+**Request:** "Renmark is not giving me clickable options after an interaction and that should be a rule." Found live: after the `/renmark:init` what's-next picker, the user replied with a clarifying question instead of selecting, and the agent answered with a prose `1./2.` list rather than re-rendering the clickable `AskUserQuestion` picker.
+**Built:** Root cause (debug session 20260614-164412-9580) — `handoff-menu.md` rules 6–9 + `next-steps.md` mandated the clickable picker only at the first turn a skill ends with a question; no rule required re-rendering when the hand-off continues across turns (user replies with a non-selection), so the agent legitimately dropped to prose and the visible-choices guarantee lapsed. Fix strengthens the existing rule-9 hard-guarantee (the range all 21 SKILL citations already point at) with a **continuation clause**, tightens the rule-6 dispatch bullet (a non-selection free-text reply keeps the hand-off OPEN → answer + re-render), and updates the `next-steps.md` rule-9 gloss. Zero renumbering → every citing skill inherits the fix. Suite 822 passed.
+**Files changed:**
+- `plugin/skills/_shared/handoff-menu.md` (rule 6 dispatch bullet + rule 9 continuation clause)
+- `plugin/skills/_shared/next-steps.md` (rule-9 gloss)
+**Do not change:**
+- Keep the rule range cited by skills at "6–9" — the continuation fix lives INSIDE rule 9 precisely to avoid renumbering all 21 SKILL citations. Do not promote it to a "rule 10" without bulk-updating every citation.
+
 ## [2026-06-14] — v0.16.1 — fix: project-map freshness header wedged --setup staleness
 **Request:** Release the stale-map fix found by live-running `/renmark:roadmap --setup`.
 **Built:** Bumped 0.16.0 → 0.16.1 (7 locations, drift clean). Fixes the bug where `renmark.init.write_full_map` preserved a stale `Last refreshed @ <sha>` header on body-unchanged refreshes, so `renmark.roadmap.program_map_is_stale` wedged `True` after any structure-neutral commit and `/renmark:roadmap --setup` could never clear it via `/renmark:init`. `write_full_map` now advances the header whenever the full text differs (body still byte-skipped, still reports `unchanged`). +regression test; suite 822. Found via debug session 20260614-061609-c4c6.

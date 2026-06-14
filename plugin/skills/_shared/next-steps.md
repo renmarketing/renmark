@@ -50,7 +50,9 @@ rules 6–9 verbatim, BY REFERENCE** — do not restate them here:
   (PRIMARY), real `options[]` entries, 4-option cap.
 - **Rule 7** — printed numbered fallback when the picker is unavailable/declined.
 - **Rule 8** — a choice is always required; never auto-proceed.
-- **Rule 9** — visible choices XOR printed fallback, never a bare question.
+- **Rule 9** — visible choices XOR printed fallback, never a bare question; its
+  continuation clause re-renders the picker on every open turn (a clarifying
+  reply is answered, then the picker is shown again — never prose options).
 
 The primary (state-derived) recommendation is always the top-priority option and
 labelled `(Recommended)`.

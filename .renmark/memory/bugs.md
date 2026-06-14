@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-06-14 — Hand-off picker not re-rendered on continuation turns
+
+**Severity:** medium
+**Symptom:** After a renmark hand-off, when the user replies with a clarifying question instead of selecting, the skill answers in prose with an inline numbered list instead of re-rendering the clickable AskUserQuestion picker.
+**Root cause:** handoff-menu.md rules 6-9 + next-steps.md mandate the clickable picker only at the first turn the skill ends with a question; no rule required re-rendering the picker when the hand-off continues across turns (user replies with a non-selection), so the agent legitimately drops to prose and the visible-choices guarantee lapses.
+**Fix:** Added a continuation clause to handoff-menu.md rule 9 (the existing hard-guarantee the 21 SKILL citations already point at) + tightened rule 6 dispatch bullet + updated next-steps.md rule-9 gloss. Zero renumbering, so all citing skills inherit the fix.
+**Lesson:** A non-selection free-text reply to a hand-off (clarifying question/follow-up) keeps the hand-off OPEN: answer it, then re-render the picker in the same turn. An inline 1./2. list in the reply body is NOT a rule-7 fallback.
+
+---
+
 ### 2026-06-14 — roadmap --setup staleness guard unclearable by /renmark:init after non-structural commit
 
 **Severity:** major

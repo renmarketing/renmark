@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-14, bug) **Hand-off picker not re-rendered on continuation turns** — A non-selection free-text reply to a hand-off (clarifying question/follow-up) keeps the hand-off OPEN: answer it, then re-render the picker in the same turn. An inline 1./2. list in the reply body is NOT a rule-7 fallback.
+
 - (2026-06-14, bug) **roadmap --setup staleness guard unclearable by /renmark:init after non-structural commit** — A freshness marker (Last-refreshed @ sha) must advance independently of body-content equality — coupling a staleness check to a sha that only moves on body change creates an unclearable wedge. Also: test fixtures for sha-keyed checks must use VALID HEX (the header regex is [0-9a-fA-F]+).
 
 - (2026-06-14, .renmark/reviews/2026-06-14-cc2beae3572e760c98ba5cb8ef7091129b8f7e59.verification.md) model `verify`: **verify-roadmap-staged-planner** — 6/6 behaviors verified; failed: none; regressions: 1 (loop driver, no overlap); full suite 812 passed

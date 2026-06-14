@@ -100,6 +100,11 @@ contextual:
      is one selection away.
    - On return, dispatch by the chosen option (map the selected label back to its
      `[x]` action); a free-text reply is matched to a number or bracket code.
+     **A free-text reply that maps to NO option — a clarifying question, a
+     follow-up, a request for more detail — is NOT a selection: answer it, then
+     **re-render this picker in the same turn** (rule 9 continuation clause). The
+     hand-off stays open until an actual action is chosen — never reply to a
+     non-selection with a prose / inline list of the options.**
 
 7. **Fallback — printed numbered list.** Used when `AskUserQuestion` is
    unavailable/non-interactive or errors, AND printed as the reference list
@@ -151,6 +156,18 @@ contextual:
    choices — declined, errored, header-only, or no valid selection — print the
    numbered list in the **same turn** before yielding. When in doubt, print the
    fallback: a redundant numbered list is harmless; a choiceless prompt is a bug.
+
+   **Continuation clause (owner rule, 2026-06-14) — the guarantee applies to
+   EVERY turn the hand-off is open, not just the first.** A hand-off is not
+   "done" when `AskUserQuestion` returns — it is done only when the user *selects
+   an action* (or a rule-8 default-forward / REQ-12 resolution fires). When the
+   user instead replies with a clarifying question, a follow-up, or any free text
+   that maps to no surviving option, the hand-off is **still open**: answer them,
+   then in the **same turn re-render the picker** (rule 6) — or the printed
+   fallback (rule 7) if the picker is unavailable. **Never let a continuation turn
+   end in prose options or an inline list** — a `1. … 2. …` written in the reply
+   body is NOT a rule-7 fallback and does not satisfy this guarantee. Re-render
+   the real picker on every open turn until an action is chosen.
 
 ---
 
