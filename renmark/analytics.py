@@ -247,6 +247,66 @@ def record_feature_run(
     )
 
 
+#: ``branch_disposition`` values treated as non-terminal — a closing pass may
+#: still transform them. ``""``/``"open"`` are pre-close; ``"merged"`` is the
+#: legacy non-canonical value finish step 2.5 writes before the disposition is
+#: finalized.
+_NONTERMINAL_DISPOSITIONS: frozenset[str] = frozenset({"", "open", "merged"})
+
+
+def close_feature_disposition(
+    repo: str | Path,
+    *,
+    feature: str,
+    sha: str,
+    disposition: str = "merged-deleted",
+) -> bool:
+    """Transform a feature run's ``branch_disposition`` to a terminal value.
+
+    Rewrites (never appends) the existing ``feature-runs.jsonl`` row(s) matching
+    both ``feature`` and ``sha`` whose ``branch_disposition`` is still
+    non-terminal (``""``, ``"open"``, or the legacy ``"merged"``), setting it to
+    ``disposition``. The whole ledger is rewritten atomically
+    (``tempfile.mkstemp`` + ``os.replace``).
+
+    Returns ``True`` if at least one row changed (ledger rewritten), ``False``
+    otherwise — no matching non-terminal row means a no-op (no append, no
+    rewrite), so this is idempotent and safe to re-run. Never raises; analytics
+    is observational, never load-bearing, so any IO/parse failure returns
+    ``False``.
+    """
+    path = analytics_dir(repo) / FEATURE_RUNS_LEDGER
+    try:
+        rows = read_jsonl(path)
+        changed = False
+        for row in rows:
+            if (
+                row.get("feature") == feature
+                and row.get("sha") == sha
+                and str(row.get("branch_disposition", "")) in _NONTERMINAL_DISPOSITIONS
+            ):
+                row["branch_disposition"] = disposition
+                changed = True
+        if not changed:
+            return False
+        tmp_path: str | None = None
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = "".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows)
+            fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+            os.replace(tmp_path, path)
+            tmp_path = None
+        finally:
+            if tmp_path is not None:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_path)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
 def record_loop_run(
     repo: str | Path,
     *,
@@ -726,6 +786,7 @@ __all__ = [
     "aggregate",
     "analytics_dir",
     "build_health_report",
+    "close_feature_disposition",
     "read_jsonl",
     "record_event",
     "record_feature_run",

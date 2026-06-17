@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-16] — finish-branch-disposition (task 1): analytics close-out helper
+**Request:** /renmark:analytics reports merged/released features as perpetually `open` because finish never closes the disposition row. Add the source helper to fix it.
+**Built:**
+- `renmark/analytics.close_feature_disposition(repo, *, feature, sha, disposition='merged-deleted') -> bool` — transforms the existing non-terminal disposition row (matched on feature AND sha; non-terminal = `''|'open'|'merged'`) to its terminal value **in place** via atomic rewrite (mkstemp + os.replace), never appends.
+- Idempotent no-op (returns False) when already terminal / row absent; non-raising (swallows OSError/TypeError/ValueError) — analytics stays observational.
+**Files changed:**
+- `renmark/analytics.py` — new helper + `__all__` export; `record_feature_run`/`_agg_features` untouched.
+**Do not change:**
+- Must TRANSFORM the row, never append — `_agg_features` counts `branch_disposition` per row, so a second row double-counts (open + merged-deleted).
+- Keep the helper non-raising and idempotent; do not alter `record_feature_run`'s append-only contract.
+
 ## [2026-06-17] — req14-scan: honest read-only claim + final hardening (pivot re-review)
 **Request:** The pivot re-review found the "structural read-only" wording overstated (running `pytest` executes project code → not a sandbox) plus 2 hardening Majors. REQ-14 explicitly authorizes running tests as read-only checks, so behavior is compliant — the claim just needed to be accurate.
 **Built:**
