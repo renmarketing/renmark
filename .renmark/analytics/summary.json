@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-06-14T23:20:02+00:00",
+  "generated_at": "2026-06-17T02:15:52+00:00",
   "source": "local-observed",
   "features": {
-    "started": 8,
-    "completed": 8,
+    "started": 9,
+    "completed": 9,
     "blocked": 0,
     "by_status": {
-      "completed": 8
+      "completed": 9
     },
     "branch_dispositions": {
-      "merged-deleted": 8
+      "merged-deleted": 9
     },
     "shipped_names": [
       "fable-integration",
@@ -19,30 +19,33 @@
       "claude-doc-slimming",
       "doc-slimming-fixes",
       "playwright-browser-control",
-      "roadmap-staged-planner"
+      "roadmap-staged-planner",
+      "req14-scan-proposer"
     ],
     "blocked_names": []
   },
   "tasks": {
-    "total": 86,
-    "passed": 85,
+    "total": 104,
+    "passed": 103,
     "failed": 0,
     "skipped": 1,
-    "verification_pass": 86,
+    "verification_pass": 104,
     "verification_fail": 0,
     "common_failure_reasons": [],
     "tokens_by_executor": {
       "codex": 182951,
-      "sonnet": 160430,
-      "haiku": 23575
+      "sonnet": 168190,
+      "opus": 56800,
+      "haiku": 33465
     },
     "tokens_by_model": {
       "codex": 182951,
-      "sonnet": 160430,
-      "haiku": 23575
+      "sonnet": 168190,
+      "opus": 56800,
+      "haiku": 33465
     },
     "tokens_by_provider": {
-      "unknown": 184005,
+      "unknown": 258455,
       "openai": 182951
     }
   },
@@ -60,12 +63,12 @@
     "rejected": 0
   },
   "verification": {
-    "pass": 86,
+    "pass": 104,
     "fail": 0
   },
   "releases_created": 10,
   "branch_dispositions": {
-    "merged-deleted": 8
+    "merged-deleted": 9
   },
   "common_failure_reasons": [],
   "events": {
@@ -80,20 +83,21 @@
     "resume": 2
   },
   "tokens": {
-    "total": 1666756,
+    "total": 1881206,
     "by_provider": {
-      "unknown": 1666756
+      "unknown": 1881206
     },
     "by_model": {
-      "sonnet": 913001,
-      "haiku": 555885,
-      "opus": 197870,
+      "sonnet": 990761,
+      "haiku": 595775,
+      "opus": 294670,
       "codex": 0
     },
     "by_executor": {
       "codex": 182951,
-      "sonnet": 160430,
-      "haiku": 23575
+      "sonnet": 168190,
+      "opus": 56800,
+      "haiku": 33465
     },
     "by_feature": {},
     "requests": 0,
