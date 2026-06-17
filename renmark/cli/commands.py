@@ -73,6 +73,33 @@ def cmd_logs(repo: Path, n: int = 10) -> int:
     return 0
 
 
+def cmd_scan(repo: Path, *, propose: bool = False, emit_cron: bool = False) -> int:
+    from .. import scan as _scan
+
+    if emit_cron:
+        print(_scan.emit_cron(repo))
+        return 0
+
+    report = _scan.run_scan(repo)
+    path = _scan.write_report(repo, report)
+    ids = _scan.propose_findings(repo, report) if propose else []
+
+    newly_proposed = len(ids)
+    deduped_str = str(report.finding_count - newly_proposed) if propose else "—"
+    failed_checks = len(report.checks_failed_to_run)
+
+    partial_note = f"  |  partial: {failed_checks} checks failed to run" if failed_checks else ""
+    print(
+        f"Findings: {report.finding_count}  |  Proposed: {newly_proposed}"
+        f"  |  Deduped/skipped: {deduped_str}  |  Checks failed to run: {failed_checks}"
+        f"{partial_note}"
+    )
+    print(f"Report: {path}")
+    if not propose:
+        print("(run with --propose to file backlog items)")
+    return 2 if failed_checks else 0
+
+
 def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     """Ad-hoc Codex task mode (v0.3.0+).
 

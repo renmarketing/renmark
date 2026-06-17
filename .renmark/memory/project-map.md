@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-14 @ bbb8f07 -->
+<!-- Last refreshed: 2026-06-16 @ c2b0a28 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=96
+**Languages:** python=98
 
 ## Directory tree
 
@@ -23,6 +23,7 @@ ai-system/
 | Path | Purpose | Key symbols |
 |---|---|---|
 | `renmark/init.py` | Project-map generator — renmark's analog to Claude Code's native /init. | `FileInfo`, `Standard`, `Gap`, `StandardsScan`, `RepoScan`, `scan_repo` |
+| `renmark/scan.py` | The v1 engine for the REQ-14 read-only scheduled QA proposer lane (``/renmark:sc | `Finding`, `finding_key`, `make_finding`, `ScanReport`, `run_scan`, `load_ledger` |
 | `renmark/lifecycle.py` | Lifecycle state for renmark features — enforces G12 (lifecycle persistence) and  | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `renmark/analytics.py` | Analytics event ledgers + Python aggregation (REQ-15). | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `record_loop_run` |
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
@@ -37,12 +38,11 @@ ai-system/
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/roadmap.py` | Roadmap reporter. | `RoadmapRow`, `build_rows`, `render_table`, `write_roadmap_md`, `render_program_table`, `reconcile_setup` |
-| `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | `validate_lifecycle`, `validate_pipeline`, `validate_subagent_output`, `validate_artifact_metadata`, `validate_limits`, `validate_analytics_summary` |
-| `renmark/lint.py` | Plugin contract linter — checks that SKILL.md files, command shims, and CLAUDE.m | `parse_frontmatter`, `lint_skill_files`, `lint_next_steps_citation`, `lint_command_shims`, `validate_rule_markers`, `iter_rule_blocks` |
+| `tests/test_scan.py` | --- | `test_finding_key_is_stable_and_formatted`, `test_propose_findings_deduplicates_unchanged_reports`, `test_changed_fingerprint_resurfaces_existing_item_without_duplication`, `test_write_report_without_propose_leaves_backlog_empty`, `test_proposed_item_has_expected_shape`, `test_emit_cron_prefers_direct_python_trigger_and_labels_optional_hook` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | `PlanLintReport`, `lint_plan`, `main` |
 | `renmark/modularity.py` | Modularity / scalability health lens — pure stdlib ``ast``, zero-dep, never-rais | `analyze` |
-| `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | — |
+| `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | — |
 
 ## Commands (user-facing)
 
@@ -70,6 +70,7 @@ ai-system/
 | `/renmark:prd` | Use to create or update the project's PRD (Product Requirements Document) — the per-project source of truth that plans a |
 | `/renmark:resume` | Use after `/clear` or `/compact`, or at the start of a fresh session, to discover where the in-flight renmark feature st |
 | `/renmark:roadmap` | "Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, \"show t |
+| `/renmark:scan` | "Use to run a deterministic read-only QA proposer lane — runs audit + verifiers, dedupes findings, proposes backlog item |
 | `/renmark:setup` | "Thin alias — /renmark:setup refreshes/back-fills renmark rule blocks in an existing project by delegating to /renmark:i |
 | `/renmark:start` | "Use when a vibe coder wants to build something and doesn't know where to begin — the plain-English entry point for the  |
 | `/renmark:usage` | Use when the user wants observed local usage status — typed as /renmark:usage, "show usage", "rolling 5h", "weekly limit |

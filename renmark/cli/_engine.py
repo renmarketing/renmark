@@ -36,7 +36,7 @@ from ..state import (
     write_pause,
 )
 from ..verifier import run_verifier
-from .commands import cmd_analytics, cmd_logs, cmd_roadmap, cmd_task, cmd_usage
+from .commands import cmd_analytics, cmd_logs, cmd_roadmap, cmd_scan, cmd_task, cmd_usage
 
 
 @dataclass
@@ -996,6 +996,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--logs", action="store_true", help="list recent .renmark/logs/ files for troubleshooting")
     ap.add_argument("--logs-n", type=int, default=10, help="how many logs to list (with --logs; default 10)")
+    ap.add_argument("--scan", action="store_true", help="scan repo and print cron/schedule proposals; exit 0")
+    ap.add_argument("--propose", action="store_true", help="(with --scan) include proposed cron entries")
+    ap.add_argument("--emit-cron", action="store_true", help="(with --scan) emit cron block to stdout (read-only)")
     ap.add_argument(
         "--no-commit",
         action="store_true",
@@ -1014,6 +1017,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--output", metavar="ARTIFACT_PATH", help="(with --task) where Codex writes its artifact")
     args = ap.parse_args(argv)
 
+    if (args.propose or args.emit_cron) and not args.scan:
+        print("--propose/--emit-cron require --scan", file=sys.stderr)
+        return 2
+
     repo = Path(args.repo).resolve()
 
     if args.usage:
@@ -1024,13 +1031,15 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_roadmap(repo)
     if args.logs:
         return cmd_logs(repo, n=args.logs_n)
+    if args.scan:
+        return cmd_scan(repo, propose=args.propose, emit_cron=args.emit_cron)
     if args.task:
         if not args.output:
             ap.error("--task requires --output ARTIFACT_PATH")
         return cmd_task(args.task, args.output, repo=repo)
 
     if not args.plan:
-        ap.error("plan path is required unless --usage / --analytics / --roadmap / --logs / --task")
+        ap.error("plan path is required unless --usage / --analytics / --roadmap / --logs / --scan / --task")
     return execute_plan(
         args.plan,
         repo=repo,

@@ -1,5 +1,71 @@
 # Changelog
 
+## [2026-06-17] — req14-scan: honest read-only claim + final hardening (pivot re-review)
+**Request:** The pivot re-review found the "structural read-only" wording overstated (running `pytest` executes project code → not a sandbox) plus 2 hardening Majors. REQ-14 explicitly authorizes running tests as read-only checks, so behavior is compliant — the claim just needed to be accurate.
+**Built:**
+- Corrected `emit_cron` + module docstring + `plugin/skills/scan/SKILL.md`: scan.py itself does NO git/product-file/PRD mutation and never commits/merges/pushes/releases/executes fixes (true, structural), but it is **NOT a sandbox** — the verifiers it runs (pytest/ruff/mypy) execute the project's own code, so run the scheduled scan at the same trust level as your test suite. Write-path inventory now also lists the backlog reservation file (next_id/rollback) under `.renmark/state/`.
+- **Major** — report-path nonce widened to `uuid4().hex` and the report is reserved with `O_EXCL` (re-roll on collision), so a same-name report is never overwritten.
+- **Major** — rollback now uses an explicit reservation marker (`__renmark_scan_reservation__:<uuid>` in `BacklogItem.pending_decision`); `_rollback_reserved(repo, id, token)` unlinks ONLY when that exact token is still on disk — never another writer's real item.
+- Tests → 26; full suite 848 green. write_lifecycle refs = 0 (invariant holds).
+**Files changed:** `renmark/scan.py`, `plugin/skills/scan/SKILL.md`, `tests/test_scan.py`
+**Do not change:**
+- Do NOT re-introduce a "sandboxed / nothing-it-runs-can-mutate" claim. scan's guarantee is: no git/product mutation BY SCAN ITSELF; the read-only CHECKS run project code at test-suite trust. That distinction is the honest contract.
+
+## [2026-06-17] — req14-scan: pivot read-only to STRUCTURAL (resolves 2 Critical re-review findings)
+**Request:** A focused re-review of the fix commit found the Bash-denylist hook *still* bypassable (absolute-path/`env`/`command`/wrapper forms; `$(…)`/backtick substitution). Decision (user-approved): stop hardening a leaky denylist.
+**Built:**
+- **Pivot (resolves both Criticals):** `emit_cron` now emits `renmark-execute --scan --propose` as the PRIMARY scheduled trigger — pure Python, no LLM, no Bash tool, no token spend. Read-only is now **structural**: the scan engine's only write paths are the report, the dedup ledger, and backlog `write_item`; it has no commit/merge/push/edit code, so the guarantee no longer depends on a runtime hook. The `READONLY_HOOK` is retained but demoted to OPTIONAL best-effort defense-in-depth, relevant only if a user triggers via `claude -p`.
+- **Major** — `_report_rel_path` now folds `checks_failed_to_run` into the hash + appends an `os.urandom(4)` nonce (no same-second collision).
+- **Major** — `_ledger_lock` surfaces lock-acquire failure (stderr warning `renmark:scan WARNING: ledger lock unavailable` + `degraded` list) instead of silently running unlocked.
+- **Major** — `_rollback_reserved` reads the file back and only unlinks its own empty placeholder (never another writer's real item).
+- Tests → 25; full suite 847 green. Structural read-only independently verified (0 mutate paths; only `run_verifier` runs the read-only gates).
+**Files changed:** `renmark/scan.py`, `plugin/skills/scan/SKILL.md`, `tests/test_scan.py`
+**Do not change:**
+- Read-only is guaranteed STRUCTURALLY by the direct `renmark-execute --scan` Python trigger (no mutate path), NOT by the Bash hook. Do not reintroduce a denylist hook as the trust boundary, and do not route the scheduled trigger through `claude -p` as the default.
+
+## [2026-06-17] — req14-scan: code-review fixes (1 Critical, 4 Major, 1 Minor)
+**Request:** Fix the codex review findings (`.renmark/reviews/2026-06-17-e6244a2.review.md`) before merging the scan lane.
+**Built:**
+- **CRITICAL** — `renmark/scan.py` `READONLY_HOOK` denylist was bypassable (`git -C x commit`, `git --git-dir=… commit`, `FOO=1 git commit`). Replaced the brittle regex with a base64-embedded `shlex` tokenizer that skips env-assignments + git global options and blocks any mutating git subcommand by position; `emit_cron` now states the restricted `--tools`/`--disallowedTools`/`dontAsk` allowlist is the primary boundary and the hook is defense-in-depth.
+- **MAJOR** — unique report paths (`<date>-<HHMMSS>-<hash>-scan.review.md`) so same-day scans don't overwrite + retarget `evidence_path`; `propose_findings` links the exact written path via `ScanReport.evidence_path`.
+- **MAJOR** — stale-ledger entries (missing `backlog_id`) now recreate the item instead of permanently suppressing the finding.
+- **MAJOR** — proposal dedup serialized under an `fcntl.flock` on `.renmark/state/proposals.lock` (concurrent-scan safe).
+- **MAJOR** — failed `write_item` rolls back the reserved `next_id` placeholder (no ghost items).
+- **MAJOR (partial)** — `cmd_scan` returns `2` on a partial run (`checks_failed_to_run` non-empty); still `0` for clean/with-findings (proposer, not a gate).
+- **MINOR** — `--propose`/`--emit-cron` now require `--scan` (fail fast, exit 2).
+- Tests extended to 22 (subprocess-driven hook deny/allow, path uniqueness, stale-ledger recreate, partial exit, flag gating). Full suite 844 green.
+**Files changed:** `renmark/scan.py`, `renmark/cli/commands.py`, `renmark/cli/_engine.py`, `tests/test_scan.py`
+**Do not change:**
+- The read-only boundary is the restricted tool-list (`--tools`/`--disallowedTools`/`--permission-mode dontAsk`); the Bash-denylist hook is best-effort defense-in-depth, NOT the sole guarantee. Do not reintroduce a single-regex hook.
+
+## [2026-06-16] — refresh scan tests for post-review contract fixes
+**Request:** Update `tests/test_scan.py` for the fixed `renmark/scan.py` behavior: unique report paths, behavioral read-only hook checks, stale-ledger recreation, partial exit codes, and `--scan` flag gating.
+**Built:** Replaced the stale path-equality and regex-literal assertions with behavior that matches the current scan contract. Added subprocess-driven deny/allow coverage for `_READONLY_HOOK_COMMAND`, same-day report-path uniqueness and evidence-path propagation checks, stale-ledger recreation coverage, direct `cmd_scan()` exit-code tests, and top-level `python3 -m renmark` flag-gating tests. Kept `tests/test_scan.py` as a valid renmark artifact envelope while remaining importable by pytest.
+**Files changed:**
+- `tests/test_scan.py`
+**Do not change:**
+- Do not regress these tests to date-only report-path assumptions or hook substring checks; the supported contract is exact evidence-path propagation plus real deny/allow semantics.
+
+## [2026-06-16] — req14-scan-proposer wave 1: engine + skill wiring (tasks 1,5,6,7,8)
+**Request:** Build the REQ-14 read-only scheduled QA proposer lane `/renmark:scan`.
+**Built:** `renmark/scan.py` engine (zero-LLM, never raises): `run_scan` composes `audit.run_audit` + pytest/ruff/mypy verifiers into normalized `Finding`s; `.renmark/state/proposals.json` dedup ledger keyed `{check}:{rule_id}:{target}` (unseen→propose, same fingerprint→skip, changed→re-surface); `propose_findings` lands `source="qa"`/`status="needs review"` items via the REQ-13 backlog seam; `emit_cron` prints the read-only external trigger + a PreToolUse Bash-denylist hook (`READONLY_HOOK`) that blocks git commit/push/merge/rebase/reset --hard/tag/branch -d/checkout -b/rm -rf. Registered `scan` (audit domain) in lifecycle; added `/renmark:scan` SKILL.md, command shim, and help entry.
+**Files changed:**
+- `renmark/scan.py` (new engine), `renmark/lifecycle.py` (registry +3 lines)
+- `plugin/skills/scan/SKILL.md`, `plugin/commands/scan.md` (new), `plugin/skills/help/SKILL.md` (help entry)
+**Do not change:**
+- `renmark/scan.py` MUST NOT import/call `lifecycle.write_lifecycle`; sole writes are the report artifact, the dedup ledger, and backlog `write_item(source="qa")`. Read-only is the REQ-14 invariant.
+
+## [2026-06-15] — project scope: scan-proposer (REQ-14)
+**Request:** "REQ-14 — scheduled read-only QA proposer lane (propose backlog items, never execute)." Brainstormed → spec at `.renmark/specs/2026-06-15-req14-scan-proposer.spec.md`.
+**Scope contract (confirmed):**
+- **Stack:** unchanged — Python ≥3.10 Claude Code plugin; stdlib + existing pytest/ruff/mypy gates; **no new runtime deps**.
+- **Deployment / trigger:** scheduling stays **external** to renmark (Option 1). renmark ships the `/renmark:scan` worker + a `--emit-cron` helper that *prints* the trigger command; the recurring trigger is the user's WSL `cron` / Windows Task Scheduler running `claude -p "/renmark:scan --propose"` headless. Cloud Routines (`/schedule`) ruled out — fresh-clone, no local repo access.
+- **MVP boundary (v1):** `/renmark:scan` (read-only scan→report), `/renmark:scan --propose` (scan + dedupe + `write_item(source="qa", status="needs review")`), `/renmark:scan --emit-cron`. v1 checks = `run_audit()` + shell verifiers. Read-only **enforced** via restricted tool-list + `--permission-mode dontAsk` + a PreToolUse Bash-denylist hook (ships in v1). Dedup ledger (`.renmark/state/proposals.json`, key `{check}:{rule_id}:{target}`) is a prerequisite before any backlog write.
+- **Out-of-scope (this build):** `verify --qa`/`--deep-qa` composition (→ v2); renmark-managed scheduling / `/renmark:schedule`; autonomous scheduled *execution* (product-level non-goal, see PRD REQ-14); merge/PR/release/PRD-edit/budget-escalation.
+**Do not change:**
+- The single backlog seam is `write_item(..., source="qa", status="needs review", evidence_path=...)` (REQ-13 `SCHEDULED-QA.md`) — do not widen the lane's mutation surface.
+- Scheduling stays external (Option 1). Do not add a renmark-managed scheduler without revisiting this scope decision.
+
 ## [2026-06-14] — fix(handoff): re-render the picker on hand-off continuation turns
 **Request:** "Renmark is not giving me clickable options after an interaction and that should be a rule." Found live: after the `/renmark:init` what's-next picker, the user replied with a clarifying question instead of selecting, and the agent answered with a prose `1./2.` list rather than re-rendering the clickable `AskUserQuestion` picker.
 **Built:** Root cause (debug session 20260614-164412-9580) — `handoff-menu.md` rules 6–9 + `next-steps.md` mandated the clickable picker only at the first turn a skill ends with a question; no rule required re-rendering when the hand-off continues across turns (user replies with a non-selection), so the agent legitimately dropped to prose and the visible-choices guarantee lapsed. Fix strengthens the existing rule-9 hard-guarantee (the range all 21 SKILL citations already point at) with a **continuation clause**, tightens the rule-6 dispatch bullet (a non-selection free-text reply keeps the hand-off OPEN → answer + re-render), and updates the `next-steps.md` rule-9 gloss. Zero renumbering → every citing skill inherits the fix. Suite 822 passed.

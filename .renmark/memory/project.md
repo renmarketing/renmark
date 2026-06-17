@@ -29,3 +29,11 @@
   channel — falling back to the pre-existing Chrome DevTools MCP (cold session)
   when Playwright is absent. This is the project's first optional runtime dep;
   the core runtime stays stdlib-only.
+- 2026-06-15: REQ-14 scheduled read-only QA proposer lane spec'd as
+  `/renmark:scan` (spec: `.renmark/specs/2026-06-15-req14-scan-proposer.spec.md`).
+  Decision: scheduling stays **external** to renmark (Option 1) — renmark ships
+  the worker + `--emit-cron` printer; the trigger is the user's WSL cron / Task
+  Scheduler. Cloud Routines (`/schedule`) ruled out (fresh-clone, no local repo
+  access). Read-only is **enforced** (restricted tool-list + `dontAsk` +
+  PreToolUse Bash-denylist hook), not conventional. Lands deduped `source="qa"`
+  backlog items via the REQ-13 `SCHEDULED-QA.md` seam — never executes.
