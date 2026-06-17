@@ -496,3 +496,46 @@ def test_close_feature_disposition_branch_narrows_when_feature_slug_reused(tmp_p
     assert by_branch["feature/dup"]["branch_disposition"] == "merged-deleted"
     # The other run (same slug, different branch) was NOT over-closed.
     assert by_branch["feature/dup-2"]["branch_disposition"] == "open"
+
+
+def test_close_feature_disposition_wrong_branch_does_not_overclose(tmp_path):
+    """A WRONG/stale branch on a reused feature slug must close nothing. When the
+    given ``branch`` matches no candidate, the fallback is legacy-only (rows with
+    no recorded branch) — it must NEVER close rows carrying a *different* branch,
+    which belong to other runs (over-close is the exact bug branch narrowing
+    prevents)."""
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="reuse",
+        branch="feature/reuse-a",
+        status="completed",
+        sha="sha-reuse-a",
+        branch_disposition="open",
+    )
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="reuse",
+        branch="feature/reuse-b",
+        status="completed",
+        sha="sha-reuse-b",
+        branch_disposition="open",
+    )
+
+    changed = analytics.close_feature_disposition(
+        repo,
+        feature="reuse",
+        branch="feature/NONEXISTENT",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    by_branch = {row["branch"]: row for row in rows if row["feature"] == "reuse"}
+
+    # A wrong branch closed nothing — both other-run rows remain open.
+    assert changed is False
+    assert by_branch["feature/reuse-a"]["branch_disposition"] == "open"
+    assert by_branch["feature/reuse-b"]["branch_disposition"] == "open"

@@ -274,9 +274,10 @@ def close_feature_disposition(
     (unlike ``sha``, which finish's ``[m]`` merge path rewrites to the
     merge-commit sha) and is recorded by :func:`record_feature_run`. When
     ``branch`` is given and matches one or more open feature rows, only that
-    run's rows are closed; when it matches **none** (e.g. legacy rows recorded
-    before ``branch`` was persisted), the close-out falls back to the full
-    feature candidate set so a missing branch can never cause a silent no-op.
+    run's rows are closed; when it matches **none**, the fallback is
+    **legacy-only** — it closes solely the candidates that carry no recorded
+    ``branch`` (pre-branch-field data), never rows carrying a *different*
+    branch (those belong to other runs, so closing them would over-close).
 
     ``sha`` is a further *optional narrowing* (applied after any branch
     narrowing) with the same safety fallback: when ``sha`` is given and matches
@@ -308,6 +309,14 @@ def close_feature_disposition(
             branch_narrowed = [row for row in feature_candidates if row.get("branch") == branch]
             if branch_narrowed:
                 feature_candidates = branch_narrowed
+            else:
+                # branch given but matched no candidate: fall back ONLY to legacy
+                # rows with no recorded branch (pre-branch-field data). Never close
+                # rows that carry a DIFFERENT branch — those are other runs (no
+                # over-close).
+                feature_candidates = [
+                    row for row in feature_candidates if not str(row.get("branch", ""))
+                ]
         if sha:
             narrowed = [row for row in feature_candidates if row.get("sha") == sha]
             to_transform = narrowed if narrowed else feature_candidates

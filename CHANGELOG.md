@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-16] — finish-branch-disposition (re-review fix): wrong-branch fallback no longer over-closes
+**Request:** Codex re-review of the fixes found one residual Major: when `branch` is given but matches no row, the fallback closed ALL same-feature non-terminal rows — a wrong branch on a reused slug could still over-close.
+**Built:**
+- `renmark/analytics.close_feature_disposition` — when a given `branch` matches no candidate, the fallback now closes ONLY legacy rows with no recorded `branch`; it never closes rows carrying a *different* branch (those are other runs). A wrong branch on a reused slug now returns `False` and closes nothing.
+- New regression test `test_close_feature_disposition_wrong_branch_does_not_overclose` (verified to fail against the old logic). Full suite 856 passed, 28 skipped. SKILL.md `[m]`/`[r]` snippet fixes confirmed correct by the re-review.
+**Files changed:**
+- `renmark/analytics.py`, `tests/test_reports_analytics.py`
+**Do not change:**
+- Branch-miss fallback is **legacy-only** (rows with empty/missing `branch`); never fall back to rows with a different recorded branch — that re-opens the over-close bug.
+- The sha-mismatch fallback (no branch passed) is a separate, intentional safety net — keep it; it's what closes the row when only a stale sha is known.
+
 ## [2026-06-16] — finish-branch-disposition (codereview fixes): branch narrowing + self-contained merge snippet
 **Request:** Apply 2 actionable Major findings from the codex review of `main..HEAD` (2 others deferred with rationale).
 **Built:**
