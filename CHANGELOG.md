@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-15] — project scope: scan-proposer (REQ-14)
+**Request:** "REQ-14 — scheduled read-only QA proposer lane (propose backlog items, never execute)." Brainstormed → spec at `.renmark/specs/2026-06-15-req14-scan-proposer.spec.md`.
+**Scope contract (confirmed):**
+- **Stack:** unchanged — Python ≥3.10 Claude Code plugin; stdlib + existing pytest/ruff/mypy gates; **no new runtime deps**.
+- **Deployment / trigger:** scheduling stays **external** to renmark (Option 1). renmark ships the `/renmark:scan` worker + a `--emit-cron` helper that *prints* the trigger command; the recurring trigger is the user's WSL `cron` / Windows Task Scheduler running `claude -p "/renmark:scan --propose"` headless. Cloud Routines (`/schedule`) ruled out — fresh-clone, no local repo access.
+- **MVP boundary (v1):** `/renmark:scan` (read-only scan→report), `/renmark:scan --propose` (scan + dedupe + `write_item(source="qa", status="needs review")`), `/renmark:scan --emit-cron`. v1 checks = `run_audit()` + shell verifiers. Read-only **enforced** via restricted tool-list + `--permission-mode dontAsk` + a PreToolUse Bash-denylist hook (ships in v1). Dedup ledger (`.renmark/state/proposals.json`, key `{check}:{rule_id}:{target}`) is a prerequisite before any backlog write.
+- **Out-of-scope (this build):** `verify --qa`/`--deep-qa` composition (→ v2); renmark-managed scheduling / `/renmark:schedule`; autonomous scheduled *execution* (product-level non-goal, see PRD REQ-14); merge/PR/release/PRD-edit/budget-escalation.
+**Do not change:**
+- The single backlog seam is `write_item(..., source="qa", status="needs review", evidence_path=...)` (REQ-13 `SCHEDULED-QA.md`) — do not widen the lane's mutation surface.
+- Scheduling stays external (Option 1). Do not add a renmark-managed scheduler without revisiting this scope decision.
+
 ## [2026-06-14] — fix(handoff): re-render the picker on hand-off continuation turns
 **Request:** "Renmark is not giving me clickable options after an interaction and that should be a rule." Found live: after the `/renmark:init` what's-next picker, the user replied with a clarifying question instead of selecting, and the agent answered with a prose `1./2.` list rather than re-rendering the clickable `AskUserQuestion` picker.
 **Built:** Root cause (debug session 20260614-164412-9580) — `handoff-menu.md` rules 6–9 + `next-steps.md` mandated the clickable picker only at the first turn a skill ends with a question; no rule required re-rendering when the hand-off continues across turns (user replies with a non-selection), so the agent legitimately dropped to prose and the visible-choices guarantee lapsed. Fix strengthens the existing rule-9 hard-guarantee (the range all 21 SKILL citations already point at) with a **continuation clause**, tightens the rule-6 dispatch bullet (a non-selection free-text reply keeps the hand-off OPEN → answer + re-render), and updates the `next-steps.md` rule-9 gloss. Zero renumbering → every citing skill inherits the fix. Suite 822 passed.

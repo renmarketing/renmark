@@ -1,26 +1,50 @@
 {
-  "generated_at": "2026-06-09T23:40:30+00:00",
+  "generated_at": "2026-06-14T23:20:02+00:00",
   "source": "local-observed",
   "features": {
-    "started": 0,
-    "completed": 0,
+    "started": 8,
+    "completed": 8,
     "blocked": 0,
-    "by_status": {},
-    "branch_dispositions": {},
-    "shipped_names": [],
+    "by_status": {
+      "completed": 8
+    },
+    "branch_dispositions": {
+      "merged-deleted": 8
+    },
+    "shipped_names": [
+      "fable-integration",
+      "fable-routing",
+      "agent-routing-policy",
+      "cowork-alignment",
+      "claude-doc-slimming",
+      "doc-slimming-fixes",
+      "playwright-browser-control",
+      "roadmap-staged-planner"
+    ],
     "blocked_names": []
   },
   "tasks": {
-    "total": 0,
-    "passed": 0,
+    "total": 86,
+    "passed": 85,
     "failed": 0,
-    "skipped": 0,
-    "verification_pass": 0,
+    "skipped": 1,
+    "verification_pass": 86,
     "verification_fail": 0,
     "common_failure_reasons": [],
-    "tokens_by_executor": {},
-    "tokens_by_model": {},
-    "tokens_by_provider": {}
+    "tokens_by_executor": {
+      "codex": 182951,
+      "sonnet": 160430,
+      "haiku": 23575
+    },
+    "tokens_by_model": {
+      "codex": 182951,
+      "sonnet": 160430,
+      "haiku": 23575
+    },
+    "tokens_by_provider": {
+      "unknown": 184005,
+      "openai": 182951
+    }
   },
   "loops": {
     "total": 0,
@@ -36,31 +60,41 @@
     "rejected": 0
   },
   "verification": {
-    "pass": 0,
+    "pass": 86,
     "fail": 0
   },
-  "releases_created": 0,
-  "branch_dispositions": {},
+  "releases_created": 10,
+  "branch_dispositions": {
+    "merged-deleted": 8
+  },
   "common_failure_reasons": [],
-  "events": {},
+  "events": {
+    "release": 10,
+    "resume": 2,
+    "quota": 1
+  },
   "quota_rate_limit": {
     "rate_limit": 0,
-    "quota": 0,
+    "quota": 1,
     "pause": 0,
-    "resume": 0
+    "resume": 2
   },
   "tokens": {
-    "total": 649704,
+    "total": 1666756,
     "by_provider": {
-      "unknown": 649704
+      "unknown": 1666756
     },
     "by_model": {
-      "sonnet": 347071,
-      "haiku": 179463,
-      "opus": 123170,
+      "sonnet": 913001,
+      "haiku": 555885,
+      "opus": 197870,
       "codex": 0
     },
-    "by_executor": {},
+    "by_executor": {
+      "codex": 182951,
+      "sonnet": 160430,
+      "haiku": 23575
+    },
     "by_feature": {},
     "requests": 0,
     "agent_calls": 0
