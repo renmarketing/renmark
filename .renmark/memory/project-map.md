@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-17 @ 05e35e4 -->
+<!-- Last refreshed: 2026-06-17 @ 323793c -->
 
 # Project map — ai-system
 
