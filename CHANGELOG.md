@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-16] — finish-branch-disposition (tasks 2-3 + robustness fix): wire close-out + feature-name matching
+**Request:** Wire `close_feature_disposition` into finish's `[m]` merge and `[r]` release paths, with tests; then fix a no-op bug found in review.
+**Built:**
+- `plugin/skills/finish/SKILL.md` — `[m]` merge path (after branch delete) and `[r]` release path (4c-post, after `record_event`, before `clear_lifecycle`) now call `analytics.close_feature_disposition(repo, feature=feature_name, disposition="merged-deleted")`, non-blocking. Step 2.5 guard note added: the `open`/`merged` row is intentionally non-terminal, closed later by `[m]`/`[r]`.
+- `tests/test_reports_analytics.py` — 6 new tests (transform-not-append, no-double-count rollup, idempotent, absent no-op, legacy-`merged` treated non-terminal, sha-mismatch fallback). Whole suite: 854 passed, 28 skipped.
+- **Robustness fix (caught in orchestrate review):** the merge path runs `git merge --no-ff`, so post-merge `git rev-parse HEAD` is the merge-commit sha, not the feature-tip sha step 2.5 recorded — matching on feature+sha would no-op and silently fail to close. `close_feature_disposition` is now **feature-primary**: matches non-terminal rows by feature name; `sha` (now optional, default `""`) only narrows, and **falls back to feature-identity** when a passed sha matches no open row. Callers drop the fragile `git rev-parse HEAD` derivation.
+**Files changed:**
+- `plugin/skills/finish/SKILL.md`, `tests/test_reports_analytics.py`, `renmark/analytics.py`
+**Do not change:**
+- Close-out matches by **feature name** (the stable identity across the open row and merge); do NOT reintroduce sha-equality as a hard match — post-merge HEAD ≠ recorded feature sha, which silently no-ops.
+- Keep the close-out calls **non-blocking** (try/except) — analytics must never abort a merge/release.
+- Do NOT write a terminal `branch_disposition` in step 2.5; the open row must stay non-terminal until `[m]`/`[r]` (PR/nothing paths leave it legitimately open).
+
 ## [2026-06-16] — finish-branch-disposition (task 1): analytics close-out helper
 **Request:** /renmark:analytics reports merged/released features as perpetually `open` because finish never closes the disposition row. Add the source helper to fix it.
 **Built:**

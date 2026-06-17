@@ -258,16 +258,22 @@ def close_feature_disposition(
     repo: str | Path,
     *,
     feature: str,
-    sha: str,
+    sha: str = "",
     disposition: str = "merged-deleted",
 ) -> bool:
     """Transform a feature run's ``branch_disposition`` to a terminal value.
 
-    Rewrites (never appends) the existing ``feature-runs.jsonl`` row(s) matching
-    both ``feature`` and ``sha`` whose ``branch_disposition`` is still
-    non-terminal (``""``, ``"open"``, or the legacy ``"merged"``), setting it to
-    ``disposition``. The whole ledger is rewritten atomically
-    (``tempfile.mkstemp`` + ``os.replace``).
+    Matching is **feature-primary**: the feature name is the stable identity, so
+    rows are first selected by ``feature`` plus a still-non-terminal
+    ``branch_disposition`` (``""``, ``"open"``, or the legacy ``"merged"``).
+    ``sha`` is an *optional narrowing* with a safety fallback: when ``sha`` is
+    given and matches one or more of those open rows, only the sha-matched
+    subset is closed; but when ``sha`` matches **no** open row (e.g. finish's
+    ``[m]`` merge path records the merge-commit sha, not the feature-tip sha
+    step 2.5 stored), it falls back to closing by feature identity anyway. This
+    guarantees a stale/wrong sha can never cause a silent no-op. When ``sha`` is
+    empty, all open feature rows are closed. The whole ledger is rewritten
+    (never appended) atomically (``tempfile.mkstemp`` + ``os.replace``).
 
     Returns ``True`` if at least one row changed (ledger rewritten), ``False``
     otherwise — no matching non-terminal row means a no-op (no append, no
@@ -278,15 +284,21 @@ def close_feature_disposition(
     path = analytics_dir(repo) / FEATURE_RUNS_LEDGER
     try:
         rows = read_jsonl(path)
+        feature_candidates = [
+            row
+            for row in rows
+            if row.get("feature") == feature
+            and str(row.get("branch_disposition", "")) in _NONTERMINAL_DISPOSITIONS
+        ]
+        if sha:
+            narrowed = [row for row in feature_candidates if row.get("sha") == sha]
+            to_transform = narrowed if narrowed else feature_candidates
+        else:
+            to_transform = feature_candidates
         changed = False
-        for row in rows:
-            if (
-                row.get("feature") == feature
-                and row.get("sha") == sha
-                and str(row.get("branch_disposition", "")) in _NONTERMINAL_DISPOSITIONS
-            ):
-                row["branch_disposition"] = disposition
-                changed = True
+        for row in to_transform:
+            row["branch_disposition"] = disposition
+            changed = True
         if not changed:
             return False
         tmp_path: str | None = None
