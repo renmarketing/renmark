@@ -455,3 +455,44 @@ def test_close_feature_disposition_sha_mismatch_falls_back_to_feature(tmp_path):
     assert changed is True
     assert len(matching) == 1
     assert matching[0]["branch_disposition"] == "merged-deleted"
+
+
+def test_close_feature_disposition_branch_narrows_when_feature_slug_reused(tmp_path):
+    """The feature slug is reusable, so two concurrent runs can share a feature
+    name on different branches. Closing one branch's run must NOT over-close the
+    other branch's still-open run — ``branch`` is the stable narrowing key."""
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="dup",
+        branch="feature/dup",
+        status="completed",
+        sha="sha-dup-1",
+        branch_disposition="open",
+    )
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="dup",
+        branch="feature/dup-2",
+        status="completed",
+        sha="sha-dup-2",
+        branch_disposition="open",
+    )
+
+    changed = analytics.close_feature_disposition(
+        repo,
+        feature="dup",
+        branch="feature/dup",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    by_branch = {row["branch"]: row for row in rows if row["feature"] == "dup"}
+
+    assert changed is True
+    assert by_branch["feature/dup"]["branch_disposition"] == "merged-deleted"
+    # The other run (same slug, different branch) was NOT over-closed.
+    assert by_branch["feature/dup-2"]["branch_disposition"] == "open"

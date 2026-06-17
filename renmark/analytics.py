@@ -258,6 +258,7 @@ def close_feature_disposition(
     repo: str | Path,
     *,
     feature: str,
+    branch: str = "",
     sha: str = "",
     disposition: str = "merged-deleted",
 ) -> bool:
@@ -266,14 +267,27 @@ def close_feature_disposition(
     Matching is **feature-primary**: the feature name is the stable identity, so
     rows are first selected by ``feature`` plus a still-non-terminal
     ``branch_disposition`` (``""``, ``"open"``, or the legacy ``"merged"``).
-    ``sha`` is an *optional narrowing* with a safety fallback: when ``sha`` is
-    given and matches one or more of those open rows, only the sha-matched
-    subset is closed; but when ``sha`` matches **no** open row (e.g. finish's
-    ``[m]`` merge path records the merge-commit sha, not the feature-tip sha
-    step 2.5 stored), it falls back to closing by feature identity anyway. This
-    guarantees a stale/wrong sha can never cause a silent no-op. When ``sha`` is
-    empty, all open feature rows are closed. The whole ledger is rewritten
-    (never appended) atomically (``tempfile.mkstemp`` + ``os.replace``).
+
+    ``branch`` is the **stable narrowing key**: the feature slug is reusable, so
+    matching by feature alone can close the wrong (or multiple) non-terminal
+    rows when a slug is reused across runs. ``branch`` is stable across a merge
+    (unlike ``sha``, which finish's ``[m]`` merge path rewrites to the
+    merge-commit sha) and is recorded by :func:`record_feature_run`. When
+    ``branch`` is given and matches one or more open feature rows, only that
+    run's rows are closed; when it matches **none** (e.g. legacy rows recorded
+    before ``branch`` was persisted), the close-out falls back to the full
+    feature candidate set so a missing branch can never cause a silent no-op.
+
+    ``sha`` is a further *optional narrowing* (applied after any branch
+    narrowing) with the same safety fallback: when ``sha`` is given and matches
+    one or more of the (branch-narrowed) open rows, only the sha-matched subset
+    is closed; but when ``sha`` matches **no** such row (e.g. finish's ``[m]``
+    merge path records the merge-commit sha, not the feature-tip sha step 2.5
+    stored), it falls back to closing the current candidate set anyway. This
+    guarantees a stale/wrong sha can never cause a silent no-op. When both
+    ``branch`` and ``sha`` are empty, all open feature rows are closed. The
+    whole ledger is rewritten (never appended) atomically (``tempfile.mkstemp``
+    + ``os.replace``).
 
     Returns ``True`` if at least one row changed (ledger rewritten), ``False``
     otherwise — no matching non-terminal row means a no-op (no append, no
@@ -290,6 +304,10 @@ def close_feature_disposition(
             if row.get("feature") == feature
             and str(row.get("branch_disposition", "")) in _NONTERMINAL_DISPOSITIONS
         ]
+        if branch:
+            branch_narrowed = [row for row in feature_candidates if row.get("branch") == branch]
+            if branch_narrowed:
+                feature_candidates = branch_narrowed
         if sha:
             narrowed = [row for row in feature_candidates if row.get("sha") == sha]
             to_transform = narrowed if narrowed else feature_candidates

@@ -231,12 +231,15 @@ identity) — do NOT re-derive a sha: `git merge --no-ff` makes post-merge HEAD 
 merge commit, not the feature-tip sha step 2.5 recorded, so a sha match would miss
 the open row. `close_feature_disposition` keys on feature name:
 ```python
+from pathlib import Path
 from renmark import analytics, lifecycle
 try:
+    repo = Path('.')
     s = lifecycle.read_lifecycle(repo)
     feature_name = s.feature if s else ""
+    branch = s.branch if s else ""
     analytics.close_feature_disposition(
-        repo, feature=feature_name, disposition="merged-deleted")
+        repo, feature=feature_name, branch=branch, disposition="merged-deleted")
 except Exception as e:
     print(f"[finish] non-blocking: disposition close-out failed: {e}")
 ```
@@ -337,8 +340,9 @@ analytics.record_event(Path('.'), ts=state.now_iso(), kind="release", version=ve
 try:
     s = lifecycle.read_lifecycle(Path('.'))
     feature_name = s.feature if s else ""
+    branch = s.branch if s else ""
     analytics.close_feature_disposition(
-        Path('.'), feature=feature_name, disposition="merged-deleted")
+        Path('.'), feature=feature_name, branch=branch, disposition="merged-deleted")
 except Exception as e:
     print(f"[finish] non-blocking: disposition close-out failed: {e}")
 # Final step on the release path — clear lifecycle so the next /renmark:start is not redirected to resume.

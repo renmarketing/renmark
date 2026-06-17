@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-16] — finish-branch-disposition (codereview fixes): branch narrowing + self-contained merge snippet
+**Request:** Apply 2 actionable Major findings from the codex review of `main..HEAD` (2 others deferred with rationale).
+**Built:**
+- **#3 (Major)** — `plugin/skills/finish/SKILL.md` merge-path `[m]` close-out snippet was not self-contained: it referenced `repo` without defining it / importing `Path`, so standalone it would `NameError`, get swallowed by the broad `except`, and silently fail to close (reintroducing the bug). Now imports `Path`, defines `repo = Path('.')`, reads `branch`, mirrors the release block.
+- **#1 (Major)** — `renmark/analytics.close_feature_disposition` gained an optional `branch` narrowing key (branch is stable across a `--no-ff` merge, unlike sha, and is recorded per run). Match order: feature → branch (when given) → sha (with the post-merge fallback intact). Prevents over-closing when a feature slug is reused across runs. Both finish callers ([m]/[r]) now pass `branch`.
+- New regression test `test_close_feature_disposition_branch_narrows_when_feature_slug_reused`; full suite 855 passed, 28 skipped.
+- **Deferred (recorded in the review artifact):** #2 lock-free read-modify-write (module-wide design — `_append`/`write_summary` are also lock-free; analytics is observational, single-writer-serial); #4 fsync before `os.replace` (sibling `write_summary` also omits it — matching the established pattern).
+**Files changed:**
+- `renmark/analytics.py`, `plugin/skills/finish/SKILL.md`, `tests/test_reports_analytics.py`
+**Do not change:**
+- Match order is feature → branch → sha; `branch` is the stable narrowing key (sha is NOT reliable post-merge). Don't drop branch narrowing — it's what prevents over-closing a reused slug.
+- Keep both finish close-out snippets **self-contained** (`repo = Path('.')`) and non-blocking — a bare `repo` ref silently NameErrors and reintroduces the bug.
+
 ## [2026-06-16] — finish-branch-disposition (tasks 2-3 + robustness fix): wire close-out + feature-name matching
 **Request:** Wire `close_feature_disposition` into finish's `[m]` merge and `[r]` release paths, with tests; then fix a no-op bug found in review.
 **Built:**
