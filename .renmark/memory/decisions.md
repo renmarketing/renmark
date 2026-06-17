@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-031 — Finished feature req14-scan-proposer
+
+**Date:** 2026-06-16
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch  reached stage ready-to-release
+
+---
+
 ## ADR-030 — Finished feature roadmap-staged-planner
 
 **Date:** 2026-06-14
