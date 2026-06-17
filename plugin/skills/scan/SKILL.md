@@ -1,6 +1,6 @@
 ---
 name: scan
-description: "Use to run the read-only scheduled QA proposer lane — typed as /renmark:scan. Inspects the project with read-only checks (audit + shell verifiers), writes a bounded report, and with --propose lands deduped source=qa backlog items for human triage; --emit-cron prints the direct cron/Task Scheduler command (renmark-execute --scan --propose, no LLM, no token spend). Never edits code, commits, merges, releases, or executes (REQ-14)."
+description: "Use to run the scheduled QA proposer lane — typed as /renmark:scan. Inspects the project by running verifiers (audit + pytest/ruff/mypy), writes a bounded report, and with --propose lands deduped source=qa backlog items for human triage; --emit-cron prints the direct cron/Task Scheduler command (renmark-execute --scan --propose, no LLM, no token spend). Never edits product code, commits, merges, releases, or executes fixes (REQ-14). Note: verifiers execute the project's own code — run at the same trust level as your test suite."
 ---
 
 # scan
@@ -87,11 +87,18 @@ This command runs **entirely inside the Python binary** — no `claude -p`, no
 LLM call, no Bash tool invocation, no token spend. It is safe to drop directly
 into `cron`, Windows Task Scheduler, a CI step, or any external scheduler.
 
-**Why this is the right trigger:** The scan engine is pure Python. Its only
-write paths are the review report (`.renmark/reviews/`), the dedup ledger
-(`.renmark/state/proposals.json`), and `write_item` for backlog proposals. It
-has no code path that commits, merges, pushes, or edits product files. That
-structural absence — not any runtime hook — is the read-only guarantee.
+**Why this is the right trigger:** The scan engine is pure Python. Its write
+paths are: the review report (`.renmark/reviews/`), the dedup ledger
+(`.renmark/state/proposals.json`), the backlog reservation file under
+`.renmark/state/` (next_id allocation and rollback on failure), and `write_item`
+for backlog proposals. It has no code path that commits, merges, pushes, or
+edits product files — that structural absence is real and permanent.
+
+**Important: scan is NOT a sandbox.** The verifiers it runs (pytest, ruff,
+mypy) execute the **project's own code**. Side effects from the project's test
+suite — temporary files, network calls in tests, database fixtures — apply here
+too. Schedule and trust scan at the same level as running your test suite
+directly, not as an isolated read-only probe.
 
 **Scheduling is EXTERNAL to renmark (Option 1).** Renmark never daemonizes,
 registers a cron, or owns the schedule — the printed command is the handoff.

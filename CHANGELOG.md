@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-17] — req14-scan: honest read-only claim + final hardening (pivot re-review)
+**Request:** The pivot re-review found the "structural read-only" wording overstated (running `pytest` executes project code → not a sandbox) plus 2 hardening Majors. REQ-14 explicitly authorizes running tests as read-only checks, so behavior is compliant — the claim just needed to be accurate.
+**Built:**
+- Corrected `emit_cron` + module docstring + `plugin/skills/scan/SKILL.md`: scan.py itself does NO git/product-file/PRD mutation and never commits/merges/pushes/releases/executes fixes (true, structural), but it is **NOT a sandbox** — the verifiers it runs (pytest/ruff/mypy) execute the project's own code, so run the scheduled scan at the same trust level as your test suite. Write-path inventory now also lists the backlog reservation file (next_id/rollback) under `.renmark/state/`.
+- **Major** — report-path nonce widened to `uuid4().hex` and the report is reserved with `O_EXCL` (re-roll on collision), so a same-name report is never overwritten.
+- **Major** — rollback now uses an explicit reservation marker (`__renmark_scan_reservation__:<uuid>` in `BacklogItem.pending_decision`); `_rollback_reserved(repo, id, token)` unlinks ONLY when that exact token is still on disk — never another writer's real item.
+- Tests → 26; full suite 848 green. write_lifecycle refs = 0 (invariant holds).
+**Files changed:** `renmark/scan.py`, `plugin/skills/scan/SKILL.md`, `tests/test_scan.py`
+**Do not change:**
+- Do NOT re-introduce a "sandboxed / nothing-it-runs-can-mutate" claim. scan's guarantee is: no git/product mutation BY SCAN ITSELF; the read-only CHECKS run project code at test-suite trust. That distinction is the honest contract.
+
 ## [2026-06-17] — req14-scan: pivot read-only to STRUCTURAL (resolves 2 Critical re-review findings)
 **Request:** A focused re-review of the fix commit found the Bash-denylist hook *still* bypassable (absolute-path/`env`/`command`/wrapper forms; `$(…)`/backtick substitution). Decision (user-approved): stop hardening a leaky denylist.
 **Built:**

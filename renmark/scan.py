@@ -13,12 +13,24 @@ Design contract (mirrors :mod:`renmark.audit` / :mod:`renmark.backlog`):
   that cannot run is recorded in ``checks_failed_to_run``, downgrades the report
   to ``completion_state="partial"`` with lowered confidence, and the scan
   continues — it never crashes.
-- **Read-only by contract.** The ONLY writes a scan performs are (1) its report
-  artifact under ``.renmark/reviews/``, (2) the dedup ledger
-  ``.renmark/state/proposals.json``, and (3) — only via
-  :func:`propose_findings` — backlog items through
-  :func:`renmark.backlog.write_item`. It MUST NOT advance ``lifecycle.json``;
+- **What scan.py itself writes (and does not do).** ``scan.py`` performs no git,
+  product-file, or PRD mutation and never commits, merges, pushes, releases, or
+  executes fixes. Its OWN writes are confined to ``.renmark/`` state: (1) the
+  report artifact under ``.renmark/reviews/``, (2) the dedup ledger
+  ``.renmark/state/proposals.json``, and (3) — only via :func:`propose_findings`
+  — backlog items, which means it creates AND (on a failed write) deletes a
+  backlog *reservation* file via :func:`renmark.backlog.next_id` /
+  :func:`_rollback_reserved` under ``.renmark/state/backlog/`` in addition to the
+  final :func:`renmark.backlog.write_item`. It MUST NOT advance ``lifecycle.json``;
   this module deliberately never imports or calls the lifecycle writer.
+- **Read-only CHECKS run your project's own code.** REQ-14 authorizes the lane to
+  run read-only checks (pytest / ruff / mypy). Those verifiers execute the
+  PROJECT'S own code — conftest, fixtures, plugins, ``setup.cfg`` hooks — so the
+  scan is NOT a sandbox and the checks it runs are NOT guaranteed side-effect-free.
+  Run a scheduled scan at the SAME trust level as running your own test suite. The
+  read-only property is about what ``scan.py`` itself does (no mutate / commit /
+  merge / push / release / fix-exec), not a claim that the verifiers it invokes
+  cannot have side effects.
 - **Deduplication before any backlog write.** A SARIF-style stable
   :func:`finding_key` keyed against the ledger guarantees repeated scheduled runs
   never spam the backlog (the Dependabot noise failure mode). The ledger
@@ -27,14 +39,16 @@ Design contract (mirrors :mod:`renmark.audit` / :mod:`renmark.backlog`):
 
 Read-only posture — where the real boundary is
 -----------------------------------------------
-The read-only guarantee is **STRUCTURAL**, not enforced by any denylist. The
-PRIMARY scheduled trigger is the pure-Python CLI ``renmark-execute --scan
---propose`` run from the repo root by external cron / Windows Task Scheduler
-(see :func:`emit_cron`). That process has NO code path that commits, merges,
-pushes, or edits — its sole writes are the report artifact, the dedup ledger,
-and backlog ``write_item``. There is no LLM in the trust path, no Bash tool,
-and no hook to bypass: read-only is a property of the call graph, not a filter
-in front of it.
+The read-only guarantee is **STRUCTURAL** at the ``scan.py`` level: this module
+has no code path that commits, merges, pushes, releases, edits product files, or
+executes a fix. The PRIMARY scheduled trigger is the pure-Python CLI
+``renmark-execute --scan --propose`` run from the repo root by external cron /
+Windows Task Scheduler (see :func:`emit_cron`). That process's writes are
+confined to ``.renmark/`` state (the report, the dedup ledger, and the backlog
+reservation + item). It is NOT a sandbox: the read-only CHECKS it runs (pytest /
+ruff / mypy) execute the project's own code, so treat a scheduled scan at the
+same trust level as running your test suite — do not read the structural
+guarantee as "nothing it runs can mutate."
 
 The :data:`READONLY_HOOK` Bash denylist is **OPTIONAL, best-effort defense-in-
 depth** — relevant ONLY to the alternative model-driven trigger
@@ -54,6 +68,7 @@ import hashlib
 import json
 import os
 import sys
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -441,20 +456,22 @@ def _report_rel_path(report: ScanReport) -> str:
     folds in the report's full content — ``completion_state``, ``checks_run``,
     ``checks_failed_to_run`` (previously omitted, which let two reports differing
     ONLY in which checks failed collide), and every finding fingerprint — AND a
-    true per-write nonce (``os.urandom(4).hex()``) so two same-second scans of an
-    identical tree still get distinct files. This closes the same-day collision
-    where multiple scans overwrote one artifact and silently retargeted every
-    backlog ``evidence_path`` for that day. Never raises.
+    true per-write nonce so two same-second scans of an identical tree still get
+    distinct files. The nonce is a full 128-bit ``uuid4().hex`` (widened from the
+    previous 32-bit ``os.urandom(4)``, whose birthday-collision odds were
+    non-negligible across a day of frequent scans). :func:`write_report` ALSO
+    re-rolls the path under an ``O_EXCL`` create loop, so even a hash collision can
+    never overwrite an existing artifact. Never raises.
     """
     stamp = now_iso()
     date_str = stamp[:10]  # YYYY-MM-DD
     # Time component: digits only from the HH:MM:SS slice, robust to ISO variants.
     time_str = "".join(c for c in stamp[11:19] if c.isdigit()) or "000000"
     # Content hash: folds in completion_state, BOTH check lists, and finding
-    # fingerprints, plus a per-write nonce so identical-content same-second scans
-    # never collide. The nonce alone guarantees uniqueness; the content is kept so
-    # the path still hints at what the report contained.
-    nonce = os.urandom(4).hex()
+    # fingerprints, plus a per-write 128-bit nonce so identical-content same-second
+    # scans never collide. The nonce alone guarantees uniqueness; the content is
+    # kept so the path still hints at what the report contained.
+    nonce = uuid.uuid4().hex
     digest_src = "\n".join(
         [
             report.completion_state,
@@ -492,6 +509,46 @@ def _render_body(report: ScanReport) -> str:
     return "\n".join(lines).rstrip()
 
 
+#: Bounded re-rolls when an ``O_EXCL`` report-path reservation hits an existing
+#: file (a hash+nonce collision — astronomically rare, but never overwrite).
+_REPORT_RESERVE_RETRIES: int = 8
+
+
+def _reserve_report_path(repo: Path, report: ScanReport) -> str:
+    """Reserve a *non-colliding* report path via ``O_EXCL`` and return it (repo-
+    relative).
+
+    Computes a candidate via :func:`_report_rel_path` (which carries a 128-bit
+    nonce) and atomically claims it by creating an empty file with
+    ``O_CREAT | O_EXCL``. If the name already exists (the vanishingly-rare nonce
+    collision, or a same-second sibling), it re-rolls a fresh candidate rather
+    than reusing the colliding name — so :func:`renmark.summary.write_artifact`
+    fills a file this call owns and two writes can never clobber. On exhausted
+    retries or any IO error it degrades to the last computed path WITHOUT a
+    reservation (write_artifact still writes it); the nonce makes a real collision
+    on that fallback negligible. Never raises into the caller.
+    """
+    rel_path = _report_rel_path(report)
+    for _ in range(_REPORT_RESERVE_RETRIES):
+        out_path = repo / rel_path
+        try:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(out_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            # Name already taken — re-roll a fresh nonce-bearing candidate.
+            rel_path = _report_rel_path(report)
+            continue
+        except OSError:
+            # Can't reserve (perms / disk) — degrade to the computed path; the
+            # nonce keeps a true collision negligible and write_artifact still writes.
+            return rel_path
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        return rel_path
+    # Retries exhausted (pathological collision storm) — degrade to last candidate.
+    return rel_path
+
+
 def write_report(repo: Path | str, report: ScanReport) -> str:
     """Write the scan report to ``.renmark/reviews/<date>-scan.review.md``.
 
@@ -504,9 +561,15 @@ def write_report(repo: Path | str, report: ScanReport) -> str:
 
     Side effect: stores the written path on ``report.evidence_path`` so a later
     :func:`propose_findings` links the EXACT artifact, never a recomputed guess.
+
+    Collision safety: the target path is reserved with an ``O_EXCL`` create before
+    :func:`renmark.summary.write_artifact` fills it, re-rolling the (nonce-bearing)
+    path on the vanishingly-rare event the name already exists. Two writes can
+    therefore never clobber each other — a same-name collision regenerates rather
+    than overwrites.
     """
     repo = Path(repo)
-    rel_path = _report_rel_path(report)
+    rel_path = _reserve_report_path(repo, report)
     out_path = repo / rel_path
 
     summary_lines: list[str] = [
@@ -627,16 +690,36 @@ def propose_findings(repo: Path | str, report: ScanReport) -> list[str]:
     return new_ids
 
 
+#: Prefix of the unique reservation marker scan stamps into the ``pending_decision``
+#: field of the placeholder it controls. ``_rollback_reserved`` unlinks ONLY when
+#: this exact (prefix + per-reservation uuid) token is still present on disk —
+#: the sole proof the file is the one this scan reserved. A real QA item written by
+#: :func:`_propose_one` carries ``pending_decision=""``, so the final successful
+#: write clears the marker; if that write fails the marker survives and rollback
+#: can safely reclaim. No legitimate item ever carries this token.
+_RESERVATION_MARKER_PREFIX: str = "__renmark_scan_reservation__:"
+
+
 def _propose_one(repo: Path, f: Finding, evidence_path: str, stamp: str) -> str | None:
     """Write one fresh ``source="qa"`` backlog item, all-or-nothing.
 
     :func:`renmark.backlog.next_id` reserves the id by *creating a placeholder
-    file* (``O_CREAT|O_EXCL``). If the subsequent :func:`renmark.backlog.write_item`
-    fails, that placeholder would leak as a ghost item — so on failure we roll
-    back by deleting the reserved file. Returns the new id, or ``None`` on
-    failure (rolled back). Never raises into the caller.
+    file* (``O_CREAT|O_EXCL``). We immediately overwrite that placeholder with a
+    marker item carrying a UNIQUE reservation token in ``pending_decision`` (see
+    :data:`_RESERVATION_MARKER_PREFIX`) so ownership is provable, then write the
+    real item (which clears the marker). If the marker write itself fails we never
+    owned a populated file, so there is nothing to roll back; if the real
+    :func:`renmark.backlog.write_item` fails, the marker survives and
+    :func:`_rollback_reserved` reclaims the id by matching that exact token.
+    Returns the new id, or ``None`` on failure (rolled back). Never raises.
     """
     item_id = backlog.next_id(repo)
+    marker_token = f"{_RESERVATION_MARKER_PREFIX}{uuid.uuid4().hex}"
+    # Stamp the ownership marker over next_id's placeholder. If THIS write fails we
+    # never populated the file, so a later run can re-reserve; nothing to roll back.
+    marker = backlog.BacklogItem(id=item_id, title="", pending_decision=marker_token)
+    if backlog.write_item(repo, marker) is None:
+        return None
     item = backlog.BacklogItem(
         id=item_id,
         title=f.title,
@@ -651,46 +734,45 @@ def _propose_one(repo: Path, f: Finding, evidence_path: str, stamp: str) -> str 
     )
     if backlog.write_item(repo, item) is not None:
         return item_id
-    # write_item failed — roll back the reserved placeholder so no ghost leaks.
-    _rollback_reserved(repo, item_id)
+    # write_item failed — roll back ONLY our marked placeholder so no ghost leaks.
+    _rollback_reserved(repo, item_id, marker_token)
     return None
 
 
-def _rollback_reserved(repo: Path, item_id: str) -> None:
-    """Delete the placeholder file ``next_id`` reserved for ``item_id`` — but ONLY
-    if it is still the empty placeholder this scan reserved.
+def _rollback_reserved(repo: Path, item_id: str, marker_token: str) -> None:
+    """Delete the reservation file for ``item_id`` — but ONLY if it still carries
+    the EXACT ``marker_token`` this scan stamped into ``pending_decision``.
 
-    Ownership check (critical): ``next_id`` reserves an id by writing a minimal
-    placeholder (``BacklogItem(id=item_id, title="")`` — empty title, no source,
-    no timestamps). Before unlinking we read the file BACK and confirm it is still
-    that placeholder. If another writer has legitimately populated the id (a
-    real item: non-empty title, or a populated ``source`` / ``created_at`` /
-    ``summary``), we MUST NOT delete it — a ``write_item`` "failure" return is not
-    proof the file on disk is ours, and clobbering another writer's item would be
-    a data-loss bug far worse than a leaked placeholder.
+    Ownership check (critical): an empty-field heuristic can false-match a real
+    item (fields like ``risk`` / ``updated_at`` / ``served_requirements`` /
+    ``disposition`` aren't proof of ownership), so we use an EXPLICIT marker
+    instead. :func:`_propose_one` writes a unique
+    :data:`_RESERVATION_MARKER_PREFIX`-prefixed uuid token into the placeholder's
+    ``pending_decision``; we read the file BACK and unlink ONLY when that exact
+    token is still present. If a real item now lives at the id (the successful
+    write cleared the marker, or another writer legitimately populated it), the
+    token will NOT match and we leave the file untouched — clobbering another
+    writer's item is a data-loss bug far worse than a leaked placeholder. A
+    ``write_item`` "failure" return is never treated as proof the on-disk file is
+    ours; only the marker is.
 
     Best-effort: gated through the backlog module's own safe-id check + path
-    builder so we never delete outside the backlog dir, and swallows IO errors
-    (a leftover placeholder is a lesser evil than a raised exception in a
-    read-only scan). Never raises.
+    builder so we never delete outside the backlog dir, and swallows IO errors.
+    Never raises.
     """
     if not backlog._is_safe_item_id(item_id):  # reuse backlog's traversal guard
         return
-    # Read it back: only unlink if it is STILL the empty placeholder we reserved.
+    if not marker_token or not marker_token.startswith(_RESERVATION_MARKER_PREFIX):
+        # No valid marker to match against — refuse to delete anything.
+        return
+    # Read it back: only unlink if our EXACT reservation marker is still present.
     existing = backlog.read_item(repo, item_id)
     if existing is None:
         # Already gone (or unreadable) — nothing safe to roll back.
         return
-    is_placeholder = (
-        existing.title == ""
-        and existing.source == ""
-        and existing.summary == ""
-        and existing.recommended_action == ""
-        and existing.created_at == ""
-        and existing.evidence_path == ""
-    )
-    if not is_placeholder:
-        # A real item now lives at this id — another writer owns it. Leave it.
+    if existing.pending_decision != marker_token:
+        # Marker absent or different — a real item (or another reservation) owns
+        # this id now. Leave it; never unlink an item lacking our exact marker.
         return
     with contextlib.suppress(OSError):
         backlog._item_json_path(repo, item_id).unlink(missing_ok=True)
@@ -878,11 +960,16 @@ def emit_cron(repo: Path | str) -> str:
 
     The PRIMARY emitted trigger is the **direct pure-Python CLI**
     ``renmark-execute --scan --propose`` run from the repo root by external cron /
-    Windows Task Scheduler. Read-only is STRUCTURAL on that path: the process only
-    writes the report, the dedup ledger, and backlog ``write_item`` — it has NO
-    code path that commits, merges, pushes, or edits, so there is no LLM, no Bash
-    tool, and no hook anywhere in the trust path. No Claude token is needed for the
-    direct path; cron just needs the repo + Python.
+    Windows Task Scheduler. ``scan.py`` itself is STRUCTURALLY read-only: it
+    performs no git / product-file / PRD mutation and never commits, merges,
+    pushes, releases, or executes fixes. Its writes are confined to ``.renmark/``
+    state — the scan report, the dedup ledger, and (on ``--propose``) a backlog
+    reservation file (created via ``next_id`` / removed via rollback) plus the
+    final ``write_item``. It is NOT a sandbox, though: the read-only CHECKS it runs
+    (pytest / ruff / mypy) execute the project's OWN code (conftest, fixtures,
+    plugins), so run a scheduled scan at the same trust level as running your test
+    suite — do not read this as "nothing it runs can mutate." No Claude token is
+    needed for the direct path; cron just needs the repo + Python.
 
     A clearly-labeled OPTIONAL block follows for the alternative model-driven
     trigger (``claude -p "/renmark:scan --propose"``), which DOES have a Bash tool;
@@ -898,13 +985,16 @@ def emit_cron(repo: Path | str) -> str:
         f"# repo: {repo}\n"
         "#\n"
         "# ============================================================\n"
-        "# PRIMARY (recommended) — direct pure-Python CLI. Read-only is\n"
-        "# STRUCTURAL here: this process's ONLY writes are the scan report, the\n"
-        "# dedup ledger, and backlog write_item. It has NO code path that commits,\n"
-        "# merges, pushes, or edits — there is no LLM, no Bash tool, and no hook in\n"
-        "# the trust path, so there is nothing to bypass. Run it from the repo\n"
-        "# root via WSL cron / Windows Task Scheduler. No Claude token is needed\n"
-        "# for this path — cron just needs the repo checkout + Python on PATH.\n"
+        "# PRIMARY (recommended) — direct pure-Python CLI. scan.py itself does NO\n"
+        "# git / product-file / PRD mutation and never commits, merges, pushes,\n"
+        "# releases, or executes fixes; its writes are confined to .renmark/ state\n"
+        "# (the scan report, the dedup ledger, a backlog reservation file, and the\n"
+        "# final backlog write_item). NOTE: it is NOT a sandbox — the read-only\n"
+        "# CHECKS it runs (pytest / ruff / mypy) execute THIS project's own code\n"
+        "# (conftest, fixtures, plugins), so run the scheduled scan at the same\n"
+        "# trust level as running your test suite. Run it from the repo root via\n"
+        "# WSL cron / Windows Task Scheduler. No Claude token is needed for this\n"
+        "# path — cron just needs the repo checkout + Python on PATH.\n"
         "# ============================================================\n"
         f"#   cd {repo} && {direct_line}\n"
         "#\n"
