@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-16] — req14-scan-proposer wave 1: engine + skill wiring (tasks 1,5,6,7,8)
+**Request:** Build the REQ-14 read-only scheduled QA proposer lane `/renmark:scan`.
+**Built:** `renmark/scan.py` engine (zero-LLM, never raises): `run_scan` composes `audit.run_audit` + pytest/ruff/mypy verifiers into normalized `Finding`s; `.renmark/state/proposals.json` dedup ledger keyed `{check}:{rule_id}:{target}` (unseen→propose, same fingerprint→skip, changed→re-surface); `propose_findings` lands `source="qa"`/`status="needs review"` items via the REQ-13 backlog seam; `emit_cron` prints the read-only external trigger + a PreToolUse Bash-denylist hook (`READONLY_HOOK`) that blocks git commit/push/merge/rebase/reset --hard/tag/branch -d/checkout -b/rm -rf. Registered `scan` (audit domain) in lifecycle; added `/renmark:scan` SKILL.md, command shim, and help entry.
+**Files changed:**
+- `renmark/scan.py` (new engine), `renmark/lifecycle.py` (registry +3 lines)
+- `plugin/skills/scan/SKILL.md`, `plugin/commands/scan.md` (new), `plugin/skills/help/SKILL.md` (help entry)
+**Do not change:**
+- `renmark/scan.py` MUST NOT import/call `lifecycle.write_lifecycle`; sole writes are the report artifact, the dedup ledger, and backlog `write_item(source="qa")`. Read-only is the REQ-14 invariant.
+
 ## [2026-06-15] — project scope: scan-proposer (REQ-14)
 **Request:** "REQ-14 — scheduled read-only QA proposer lane (propose backlog items, never execute)." Brainstormed → spec at `.renmark/specs/2026-06-15-req14-scan-proposer.spec.md`.
 **Scope contract (confirmed):**

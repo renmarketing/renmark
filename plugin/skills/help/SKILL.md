@@ -147,6 +147,12 @@ spends tokens without your approval. /renmark:debug runs ad-hoc, anytime.
       Snapshot of every skill, shim, template, and memory file with
       freshness and pairing health. Zero LLM calls.
 
+  /renmark:scan [--propose] [--emit-cron]
+      Read-only scheduled QA proposer lane (REQ-14). Inspects with audit +
+      shell verifiers, writes a bounded report; --propose lands deduped
+      source=qa backlog items for triage; --emit-cron prints the safe
+      external trigger. Never edits, commits, or executes.
+
 ── Meta ──────────────────────────────────────────────────────────────────
 
 Where things live:

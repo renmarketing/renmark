@@ -71,6 +71,7 @@ IMPLEMENTED_SKILLS: frozenset[str] = frozenset(
         "prd",
         "resume",
         "roadmap",
+        "scan",
         "setup",
         "start",
         "usage",
@@ -119,6 +120,7 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "loop": "build",
     "audit": "audit",
     "inventory": "audit",
+    "scan": "audit",
     "setup": "meta",
     "roadmap": "meta",
     "help": "meta",
@@ -178,6 +180,7 @@ AUX_SKILLS: frozenset[str] = frozenset(
         "approve",
         "audit",
         "inventory",
+        "scan",
     }
 )
 
