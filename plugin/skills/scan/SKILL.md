@@ -1,6 +1,6 @@
 ---
 name: scan
-description: "Use to run the read-only scheduled QA proposer lane — typed as /renmark:scan. Inspects the project with read-only checks (audit + shell verifiers), writes a bounded report, and with --propose lands deduped source=qa backlog items for human triage; --emit-cron prints the safe external trigger command. Never edits code, commits, merges, releases, or executes (REQ-14)."
+description: "Use to run the read-only scheduled QA proposer lane — typed as /renmark:scan. Inspects the project with read-only checks (audit + shell verifiers), writes a bounded report, and with --propose lands deduped source=qa backlog items for human triage; --emit-cron prints the direct cron/Task Scheduler command (renmark-execute --scan --propose, no LLM, no token spend). Never edits code, commits, merges, releases, or executes (REQ-14)."
 ---
 
 # scan
@@ -77,22 +77,35 @@ findings body.
 renmark-execute --scan --emit-cron
 ```
 
-Prints the safe **external** trigger command for scheduling:
+Prints the **direct** external trigger command for scheduling:
 
 ```bash
-claude -p "/renmark:scan --propose" \
-  --tools "Read,Bash,Write" \
-  --disallowedTools "Edit,Agent" \
-  --permission-mode dontAsk
+renmark-execute --scan --propose
 ```
 
-Also prints the recommended PreToolUse Bash-denylist hook (blocks write/commit
-verbs at the shell level) and an auth note (the external trigger requires a
-valid `ANTHROPIC_API_KEY` or session token in the scheduler environment).
+This command runs **entirely inside the Python binary** — no `claude -p`, no
+LLM call, no Bash tool invocation, no token spend. It is safe to drop directly
+into `cron`, Windows Task Scheduler, a CI step, or any external scheduler.
+
+**Why this is the right trigger:** The scan engine is pure Python. Its only
+write paths are the review report (`.renmark/reviews/`), the dedup ledger
+(`.renmark/state/proposals.json`), and `write_item` for backlog proposals. It
+has no code path that commits, merges, pushes, or edits product files. That
+structural absence — not any runtime hook — is the read-only guarantee.
 
 **Scheduling is EXTERNAL to renmark (Option 1).** Renmark never daemonizes,
 registers a cron, or owns the schedule — the printed command is the handoff.
 Pass it to `cron`, a CI step, or any scheduler the project already uses.
+
+#### Optional: PreToolUse Bash-denylist hook (defense-in-depth)
+
+`--emit-cron` also prints a sample PreToolUse Bash-denylist hook that blocks
+write/commit shell verbs. This hook is **optional and best-effort**. It is
+relevant **only** when a user chooses to trigger scan via
+`claude -p "/renmark:scan --propose"` rather than via the direct binary. When
+using the direct binary (the recommended path above), the hook has no effect
+and need not be installed. The hook is defense-in-depth; it is NOT the
+read-only guarantee.
 
 ## Hard Read-Only Contract (REQ-14)
 

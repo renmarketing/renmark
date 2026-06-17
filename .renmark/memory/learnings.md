@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-16, .renmark/reviews/2026-06-17-e6244a2.review.md) model `verify`: **verify-req14-scan-fixes** — post-review-fix re-verification: full suite 844 green; Critical hook bypass independently confirmed blocked (git -C/--git-dir/env-prefix all rc=2); read-only invariant holds
+
 - (2026-06-16, .renmark/reviews/2026-06-17-e6244a2.verification.md) model `verify`: **verify-req14-scan-proposer** — 3/3 behaviors verified; failed: none; regressions: 0; dedup proven end-to-end (run1 proposed 1, run2 0); engine found 1 real finding on the renmark repo while dogfooding
 
 - (2026-06-14, bug) **Hand-off picker not re-rendered on continuation turns** — A non-selection free-text reply to a hand-off (clarifying question/follow-up) keeps the hand-off OPEN: answer it, then re-render the picker in the same turn. An inline 1./2. list in the reply body is NOT a rule-7 fallback.

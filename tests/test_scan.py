@@ -8,8 +8,8 @@ generator: codex
 stale_after: null
 dependency_refs:
   - /home/renmark/projects/ai-system/renmark/scan.py
-  - /home/renmark/projects/ai-system/renmark/cli/commands.py
-  - /home/renmark/projects/ai-system/renmark/cli/_engine.py
+  - /home/renmark/projects/ai-system/renmark/backlog.py
+  - /home/renmark/projects/ai-system/renmark/summary.py
 completion_state: complete
 confidence: medium
 validation_status: unvalidated
@@ -18,54 +18,57 @@ parser_success: true
 schema_compliance: true
 ---
 
-# REQ-14 scan test refresh
+# REQ-14 scan structural-pivot test refresh
 
 ## Perspectives
 
-1. Contract perspective: assert the current `renmark.scan` seams as implemented, not the pre-fix assumptions the stale tests encoded.
-2. Persistence perspective: drive the real backlog and proposal ledger on disk so evidence-path, stale-ledger, and dedup behavior are exercised end to end.
-3. Enforcement perspective: execute the read-only hook command as a subprocess with the same stdin JSON shape Claude Code uses instead of substring-matching obsolete regex text.
-4. CLI perspective: split direct `cmd_scan()` exit-code coverage from top-level `python3 -m renmark` flag-gating coverage so failures point at the right layer.
+1. Contract perspective: assert the current `renmark.scan` interface as implemented after the structural read-only pivot, not the earlier single-line cron/hook assumptions.
+2. Persistence perspective: drive the real `renmark.backlog` and `renmark.summary` paths so evidence-path, reservation, rollback, and dedup behavior are exercised through the supported seams.
+3. Failure-path perspective: verify degraded locking and write rollback are surfaced and safe under contention-like failures rather than silently passing.
+4. CLI perspective: keep direct `cmd_scan()` exit semantics separate from top-level `python3 -m renmark` flag gating and `--emit-cron` rendering.
 
 ## Assumptions
 
-- Blocking: `write_report()` is the only supported way to set `ScanReport.evidence_path` before `propose_findings()`.
-- Blocking: the current hook contract is behavioral: deny mutating git/rm commands, allow read-only commands, and emit a block JSON payload on denial.
-- Deferrable: report-path uniqueness is asserted with controlled same-day timestamps rather than wall-clock sleeps.
-- Deferrable: `python3 -m renmark --scan --emit-cron` is exercised against the repo root because that path is import-safe and write-free.
+- Blocking: the artifact envelope must remain a module docstring so `tests/test_scan.py` stays importable by pytest while still satisfying the renmark artifact format.
+- Blocking: the updated `renmark/scan.py` source is authoritative for the current contract; no separate review artifact was provided with stronger requirements.
+- Deferrable: the degraded-lock regression can assert the stderr warning prefix instead of an internal `degraded` list because `_ledger_lock` does not expose that list to callers.
+- Deferrable: rollback ownership is exercised by forcing the real `backlog.write_item()` replace step to fail after another writer has populated the reserved target file.
 
 ## Edge Cases
 
 ### Findings
 
-- Blocking: a changed fingerprint with a stale `backlog_id` must create a fresh backlog item instead of suppressing the live finding.
-- Blocking: the re-surface path must update the existing item's `evidence_path` to the second report artifact, not a recomputed stale path.
-- Blocking: partial scan runs must return exit code `2` from `cmd_scan()` even if report writing succeeds.
-- Deferrable: same-second uniqueness is not asserted because the current implementation derives uniqueness from the timestamp slice plus content hash.
+- Blocking: `emit_cron()` now emits the direct Python trigger as the primary path, while the Claude trigger remains optional and wrapped across lines, so one-line flag-string assertions are stale.
+- Blocking: `_report_rel_path()` now includes `checks_failed_to_run` and a nonce, so identical same-day reports must produce distinct artifact paths.
+- Blocking: `_ledger_lock()` no longer silently serializes on lock failure; the warning prefix must be visible when flock acquisition fails.
+- Blocking: `_rollback_reserved()` must delete only the still-empty placeholder, not a real item another writer populated at the reserved id.
 
 ## Recommendations
 
-- Keep hook tests behavioral. The command body is intentionally base64-wrapped and implementation details can change again without changing the deny/allow contract.
-- Keep evidence-path assertions anchored to the path actually returned by `write_report()`. Date-only path reconstruction is explicitly obsolete.
+- Keep cron assertions fragment-based for the optional Claude flags; line wrapping is now intentionally part of the emitted text.
+- Keep rollback tests at the filesystem seam by forcing low-level replace failures instead of stubbing `backlog.write_item()` or `_propose_one()`.
 
 ## Evidence
 
-- Files read: `/home/renmark/projects/ai-system/CHANGELOG.md`, `/home/renmark/projects/ai-system/renmark/scan.py`, `/home/renmark/projects/ai-system/renmark/cli/commands.py`, `/home/renmark/projects/ai-system/renmark/cli/_engine.py`
+- Files read: `/home/renmark/projects/ai-system/CHANGELOG.md`, `/home/renmark/projects/ai-system/renmark/scan.py`, `/home/renmark/projects/ai-system/renmark/backlog.py`, `/home/renmark/projects/ai-system/tests/test_scan.py`
 - Planned verifier: `python3 -m pytest -q tests/test_scan.py`
-- Missing context: no separate code-review artifact was provided; the updated source is the only authoritative contract.
+- Missing context: no external review artifact was provided for the "3 Major fixes"; the updated source file is the only concrete contract.
 
 ## Summary
 
-- Replaced the stale path-equality assertion with re-surface and evidence-path assertions that match the fixed scan contract.
-- Swapped the old regex-literal hook check for real subprocess-driven deny and allow coverage.
-- Added regressions for unique report paths, stale-ledger recreation, partial exit codes, and top-level flag gating.
-- Kept the file as a valid renmark artifact envelope while remaining importable and executable by pytest.
+- Updated cron rendering assertions to the structural direct-CLI contract while preserving the optional hook behavior coverage.
+- Replaced the stale deterministic report-path assumption with a nonce-backed distinctness regression for identical partial reports.
+- Added surfaced-lock-degradation coverage that proves `propose_findings()` still completes and warns when flock acquisition fails.
+- Added rollback ownership coverage for both the real-item preservation case and the empty-placeholder cleanup case.
 """
 
 from __future__ import annotations
 
 import ast
+import contextlib
+import fcntl
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -114,6 +117,32 @@ def _run_hook(command: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         cwd=str(_repo_root()),
     )
+
+
+def _write_backlog_json(path: Path, item: backlog.BacklogItem) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(item.to_json(), encoding="utf-8")
+
+
+@contextlib.contextmanager
+def _replace_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    on_before_raise: callable[[Path, Path], None] | None = None,
+) -> None:
+    original_replace = Path.replace
+
+    def failing_replace(self: Path, target: Path | str) -> Path:
+        target_path = Path(target)
+        if on_before_raise is not None:
+            on_before_raise(self, target_path)
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(Path, "replace", failing_replace)
+    try:
+        yield
+    finally:
+        monkeypatch.setattr(Path, "replace", original_replace)
 
 
 def test_finding_key_is_stable_and_formatted() -> None:
@@ -205,17 +234,18 @@ def test_proposed_item_has_expected_shape(tmp_path: Path) -> None:
     assert item.evidence_path == report_path
 
 
-def test_emit_cron_includes_permission_guards_and_commit_block_semantics(tmp_path: Path) -> None:
+def test_emit_cron_prefers_direct_python_trigger_and_labels_optional_hook(tmp_path: Path) -> None:
     cron = scan.emit_cron(tmp_path)
-    proc = _run_hook("git -C /tmp commit -m x")
 
-    assert "--permission-mode dontAsk" in cron
-    assert "--disallowedTools" in cron
+    assert "renmark-execute --scan" in cron
+    assert "PRIMARY (recommended) — direct pure-Python CLI" in cron
+    assert "Read-only is" in cron
+    assert "STRUCTURAL here" in cron
+    assert "OPTIONAL — model-driven trigger" in cron
+    assert "best-effort PreToolUse hook" in cron
     assert "--tools" in cron
-    assert '"matcher": "Bash"' in cron
-    assert proc.returncode != 0
-    assert "block" in proc.stdout
-    assert "decision" in proc.stdout
+    assert "--disallowedTools" in cron
+    assert "--permission-mode dontAsk" in cron
 
 
 @pytest.mark.parametrize(
@@ -243,29 +273,20 @@ def test_readonly_hook_allows_read_only_commands(command: str) -> None:
     assert "block" not in proc.stdout
 
 
-def test_write_report_same_day_calls_are_distinct_and_evidence_tracks_written_path(
+def test_write_report_identical_partial_reports_get_distinct_nonce_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    stamps = iter(
-        [
-            "2026-06-16T12:00:01+00:00",
-            "2026-06-16T12:00:02+00:00",
-            "2026-06-16T12:00:03+00:00",
-        ]
-    )
-    monkeypatch.setattr(scan, "now_iso", lambda: next(stamps))
+    monkeypatch.setattr(scan, "now_iso", lambda: "2026-06-16T12:00:01+00:00")
 
-    report = _report(_finding())
-    first_path = scan.write_report(tmp_path, report)
-    second_path = scan.write_report(tmp_path, report)
-    new_ids = scan.propose_findings(tmp_path, report)
-    item = backlog.read_item(tmp_path, new_ids[0])
+    first_report = _report(_finding(), failed_checks=["mypy"])
+    second_report = _report(_finding(), failed_checks=["mypy"])
+
+    first_path = scan.write_report(tmp_path, first_report)
+    second_path = scan.write_report(tmp_path, second_report)
 
     assert first_path != second_path
-    assert report.evidence_path == second_path
-    assert item is not None
-    assert item.evidence_path == second_path
-    assert item.evidence_path != ".renmark/reviews/2026-06-16-scan.review.md"
+    assert first_report.evidence_path == first_path
+    assert second_report.evidence_path == second_path
 
 
 def test_stale_ledger_entry_with_changed_fingerprint_creates_new_item(
@@ -300,6 +321,89 @@ def test_stale_ledger_entry_with_changed_fingerprint_creates_new_item(
     assert entry["backlog_id"] == new_ids[0]
     assert entry["fingerprint"] == changed.fingerprint
     assert entry["state"] == "proposed"
+
+
+def test_propose_findings_warns_when_ledger_lock_acquisition_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    original_flock = fcntl.flock
+
+    def raising_flock(fd: int, op: int) -> None:
+        if op & fcntl.LOCK_EX:
+            raise OSError("lock unavailable")
+        return original_flock(fd, op)
+
+    monkeypatch.setattr(fcntl, "flock", raising_flock)
+
+    report = _report(_finding())
+    report_path = scan.write_report(tmp_path, report)
+    new_ids = scan.propose_findings(tmp_path, report)
+    stderr = capsys.readouterr().err
+    item = backlog.read_item(tmp_path, new_ids[0])
+
+    assert len(new_ids) == 1
+    assert item is not None
+    assert item.evidence_path == report_path
+    assert stderr.startswith("renmark:scan WARNING: ledger lock unavailable")
+
+
+def test_propose_one_preserves_real_item_when_reserved_write_loses_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report_stamp = iter(["2026-06-16T14:00:00+00:00", "2026-06-16T14:00:01+00:00"])
+    monkeypatch.setattr(scan, "now_iso", lambda: next(report_stamp))
+
+    finding = _finding(title="pytest failed badly", summary_text="real writer won the race")
+    report = _report(finding)
+    evidence_path = scan.write_report(tmp_path, report)
+    stamp = "2026-06-16T14:00:02+00:00"
+    backlog_path = backlog.backlog_dir(tmp_path) / "BL-0001.json"
+
+    def another_writer_claims_id(_tmp: Path, target: Path) -> None:
+        assert target == backlog_path
+        real_item = backlog.BacklogItem(
+            id="BL-0001",
+            title="another writer item",
+            status="needs review",
+            source="qa",
+            risk="medium",
+            summary="another writer summary",
+            evidence_path=evidence_path,
+            recommended_action="review another writer item",
+            created_at=stamp,
+            updated_at=stamp,
+        )
+        _write_backlog_json(target, real_item)
+
+    with _replace_failure(monkeypatch, on_before_raise=another_writer_claims_id):
+        proposed_id = scan._propose_one(tmp_path, finding, evidence_path, stamp)
+
+    preserved = backlog.read_item(tmp_path, "BL-0001")
+
+    assert proposed_id is None
+    assert preserved is not None
+    assert preserved.title == "another writer item"
+    assert backlog_path.exists()
+
+
+def test_propose_one_rolls_back_empty_reserved_placeholder_on_write_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report_stamp = iter(["2026-06-16T15:00:00+00:00", "2026-06-16T15:00:01+00:00"])
+    monkeypatch.setattr(scan, "now_iso", lambda: next(report_stamp))
+
+    finding = _finding(title="pytest failed softly", summary_text="placeholder should disappear")
+    report = _report(finding)
+    evidence_path = scan.write_report(tmp_path, report)
+    stamp = "2026-06-16T15:00:02+00:00"
+    backlog_path = backlog.backlog_dir(tmp_path) / "BL-0001.json"
+
+    with _replace_failure(monkeypatch):
+        proposed_id = scan._propose_one(tmp_path, finding, evidence_path, stamp)
+
+    assert proposed_id is None
+    assert backlog.read_item(tmp_path, "BL-0001") is None
+    assert not backlog_path.exists()
 
 
 def test_cmd_scan_returns_partial_exit_code_when_checks_failed(
@@ -343,6 +447,7 @@ def test_cli_scan_emit_cron_exits_zero() -> None:
     )
 
     assert proc.returncode == 0
+    assert "renmark-execute --scan" in proc.stdout
     assert "--permission-mode dontAsk" in proc.stdout
 
 

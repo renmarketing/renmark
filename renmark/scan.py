@@ -27,14 +27,22 @@ Design contract (mirrors :mod:`renmark.audit` / :mod:`renmark.backlog`):
 
 Read-only posture — where the real boundary is
 -----------------------------------------------
-The PRIMARY read-only guarantee is the *allowlist* the scheduled scan runs
-under: ``--disallowedTools Edit,Write`` + a restricted ``--tools`` list +
-``--permission-mode dontAsk`` (see :func:`emit_cron`). That restricted-tool
-posture is the boundary. The :data:`READONLY_HOOK` Bash denylist is
-**defense-in-depth only**: denylists are best-effort and can never be proven
-exhaustive (new git plumbing, aliases, env tricks), so they must never be
-mistaken for the actual sandbox. If the allowlist is correct, the hook is
-redundant; if the allowlist is wrong, the hook is a backstop, not a fix.
+The read-only guarantee is **STRUCTURAL**, not enforced by any denylist. The
+PRIMARY scheduled trigger is the pure-Python CLI ``renmark-execute --scan
+--propose`` run from the repo root by external cron / Windows Task Scheduler
+(see :func:`emit_cron`). That process has NO code path that commits, merges,
+pushes, or edits — its sole writes are the report artifact, the dedup ledger,
+and backlog ``write_item``. There is no LLM in the trust path, no Bash tool,
+and no hook to bypass: read-only is a property of the call graph, not a filter
+in front of it.
+
+The :data:`READONLY_HOOK` Bash denylist is **OPTIONAL, best-effort defense-in-
+depth** — relevant ONLY to the alternative model-driven trigger
+(``claude -p "/renmark:scan --propose"``), which does have a Bash tool.
+Denylists can never be proven exhaustive (absolute paths, ``env``/``command``
+prefixes, ``bash -c``, ``eval``, command substitution), so the hook is NOT a
+guarantee and the project no longer tries to make it airtight. The structural
+Python trigger is the boundary; the hook is a backstop on the optional path.
 
 Full design context: ``.renmark/specs/2026-06-15-req14-scan-proposer.spec.md``.
 """
@@ -45,6 +53,7 @@ import contextlib
 import hashlib
 import json
 import os
+import sys
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -347,22 +356,47 @@ def save_ledger(repo: Path | str, ledger: dict[str, dict[str, object]]) -> None:
 _LEDGER_LOCK_NAME: str = "proposals.lock"
 
 
+def _warn_lock_degraded(reason: str) -> None:
+    """Surface a lost-concurrency-safety condition on stderr (one line).
+
+    The scan still completes, but a silent fall-through to unserialised
+    load→write→save under contention could double-file a finding — so the loss
+    MUST be visible, never silent. Best-effort; never raises.
+    """
+    with contextlib.suppress(Exception):
+        print(
+            f"renmark:scan WARNING: ledger lock unavailable ({reason}); "
+            "proceeding WITHOUT concurrency safety — overlapping scans may double-file.",
+            file=sys.stderr,
+        )
+
+
 @contextlib.contextmanager
-def _ledger_lock(repo: Path | str) -> Iterator[None]:
+def _ledger_lock(repo: Path | str, degraded: list[str] | None = None) -> Iterator[None]:
     """Serialise the ledger load→check→write→save cycle across concurrent scans.
 
     Uses a stdlib advisory file lock (``fcntl.flock`` on a ``.proposals.lock``
     sentinel inside ``.renmark/state/``) so two overlapping scheduled scans can't
     both observe a finding as "new" and double-file it. Dependency-free.
 
-    Degrades gracefully and NEVER raises: if ``fcntl`` is unavailable (non-POSIX)
-    or the lock file can't be opened/locked, the body still runs unserialised —
-    correctness under contention is best-effort, but a single scan must never
-    crash because it couldn't take the lock. The lock is always released.
+    Degrades gracefully and NEVER raises, but **never silently**: if ``fcntl`` is
+    unavailable (non-POSIX) or the lock file can't be opened/locked, the body
+    still runs unserialised — but the loss of concurrency safety is surfaced as a
+    one-line ``sys.stderr`` warning AND appended to the optional ``degraded`` list
+    (a string reason) so the caller / report can see it. A single scan must never
+    crash because it couldn't take the lock, but it must never pretend it was
+    serialised when it wasn't. The lock is always released.
     """
+
+    def _mark(reason: str) -> None:
+        if degraded is not None:
+            degraded.append(reason)
+        _warn_lock_degraded(reason)
+
     try:
         import fcntl  # POSIX only; absent on Windows.
     except ImportError:  # pragma: no cover - non-POSIX fallback
+        _mark("fcntl unavailable (non-POSIX)")
         yield
         return
 
@@ -371,10 +405,11 @@ def _ledger_lock(repo: Path | str) -> Iterator[None]:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
-    except OSError:  # pragma: no cover - lock dir/file unavailable
+    except OSError as exc:  # pragma: no cover - lock dir/file unavailable
         if fd is not None:
             with contextlib.suppress(OSError):
                 os.close(fd)
+        _mark(f"lock file open failed: {exc}")
         yield
         return
 
@@ -383,8 +418,8 @@ def _ledger_lock(repo: Path | str) -> Iterator[None]:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
             locked = True
-        except OSError:  # pragma: no cover - lock acquisition failed
-            pass
+        except OSError as exc:  # pragma: no cover - lock acquisition failed
+            _mark(f"flock failed: {exc}")
         yield
     finally:
         if locked:
@@ -402,19 +437,32 @@ def _report_rel_path(report: ScanReport) -> str:
 
     Shape: ``.renmark/reviews/<date>-<time>-<hash>-scan.review.md``. The date +
     time come from :func:`renmark.state.now_iso` (NOT ``datetime.now`` — keeps
-    the determinism convention so tests can pin time at one seam); the short hash
-    is derived from the report's content so two scans that land in the same
-    second still get distinct files. This closes the same-day collision where
-    multiple scans overwrote one artifact and silently retargeted every backlog
-    ``evidence_path`` for that day. Never raises.
+    the determinism convention so tests can pin time at one seam). The short hash
+    folds in the report's full content — ``completion_state``, ``checks_run``,
+    ``checks_failed_to_run`` (previously omitted, which let two reports differing
+    ONLY in which checks failed collide), and every finding fingerprint — AND a
+    true per-write nonce (``os.urandom(4).hex()``) so two same-second scans of an
+    identical tree still get distinct files. This closes the same-day collision
+    where multiple scans overwrote one artifact and silently retargeted every
+    backlog ``evidence_path`` for that day. Never raises.
     """
     stamp = now_iso()
     date_str = stamp[:10]  # YYYY-MM-DD
     # Time component: digits only from the HH:MM:SS slice, robust to ISO variants.
     time_str = "".join(c for c in stamp[11:19] if c.isdigit()) or "000000"
-    # Content hash: stable for identical reports, distinct for different ones.
+    # Content hash: folds in completion_state, BOTH check lists, and finding
+    # fingerprints, plus a per-write nonce so identical-content same-second scans
+    # never collide. The nonce alone guarantees uniqueness; the content is kept so
+    # the path still hints at what the report contained.
+    nonce = os.urandom(4).hex()
     digest_src = "\n".join(
-        [report.completion_state, *report.checks_run, *(f.fingerprint for f in report.findings)]
+        [
+            report.completion_state,
+            *report.checks_run,
+            *report.checks_failed_to_run,
+            *(f.fingerprint for f in report.findings),
+            nonce,
+        ]
     )
     short = hashlib.sha1(digest_src.encode("utf-8", errors="replace")).hexdigest()[:8]
     return f".renmark/reviews/{date_str}-{time_str}-{short}-scan.review.md"
@@ -523,8 +571,9 @@ def propose_findings(repo: Path | str, report: ScanReport) -> list[str]:
     evidence_path = report.evidence_path or _report_rel_path(report)
     stamp = now_iso()
     new_ids: list[str] = []
+    lock_degraded: list[str] = []
 
-    with _ledger_lock(repo):
+    with _ledger_lock(repo, degraded=lock_degraded):
         ledger = load_ledger(repo)
 
         for f in report.findings:
@@ -608,7 +657,17 @@ def _propose_one(repo: Path, f: Finding, evidence_path: str, stamp: str) -> str 
 
 
 def _rollback_reserved(repo: Path, item_id: str) -> None:
-    """Delete the placeholder file ``next_id`` reserved for ``item_id``.
+    """Delete the placeholder file ``next_id`` reserved for ``item_id`` — but ONLY
+    if it is still the empty placeholder this scan reserved.
+
+    Ownership check (critical): ``next_id`` reserves an id by writing a minimal
+    placeholder (``BacklogItem(id=item_id, title="")`` — empty title, no source,
+    no timestamps). Before unlinking we read the file BACK and confirm it is still
+    that placeholder. If another writer has legitimately populated the id (a
+    real item: non-empty title, or a populated ``source`` / ``created_at`` /
+    ``summary``), we MUST NOT delete it — a ``write_item`` "failure" return is not
+    proof the file on disk is ours, and clobbering another writer's item would be
+    a data-loss bug far worse than a leaked placeholder.
 
     Best-effort: gated through the backlog module's own safe-id check + path
     builder so we never delete outside the backlog dir, and swallows IO errors
@@ -617,18 +676,39 @@ def _rollback_reserved(repo: Path, item_id: str) -> None:
     """
     if not backlog._is_safe_item_id(item_id):  # reuse backlog's traversal guard
         return
+    # Read it back: only unlink if it is STILL the empty placeholder we reserved.
+    existing = backlog.read_item(repo, item_id)
+    if existing is None:
+        # Already gone (or unreadable) — nothing safe to roll back.
+        return
+    is_placeholder = (
+        existing.title == ""
+        and existing.source == ""
+        and existing.summary == ""
+        and existing.recommended_action == ""
+        and existing.created_at == ""
+        and existing.evidence_path == ""
+    )
+    if not is_placeholder:
+        # A real item now lives at this id — another writer owns it. Leave it.
+        return
     with contextlib.suppress(OSError):
         backlog._item_json_path(repo, item_id).unlink(missing_ok=True)
 
 
-# ── Read-only enforcement (PreToolUse hook) ─────────────────────────────────────
+# ── OPTIONAL best-effort Bash denylist (PreToolUse hook) ─────────────────────────
 #
-# DEFENSE-IN-DEPTH ONLY. This denylist is a backstop, never the boundary. The
-# real read-only guarantee is the restricted ``--tools`` allowlist +
-# ``--disallowedTools Edit,Write`` + ``--permission-mode dontAsk`` posture (see
-# :func:`emit_cron`). Denylists are best-effort by nature — they can never be
-# proven exhaustive against new git plumbing, aliases, or shell tricks — so the
-# allowlist posture, not this hook, is what makes the scan read-only.
+# BEST-EFFORT, NOT THE BOUNDARY. The structural read-only guarantee is the direct
+# pure-Python trigger ``renmark-execute --scan --propose`` (see :func:`emit_cron`),
+# which has no LLM, no Bash tool, and no commit/merge/push/edit code path — so
+# there is nothing for a denylist to guard. This hook is relevant ONLY to the
+# OPTIONAL alternative trigger ``claude -p "/renmark:scan --propose"`` (model-
+# driven, has a Bash tool). It is provided as defense-in-depth for that path and
+# is KNOWN to be bypassable (absolute paths like ``/usr/bin/git commit``, ``env
+# git commit``, ``command git commit``, ``bash -c "git commit"``, ``eval``,
+# ``$(...)`` / backtick substitution). The project no longer attempts to make it
+# airtight — making the denylist exhaustive is explicitly out of scope. Use the
+# direct-Python trigger when you need a guarantee.
 
 #: The Python program (source text) embedded into the PreToolUse hook command.
 #:
@@ -794,42 +874,61 @@ READONLY_HOOK: dict[str, object] = {
 
 
 def emit_cron(repo: Path | str) -> str:
-    """Return (PRINT-only, no writes) the headless read-only trigger setup text.
+    """Return (PRINT-only, no writes) the scheduled read-only trigger setup text.
 
-    Three blocks: (1) the headless cron line with the restricted tool-list +
-    ``--permission-mode dontAsk``; (2) the :data:`READONLY_HOOK` JSON to paste
-    into ``settings.json`` (defense-in-depth Bash denylist); (3) the one-time
-    auth note. Pure string — never writes, never raises.
+    The PRIMARY emitted trigger is the **direct pure-Python CLI**
+    ``renmark-execute --scan --propose`` run from the repo root by external cron /
+    Windows Task Scheduler. Read-only is STRUCTURAL on that path: the process only
+    writes the report, the dedup ledger, and backlog ``write_item`` — it has NO
+    code path that commits, merges, pushes, or edits, so there is no LLM, no Bash
+    tool, and no hook anywhere in the trust path. No Claude token is needed for the
+    direct path; cron just needs the repo + Python.
+
+    A clearly-labeled OPTIONAL block follows for the alternative model-driven
+    trigger (``claude -p "/renmark:scan --propose"``), which DOES have a Bash tool;
+    the :data:`READONLY_HOOK` JSON is offered there as BEST-EFFORT defense-in-depth
+    only — it is not a guarantee. Pure string — never writes, never raises.
     """
     repo = Path(repo)
-    cron_line = (
-        'claude -p "/renmark:scan --propose" '
-        '--tools "Read,Bash,Grep,Glob" '
-        '--disallowedTools "Edit,Write" '
-        "--permission-mode dontAsk"
-    )
+    direct_line = "renmark-execute --scan --propose"
+    optional_line = 'claude -p "/renmark:scan --propose"'
     hook_json = json.dumps(READONLY_HOOK, indent=2)
     return (
         "# renmark:scan — read-only scheduled QA proposer trigger\n"
         f"# repo: {repo}\n"
         "#\n"
-        "# PRIMARY read-only guarantee: the restricted allowlist on the cron line\n"
-        "#   below — `--disallowedTools Edit,Write` + restricted `--tools` +\n"
-        "#   `--permission-mode dontAsk`. THAT is the boundary. The PreToolUse hook\n"
-        "#   (block 2) is defense-in-depth only; denylists are best-effort and can\n"
-        "#   never be proven exhaustive, so never rely on the hook alone.\n"
+        "# ============================================================\n"
+        "# PRIMARY (recommended) — direct pure-Python CLI. Read-only is\n"
+        "# STRUCTURAL here: this process's ONLY writes are the scan report, the\n"
+        "# dedup ledger, and backlog write_item. It has NO code path that commits,\n"
+        "# merges, pushes, or edits — there is no LLM, no Bash tool, and no hook in\n"
+        "# the trust path, so there is nothing to bypass. Run it from the repo\n"
+        "# root via WSL cron / Windows Task Scheduler. No Claude token is needed\n"
+        "# for this path — cron just needs the repo checkout + Python on PATH.\n"
+        "# ============================================================\n"
+        f"#   cd {repo} && {direct_line}\n"
         "#\n"
-        "# 1. Headless cron line (WSL cron / Windows Task Scheduler):\n"
-        f"{cron_line}\n"
+        "# ------------------------------------------------------------\n"
+        "# OPTIONAL — model-driven trigger (has a Bash tool, NOT structural).\n"
+        "# If you instead trigger via the headless model, you may add the\n"
+        "# best-effort PreToolUse hook below as defense-in-depth — it is\n"
+        "# BEST-EFFORT, NOT a guarantee (absolute paths, env/command prefixes,\n"
+        "# bash -c, eval, and $(...) substitution all bypass it). The structural\n"
+        "# guarantee is the direct-Python trigger above; prefer it.\n"
+        "# ------------------------------------------------------------\n"
+        f"#   {optional_line} \\\n"
+        '#       --tools "Read,Bash,Grep,Glob" --disallowedTools "Edit,Write" \\\n'
+        "#       --permission-mode dontAsk\n"
         "#\n"
-        "# 2. PreToolUse Bash-denylist hook — paste into settings.json (the\n"
-        "#    `hooks` key denies git-mutating / destructive commands even though\n"
-        "#    Bash is enabled for verifiers — defense-in-depth, NOT the boundary):\n"
+        "#   Optional best-effort PreToolUse Bash-denylist hook — paste into\n"
+        "#   settings.json. Defense-in-depth for the model-driven path ONLY;\n"
+        "#   bypassable and NOT a guarantee:\n"
         f"{hook_json}\n"
         "#\n"
-        "# 3. One-time auth (headless runs need a token, not interactive login):\n"
-        "#    claude setup-token\n"
-        "#    export CLAUDE_CODE_OAUTH_TOKEN=<token printed above>\n"
+        "#   The model-driven path also needs a one-time headless auth token\n"
+        "#   (the direct-Python path above does NOT):\n"
+        "#     claude setup-token\n"
+        "#     export CLAUDE_CODE_OAUTH_TOKEN=<token printed above>\n"
     )
 
 

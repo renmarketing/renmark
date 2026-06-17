@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-06-17] — req14-scan: pivot read-only to STRUCTURAL (resolves 2 Critical re-review findings)
+**Request:** A focused re-review of the fix commit found the Bash-denylist hook *still* bypassable (absolute-path/`env`/`command`/wrapper forms; `$(…)`/backtick substitution). Decision (user-approved): stop hardening a leaky denylist.
+**Built:**
+- **Pivot (resolves both Criticals):** `emit_cron` now emits `renmark-execute --scan --propose` as the PRIMARY scheduled trigger — pure Python, no LLM, no Bash tool, no token spend. Read-only is now **structural**: the scan engine's only write paths are the report, the dedup ledger, and backlog `write_item`; it has no commit/merge/push/edit code, so the guarantee no longer depends on a runtime hook. The `READONLY_HOOK` is retained but demoted to OPTIONAL best-effort defense-in-depth, relevant only if a user triggers via `claude -p`.
+- **Major** — `_report_rel_path` now folds `checks_failed_to_run` into the hash + appends an `os.urandom(4)` nonce (no same-second collision).
+- **Major** — `_ledger_lock` surfaces lock-acquire failure (stderr warning `renmark:scan WARNING: ledger lock unavailable` + `degraded` list) instead of silently running unlocked.
+- **Major** — `_rollback_reserved` reads the file back and only unlinks its own empty placeholder (never another writer's real item).
+- Tests → 25; full suite 847 green. Structural read-only independently verified (0 mutate paths; only `run_verifier` runs the read-only gates).
+**Files changed:** `renmark/scan.py`, `plugin/skills/scan/SKILL.md`, `tests/test_scan.py`
+**Do not change:**
+- Read-only is guaranteed STRUCTURALLY by the direct `renmark-execute --scan` Python trigger (no mutate path), NOT by the Bash hook. Do not reintroduce a denylist hook as the trust boundary, and do not route the scheduled trigger through `claude -p` as the default.
+
 ## [2026-06-17] — req14-scan: code-review fixes (1 Critical, 4 Major, 1 Minor)
 **Request:** Fix the codex review findings (`.renmark/reviews/2026-06-17-e6244a2.review.md`) before merging the scan lane.
 **Built:**
