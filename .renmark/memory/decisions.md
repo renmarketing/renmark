@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-032 — Finished feature finish-branch-disposition
+
+**Date:** 2026-06-17
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch feature/finish-branch-disposition reached stage ready-to-release
+
+---
+
 ## ADR-031 — Finished feature req14-scan-proposer
 
 **Date:** 2026-06-16

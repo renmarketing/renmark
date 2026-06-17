@@ -303,3 +303,239 @@ def test_record_feature_run_idempotent_on_rerun(tmp_path):
         branch_disposition="merged",
     )
     assert len(analytics.read_jsonl(ledger)) == 2
+
+
+def test_close_feature_disposition_transforms_not_appends(tmp_path):
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="f1",
+        branch="feature/f1",
+        status="completed",
+        sha="s1",
+        branch_disposition="open",
+    )
+
+    changed = analytics.close_feature_disposition(
+        repo,
+        feature="f1",
+        sha="s1",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    matching = [row for row in rows if row["feature"] == "f1" and row["sha"] == "s1"]
+
+    assert changed is True
+    assert len(matching) == 1
+    assert matching[0]["branch_disposition"] == "merged-deleted"
+
+
+def test_close_feature_disposition_no_double_count_in_rollup(tmp_path):
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="f1",
+        branch="feature/f1",
+        status="completed",
+        sha="s1",
+        branch_disposition="open",
+    )
+    analytics.close_feature_disposition(
+        repo,
+        feature="f1",
+        sha="s1",
+        disposition="merged-deleted",
+    )
+
+    health = analytics.build_health_report(repo, now=NOW)
+
+    assert health["branch_dispositions"].get("merged-deleted") == 1
+    assert health["branch_dispositions"].get("open", 0) == 0
+
+
+def test_close_feature_disposition_idempotent(tmp_path):
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="f1",
+        branch="feature/f1",
+        status="completed",
+        sha="s1",
+        branch_disposition="open",
+    )
+    analytics.close_feature_disposition(
+        repo,
+        feature="f1",
+        sha="s1",
+        disposition="merged-deleted",
+    )
+
+    second_changed = analytics.close_feature_disposition(
+        repo,
+        feature="f1",
+        sha="s1",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    matching = [row for row in rows if row["feature"] == "f1" and row["sha"] == "s1"]
+
+    assert second_changed is False
+    assert len(matching) == 1
+    assert matching[0]["branch_disposition"] == "merged-deleted"
+
+
+def test_close_feature_disposition_absent_is_noop(tmp_path):
+    repo = tmp_path
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    before = analytics.read_jsonl(ledger)
+
+    changed = analytics.close_feature_disposition(repo, feature="nope", sha="nope")
+
+    after = analytics.read_jsonl(ledger)
+
+    assert changed is False
+    assert len(after) == len(before)
+
+
+def test_close_feature_disposition_treats_legacy_merged_as_nonterminal(tmp_path):
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="f2",
+        branch="feature/f2",
+        status="completed",
+        sha="s2",
+        branch_disposition="merged",
+    )
+
+    changed = analytics.close_feature_disposition(repo, feature="f2", sha="s2")
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    matching = [row for row in rows if row["feature"] == "f2" and row["sha"] == "s2"]
+
+    assert changed is True
+    assert len(matching) == 1
+    assert matching[0]["branch_disposition"] == "merged-deleted"
+
+
+def test_close_feature_disposition_sha_mismatch_falls_back_to_feature(tmp_path):
+    """Post-merge HEAD is the merge-commit sha, not the feature-tip sha step 2.5
+    recorded — the close-out must still close by feature identity (fallback)."""
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="fX",
+        branch="feature/fX",
+        status="completed",
+        sha="real-sha",
+        branch_disposition="open",
+    )
+
+    changed = analytics.close_feature_disposition(
+        repo,
+        feature="fX",
+        sha="WRONG-merge-sha",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    matching = [row for row in rows if row["feature"] == "fX"]
+
+    assert changed is True
+    assert len(matching) == 1
+    assert matching[0]["branch_disposition"] == "merged-deleted"
+
+
+def test_close_feature_disposition_branch_narrows_when_feature_slug_reused(tmp_path):
+    """The feature slug is reusable, so two concurrent runs can share a feature
+    name on different branches. Closing one branch's run must NOT over-close the
+    other branch's still-open run — ``branch`` is the stable narrowing key."""
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="dup",
+        branch="feature/dup",
+        status="completed",
+        sha="sha-dup-1",
+        branch_disposition="open",
+    )
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="dup",
+        branch="feature/dup-2",
+        status="completed",
+        sha="sha-dup-2",
+        branch_disposition="open",
+    )
+
+    changed = analytics.close_feature_disposition(
+        repo,
+        feature="dup",
+        branch="feature/dup",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    by_branch = {row["branch"]: row for row in rows if row["feature"] == "dup"}
+
+    assert changed is True
+    assert by_branch["feature/dup"]["branch_disposition"] == "merged-deleted"
+    # The other run (same slug, different branch) was NOT over-closed.
+    assert by_branch["feature/dup-2"]["branch_disposition"] == "open"
+
+
+def test_close_feature_disposition_wrong_branch_does_not_overclose(tmp_path):
+    """A WRONG/stale branch on a reused feature slug must close nothing. When the
+    given ``branch`` matches no candidate, the fallback is legacy-only (rows with
+    no recorded branch) — it must NEVER close rows carrying a *different* branch,
+    which belong to other runs (over-close is the exact bug branch narrowing
+    prevents)."""
+    repo = tmp_path
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="reuse",
+        branch="feature/reuse-a",
+        status="completed",
+        sha="sha-reuse-a",
+        branch_disposition="open",
+    )
+    analytics.record_feature_run(
+        repo,
+        ts=NOW,
+        feature="reuse",
+        branch="feature/reuse-b",
+        status="completed",
+        sha="sha-reuse-b",
+        branch_disposition="open",
+    )
+
+    changed = analytics.close_feature_disposition(
+        repo,
+        feature="reuse",
+        branch="feature/NONEXISTENT",
+        disposition="merged-deleted",
+    )
+
+    ledger = analytics.analytics_dir(repo) / analytics.FEATURE_RUNS_LEDGER
+    rows = analytics.read_jsonl(ledger)
+    by_branch = {row["branch"]: row for row in rows if row["feature"] == "reuse"}
+
+    # A wrong branch closed nothing — both other-run rows remain open.
+    assert changed is False
+    assert by_branch["feature/reuse-a"]["branch_disposition"] == "open"
+    assert by_branch["feature/reuse-b"]["branch_disposition"] == "open"

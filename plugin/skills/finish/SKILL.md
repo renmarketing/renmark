@@ -101,6 +101,8 @@ Present: N commits, M files changed, brief note on each commit.
 
 After the branch summary and before presenting the next-steps menu, build the feature report and record the analytics run. This step is **non-blocking** — if any call fails, log the error and continue to step 3 without aborting finish.
 
+> **Do NOT "fix" this step to write a terminal `branch_disposition` directly.** The `open`/`merged` row recorded here is *intentionally* non-terminal: it is transformed to its terminal value (`merged-deleted`) later by the `[m]` merge close-out (§3) or the `[r]` release close-out (§4, block 4c-post) via `analytics.close_feature_disposition`. Writing a terminal value here would break the fresh-finish case where the branch has not yet been closed (PR/nothing paths leave it legitimately open).
+
 ```python
 import subprocess, glob
 from renmark import reports, analytics, state, lifecycle, summary
@@ -220,7 +222,29 @@ created it, so closing the feature is what removes it. Use `git branch -d` (lowe
 the *safe* form: it refuses to delete an unmerged branch); never `-D` unless the user
 explicitly discards unmerged work. Omit both `git push` lines when there's no `origin`.
 
-After the merge and branch deletion complete, clear lifecycle state so the next
+After the merge and branch deletion complete, **close out the analytics
+disposition** — transform the non-terminal `open`/`merged` row recorded in step 2.5
+to its terminal `merged-deleted` value (the branch is now merged AND deleted). This
+is **non-blocking** (try/except, log + continue — mirror step 2.5): never let an
+analytics no-op abort the close. Match on the **feature name** (the stable
+identity) — do NOT re-derive a sha: `git merge --no-ff` makes post-merge HEAD the
+merge commit, not the feature-tip sha step 2.5 recorded, so a sha match would miss
+the open row. `close_feature_disposition` keys on feature name:
+```python
+from pathlib import Path
+from renmark import analytics, lifecycle
+try:
+    repo = Path('.')
+    s = lifecycle.read_lifecycle(repo)
+    feature_name = s.feature if s else ""
+    branch = s.branch if s else ""
+    analytics.close_feature_disposition(
+        repo, feature=feature_name, branch=branch, disposition="merged-deleted")
+except Exception as e:
+    print(f"[finish] non-blocking: disposition close-out failed: {e}")
+```
+
+After the close-out, clear lifecycle state so the next
 `/renmark:start` is not permanently redirected to resume:
 ```python
 from renmark import lifecycle
@@ -309,6 +333,18 @@ from pathlib import Path
 version = Path('VERSION').read_text().strip()  # the version tagged in 4b
 lifecycle.write_lifecycle(Path('.'), stage="released")
 analytics.record_event(Path('.'), ts=state.now_iso(), kind="release", version=version)
+# Close out the disposition: release is cut from main AFTER merge, so the branch is
+# already gone — transform step 2.5's non-terminal row to terminal. Match on the
+# feature name (the stable identity), NOT a sha: post-merge HEAD is the merge commit,
+# not the feature-tip sha step 2.5 recorded. Non-blocking.
+try:
+    s = lifecycle.read_lifecycle(Path('.'))
+    feature_name = s.feature if s else ""
+    branch = s.branch if s else ""
+    analytics.close_feature_disposition(
+        Path('.'), feature=feature_name, branch=branch, disposition="merged-deleted")
+except Exception as e:
+    print(f"[finish] non-blocking: disposition close-out failed: {e}")
 # Final step on the release path — clear lifecycle so the next /renmark:start is not redirected to resume.
 lifecycle.clear_lifecycle(Path('.'))
 ```

@@ -1,5 +1,53 @@
 # Changelog
 
+## [2026-06-16] — finish-branch-disposition (re-review fix): wrong-branch fallback no longer over-closes
+**Request:** Codex re-review of the fixes found one residual Major: when `branch` is given but matches no row, the fallback closed ALL same-feature non-terminal rows — a wrong branch on a reused slug could still over-close.
+**Built:**
+- `renmark/analytics.close_feature_disposition` — when a given `branch` matches no candidate, the fallback now closes ONLY legacy rows with no recorded `branch`; it never closes rows carrying a *different* branch (those are other runs). A wrong branch on a reused slug now returns `False` and closes nothing.
+- New regression test `test_close_feature_disposition_wrong_branch_does_not_overclose` (verified to fail against the old logic). Full suite 856 passed, 28 skipped. SKILL.md `[m]`/`[r]` snippet fixes confirmed correct by the re-review.
+**Files changed:**
+- `renmark/analytics.py`, `tests/test_reports_analytics.py`
+**Do not change:**
+- Branch-miss fallback is **legacy-only** (rows with empty/missing `branch`); never fall back to rows with a different recorded branch — that re-opens the over-close bug.
+- The sha-mismatch fallback (no branch passed) is a separate, intentional safety net — keep it; it's what closes the row when only a stale sha is known.
+
+## [2026-06-16] — finish-branch-disposition (codereview fixes): branch narrowing + self-contained merge snippet
+**Request:** Apply 2 actionable Major findings from the codex review of `main..HEAD` (2 others deferred with rationale).
+**Built:**
+- **#3 (Major)** — `plugin/skills/finish/SKILL.md` merge-path `[m]` close-out snippet was not self-contained: it referenced `repo` without defining it / importing `Path`, so standalone it would `NameError`, get swallowed by the broad `except`, and silently fail to close (reintroducing the bug). Now imports `Path`, defines `repo = Path('.')`, reads `branch`, mirrors the release block.
+- **#1 (Major)** — `renmark/analytics.close_feature_disposition` gained an optional `branch` narrowing key (branch is stable across a `--no-ff` merge, unlike sha, and is recorded per run). Match order: feature → branch (when given) → sha (with the post-merge fallback intact). Prevents over-closing when a feature slug is reused across runs. Both finish callers ([m]/[r]) now pass `branch`.
+- New regression test `test_close_feature_disposition_branch_narrows_when_feature_slug_reused`; full suite 855 passed, 28 skipped.
+- **Deferred (recorded in the review artifact):** #2 lock-free read-modify-write (module-wide design — `_append`/`write_summary` are also lock-free; analytics is observational, single-writer-serial); #4 fsync before `os.replace` (sibling `write_summary` also omits it — matching the established pattern).
+**Files changed:**
+- `renmark/analytics.py`, `plugin/skills/finish/SKILL.md`, `tests/test_reports_analytics.py`
+**Do not change:**
+- Match order is feature → branch → sha; `branch` is the stable narrowing key (sha is NOT reliable post-merge). Don't drop branch narrowing — it's what prevents over-closing a reused slug.
+- Keep both finish close-out snippets **self-contained** (`repo = Path('.')`) and non-blocking — a bare `repo` ref silently NameErrors and reintroduces the bug.
+
+## [2026-06-16] — finish-branch-disposition (tasks 2-3 + robustness fix): wire close-out + feature-name matching
+**Request:** Wire `close_feature_disposition` into finish's `[m]` merge and `[r]` release paths, with tests; then fix a no-op bug found in review.
+**Built:**
+- `plugin/skills/finish/SKILL.md` — `[m]` merge path (after branch delete) and `[r]` release path (4c-post, after `record_event`, before `clear_lifecycle`) now call `analytics.close_feature_disposition(repo, feature=feature_name, disposition="merged-deleted")`, non-blocking. Step 2.5 guard note added: the `open`/`merged` row is intentionally non-terminal, closed later by `[m]`/`[r]`.
+- `tests/test_reports_analytics.py` — 6 new tests (transform-not-append, no-double-count rollup, idempotent, absent no-op, legacy-`merged` treated non-terminal, sha-mismatch fallback). Whole suite: 854 passed, 28 skipped.
+- **Robustness fix (caught in orchestrate review):** the merge path runs `git merge --no-ff`, so post-merge `git rev-parse HEAD` is the merge-commit sha, not the feature-tip sha step 2.5 recorded — matching on feature+sha would no-op and silently fail to close. `close_feature_disposition` is now **feature-primary**: matches non-terminal rows by feature name; `sha` (now optional, default `""`) only narrows, and **falls back to feature-identity** when a passed sha matches no open row. Callers drop the fragile `git rev-parse HEAD` derivation.
+**Files changed:**
+- `plugin/skills/finish/SKILL.md`, `tests/test_reports_analytics.py`, `renmark/analytics.py`
+**Do not change:**
+- Close-out matches by **feature name** (the stable identity across the open row and merge); do NOT reintroduce sha-equality as a hard match — post-merge HEAD ≠ recorded feature sha, which silently no-ops.
+- Keep the close-out calls **non-blocking** (try/except) — analytics must never abort a merge/release.
+- Do NOT write a terminal `branch_disposition` in step 2.5; the open row must stay non-terminal until `[m]`/`[r]` (PR/nothing paths leave it legitimately open).
+
+## [2026-06-16] — finish-branch-disposition (task 1): analytics close-out helper
+**Request:** /renmark:analytics reports merged/released features as perpetually `open` because finish never closes the disposition row. Add the source helper to fix it.
+**Built:**
+- `renmark/analytics.close_feature_disposition(repo, *, feature, sha, disposition='merged-deleted') -> bool` — transforms the existing non-terminal disposition row (matched on feature AND sha; non-terminal = `''|'open'|'merged'`) to its terminal value **in place** via atomic rewrite (mkstemp + os.replace), never appends.
+- Idempotent no-op (returns False) when already terminal / row absent; non-raising (swallows OSError/TypeError/ValueError) — analytics stays observational.
+**Files changed:**
+- `renmark/analytics.py` — new helper + `__all__` export; `record_feature_run`/`_agg_features` untouched.
+**Do not change:**
+- Must TRANSFORM the row, never append — `_agg_features` counts `branch_disposition` per row, so a second row double-counts (open + merged-deleted).
+- Keep the helper non-raising and idempotent; do not alter `record_feature_run`'s append-only contract.
+
 ## [2026-06-17] — req14-scan: honest read-only claim + final hardening (pivot re-review)
 **Request:** The pivot re-review found the "structural read-only" wording overstated (running `pytest` executes project code → not a sandbox) plus 2 hardening Majors. REQ-14 explicitly authorizes running tests as read-only checks, so behavior is compliant — the claim just needed to be accurate.
 **Built:**

@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-16 @ c2b0a28 -->
+<!-- Last refreshed: 2026-06-17 @ 323793c -->
 
 # Project map — ai-system
 
@@ -24,8 +24,8 @@ ai-system/
 |---|---|---|
 | `renmark/init.py` | Project-map generator — renmark's analog to Claude Code's native /init. | `FileInfo`, `Standard`, `Gap`, `StandardsScan`, `RepoScan`, `scan_repo` |
 | `renmark/scan.py` | The v1 engine for the REQ-14 read-only scheduled QA proposer lane (``/renmark:sc | `Finding`, `finding_key`, `make_finding`, `ScanReport`, `run_scan`, `load_ledger` |
+| `renmark/analytics.py` | Analytics event ledgers + Python aggregation (REQ-15). | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `close_feature_disposition` |
 | `renmark/lifecycle.py` | Lifecycle state for renmark features — enforces G12 (lifecycle persistence) and  | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
-| `renmark/analytics.py` | Analytics event ledgers + Python aggregation (REQ-15). | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `record_loop_run` |
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
 | `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `no_raw_jsonl`, `disclaimer_present`, `shim_thinness` |
 | `tests/test_plan_lint.py` | --- artifact_type: renmark_task_output schema_version: 1 created_at: 2026-06-11T | `test_valid_plan_pass`, `test_valid_plan_cli_exit_0`, `test_missing_verifier_block`, `test_too_many_tasks_block`, `test_duplicate_target_same_group_block`, `test_same_target_different_groups_pass` |
@@ -36,13 +36,13 @@ ai-system/
 | `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
+| `tests/test_reports_analytics.py` | — | `test_build_and_write_feature_report`, `test_feature_report_uses_version_path_for_release_link`, `test_record_functions_append_parseable_jsonl`, `test_aggregate_and_health_report_cover_seeded_and_empty_projects`, `test_record_feature_run_idempotent_on_rerun`, `test_close_feature_disposition_transforms_not_appends` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/roadmap.py` | Roadmap reporter. | `RoadmapRow`, `build_rows`, `render_table`, `write_roadmap_md`, `render_program_table`, `reconcile_setup` |
-| `tests/test_scan.py` | --- | `test_finding_key_is_stable_and_formatted`, `test_propose_findings_deduplicates_unchanged_reports`, `test_changed_fingerprint_resurfaces_existing_item_without_duplication`, `test_write_report_without_propose_leaves_backlog_empty`, `test_proposed_item_has_expected_shape`, `test_emit_cron_prefers_direct_python_trigger_and_labels_optional_hook` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | `PlanLintReport`, `lint_plan`, `main` |
 | `renmark/modularity.py` | Modularity / scalability health lens — pure stdlib ``ast``, zero-dep, never-rais | `analyze` |
-| `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | — |
+| `tests/test_scan.py` | --- | — |
 
 ## Commands (user-facing)
 

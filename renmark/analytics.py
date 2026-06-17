@@ -247,6 +247,105 @@ def record_feature_run(
     )
 
 
+#: ``branch_disposition`` values treated as non-terminal — a closing pass may
+#: still transform them. ``""``/``"open"`` are pre-close; ``"merged"`` is the
+#: legacy non-canonical value finish step 2.5 writes before the disposition is
+#: finalized.
+_NONTERMINAL_DISPOSITIONS: frozenset[str] = frozenset({"", "open", "merged"})
+
+
+def close_feature_disposition(
+    repo: str | Path,
+    *,
+    feature: str,
+    branch: str = "",
+    sha: str = "",
+    disposition: str = "merged-deleted",
+) -> bool:
+    """Transform a feature run's ``branch_disposition`` to a terminal value.
+
+    Matching is **feature-primary**: the feature name is the stable identity, so
+    rows are first selected by ``feature`` plus a still-non-terminal
+    ``branch_disposition`` (``""``, ``"open"``, or the legacy ``"merged"``).
+
+    ``branch`` is the **stable narrowing key**: the feature slug is reusable, so
+    matching by feature alone can close the wrong (or multiple) non-terminal
+    rows when a slug is reused across runs. ``branch`` is stable across a merge
+    (unlike ``sha``, which finish's ``[m]`` merge path rewrites to the
+    merge-commit sha) and is recorded by :func:`record_feature_run`. When
+    ``branch`` is given and matches one or more open feature rows, only that
+    run's rows are closed; when it matches **none**, the fallback is
+    **legacy-only** — it closes solely the candidates that carry no recorded
+    ``branch`` (pre-branch-field data), never rows carrying a *different*
+    branch (those belong to other runs, so closing them would over-close).
+
+    ``sha`` is a further *optional narrowing* (applied after any branch
+    narrowing) with the same safety fallback: when ``sha`` is given and matches
+    one or more of the (branch-narrowed) open rows, only the sha-matched subset
+    is closed; but when ``sha`` matches **no** such row (e.g. finish's ``[m]``
+    merge path records the merge-commit sha, not the feature-tip sha step 2.5
+    stored), it falls back to closing the current candidate set anyway. This
+    guarantees a stale/wrong sha can never cause a silent no-op. When both
+    ``branch`` and ``sha`` are empty, all open feature rows are closed. The
+    whole ledger is rewritten (never appended) atomically (``tempfile.mkstemp``
+    + ``os.replace``).
+
+    Returns ``True`` if at least one row changed (ledger rewritten), ``False``
+    otherwise — no matching non-terminal row means a no-op (no append, no
+    rewrite), so this is idempotent and safe to re-run. Never raises; analytics
+    is observational, never load-bearing, so any IO/parse failure returns
+    ``False``.
+    """
+    path = analytics_dir(repo) / FEATURE_RUNS_LEDGER
+    try:
+        rows = read_jsonl(path)
+        feature_candidates = [
+            row
+            for row in rows
+            if row.get("feature") == feature
+            and str(row.get("branch_disposition", "")) in _NONTERMINAL_DISPOSITIONS
+        ]
+        if branch:
+            branch_narrowed = [row for row in feature_candidates if row.get("branch") == branch]
+            if branch_narrowed:
+                feature_candidates = branch_narrowed
+            else:
+                # branch given but matched no candidate: fall back ONLY to legacy
+                # rows with no recorded branch (pre-branch-field data). Never close
+                # rows that carry a DIFFERENT branch — those are other runs (no
+                # over-close).
+                feature_candidates = [
+                    row for row in feature_candidates if not str(row.get("branch", ""))
+                ]
+        if sha:
+            narrowed = [row for row in feature_candidates if row.get("sha") == sha]
+            to_transform = narrowed if narrowed else feature_candidates
+        else:
+            to_transform = feature_candidates
+        changed = False
+        for row in to_transform:
+            row["branch_disposition"] = disposition
+            changed = True
+        if not changed:
+            return False
+        tmp_path: str | None = None
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = "".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows)
+            fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+            os.replace(tmp_path, path)
+            tmp_path = None
+        finally:
+            if tmp_path is not None:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_path)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
 def record_loop_run(
     repo: str | Path,
     *,
@@ -726,6 +825,7 @@ __all__ = [
     "aggregate",
     "analytics_dir",
     "build_health_report",
+    "close_feature_disposition",
     "read_jsonl",
     "record_event",
     "record_feature_run",

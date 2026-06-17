@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-16, .renmark/reviews/2026-06-16-e6c015039b6e32dbb6ada6014cf03cc929575f02.verification.md) model `verify`: **verify-finish-branch-disposition** — 4/4 behaviors verified; failed: none; regressions: 0. Smoke confirmed transform-not-append, rollup no-double-count, both finish paths wired, feature-name fallback closes post-merge.
+
+- (2026-06-16, run) **finish disposition close-out** — Match the open feature-run row by FEATURE NAME, not feature+sha: finish merges with --no-ff so post-merge HEAD is the merge commit, not the recorded feature-tip sha; a sha-hard match silently no-ops. close_feature_disposition is feature-primary with sha as optional narrowing + fallback.
+
 - (2026-06-16, .renmark/reviews/2026-06-17-e6244a2.review.md) model `verify`: **verify-req14-scan-fixes** — post-review-fix re-verification: full suite 844 green; Critical hook bypass independently confirmed blocked (git -C/--git-dir/env-prefix all rc=2); read-only invariant holds
 
 - (2026-06-16, .renmark/reviews/2026-06-17-e6244a2.verification.md) model `verify`: **verify-req14-scan-proposer** — 3/3 behaviors verified; failed: none; regressions: 0; dedup proven end-to-end (run1 proposed 1, run2 0); engine found 1 real finding on the renmark repo while dogfooding
