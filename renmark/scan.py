@@ -18,18 +18,34 @@ Design contract (mirrors :mod:`renmark.audit` / :mod:`renmark.backlog`):
   ``.renmark/state/proposals.json``, and (3) — only via
   :func:`propose_findings` — backlog items through
   :func:`renmark.backlog.write_item`. It MUST NOT advance ``lifecycle.json``;
-  this module deliberately never imports ``renmark.lifecycle.write_lifecycle``.
+  this module deliberately never imports or calls the lifecycle writer.
 - **Deduplication before any backlog write.** A SARIF-style stable
   :func:`finding_key` keyed against the ledger guarantees repeated scheduled runs
-  never spam the backlog (the Dependabot noise failure mode).
+  never spam the backlog (the Dependabot noise failure mode). The ledger
+  load→check→write→save sequence is serialised with a stdlib file lock
+  (:func:`_ledger_lock`) so overlapping scheduled scans can't double-file.
+
+Read-only posture — where the real boundary is
+-----------------------------------------------
+The PRIMARY read-only guarantee is the *allowlist* the scheduled scan runs
+under: ``--disallowedTools Edit,Write`` + a restricted ``--tools`` list +
+``--permission-mode dontAsk`` (see :func:`emit_cron`). That restricted-tool
+posture is the boundary. The :data:`READONLY_HOOK` Bash denylist is
+**defense-in-depth only**: denylists are best-effort and can never be proven
+exhaustive (new git plumbing, aliases, env tricks), so they must never be
+mistaken for the actual sandbox. If the allowlist is correct, the hook is
+redundant; if the allowlist is wrong, the hook is a backstop, not a fix.
 
 Full design context: ``.renmark/specs/2026-06-15-req14-scan-proposer.spec.md``.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import os
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -136,6 +152,11 @@ class ScanReport:
     completion_state: str = "complete"  # complete | partial | failed
     confidence: str = "high"  # low | medium | high
     validation_status: str = "validated"  # validated | unvalidated | failed
+    #: The exact repo-relative path :func:`write_report` wrote this report to.
+    #: Threaded into each proposed item's ``evidence_path`` so the link always
+    #: points at the *actual* artifact (never a recomputed date-only guess that
+    #: a same-day re-scan would silently retarget). Empty until ``write_report``.
+    evidence_path: str = ""
 
     @property
     def finding_count(self) -> int:
@@ -322,17 +343,81 @@ def save_ledger(repo: Path | str, ledger: dict[str, dict[str, object]]) -> None:
         return
 
 
+#: Relative path of the advisory lock guarding the ledger's read→write cycle.
+_LEDGER_LOCK_NAME: str = "proposals.lock"
+
+
+@contextlib.contextmanager
+def _ledger_lock(repo: Path | str) -> Iterator[None]:
+    """Serialise the ledger load→check→write→save cycle across concurrent scans.
+
+    Uses a stdlib advisory file lock (``fcntl.flock`` on a ``.proposals.lock``
+    sentinel inside ``.renmark/state/``) so two overlapping scheduled scans can't
+    both observe a finding as "new" and double-file it. Dependency-free.
+
+    Degrades gracefully and NEVER raises: if ``fcntl`` is unavailable (non-POSIX)
+    or the lock file can't be opened/locked, the body still runs unserialised —
+    correctness under contention is best-effort, but a single scan must never
+    crash because it couldn't take the lock. The lock is always released.
+    """
+    try:
+        import fcntl  # POSIX only; absent on Windows.
+    except ImportError:  # pragma: no cover - non-POSIX fallback
+        yield
+        return
+
+    path = _ledger_path(repo).with_name(_LEDGER_LOCK_NAME)
+    fd: int | None = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError:  # pragma: no cover - lock dir/file unavailable
+        if fd is not None:
+            with contextlib.suppress(OSError):
+                os.close(fd)
+        yield
+        return
+
+    locked = False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            locked = True
+        except OSError:  # pragma: no cover - lock acquisition failed
+            pass
+        yield
+    finally:
+        if locked:
+            with contextlib.suppress(OSError):
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        with contextlib.suppress(OSError):
+            os.close(fd)
+
+
 # ── Report writer ──────────────────────────────────────────────────────────────
 
 
-def _report_rel_path(repo: Path | str) -> str:
-    """Compute the report's repo-relative path (``.renmark/reviews/<date>-scan.review.md``).
+def _report_rel_path(report: ScanReport) -> str:
+    """Compute a *unique* repo-relative report path.
 
-    Date comes from :func:`renmark.state.now_iso` (NOT ``datetime.now`` — keeps
-    the determinism convention so tests can pin time at one seam). Never raises.
+    Shape: ``.renmark/reviews/<date>-<time>-<hash>-scan.review.md``. The date +
+    time come from :func:`renmark.state.now_iso` (NOT ``datetime.now`` — keeps
+    the determinism convention so tests can pin time at one seam); the short hash
+    is derived from the report's content so two scans that land in the same
+    second still get distinct files. This closes the same-day collision where
+    multiple scans overwrote one artifact and silently retargeted every backlog
+    ``evidence_path`` for that day. Never raises.
     """
-    date_str = now_iso()[:10]  # YYYY-MM-DD slice of the ISO8601 timestamp
-    return f".renmark/reviews/{date_str}-scan.review.md"
+    stamp = now_iso()
+    date_str = stamp[:10]  # YYYY-MM-DD
+    # Time component: digits only from the HH:MM:SS slice, robust to ISO variants.
+    time_str = "".join(c for c in stamp[11:19] if c.isdigit()) or "000000"
+    # Content hash: stable for identical reports, distinct for different ones.
+    digest_src = "\n".join(
+        [report.completion_state, *report.checks_run, *(f.fingerprint for f in report.findings)]
+    )
+    short = hashlib.sha1(digest_src.encode("utf-8", errors="replace")).hexdigest()[:8]
+    return f".renmark/reviews/{date_str}-{time_str}-{short}-scan.review.md"
 
 
 def _render_body(report: ScanReport) -> str:
@@ -368,9 +453,12 @@ def write_report(repo: Path | str, report: ScanReport) -> str:
     path :func:`propose_findings` records as each item's ``evidence_path`` (so
     compute it once, before proposing). Never raises into the caller beyond a
     summary-boundary bug (which is a real programmer error, not runtime data).
+
+    Side effect: stores the written path on ``report.evidence_path`` so a later
+    :func:`propose_findings` links the EXACT artifact, never a recomputed guess.
     """
     repo = Path(repo)
-    rel_path = _report_rel_path(repo)
+    rel_path = _report_rel_path(report)
     out_path = repo / rel_path
 
     summary_lines: list[str] = [
@@ -399,6 +487,7 @@ def write_report(repo: Path | str, report: ScanReport) -> str:
         confidence=report.confidence,
         validation_status=report.validation_status,
     )
+    report.evidence_path = rel_path
     return rel_path
 
 
@@ -420,101 +509,266 @@ def propose_findings(repo: Path | str, report: ScanReport) -> list[str]:
       the ledger's fingerprint + ``last_seen``.
 
     The report MUST already be written (so ``evidence_path`` resolves) — callers
-    invoke :func:`write_report` first. Returns the list of newly-proposed backlog
-    IDs (re-surfaced existing items are not counted as new). A ``write_item``
-    failure is swallowed per-finding (the report still persists); the finding is
-    not recorded so a later run retries it. Never raises into the caller.
+    invoke :func:`write_report` first, which records the EXACT artifact path on
+    ``report.evidence_path``; this links that path (never a recomputed date-only
+    guess). Returns the list of newly-proposed backlog IDs (re-surfaced existing
+    items are not counted as new). A ``write_item`` failure is swallowed
+    per-finding (the report still persists); the finding is not recorded so a
+    later run retries it. The whole load→write→save cycle runs under
+    :func:`_ledger_lock` so concurrent scans can't double-file. Never raises.
     """
     repo = Path(repo)
-    ledger = load_ledger(repo)
-    evidence_path = _report_rel_path(repo)
+    # Prefer the EXACT path write_report stored; fall back to a fresh unique path
+    # only if a caller skipped write_report (keeps evidence_path honest).
+    evidence_path = report.evidence_path or _report_rel_path(report)
     stamp = now_iso()
     new_ids: list[str] = []
 
-    for f in report.findings:
-        key = finding_key(f)
-        entry = ledger.get(key)
+    with _ledger_lock(repo):
+        ledger = load_ledger(repo)
 
-        if isinstance(entry, dict) and entry.get("fingerprint") == f.fingerprint:
-            # Seen, unchanged — skip. Touch last_seen so the ledger reflects the run.
-            entry["last_seen"] = stamp
-            continue
+        for f in report.findings:
+            key = finding_key(f)
+            entry = ledger.get(key)
 
-        if isinstance(entry, dict) and entry.get("backlog_id"):
-            # Seen but changed — re-surface the linked item rather than duplicate.
-            item_id = str(entry.get("backlog_id"))
-            existing = backlog.read_item(repo, item_id)
-            if existing is not None:
-                existing.title = f.title
-                existing.summary = f.summary
-                existing.risk = f.risk
-                existing.recommended_action = f.recommended_action
-                existing.evidence_path = evidence_path
-                existing.status = "needs review"  # re-surface for triage
-                existing.updated_at = stamp
-                backlog.write_item(repo, existing)
-            entry["fingerprint"] = f.fingerprint
-            entry["last_seen"] = stamp
-            entry["state"] = "re-surfaced"
-            continue
+            if isinstance(entry, dict) and entry.get("fingerprint") == f.fingerprint:
+                # Seen, unchanged — skip. Touch last_seen so the ledger reflects the run.
+                entry["last_seen"] = stamp
+                continue
 
-        # Unseen — propose a fresh backlog item.
-        item_id = backlog.next_id(repo)
-        item = backlog.BacklogItem(
-            id=item_id,
-            title=f.title,
-            status="needs review",
-            source="qa",
-            risk=f.risk,
-            summary=f.summary,
-            evidence_path=evidence_path,
-            recommended_action=f.recommended_action,
-            created_at=stamp,
-            updated_at=stamp,
-        )
-        written = backlog.write_item(repo, item)
-        if written is None:
-            # write_item failed — don't record so a later run retries this finding.
-            continue
-        ledger[key] = {
-            "backlog_id": item_id,
-            "fingerprint": f.fingerprint,
-            "first_seen": stamp,
-            "last_seen": stamp,
-            "state": "proposed",
-        }
-        new_ids.append(item_id)
+            if isinstance(entry, dict) and entry.get("backlog_id"):
+                # Seen but changed — re-surface the linked item rather than duplicate,
+                # UNLESS the linked item has gone missing/corrupt: a stale ledger
+                # pointer must not permanently suppress a live finding, so fall
+                # through to create a fresh item and repoint the ledger.
+                item_id = str(entry.get("backlog_id"))
+                existing = backlog.read_item(repo, item_id)
+                if existing is not None:
+                    existing.title = f.title
+                    existing.summary = f.summary
+                    existing.risk = f.risk
+                    existing.recommended_action = f.recommended_action
+                    existing.evidence_path = evidence_path
+                    existing.status = "needs review"  # re-surface for triage
+                    existing.updated_at = stamp
+                    backlog.write_item(repo, existing)
+                    entry["fingerprint"] = f.fingerprint
+                    entry["last_seen"] = stamp
+                    entry["state"] = "re-surfaced"
+                    continue
+                # else: stale ledger miss — fall through to fresh proposal below.
 
-    save_ledger(repo, ledger)
+            # Unseen (or stale-ledger miss) — propose a fresh backlog item,
+            # all-or-nothing: roll back the reserved id if the real write fails so
+            # a failed write never leaks a ghost placeholder item.
+            new_id = _propose_one(repo, f, evidence_path, stamp)
+            if new_id is None:
+                # write_item failed — don't record so a later run retries this finding.
+                continue
+            ledger[key] = {
+                "backlog_id": new_id,
+                "fingerprint": f.fingerprint,
+                "first_seen": stamp,
+                "last_seen": stamp,
+                "state": "proposed",
+            }
+            new_ids.append(new_id)
+
+        save_ledger(repo, ledger)
     return new_ids
 
 
-# ── Read-only enforcement (PreToolUse hook) ─────────────────────────────────────
+def _propose_one(repo: Path, f: Finding, evidence_path: str, stamp: str) -> str | None:
+    """Write one fresh ``source="qa"`` backlog item, all-or-nothing.
 
-#: PreToolUse hook command. Reads the proposed Bash command from the hook stdin
-#: JSON (``tool_input.command``) and emits a block decision when it matches any
-#: git-mutating / destructive verb. Matched → print a ``{"decision":"block"}``
-#: JSON object AND exit non-zero (defense in depth: either signal is sufficient
-#: for Claude Code to deny). Otherwise allow (exit 0, no output).
+    :func:`renmark.backlog.next_id` reserves the id by *creating a placeholder
+    file* (``O_CREAT|O_EXCL``). If the subsequent :func:`renmark.backlog.write_item`
+    fails, that placeholder would leak as a ghost item — so on failure we roll
+    back by deleting the reserved file. Returns the new id, or ``None`` on
+    failure (rolled back). Never raises into the caller.
+    """
+    item_id = backlog.next_id(repo)
+    item = backlog.BacklogItem(
+        id=item_id,
+        title=f.title,
+        status="needs review",
+        source="qa",
+        risk=f.risk,
+        summary=f.summary,
+        evidence_path=evidence_path,
+        recommended_action=f.recommended_action,
+        created_at=stamp,
+        updated_at=stamp,
+    )
+    if backlog.write_item(repo, item) is not None:
+        return item_id
+    # write_item failed — roll back the reserved placeholder so no ghost leaks.
+    _rollback_reserved(repo, item_id)
+    return None
+
+
+def _rollback_reserved(repo: Path, item_id: str) -> None:
+    """Delete the placeholder file ``next_id`` reserved for ``item_id``.
+
+    Best-effort: gated through the backlog module's own safe-id check + path
+    builder so we never delete outside the backlog dir, and swallows IO errors
+    (a leftover placeholder is a lesser evil than a raised exception in a
+    read-only scan). Never raises.
+    """
+    if not backlog._is_safe_item_id(item_id):  # reuse backlog's traversal guard
+        return
+    with contextlib.suppress(OSError):
+        backlog._item_json_path(repo, item_id).unlink(missing_ok=True)
+
+
+# ── Read-only enforcement (PreToolUse hook) ─────────────────────────────────────
+#
+# DEFENSE-IN-DEPTH ONLY. This denylist is a backstop, never the boundary. The
+# real read-only guarantee is the restricted ``--tools`` allowlist +
+# ``--disallowedTools Edit,Write`` + ``--permission-mode dontAsk`` posture (see
+# :func:`emit_cron`). Denylists are best-effort by nature — they can never be
+# proven exhaustive against new git plumbing, aliases, or shell tricks — so the
+# allowlist posture, not this hook, is what makes the scan read-only.
+
+#: The Python program (source text) embedded into the PreToolUse hook command.
 #:
-#: Kept as a single self-contained python one-liner so it pastes into
-#: settings.json with no external script file to install.
-_READONLY_HOOK_COMMAND: str = (
-    "python3 -c \""
-    "import sys,json,re;"
-    "d=json.load(sys.stdin);"
-    "c=(d.get('tool_input') or {}).get('command','');"
-    "pat=re.compile(r'\\\\bgit\\\\s+(commit|push|merge|rebase|tag)\\\\b"
-    "|\\\\bgit\\\\s+reset\\\\s+--hard\\\\b"
-    "|\\\\bgit\\\\s+branch\\\\s+-[dD]\\\\b"
-    "|\\\\bgit\\\\s+checkout\\\\s+-b\\\\b"
-    "|\\\\brm\\\\s+-rf\\\\b');"
-    "m=pat.search(c);"
-    "print(json.dumps({'decision':'block',"
-    "'reason':'renmark:scan is read-only; mutating git/rm command denied'})) if m else None;"
-    "sys.exit(2 if m else 0)"
-    "\""
-)
+#: It reads the proposed Bash command from the hook stdin JSON
+#: (``tool_input.command``) and BLOCKS when the effective program is ``git`` in
+#: ANY form running a mutating subcommand, or an ``rm -rf`` / destructive
+#: redirection. Rather than pattern-matching raw text (bypassable by
+#: ``git -C repo commit``, ``git --git-dir=. commit``, ``FOO=1 git commit``,
+#: …), it TOKENIZES each shell segment with :mod:`shlex`, skips leading
+#: ``VAR=val`` env assignments, skips git global options that take the program
+#: name away from the subcommand (``-C <path>``, ``--git-dir[=]``,
+#: ``--work-tree[=]``, ``-c <cfg>``, ``--namespace``, ``--exec-path``,
+#: ``-p``/``--paginate``, ``--bare``, ``--no-pager``), then inspects the first
+#: real subcommand. Matched → print ``{"decision":"block", ...}`` AND exit
+#: non-zero (either signal is sufficient for Claude Code to deny). Otherwise
+#: allow (exit 0, no output).
+_READONLY_HOOK_SOURCE: str = r'''
+import sys, json, shlex
+raw = sys.stdin.read()
+try:
+    cmd = (json.loads(raw).get("tool_input") or {}).get("command", "")
+except Exception:
+    cmd = ""
+if not isinstance(cmd, str):
+    cmd = ""
+# Always-mutating git subcommands (block whenever they appear as the subcommand).
+MUT = {"commit","push","merge","rebase","reset","tag","am","cherry-pick",
+       "revert","stash","clean","gc","update-ref","fast-import","apply","mv","rm"}
+# git global options that sit between "git" and the subcommand.
+OPT_VAL = {"-C","-c","--namespace","--exec-path"}        # consume the next token
+OPT_EQ = ("--git-dir","--work-tree","--namespace","--exec-path")  # may use =VALUE
+OPT_FLAG = {"-p","--paginate","--bare","--no-pager"}
+def env_assign(t):
+    i = t.find("=")
+    if i <= 0:
+        return False
+    return t[:i].replace("_","").isalnum() and not t[:i][0].isdigit()
+def git_sub_index(toks):
+    # Return index of the git subcommand token, or -1 if toks is not a git call.
+    n = len(toks)
+    i = 0
+    while i < n and env_assign(toks[i]):   # skip FOO=1 BAR=2 prefixes
+        i += 1
+    if i >= n or toks[i] != "git":
+        return -1
+    i += 1
+    while i < n:
+        t = toks[i]
+        if t in OPT_VAL:
+            i += 2; continue
+        if t in OPT_FLAG:
+            i += 1; continue
+        if t.startswith(OPT_EQ):
+            # --git-dir=X (one token) or --git-dir X (consume next).
+            i += 1 if "=" in t else 2; continue
+        if t.startswith("-"):
+            i += 1; continue
+        break
+    return i if i < n else -1
+def is_git_mutation(toks):
+    i = git_sub_index(toks)
+    if i < 0:
+        return False
+    sub = toks[i]
+    rest = toks[i + 1:]
+    if sub in MUT:
+        return True
+    # branch: mutating only when deleting (-d/-D) or creating (a non-flag arg).
+    if sub == "branch":
+        for a in rest:
+            if a in ("-d", "-D", "--delete", "-m", "-M", "--move", "-c", "-C", "--copy", "-f", "--force"):
+                return True
+            if not a.startswith("-"):
+                return True   # `git branch <name>` creates a branch
+        return False
+    # checkout: mutating when creating a branch (-b/-B) or force-overwriting (-f).
+    if sub == "checkout":
+        for a in rest:
+            if a in ("-b", "-B", "-f", "--force"):
+                return True
+        return False
+    return False
+def has_rm_rf(toks):
+    j = 0
+    while j < len(toks) and env_assign(toks[j]):
+        j += 1
+    toks = toks[j:]
+    if not toks or toks[0] != "rm":
+        return False
+    for t in toks[1:]:
+        if t.startswith("-") and not t.startswith("--") and "r" in t.lower() and "f" in t.lower():
+            return True
+    if "--recursive" in toks and "--force" in toks:
+        return True
+    return False
+blocked = False
+# Split into shell segments so "x && git commit" is inspected per-segment.
+for seg in cmd.replace("&&", "\n").replace("||", "\n").replace(";", "\n").replace("|", "\n").split("\n"):
+    seg = seg.strip()
+    if not seg:
+        continue
+    # Destructive redirection: truncating a tracked path. Best-effort.
+    if ">" in seg and ".git" in seg:
+        blocked = True
+        break
+    try:
+        toks = shlex.split(seg, comments=False, posix=True)
+    except ValueError:
+        # Unparseable (unbalanced quotes) -> be safe, deny.
+        blocked = True
+        break
+    if is_git_mutation(toks) or has_rm_rf(toks):
+        blocked = True
+        break
+if blocked:
+    print(json.dumps({"decision": "block",
+        "reason": "renmark:scan is read-only; mutating git/rm command denied"}))
+    sys.exit(2)
+sys.exit(0)
+'''
+
+
+def _build_hook_command(source: str) -> str:
+    """Wrap an embedded Python program as a single ``python3 -c "..."`` shell
+    command that pastes cleanly into ``settings.json``.
+
+    Collapses the multi-line source into a base64-decoded ``exec`` so neither
+    shell quoting nor JSON escaping can mangle the program (newlines, quotes,
+    and backslashes in the tokenizer survive intact). Deterministic; pure.
+    """
+    import base64
+
+    encoded = base64.b64encode(source.encode("utf-8")).decode("ascii")
+    # Single-quoted in the shell; b64 is ASCII-safe so no shell metachars leak.
+    return f"python3 -c 'import base64;exec(base64.b64decode(\"{encoded}\").decode())'"
+
+
+#: PreToolUse hook command — a self-contained ``python3 -c`` one-liner (no
+#: external script to install). See :data:`_READONLY_HOOK_SOURCE` for the logic.
+_READONLY_HOOK_COMMAND: str = _build_hook_command(_READONLY_HOOK_SOURCE)
 
 #: Claude Code PreToolUse hook config for the read-only scheduled scan. Paste the
 #: ``hooks`` block into settings.json; the matcher fires only on ``Bash`` tool
@@ -559,12 +813,18 @@ def emit_cron(repo: Path | str) -> str:
         "# renmark:scan — read-only scheduled QA proposer trigger\n"
         f"# repo: {repo}\n"
         "#\n"
+        "# PRIMARY read-only guarantee: the restricted allowlist on the cron line\n"
+        "#   below — `--disallowedTools Edit,Write` + restricted `--tools` +\n"
+        "#   `--permission-mode dontAsk`. THAT is the boundary. The PreToolUse hook\n"
+        "#   (block 2) is defense-in-depth only; denylists are best-effort and can\n"
+        "#   never be proven exhaustive, so never rely on the hook alone.\n"
+        "#\n"
         "# 1. Headless cron line (WSL cron / Windows Task Scheduler):\n"
         f"{cron_line}\n"
         "#\n"
         "# 2. PreToolUse Bash-denylist hook — paste into settings.json (the\n"
         "#    `hooks` key denies git-mutating / destructive commands even though\n"
-        "#    Bash is enabled for verifiers):\n"
+        "#    Bash is enabled for verifiers — defense-in-depth, NOT the boundary):\n"
         f"{hook_json}\n"
         "#\n"
         "# 3. One-time auth (headless runs need a token, not interactive login):\n"

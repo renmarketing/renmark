@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-06-17] — req14-scan: code-review fixes (1 Critical, 4 Major, 1 Minor)
+**Request:** Fix the codex review findings (`.renmark/reviews/2026-06-17-e6244a2.review.md`) before merging the scan lane.
+**Built:**
+- **CRITICAL** — `renmark/scan.py` `READONLY_HOOK` denylist was bypassable (`git -C x commit`, `git --git-dir=… commit`, `FOO=1 git commit`). Replaced the brittle regex with a base64-embedded `shlex` tokenizer that skips env-assignments + git global options and blocks any mutating git subcommand by position; `emit_cron` now states the restricted `--tools`/`--disallowedTools`/`dontAsk` allowlist is the primary boundary and the hook is defense-in-depth.
+- **MAJOR** — unique report paths (`<date>-<HHMMSS>-<hash>-scan.review.md`) so same-day scans don't overwrite + retarget `evidence_path`; `propose_findings` links the exact written path via `ScanReport.evidence_path`.
+- **MAJOR** — stale-ledger entries (missing `backlog_id`) now recreate the item instead of permanently suppressing the finding.
+- **MAJOR** — proposal dedup serialized under an `fcntl.flock` on `.renmark/state/proposals.lock` (concurrent-scan safe).
+- **MAJOR** — failed `write_item` rolls back the reserved `next_id` placeholder (no ghost items).
+- **MAJOR (partial)** — `cmd_scan` returns `2` on a partial run (`checks_failed_to_run` non-empty); still `0` for clean/with-findings (proposer, not a gate).
+- **MINOR** — `--propose`/`--emit-cron` now require `--scan` (fail fast, exit 2).
+- Tests extended to 22 (subprocess-driven hook deny/allow, path uniqueness, stale-ledger recreate, partial exit, flag gating). Full suite 844 green.
+**Files changed:** `renmark/scan.py`, `renmark/cli/commands.py`, `renmark/cli/_engine.py`, `tests/test_scan.py`
+**Do not change:**
+- The read-only boundary is the restricted tool-list (`--tools`/`--disallowedTools`/`--permission-mode dontAsk`); the Bash-denylist hook is best-effort defense-in-depth, NOT the sole guarantee. Do not reintroduce a single-regex hook.
+
+## [2026-06-16] — refresh scan tests for post-review contract fixes
+**Request:** Update `tests/test_scan.py` for the fixed `renmark/scan.py` behavior: unique report paths, behavioral read-only hook checks, stale-ledger recreation, partial exit codes, and `--scan` flag gating.
+**Built:** Replaced the stale path-equality and regex-literal assertions with behavior that matches the current scan contract. Added subprocess-driven deny/allow coverage for `_READONLY_HOOK_COMMAND`, same-day report-path uniqueness and evidence-path propagation checks, stale-ledger recreation coverage, direct `cmd_scan()` exit-code tests, and top-level `python3 -m renmark` flag-gating tests. Kept `tests/test_scan.py` as a valid renmark artifact envelope while remaining importable by pytest.
+**Files changed:**
+- `tests/test_scan.py`
+**Do not change:**
+- Do not regress these tests to date-only report-path assumptions or hook substring checks; the supported contract is exact evidence-path propagation plus real deny/allow semantics.
+
 ## [2026-06-16] — req14-scan-proposer wave 1: engine + skill wiring (tasks 1,5,6,7,8)
 **Request:** Build the REQ-14 read-only scheduled QA proposer lane `/renmark:scan`.
 **Built:** `renmark/scan.py` engine (zero-LLM, never raises): `run_scan` composes `audit.run_audit` + pytest/ruff/mypy verifiers into normalized `Finding`s; `.renmark/state/proposals.json` dedup ledger keyed `{check}:{rule_id}:{target}` (unseen→propose, same fingerprint→skip, changed→re-surface); `propose_findings` lands `source="qa"`/`status="needs review"` items via the REQ-13 backlog seam; `emit_cron` prints the read-only external trigger + a PreToolUse Bash-denylist hook (`READONLY_HOOK`) that blocks git commit/push/merge/rebase/reset --hard/tag/branch -d/checkout -b/rm -rf. Registered `scan` (audit domain) in lifecycle; added `/renmark:scan` SKILL.md, command shim, and help entry.

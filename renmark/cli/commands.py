@@ -88,14 +88,16 @@ def cmd_scan(repo: Path, *, propose: bool = False, emit_cron: bool = False) -> i
     deduped_str = str(report.finding_count - newly_proposed) if propose else "—"
     failed_checks = len(report.checks_failed_to_run)
 
+    partial_note = f"  |  partial: {failed_checks} checks failed to run" if failed_checks else ""
     print(
         f"Findings: {report.finding_count}  |  Proposed: {newly_proposed}"
         f"  |  Deduped/skipped: {deduped_str}  |  Checks failed to run: {failed_checks}"
+        f"{partial_note}"
     )
     print(f"Report: {path}")
     if not propose:
         print("(run with --propose to file backlog items)")
-    return 0
+    return 2 if failed_checks else 0
 
 
 def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:

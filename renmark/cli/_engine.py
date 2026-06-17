@@ -1017,6 +1017,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--output", metavar="ARTIFACT_PATH", help="(with --task) where Codex writes its artifact")
     args = ap.parse_args(argv)
 
+    if (args.propose or args.emit_cron) and not args.scan:
+        print("--propose/--emit-cron require --scan", file=sys.stderr)
+        return 2
+
     repo = Path(args.repo).resolve()
 
     if args.usage:
