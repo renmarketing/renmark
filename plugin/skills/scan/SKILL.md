@@ -127,6 +127,18 @@ After a `--propose` run, triage the proposed items with `/renmark:backlog`. That
 skill surfaces the `needs review` queue and lets you approve, reject, or defer
 each item before any execution occurs.
 
+scan is an **aux / terminal skill** (class 3 in
+`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It reports and proposes;
+it never advances the pipeline.
+
+> *End by calling `renmark.lifecycle.next_steps(repo, "scan")` and render per
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
+> add the skill's local follow-ups (e.g. `/renmark:backlog` to triage proposed
+> items). Render via `AskUserQuestion`
+> (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules 6–9); require an
+> explicit choice.*
+
 ## Maintainer Note
 
 **Read-only** and **external-scheduling** are invariants for this lane, not
