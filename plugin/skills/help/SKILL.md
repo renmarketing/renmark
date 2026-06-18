@@ -1,161 +1,99 @@
 ---
 name: help
-description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Prints all /renmark:* commands with one-sentence descriptions and the typical workflow order. Zero-cost — no LLM calls.
+description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Teaches the workflow — prints the user-facing pipelines first, then every skill grouped by purpose with its common modifiers. Zero-cost — no LLM calls.
 ---
 
 # help
 
 ## Overview
 
-Lists the renmark plugin's commands with brief descriptions and the recommended workflow order. Pure text output, no API calls.
+Teaches the renmark workflow. Prints the user-facing **pipelines** first (each
+with the internal stages it runs), then the full skill list grouped by purpose
+with each skill's common modifiers. Pure text output, no API calls.
 
 ## When invoked
 
 Print exactly this block (update individual entries when a command is added or
-renamed — `/renmark:audit`'s `description_drift` pass now catches stale entries):
+renamed — `/renmark:audit`'s `description_drift` pass catches stale entries).
+Keep it honest: only describe stages and modifiers that exist today.
 
 ```
 renmark — guided build assistant
 
-Renmark is a wizard pipeline. Start anywhere; each command offers to
-hand off to the next when its job is done:
+Think in pipelines, not commands. Pick the one that matches your situation and
+renmark runs the whole sequence, continuing on its own and pausing only at real
+decisions: unclear intent, PRD approval, scope change, risky action, cost,
+a blocker, or merge/release.
 
-  /renmark:start  →  /renmark:brainstorm  →  /renmark:plan
-    →  /renmark:orchestrate  →  /renmark:verify  →  /renmark:finish
+── Pipelines ───────────────────────────────────────────────────────────────
+  /renmark:init      Make a repo renmark-ready.
+      repo scan → stack/test detect → CLAUDE/AGENTS → project map →
+      standards → PRD check → lifecycle-ready
 
-Each transition is an explicit user prompt (Y / n / wait), so nothing
-spends tokens without your approval. /renmark:debug runs ad-hoc, anytime.
+  /renmark:start [idea]      Build something new.
+      intent → brainstorm (if fuzzy) → PRD → roadmap → first feature →
+      plan → build → verify → review
 
-── Pipeline ──────────────────────────────────────────────────────────────
-  /renmark:start [description]
-      Plain-English entry point for vibe coders. One open question, at
-      most 2 follow-ups, then routes to plan or brainstorm automatically.
+  /renmark:feature [name]    Add or change a feature in an existing build.
+      PRD alignment → reuse check → plan → build → verify → review → finish
 
-  /renmark:brainstorm <topic>
-      Flesh out an idea into a spec. One question at a time, Opus-driven,
-      research-backed. Bootstraps fresh projects (CLAUDE.md, AGENTS.md,
-      .renmark/).
+  /renmark:debug [symptom]   Fix what's broken.
+      reproduce → root cause → fix → regression test → verify → review
 
-  /renmark:plan <spec>
-      Decompose a spec into atomic single-file tasks. Auto-routes each to
-      opus, codex, sonnet, or haiku based on complexity. Emits cost preview.
+  /renmark:roadmap           Find gaps and decide what's next.
+      status → gap discovery → backlog proposals → next-feature pick
 
-  /renmark:orchestrate <plan>
-      Execute a plan. Tasks in the same parallel_group run concurrently;
-      commits land serially per wave. Reports per-task PASS/FAIL summaries.
+  /renmark:finish            Verify, review, and ship.
+      re-verify → QA/review as needed → report → debug if it fails →
+      PR / merge / release menu
 
-  /renmark:verify
-      Goal-backward smoke tests derived from the plan's stated feature
-      goal. Three modes: default shell smoke, --qa (live browser happy
-      path), --deep-qa (3 live-browser edge cases).
+  Which one?
+    new app → start          existing app → feature     broke → debug
+    what's next? → roadmap    adopt renmark → init       ship → finish
 
-  /renmark:feature <name>
-      Full feature pipeline with branch isolation: plan → check-plan →
-      orchestrate → verify → finish. Supports --lite and --full overrides.
+── All skills (grouped) ────────────────────────────────────────────────────
+  Format:  command — what it does — common modifiers
 
-  /renmark:finish
-      Close a feature branch — create PR, merge, or release. Refreshes
-      the project map and routes to roadmap gap discovery.
+  Product / spec
+    /renmark:start      — plain-English entry point for a new build
+    /renmark:feature    — feature with branch isolation — --lite, --full
+    /renmark:prd        — create/update the PRD (product source of truth)
+    /renmark:brainstorm — turn a fuzzy idea into a spec, one question at a time
+    /renmark:blueprint  — living schematic + UI prototype
 
-  /renmark:prd
-      Create or update the project's PRD — the per-project source of
-      truth that plans and features align to.
+  Planning / build
+    /renmark:plan        — decompose a spec into routed single-file tasks
+    /renmark:check-plan  — validate a plan — PASS / WARN / BLOCK
+    /renmark:orchestrate — execute a plan, task-isolated, per-wave summaries
+    /renmark:loop        — iterate until a verifier passes — --verify, --budget, --max-iterations
+    /renmark:backlog     — triage and approve tracked work items
 
-  /renmark:blueprint
-      Generate the project's living schematic (Container-granularity
-      Mermaid diagram, always) and a self-contained UI prototype (when
-      the project has a browser surface).
+  Verification / QA
+    /renmark:verify      — goal-backward smoke test — --qa, --deep-qa
+    /renmark:codereview  — diff-proportional review — --full, --skip, --focus
 
-── Quality gates ─────────────────────────────────────────────────────────
-  /renmark:check-plan <plan>
-      Validate a plan deterministically (renmark.plan_lint — shared with
-      orchestrate pre-flight): task count, verifier presence, parallel-
-      group safety, isolation hygiene. Returns PASS, WARN, or BLOCK.
-      Invoked automatically by plan and orchestrate.
+  Debug / autofix
+    /renmark:debug       — reproduce → root cause → fix → regression test
+    /renmark:scan        — read-only QA proposer lane — --propose, --emit-cron
 
-  /renmark:codereview [ref]
-      Diff-proportional review: scope and model tier scale with the size
-      and risk of the change. Writes a timestamped review artifact.
+  Governance / maintenance
+    /renmark:init        — onboard / document a repo (front door)
+    /renmark:setup       — refresh renmark rule blocks (alias of init's merge)
+    /renmark:audit       — plugin/registry health audit — --quick, --inventory-only, --fix
+    /renmark:inventory   — flat inventory of every command and skill
+    /renmark:hygiene     — GC stale artifacts, prune memory — --apply, --ttl-days, --memory-days, --include-memory
+    /renmark:doctor      — diagnose plugin install health — --fix
+    /renmark:approve     — clear a human-approval gate
+    /renmark:roadmap     — status + gap discovery — --gaps, --research
 
-  /renmark:debug <symptom>
-      Systematic reproduce → hypothesize → investigate → fix loop. Routes
-      cheap inspection to Haiku/Bash, multi-file traces to Codex, and
-      cross-system reasoning to Opus. State survives /clear.
+  Reporting / release
+    /renmark:finish      — close a branch: PR, merge, or release
+    /renmark:usage       — observed local usage (pause state, 5h window)
+    /renmark:analytics   — build-health: shipped/blocked, loop rate, cost
+    /renmark:resume      — cold-start recovery: prints the next command
+    /renmark:help        — this message
 
-── Terminal / meta ───────────────────────────────────────────────────────
-  /renmark:init
-      Non-destructive front door: scaffolds missing files, back-fills
-      rule blocks, scans the repo, writes the project map and dev-
-      standards health report. Renmark's analog to Claude Code's /init.
-
-  /renmark:setup
-      Thin alias — refreshes/back-fills renmark rule blocks in an
-      existing project by delegating to init's rule-block merge.
-
-  /renmark:doctor [--fix]
-      Diagnose Claude Code plugin install health. Run when /renmark:*
-      commands aren't appearing or after a version bump. --fix applies
-      safe auto-repairs.
-
-  /renmark:hygiene [--apply]
-      Garbage-collect stale artifacts and prune append-only memory logs.
-      Dry-run by default; --apply archives to .renmark/archive/YYYY-MM/.
-
-  /renmark:help
-      This message.
-
-── Recovery ──────────────────────────────────────────────────────────────
-  /renmark:resume
-      Cold-start recovery: reads lifecycle.json and prints the
-      recommended next command. Zero LLM calls. Run after /clear.
-
-  /renmark:loop [--max N]
-      Bounded iterate-until-verified engine. Repeats a build step until
-      the verifier passes or a budget/iteration cap is hit.
-
-  /renmark:backlog
-      Triage and approve backlog items interactively. "Approve and build"
-      launches bounded Loop Mode on a managed branch.
-
-── Governance / reporting ────────────────────────────────────────────────
-  /renmark:roadmap [--gaps]
-      Status table: task | llm | status | tokens | $ | commit, built from
-      git log and usage.jsonl. --gaps dispatches bounded subagents to
-      surface uncovered PRD requirements. Zero LLM calls for the default
-      table.
-
-  /renmark:usage
-      Observed local usage status: pause state, rolling 5-hour window,
-      local limits. Zero LLM calls.
-
-  /renmark:analytics
-      Project build-health summary: shipped/blocked features, loop
-      success rate, token/cost by feature. Zero LLM calls.
-
-  /renmark:approve
-      Human approval gate for lifecycle transitions that require explicit
-      sign-off (release, merge, security overrides). AI generates; the
-      human owns the merge.
-
-  /renmark:audit [--fix]      ← new in 0.9.0
-      Composable audit: lint_all + modularity + registry-sync +
-      description_drift + strict-YAML frontmatter check. Surfaces
-      stale help entries, ghost skills, and spec drift. --fix routes
-      auto-fixable issues to the appropriate skill.
-
-  /renmark:inventory           ← new in 0.9.0
-      Snapshot of every skill, shim, template, and memory file with
-      freshness and pairing health. Zero LLM calls.
-
-  /renmark:scan [--propose] [--emit-cron]
-      Read-only scheduled QA proposer lane (REQ-14). Inspects with audit +
-      shell verifiers, writes a bounded report; --propose lands deduped
-      source=qa backlog items for triage; --emit-cron prints the safe
-      external trigger. Never edits, commits, or executes.
-
-── Meta ──────────────────────────────────────────────────────────────────
-
-Where things live:
+── Where things live ───────────────────────────────────────────────────────
   .renmark/specs/    — designs from brainstorm (committed)
   .renmark/plans/    — task plans from plan (committed)
   .renmark/reviews/  — review reports (committed)
@@ -177,13 +115,17 @@ skill's SKILL.md or invoke it directly.
 `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (resume-pipeline + local
 actions). To keep `help` zero-cost / no-LLM, do **not** call
 `renmark.lifecycle.next_steps` here — emit a **static** pointer instead: after
-printing the command list, append one line steering the user back to the
-pipeline. If a feature appears to be in flight, point to `/renmark:resume` to
-pick up where it stopped; otherwise point to `/renmark:start`. This is a fixed
-suggestion, not a state-derived `AskUserQuestion` choice — no file reads, no
-subprocesses, no LLM calls.
+printing the block, append one line steering the user back to a pipeline. If a
+feature appears to be in flight, point to `/renmark:resume` to pick up where it
+stopped; otherwise point to `/renmark:start` (new build) or `/renmark:init`
+(adopt renmark into an existing repo). This is a fixed suggestion, not a
+state-derived `AskUserQuestion` choice — no file reads, no subprocesses, no LLM
+calls.
 
 ## Do not
 
 - Make any HTTP calls or run subprocesses for `/renmark:help`. It's pure documentation.
-- Rewrite the workflow order without strong reason; the brainstorm → plan → orchestrate sequence is the documented contract.
+- Advertise a pipeline stage or a modifier flag that the skill doesn't actually
+  implement. Help is the workflow's contract; keep it honest.
+- Reorder the pipeline list without strong reason — `init → start → feature →
+  debug → roadmap → finish` is the documented user-facing model.
