@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-18] — v0.17.0 — `/renmark:scan` QA proposer lane + analytics disposition close-out
+**Request:** Release the work merged to `main` since v0.16.1 (2026-06-14): the REQ-14 `/renmark:scan` read-only QA proposer lane and the analytics `branch_disposition` close-out fix.
+**Built:** Bumped 0.16.1 → 0.17.0 across all 7 locations (drift gate clean). Ships:
+- **REQ-14 `/renmark:scan`** — scheduled read-only QA proposer lane: `renmark/scan.py` engine + `--scan`/`--propose`/`--emit-cron` CLI flags + `plugin/skills/scan/SKILL.md`. Inspects via verifiers (audit + pytest/ruff/mypy), dedupes findings, proposes `source=qa` backlog items for human triage. Never edits product code, commits, merges, releases, or executes fixes. Hardened through code review (uuid4 nonce + `O_EXCL` report reservation, explicit rollback marker, honest "not a sandbox — verifiers run project code at test-suite trust" claim).
+- **Analytics disposition close-out** — `analytics.close_feature_disposition` transforms the non-terminal feature-run row to `merged-deleted` in place (feature-name primary match, branch narrowing, legacy-only branch-miss fallback); `/renmark:finish` `[m]`/`[r]` paths wire it in. Fixes dispositions reported as perpetually `open`.
+- Program reconciled to all-19-REQs-shipped via `--setup`.
+**Files changed:**
+- VERSION + 6 version locations (this commit); `renmark/scan.py`, `renmark/analytics.py`, `plugin/skills/scan/SKILL.md`, `plugin/skills/finish/SKILL.md`, `tests/test_scan.py`, `tests/test_reports_analytics.py` (in prior merged commits)
+**Do not change:**
+- `/renmark:scan` is read-only by construction (no git/product mutation by scan itself); do not add a write path. Disposition close-out matches by feature name (sha is unreliable post-`--no-ff`-merge) and stays non-blocking.
+
 ## [2026-06-16] — finish-branch-disposition (re-review fix): wrong-branch fallback no longer over-closes
 **Request:** Codex re-review of the fixes found one residual Major: when `branch` is given but matches no row, the fallback closed ALL same-feature non-terminal rows — a wrong branch on a reused slug could still over-close.
 **Built:**
