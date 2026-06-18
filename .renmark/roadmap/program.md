@@ -7,7 +7,7 @@ source_sha: bbb8f07
 
 # Program — renmark-prd-program
 
-_mode: staged · Stage 14/19 · task 0/1 done · current: Reserve scheduled QA read-only proposer lane_
+_mode: staged · Stage 1/19 · task 3/3 done · current: Build plain-English guided pipeline entry_
 
 ## ● Build plain-English guided pipeline entry — serves REQ-1
 
@@ -73,9 +73,9 @@ _mode: staged · Stage 14/19 · task 0/1 done · current: Reserve scheduled QA r
 - [x] Approve-and-build launches bounded Loop (cap 5) on managed branch
 - [x] Record one disposition per branch; no orphan branches; persist item state
 
-## ◑ Reserve scheduled QA read-only proposer lane — serves REQ-14 **(current)**
+## ● Reserve scheduled QA read-only proposer lane — serves REQ-14
 
-- [ ] Design scheduled read-only proposer lane (propose backlog items, never execute)
+- [x] Design scheduled read-only proposer lane (propose backlog items, never execute)
 
 ## ● Build local-only reporting and analytics — serves REQ-15
 
