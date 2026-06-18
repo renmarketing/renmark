@@ -1,6 +1,6 @@
 # Changelog
 
-## [2026-06-18] — pipeline-first model: 6 user-facing pipelines + Cursor-style concise replies
+## [2026-06-18] — v0.18.0 — pipeline-first model: 6 user-facing pipelines + Cursor-style concise replies
 **Request:** Align renmark to a pipeline-first mental model (Matthew Berman's "levels of AI coding" + the owner's simplified dev-stage spec): surface a few pipelines instead of 27 skills, run them autonomously and pause only at real gates, rewrite `/renmark:help` to teach the workflow, and make renmark's replies short and plain like Cursor/Codex. (A Codex patch attempted this; per owner decision it was redone fresh against the live tree.)
 **Built:**
 - **`/renmark:help` rewritten pipeline-first** (`plugin/skills/help/SKILL.md` + shim): 6 pipelines with their internal stage sequences, a "which one?" map, then all 27 commands grouped by purpose (Product/spec · Planning/build · Verification/QA · Debug/autofix · Governance/maintenance · Reporting/release) with each command's real modifiers. Stays zero-LLM prose.
