@@ -1,6 +1,6 @@
 ---
-description: "Use to start a new feature or significant change with branch isolation — typed as /renmark:feature or phrases like \"new feature X\", \"build X\", \"start feature\". Creates a branch then runs the full pipeline: plan → check-plan → orchestrate → verify → finish."
-argument-hint: '[feature name or short description]'
+description: "Use for the Feature pipeline — adding or changing something in an existing build, with branch isolation. Typed as /renmark:feature or phrases like \"new feature X\", \"build X\", \"start feature\". Runs setup check → PRD alignment (creates a PRD only if none exists) → reuse check → plan → check-plan → build → verify → review → finish, continuing automatically and pausing only at real decisions."
+argument-hint: '[feature name or short description] [--lite | --full]'
 ---
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/feature/SKILL.md` and follow its instructions exactly. The user provided this input: $ARGUMENTS

@@ -1,13 +1,17 @@
 ---
 name: start
-description: "Use when a vibe coder wants to build something and doesn't know where to begin — the plain-English entry point for the full renmark pipeline. Adaptive: one open question, at most 2 follow-ups, then routes to plan or brainstorm automatically."
+description: "Use for the New Build pipeline — the plain-English entry point when a vibe coder wants to build something new and doesn't know where to begin. Adaptive: one open question, at most 2 follow-ups, then establishes a PRD and routes to plan, brainstorm, or a staged program automatically. Runs intent → PRD → roadmap → first feature → plan → build → verify → review, pausing only at real decisions."
 ---
 
 # start
 
 ## Overview
 
-The vibe coder entry point. Ask what you want to build, and renmark handles the rest — stack selection, scope, best practices, and pipeline routing — without requiring any knowledge of specs, plans, or executors.
+The **New Build pipeline** — the vibe-coder entry point for building something new. Ask what you want to build, and renmark handles the rest — stack selection, scope, best practices, PRD, and routing — without requiring any knowledge of specs, plans, or executors.
+
+**Pipeline:** intent → (brainstorm if fuzzy) → PRD → roadmap → first feature → plan → build → verify → review. renmark continues automatically and pauses only at the real gates in the Pause Policy (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`) — chiefly unclear intent, PRD approval, and cost.
+
+**Adaptive routing (Step 7) stays intact:** a clear single-purpose build → straight to `/renmark:plan`; a fuzzy or multi-part idea → `/renmark:brainstorm` first; a whole greenfield product → the staged program. A `PRD.md` is established before the first feature is built (Step 5a); a blueprint is offered only when the architecture is non-trivial (Step 5b).
 
 ## Steps
 
@@ -128,35 +132,28 @@ The word "loop" stays inside these internal notes only.
 
 ---
 
-### 5a. Offer PRD creation (new projects only)
+### 5a. Establish the PRD before building
 
-Check whether `PRD.md` exists at the project root. If it does **not** exist, offer once — do not block:
+The New Build pipeline produces a `PRD.md` before the first feature is built — it's the source of truth the roadmap and features align to. This is a Pause-Policy gate (#2 PRD approval): the human owns the PRD, so confirm before writing it. If `PRD.md` is missing, scale the effort to the scope:
 
-> "Would you like me to create a `PRD.md` for this project? It captures the goal, users, and success criteria as a living source of truth — useful when the project grows or when handing off context.
->
-> 1. [a] Yes — run `/renmark:prd` now before we continue
-> 2. [b] Skip — continue with the normal next step"
+- **Simple scope** (a single-purpose script or tool): draft a minimal PRD — goal, users, success criteria — from the confirmed Step-5 summary, show it in ~5 lines, and continue once the user okays it. Don't run a full interview.
+- **Complex / multi-feature scope**: invoke `/renmark:prd` (create mode) for a proper pass, then return here and continue to Step 6.
 
-- If the user chooses **[a]**: invoke `/renmark:prd` (create mode), then return here and continue to Step 6 once it completes.
-- If the user chooses **[b]**, or if `PRD.md` already exists: skip silently and continue.
-
-Do not mention this step if `PRD.md` already exists. Do not block or repeat the offer.
+If `PRD.md` already exists, skip silently. Don't turn this into a heavy interrogation for small builds — but don't skip it either; the PRD is what keeps the build from drifting.
 
 ---
 
-### 5b. Offer blueprint generation (new projects only)
+### 5b. Offer a blueprint when the architecture is non-trivial
 
-Check whether `SCHEMATIC.md` exists at the project root. If it does **not** exist, offer once — do not block:
+Only relevant when the build has real structure to draw — a complex/multi-feature scope, or any browser UI. For a simple single-purpose script, skip silently (a diagram of one file is noise). When it does apply and `SCHEMATIC.md` does **not** exist, offer once — do not block, never auto-run:
 
-> "Would you like me to generate a project blueprint via `/renmark:blueprint`? It produces a living `SCHEMATIC.md` (architecture overview, module map, data flow) — and a `PROTOTYPE.html` interactive mock-up if the build has a UI.
+> "This has enough moving parts to be worth a quick blueprint via `/renmark:blueprint` — a living `SCHEMATIC.md` (architecture overview, module map, data flow), plus a `PROTOTYPE.html` mock-up if there's a UI. Want me to generate it before we build?
 >
 > 1. [a] Yes — run `/renmark:blueprint` now before we continue
 > 2. [b] Skip — continue with the normal next step"
 
 - If the user chooses **[a]**: invoke `/renmark:blueprint`, then return here and continue to Step 6 once it completes.
-- If the user chooses **[b]**, or if `SCHEMATIC.md` already exists: skip silently and continue.
-
-Do not mention this step if `SCHEMATIC.md` already exists. Do not block or repeat the offer.
+- If the user chooses **[b]**, if the scope is simple, or if `SCHEMATIC.md` already exists: skip silently and continue.
 
 ---
 

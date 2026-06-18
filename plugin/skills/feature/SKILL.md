@@ -1,13 +1,13 @@
 ---
 name: feature
-description: "Use to start a new feature or significant change with branch isolation — typed as /renmark:feature or phrases like \"new feature X\", \"build X\", \"start feature\". Creates a branch then runs the full pipeline: plan → check-plan → orchestrate → verify → finish."
+description: "Use for the Feature pipeline — adding or changing something in an existing build, with branch isolation. Typed as /renmark:feature or phrases like \"new feature X\", \"build X\", \"start feature\". Runs setup check → PRD alignment (creates a PRD only if none exists) → reuse check → plan → check-plan → build → verify → review → finish, continuing automatically and pausing only at real decisions."
 ---
 
 # feature
 
 ## Overview
 
-Full feature pipeline with branch isolation. Creates a feature branch, runs the renmark wizard end-to-end, and offers PR or merge on finish.
+The **Feature pipeline** — adding or changing something in an existing build, with branch isolation. Creates a feature branch, checks PRD alignment (creating a PRD only if none exists), honors the reuse check (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`) at plan time, runs the pipeline end-to-end, and offers PR / merge / release on finish. Continues automatically and pauses only at the Pause-Policy gates (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`) — chiefly PRD drift, the cost gate before tokens flow, and merge/release.
 
 **Pipeline (proportional — cost tracks size/risk):**
 ```
@@ -56,7 +56,7 @@ SLUG=$(echo "<feature name>" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g
 git checkout -b feature/$SLUG
 ```
 
-Confirm branch name with user before continuing.
+Generate the branch name and continue — don't ask the user to confirm it (branch naming isn't a Pause-Policy gate). The one exception: if a branch of that name already exists, pause and ask how to proceed.
 
 **Write the feature identity to `lifecycle.json` (required — do NOT skip).** Immediately after the branch exists (whether newly created or switched to), persist this feature's identity so every downstream stage writes against the correct `feature`/`branch` instead of inheriting the previous feature's:
 
