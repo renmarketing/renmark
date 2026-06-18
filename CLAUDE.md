@@ -8,11 +8,15 @@
 <!-- END:sync-note -->
 ## What this project is
 
-`renmark` is a Claude Code plugin — a guided build assistant that runs a full pipeline (`/renmark:start` → brainstorm → plan → check-plan → orchestrate → verify → finish). It routes each task to the cheapest capable executor (Haiku / Codex / Sonnet / Opus / Fable), keeps orchestrator context lean, and persists all state to disk so workflows survive `/clear`. Newer iteration than `legacy-plugin`; prefer it for new work.
+`renmark` is a Claude Code plugin — a guided build assistant. The user works through a few **pipelines** — `init` (adopt a repo), `start` (build something new), `feature` (add/change a feature), `debug` (fix what's broken), `roadmap` (find gaps / what's next), and `finish` (verify, review, ship) — each of which runs a long internal sequence (PRD → plan → build → verify → QA → review → ship) and pauses only at real decisions. It routes each task to the cheapest capable executor (Haiku / Codex / Sonnet / Opus / Fable), keeps orchestrator context lean, and persists all state to disk so workflows survive `/clear`. Newer iteration than `legacy-plugin`; prefer it for new work.
 
 <!-- PROJECT-TECH-NOTES: Python >=3.10 required for `renmark-execute`; Codex CLI optional. -->
 
 <!-- PROJECT-ARCHITECTURE: probabilistic AI for reasoning, deterministic code for execution; orchestrator coordinates and never accumulates implementation context. -->
+<!-- BEGIN:response-style-rule -->
+## Keep replies short and plain
+After a command or tool step, give a one- or two-sentence status — what changed, whether it passed, the next gate — not a recap of everything you did. No essays, no pasted code or diffs, no internal chatter about which model ran or how the pipeline works, unless the user asks for detail. Ask tight, single-purpose questions, one decision at a time. Continue the pipeline automatically and stop only at a real gate (the Pause Policy in `plugin/skills/_shared/handoff-menu.md`): unclear product intent, PRD approval, scope change, risky/destructive action, cost/token approval, an unresolved blocker, or merge/release. This governs the prose the user reads; it does NOT relax the bounded-summary, context-hygiene, or task-isolation rules that bound what the orchestrator pulls into its own context.
+<!-- END:response-style-rule -->
 <!-- BEGIN:parallelism-rule -->
 ## Parallelize large plans
 For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work, **never after**. Long-running probes → background `Bash` with `run_in_background: true`. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
@@ -141,7 +145,7 @@ MUST set these before destructive ops and check them on re-entry. `/renmark:appr
 <!-- END:lifecycle-rule -->
 ## Tooling — renmark workflow
 
-Full command list and usage → run `/renmark:help`. Typical order: start → brainstorm → prd → plan → check-plan → orchestrate → verify → finish.
+Full command list → run `/renmark:help`. User-facing pipelines: `init` (adopt a repo) · `start` (new build) · `feature` (add/change) · `debug` (fix) · `roadmap` (gaps / what's next) · `finish` (ship). Each runs its internal stages (PRD → plan → build → verify → QA → review → ship) and pauses only at the gates in the Pause Policy (`plugin/skills/_shared/handoff-menu.md`).
 
 ## File conventions
 
