@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-18 @ 9878197 -->
+<!-- Last refreshed: 2026-06-18 @ d88a017 -->
 
 # Project map — ai-system
 
@@ -56,22 +56,22 @@ ai-system/
 | `/renmark:brainstorm` | Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's  |
 | `/renmark:check-plan` | "Use before executing a renmark plan — deterministic validation via renmark.plan_lint engine (shared with orchestrate pr |
 | `/renmark:codereview` | "Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like \"review this\", \"review  |
-| `/renmark:debug` | Use when the user reports a bug or unexpected behavior — typed as /renmark:debug or phrases like "debug this", "why is X |
+| `/renmark:debug` | Use for the Debug pipeline when something is broken — typed as /renmark:debug or phrases like "debug this", "why is X fa |
 | `/renmark:doctor` | Use when `/renmark:*` commands aren't appearing, the plugin seems broken, or the user just wants a sanity check on the i |
-| `/renmark:feature` | "Use to start a new feature or significant change with branch isolation — typed as /renmark:feature or phrases like \"ne |
-| `/renmark:finish` | Use when implementation is complete — re-runs verifiers, shows commit summary, then offers PR / merge / release / nothin |
+| `/renmark:feature` | "Use for the Feature pipeline — adding or changing something in an existing build, with branch isolation. |
+| `/renmark:finish` | Use for the Ship / Readiness pipeline when implementation is complete — re-runs verifiers, shows the commit summary, rou |
 | `/renmark:help` | "Use when the user types /renmark:help or asks \"what can renmark do\", \"list renmark commands\", \"renmark overview\". |
 | `/renmark:hygiene` | Use to garbage-collect stale renmark artifacts and prune append-only memory logs. |
-| `/renmark:init` | "Use when the user wants renmark to onboard or document a project — the non-destructive front door. |
+| `/renmark:init` | "Use for the Project Setup pipeline — adopting renmark into any repo (new, in-progress, or production). |
 | `/renmark:inventory` | "Use to harvest a flat inventory of every renmark command and skill — name, domain, class, line counts, descriptions. |
 | `/renmark:loop` | Use to run a bounded agentic loop — `/renmark:loop` or "loop on this until it passes", "keep iterating until the verifie |
 | `/renmark:orchestrate` | Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "build it", "run the plan". |
 | `/renmark:plan` | Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases li |
 | `/renmark:prd` | Use to create or update the project's PRD (Product Requirements Document) — the per-project source of truth that plans a |
 | `/renmark:resume` | Use after `/clear` or `/compact`, or at the start of a fresh session, to discover where the in-flight renmark feature st |
-| `/renmark:roadmap` | "Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, \"show t |
+| `/renmark:roadmap` | "Use for the Maintenance / Gap pipeline — what's stale, missing, or next. |
 | `/renmark:scan` | "Use to run a deterministic read-only QA proposer lane — runs audit + verifiers, dedupes findings, proposes backlog item |
 | `/renmark:setup` | "Thin alias — /renmark:setup refreshes/back-fills renmark rule blocks in an existing project by delegating to /renmark:i |
-| `/renmark:start` | "Use when a vibe coder wants to build something and doesn't know where to begin — the plain-English entry point for the  |
+| `/renmark:start` | "Use for the New Build pipeline — the plain-English entry point when a vibe coder wants to build something new and doesn |
 | `/renmark:usage` | Use when the user wants observed local usage status — typed as /renmark:usage, "show usage", "rolling 5h", "weekly limit |
 | `/renmark:verify` | Use after `/renmark:orchestrate` completes — three modes selected by flag. |

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-06-18] — v0.18.0 — pipeline-first model: 6 user-facing pipelines + Cursor-style concise replies
+**Request:** Align renmark to a pipeline-first mental model (Matthew Berman's "levels of AI coding" + the owner's simplified dev-stage spec): surface a few pipelines instead of 27 skills, run them autonomously and pause only at real gates, rewrite `/renmark:help` to teach the workflow, and make renmark's replies short and plain like Cursor/Codex. (A Codex patch attempted this; per owner decision it was redone fresh against the live tree.)
+**Built:**
+- **`/renmark:help` rewritten pipeline-first** (`plugin/skills/help/SKILL.md` + shim): 6 pipelines with their internal stage sequences, a "which one?" map, then all 27 commands grouped by purpose (Product/spec · Planning/build · Verification/QA · Debug/autofix · Governance/maintenance · Reporting/release) with each command's real modifiers. Stays zero-LLM prose.
+- **New `response-style-rule`** mirrored across `CLAUDE.md`, `AGENTS.md`, and both templates: 1–2 sentence status, no essays/diffs/internal chatter unless asked; continue automatically; pause only at the 7 gates. Explicitly does NOT relax the bounded-summary / context-hygiene / task-isolation rules.
+- **Canonical Pause Policy** added to `plugin/skills/_shared/handoff-menu.md` — the 7 gates (unclear intent · PRD approval · scope change · risky/destructive · cost · blocker · merge/release), tied to the existing rule-8 default-forward + REQ-12 classification.
+- **6 pipeline skills + shims reframed** (init/start/feature/debug/roadmap/finish): descriptions+overviews lead with the pipeline name + honest stage sequence. `start` keeps adaptive routing (brainstorm/staged-program) but establishes a PRD before build (lightweight for simple scope) and offers blueprint only for non-trivial architecture; `feature` auto-proceeds on branch name (no longer a gate).
+- **Honesty fix:** `--verifier` → `--verify` in `plugin/commands/loop.md` (the real loop flag; pre-existing typo). Every help-advertised modifier verified to exist in its argparse.
+- **Metadata:** pipeline-first descriptions in `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `renmark/__init__.py`; README restructured with a six-pipelines table.
+**Files changed:**
+- `plugin/skills/help/SKILL.md`, `plugin/skills/{init,start,feature,debug,roadmap,finish}/SKILL.md`, `plugin/skills/_shared/handoff-menu.md`, `plugin/commands/{help,init,start,feature,debug,roadmap,finish,loop}.md`, `CLAUDE.md`, `AGENTS.md`, `plugin/templates/CLAUDE.md.template`, `plugin/templates/AGENTS.md.template`, `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `renmark/__init__.py`, `README.md`
+**Do not change:**
+- Help must stay **honest** — never advertise a pipeline stage or modifier the skill doesn't implement (audit `description_drift` enforces shim↔SKILL parity; modifiers verified against argparse).
+- `start` must keep its adaptive routing and the brainstorm + staged-program internals — do not flatten it to a single linear path (the owner explicitly rejected that).
+- The 7-gate Pause Policy is the single source; skills cite it rather than re-deriving gates. REQ-12 gates (PRD writes, merge/release, destructive, budget) never default.
+- Deferred to their own follow-on features (NOT this change): context-hygiene gate in finish, scheduled QA proposer, worktree manager, merge train, docs-drift loop. Version bump to 0.18.0 is a separate release step at `/renmark:finish`.
+
 ## [2026-06-18] — v0.17.0 — `/renmark:scan` QA proposer lane + analytics disposition close-out
 **Request:** Release the work merged to `main` since v0.16.1 (2026-06-14): the REQ-14 `/renmark:scan` read-only QA proposer lane and the analytics `branch_disposition` close-out fix.
 **Built:** Bumped 0.16.1 → 0.17.0 across all 7 locations (drift gate clean). Ships:

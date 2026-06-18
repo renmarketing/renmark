@@ -1,8 +1,15 @@
-# renmark v0.17.0
+# renmark v0.18.0
 
-A Claude Code plugin that turns Claude into a guided build assistant. Type `/renmark:start`, describe what you want to build, and renmark handles stack selection, scope, best practices, and the full build pipeline — no prior knowledge of specs, plans, or executors needed.
+A Claude Code plugin that turns Claude into a **pipeline-first** build assistant. Instead of memorizing commands, pick the pipeline that matches your situation and renmark runs the whole sequence — continuing on its own and pausing only at real decisions (unclear intent, PRD approval, scope change, risky action, cost, a blocker, or merge/release).
 
-For experienced developers it also exposes the full wizard pipeline directly: brainstorm → plan → orchestrate → finish. Validation (check-plan) and verification run automatically inside plan and orchestrate, so the day-to-day path is four commands, not six.
+- **`/renmark:init`** — adopt renmark into any repo (new, in-progress, or production)
+- **`/renmark:start`** — build something new from plain English
+- **`/renmark:feature`** — add or change a feature in an existing build
+- **`/renmark:debug`** — fix what's broken
+- **`/renmark:roadmap`** — find gaps and decide what's next
+- **`/renmark:finish`** — verify, review, and ship
+
+Each pipeline runs its internal stages (PRD → plan → build → verify → QA → review → ship) under renmark's context-hygiene discipline. The supporting skills (plan, orchestrate, prd, audit, …) are the machinery underneath — run `/renmark:help` for the full command list with modifiers.
 
 ---
 
@@ -92,7 +99,22 @@ Describe what you want to build. renmark asks at most 2 questions, confirms the 
 
 ---
 
-## All skills
+## The six pipelines
+
+| Pipeline | For | Internal stages it runs |
+|---|---|---|
+| `/renmark:init` | Adopt renmark into a repo | repo scan → stack/test detect → CLAUDE/AGENTS → project map → standards → PRD check → lifecycle-ready |
+| `/renmark:start` | Build something new | intent → brainstorm (if fuzzy) → PRD → roadmap → first feature → plan → build → verify → review |
+| `/renmark:feature` | Add/change a feature | PRD alignment → reuse check → plan → build → verify → review → finish |
+| `/renmark:debug` | Fix what's broken | reproduce → root cause → fix → regression test → verify → review |
+| `/renmark:roadmap` | Find gaps / what's next | status → gap discovery → backlog proposals → next-feature pick |
+| `/renmark:finish` | Verify, review, ship | re-verify → QA/review as needed → report → debug if it fails → PR / merge / release |
+
+---
+
+## All commands
+
+The pipelines above are the front door; every command (with its modifiers) also runs on its own. Run `/renmark:help` for the same list grouped by purpose.
 
 | Command | What it does |
 |---|---|
@@ -104,7 +126,7 @@ Describe what you want to build. renmark asks at most 2 questions, confirms the 
 | `/renmark:check-plan` | Validate a plan before spending tokens (runs automatically inside plan) |
 | `/renmark:orchestrate` | Execute a plan (Haiku / Codex / Sonnet / Opus / Fable, wave-parallel) — auto-verifies on completion |
 | `/renmark:verify` | Confirm the feature goal was achieved (runs automatically after orchestrate) |
-| `/renmark:feature` | Full pipeline with branch isolation (brainstorm → finish) |
+| `/renmark:feature` | Full pipeline with branch isolation (PRD alignment → plan → build → verify → review → finish); `--lite` / `--full` |
 | `/renmark:loop` | Bounded, resumable agentic loop — iterate until goal verified or budget hit |
 | `/renmark:finish` | Close branch — create PR, merge, or clean up |
 | `/renmark:backlog` | Triage backlog items; "Approve and build" launches bounded Loop Mode |

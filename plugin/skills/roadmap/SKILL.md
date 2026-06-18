@@ -1,13 +1,13 @@
 ---
 name: roadmap
-description: "Use when the user wants a status report on what renmark has built in this project — typed as /renmark:roadmap, \"show the roadmap\", \"what's been built\", \"token usage report\". Prints a table of task | llm | status | tokens | $ | commit, synthesized from usage.jsonl and git log. Zero LLM calls (default table; --gaps dispatches bounded subagents). Also handles forward planning (PRD → staged/whole-product program) and --setup brownfield reconciliation."
+description: "Use for the Maintenance / Gap pipeline — what's stale, missing, or next. Typed as /renmark:roadmap, \"show the roadmap\", \"what's been built\", \"what's next\". Default prints a zero-cost status table (task | llm | status | tokens | $ | commit) from usage.jsonl + git log; --gaps dispatches bounded subagents to compare PRD vs shipped work and propose backlog items; --research adds web research. Also handles forward planning (PRD → staged/whole-product program) and --setup brownfield reconciliation."
 ---
 
 # roadmap
 
 ## Overview
 
-Project-level status reporter. Pulls from two sources to build a per-task table with totals:
+The **Maintenance / Gap pipeline** — keeps the product moving toward the PRD. Default mode is a zero-cost status reporter; `--gaps` compares PRD vs shipped work, surfaces gaps, and proposes backlog items; `--research` adds web research. Pulls from two sources to build a per-task table with totals:
 
 - `.renmark/state/usage.jsonl` — token spend per LLM call
 - `git log` — task-N commits that have landed

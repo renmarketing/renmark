@@ -1,13 +1,13 @@
 ---
 name: debug
-description: Use when the user reports a bug or unexpected behavior — typed as /renmark:debug or phrases like "debug this", "why is X failing", "investigate the error", "find the root cause". Systematic reproduce → hypothesize → investigate → fix loop. Routes cheap investigation (greps, line counts) to Haiku/Bash, multi-file traces to Codex, and cross-system reasoning to Opus. State preserved in .renmark/debug/<session-id>/ so the session survives /clear.
+description: Use for the Debug pipeline when something is broken — typed as /renmark:debug or phrases like "debug this", "why is X failing", "investigate the error", "find the root cause". Runs reproduce → root cause → fix → regression test → verify, keeping scope tight (no feature expansion). Routes cheap investigation (greps, line counts) to Haiku/Bash, multi-file traces to Codex, and cross-system reasoning to Opus. State preserved in .renmark/debug/<session-id>/ so the session survives /clear.
 ---
 
 # debug
 
 ## Overview
 
-Modeled after `superpowers:systematic-debugging` + `context-mode:diagnose`. The loop:
+The **Debug pipeline** — fix what's broken without expanding scope. Modeled after `superpowers:systematic-debugging` + `context-mode:diagnose`. The loop:
 
 1. **Reproduce** — get a minimal repro from the user; verify you can trigger the bug
 2. **Hypothesize** — generate 3–5 ranked hypotheses for what's going wrong

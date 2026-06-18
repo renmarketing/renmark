@@ -7,6 +7,33 @@ one place the menu text lives so the skills can't drift.
 
 ---
 
+## Pause Policy — the only reasons to stop and ask
+
+renmark runs its pipelines automatically. Inside a pipeline it does **not** ask
+after every step — it continues on its own and stops for the user at exactly
+these seven gates. Nothing else is a reason to halt a running pipeline:
+
+1. **Unclear product intent** — the goal is ambiguous and a wrong guess is expensive.
+2. **PRD approval** — creating or changing `PRD.md` (the human owns the product source of truth).
+3. **Scope change** — the work drifts past what was agreed / what the PRD covers.
+4. **Risky or destructive action** — anything that can lose work or is hard to undo.
+5. **Cost / token approval** — a dispatch gate where token spend begins (show the cost preview).
+6. **Unresolved blocker** — a verifier fails, a root cause is unconfirmed, or a dependency is missing.
+7. **Merge / release approval** — landing to `main`, tagging, or publishing (REQ-12).
+
+Anything not on this list — branch naming, which model ran, intermediate stage
+transitions, routine progress — is handled silently: report it in a one-line
+status (see `CLAUDE.md` § `response-style-rule`) and keep going.
+
+**How a pause resolves** follows the default-forward classification in rule 8
+below: reversible hand-offs may default-forward to the `(Recommended)` option
+after one restatement; **dispatch gates** (#5) default-forward only with a
+validated plan AND a shown cost preview; **REQ-12 gates** (#2 PRD writes, #4
+destructive ops, #5 budget escalation, #7 merge/release) **never default —
+silence is a no**, and `/renmark:approve` is the only grant surface.
+
+---
+
 ## The three quality gates
 
 | Gate            | What it checks                                  | Command                         |

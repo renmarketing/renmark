@@ -1,13 +1,13 @@
 ---
 name: finish
-description: Use when implementation is complete — re-runs verifiers, shows commit summary, then offers PR / merge / release / nothing. Release builds a version-anchored distribution zip into .renmark/version/ (always, offline) and a matching git tag, plus a GitHub release when a remote + gh are available. Thin branch-close wrapper around gh and git.
+description: Use for the Ship / Readiness pipeline when implementation is complete — re-runs verifiers, shows the commit summary, routes failures to debug, then offers PR / merge / release / nothing. Release builds a version-anchored distribution zip into .renmark/version/ (always, offline) and a matching git tag, plus a GitHub release when a remote + gh are available. Merge and release are Pause-Policy gates — never default. Thin branch-close wrapper around gh and git.
 ---
 
 # finish
 
 ## Overview
 
-Three steps: verify everything still passes → show what was built → offer next action.
+The **Ship / Readiness pipeline**: re-verify everything still passes (route failures to `/renmark:debug`) → show what was built → offer the next action (PR / merge / release / nothing). Merge and release are Pause-Policy gates and never auto-proceed.
 
 ## When to Use
 
