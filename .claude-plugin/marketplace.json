@@ -4,13 +4,13 @@
     "name": "renmark"
   },
   "metadata": {
-    "description": "Local marketplace for the renmark multi-LLM orchestration plugin.",
+    "description": "Local marketplace for the pipeline-first renmark build assistant.",
     "version": "0.17.0"
   },
   "plugins": [
     {
       "name": "renmark",
-      "description": "Vibe coder aide and multi-LLM orchestration plugin for Claude Code. 26 guided commands: /renmark:start (plain-English entry), brainstorm, prd, blueprint, plan, check-plan, orchestrate, verify, feature, loop, finish, backlog, debug, codereview, audit, inventory, approve, hygiene, doctor, init, setup, resume, roadmap, usage, analytics, help. Persistent project memory in .renmark/.",
+      "description": "Pipeline-first build assistant for Claude Code. Six pipelines — /renmark:init (adopt a repo), /renmark:start (new build), /renmark:feature (add/change), /renmark:debug (fix), /renmark:roadmap (gaps / what's next), /renmark:finish (ship) — over 27 guided commands (also prd, brainstorm, blueprint, plan, check-plan, orchestrate, verify, codereview, loop, backlog, audit, inventory, scan, approve, hygiene, doctor, setup, resume, usage, analytics, help). Persistent project memory in .renmark/.",
       "version": "0.17.0",
       "author": {
         "name": "renmark"
