@@ -80,13 +80,24 @@ Render the result as one row:
 - `✓ Global auto-routing — renmark is the default for build/dev everywhere` — when
   `present-with-rule`
 - `! Global auto-routing — not the default everywhere` with
-  `fix: python -m renmark.doctor --fix` — when `missing` or `present-without-rule`
+  `fix: python -m renmark.doctor --install-routing` — when `missing` or
+  `present-without-rule`
+- `! Global auto-routing — existing renmark-routing block is malformed` with
+  `fix: needs-manual-repair (--install-routing will not auto-append over it)` —
+  when a pre-existing `renmark-routing` block is present but malformed/duplicate
 
 Unlike the registration checks, this row is **advisory**: it never fails the run
-(exit stays 0). When the user runs `--fix`, doctor calls
-`global_routing.install_global_rule()`, which adds the `renmark-routing` block to
-`~/.claude/CLAUDE.md` and returns `{action, path, backup}`. Relay that line and
-note it takes effect next session.
+(exit stays 0), and **plain `python -m renmark.doctor --fix` does NOT write the
+global rule** — it only detects and reports the state above (the `[i]` advisory).
+Writing the rule is a deliberate, explicit opt-in via the dedicated
+`python -m renmark.doctor --install-routing` flag, which calls
+`global_routing.install_global_rule()`. That call adds the `renmark-routing` block
+to `~/.claude/CLAUDE.md` and returns `{action, path, backup}` — `action` is one of
+`created` (file/block written fresh), `appended` (block added to an existing file),
+or `already-present` (idempotent no-op). When a pre-existing `renmark-routing` block
+is **malformed or duplicated**, `--install-routing` reports it for manual repair
+(`needs-manual-repair`) and **never auto-appends over it**. Relay the one-line
+result and note it takes effect next session.
 
 **Honest constraints (state these plainly, don't oversell):**
 
@@ -98,8 +109,11 @@ note it takes effect next session.
 - **It takes effect next session.** `~/.claude/CLAUDE.md` is read at session start;
   an already-running session won't see the new rule until it restarts.
 - **Renmark NEVER silently writes outside the project.** The global write is always
-  user-approved (`/renmark:init` offers → on yes → write; or the user runs
-  `--fix` deliberately), backed up first, and never overwrites other rules.
+  user-approved and explicit (`/renmark:init` offers → on yes → write; or the user
+  runs `--install-routing` deliberately — plain `--fix` only detects/reports),
+  backed up first, and never overwrites other rules. A malformed or duplicate
+  pre-existing `renmark-routing` block is reported for manual repair, never
+  auto-appended.
 - **It is per-machine.** The write targets THIS machine's global file —
   WSL `~/.claude/CLAUDE.md` vs Windows `%USERPROFILE%\.claude\CLAUDE.md` are
   separate; installing on one does not affect the other.
@@ -126,7 +140,8 @@ Settings changes don't take effect until Claude Code reloads its plugin registry
 ## Flags
 
 - `python -m renmark.doctor` — diagnose only, no writes
-- `python -m renmark.doctor --fix` — apply safe auto-fixes (settings.json + registry + cache symlink) and, when the user runs it deliberately, install the global `renmark-routing` rule into `~/.claude/CLAUDE.md` via `global_routing.install_global_rule()`. Each modified file gets a `.doctor.bak.<timestamp>` backup; the global write never overwrites existing rules.
+- `python -m renmark.doctor --fix` — apply safe auto-fixes (settings.json + registry + cache symlink) only. Each modified file gets a `.doctor.bak.<timestamp>` backup. **Plain `--fix` does NOT write the global `renmark-routing` rule** — it only detects and reports the global-routing state (advisory). Use `--install-routing` for that.
+- `python -m renmark.doctor --install-routing` — the explicit opt-in that installs the global `renmark-routing` rule into `~/.claude/CLAUDE.md` via `global_routing.install_global_rule()`, backing the file up first and returning `{action, path, backup}` (`created` / `appended` / `already-present`). It never overwrites existing rules; a malformed or duplicate pre-existing `renmark-routing` block is reported `needs-manual-repair` and never auto-appended.
 - `python -m renmark.doctor --json` — machine-readable output, same checks
 
 ## What it does NOT do
@@ -137,7 +152,7 @@ Settings changes don't take effect until Claude Code reloads its plugin registry
 
 ## Boundaries
 
-- Read-only by default. `--fix` writes only to `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, `~/.claude/plugins/cache/renmark-local/`, and — only on a deliberate `--fix` (or the user-approved `/renmark:init` offer) — the global `~/.claude/CLAUDE.md` (per-machine; user-approved; backed up; never overwrites other rules). Always with a timestamped backup of any pre-existing file.
+- Read-only by default. `--fix` writes only to `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, and `~/.claude/plugins/cache/renmark-local/` — it does NOT touch the global `~/.claude/CLAUDE.md`. The global `renmark-routing` write happens only on the explicit `--install-routing` flag (or the user-approved `/renmark:init` offer, which calls into the same path) — per-machine; user-approved; backed up; never overwrites other rules; a malformed/duplicate pre-existing block is reported for manual repair, never auto-appended. Always with a timestamped backup of any pre-existing file.
 - No LLM calls. No network. No code in the project tree is touched.
 - Designed to be re-runnable. `--fix` is idempotent — applying it twice is a no-op on the second run.
 

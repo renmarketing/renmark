@@ -154,10 +154,12 @@ python -c "from renmark.global_routing import detect_global_rule; print(detect_g
   > 1. [y] Yes — make renmark the default everywhere
   > 2. [n] Skip"
 
-  - **Yes** → run `/renmark:doctor --fix` (which calls
-    `global_routing.install_global_rule()`), or call
+  - **Yes** → run `/renmark:doctor --install-routing` (the dedicated opt-in flag
+    that calls `global_routing.install_global_rule()`), or call
     `global_routing.install_global_rule()` directly. Relay the one-line result
-    (`{action, path, backup}`) and note it takes effect next session.
+    (`{action, path, backup}`) and note it takes effect next session. (Plain
+    `/renmark:doctor --fix` no longer writes the global rule — it only detects
+    and reports it.)
   - **Skip** → continue. Do not re-offer on this run.
 
 **Non-blocking, always:** this offer NEVER halts init — whatever the answer (or on a
@@ -166,8 +168,9 @@ write and continue silently), init proceeds straight to the roadmap hand-off.
 **Honest scope:** auto-routing is a model-followed instruction, not a hard interlock;
 an explicit `/renmark:` command always wins; it is per-machine (the global write
 targets THIS machine's `~/.claude/CLAUDE.md`). The global write is always
-user-approved (offer → on yes → write), backed up, and never silently performed —
-see `/renmark:doctor` for the advisory check and `--fix` behavior.
+user-approved (offer → on yes → `--install-routing` write), backed up, and never
+silently performed — see `/renmark:doctor` for the advisory detect/report (plain
+`--fix`) and the explicit opt-in write (`--install-routing`).
 
 ### 5. What's next — roadmap hand-off (step 6)
 
