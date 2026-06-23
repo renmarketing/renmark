@@ -6,13 +6,20 @@ remediation commands for anything broken. Pure diagnostic by default;
 register in installed_plugins.json, refresh cache symlink).
 
 CLI:
-    python -m renmark.doctor          # check + report, exit 1 if any issue
-    python -m renmark.doctor --fix    # apply safe auto-fixes, then re-check
-    python -m renmark.doctor --json   # machine-readable output
+    python -m renmark.doctor                    # check + report, exit 1 if any issue
+    python -m renmark.doctor --fix              # apply safe registry/settings/cache fixes
+    python -m renmark.doctor --install-routing  # opt-in: write the global routing rule
+    python -m renmark.doctor --json             # machine-readable output
+
+The global ``~/.claude/CLAUDE.md`` routing rule is ADVISORY in normal and
+``--fix`` runs — doctor only DETECTS and reports its state; it never writes it.
+The write is gated behind the explicit ``--install-routing`` flag, so routine
+``--fix`` repairs never mutate the user's global CLAUDE.md.
 
 Exit codes:
     0  all checks pass
-    1  one or more checks failed (or fixes still needed)
+    1  one or more checks failed, fixes still needed, or an explicitly
+       requested --install-routing did not succeed
     2  bad usage
 
 Why this exists: directory-marketplace Claude Code plugins need THREE
@@ -295,25 +302,33 @@ def check_plugin_symlink() -> Check:
 
 
 def check_global_routing_rule() -> Check:
-    """ADVISORY-ONLY: is the optional global auto-routing rule installed?
+    """ADVISORY-ONLY: report the optional global auto-routing rule state.
 
     The renmark routing rule in ``~/.claude/CLAUDE.md`` is opt-in, so this check
     never reports ``fail``/``warn`` — it uses the informational ``"info"`` tier,
     which is excluded from both the failure and warning tallies. It can never
-    change doctor's overall pass/fail exit status.
+    change doctor's overall pass/fail exit status, and it NEVER writes: this
+    check only ever *detects*. The write is gated behind the explicit
+    ``--install-routing`` flag (see ``main``), so plain ``--fix`` never mutates
+    the global CLAUDE.md.
     """
     state = global_routing.detect_global_rule()
     path = global_routing.global_claude_path()
     if state == "present-with-rule":
         return Check("Global auto-routing rule", "info", f"global auto-routing rule present ({path})")
+    if state == "present-malformed":
+        return Check(
+            "Global auto-routing rule",
+            "warn",
+            f"manual repair needed: multiple/unbalanced renmark-routing markers in {path}",
+        )
+    # "missing" or "present-without-rule": advisory pointer to the opt-in write.
     return Check(
         "Global auto-routing rule",
         "info",
-        f"global auto-routing rule not set — run `python -m renmark.doctor --fix` to add it "
-        f"(writes {path}, backed up)",
-        fix_cmd="python -m renmark.doctor --fix",
-        auto_fixable=True,
-        fix_fn=_fix_install_global_routing_rule,
+        f"global auto-routing rule not set — run `python -m renmark.doctor --install-routing` "
+        f"to add it (writes {path}, backed up)",
+        fix_cmd="python -m renmark.doctor --install-routing",
     )
 
 
@@ -397,18 +412,29 @@ def _fix_cache_symlink() -> str:
     return f"cache symlink {cache_path} → {PLUGIN_SOURCE}"
 
 
-def _fix_install_global_routing_rule() -> str:
-    """ADVISORY: install the opt-in global routing rule. Never affects exit status."""
+def install_routing_rule() -> tuple[bool, str]:
+    """EXPLICIT opt-in: install the global routing rule (only on --install-routing).
+
+    Returns ``(ok, message)``. ``ok`` is ``False`` when the install did not
+    succeed — i.e. the rule needs manual repair — so ``main`` can flip the exit
+    code on an explicitly-requested install that fails. (Exceptions propagate to
+    the caller, which also treats them as a failed explicit install.)
+    """
     result = global_routing.install_global_rule()
     action = result.get("action")
     path = result.get("path")
     backup = result.get("backup")
+    if action == "needs-manual-repair":
+        return (
+            False,
+            f"manual repair needed: multiple/unbalanced renmark-routing markers in {path}",
+        )
     if action == "already-present":
-        return f"global auto-routing rule already present ({path})"
+        return True, f"global auto-routing rule already present ({path})"
     msg = f"global auto-routing rule {action} ({path})"
     if backup:
         msg += f"; prior file backed up to {backup}"
-    return msg
+    return True, msg
 
 
 def apply_fixes(report: DoctorReport) -> list[str]:
@@ -476,21 +502,22 @@ def render_json(report: DoctorReport) -> str:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     fix = "--fix" in argv
+    install_routing = "--install-routing" in argv
     as_json = "--json" in argv
     if "-h" in argv or "--help" in argv or "help" in argv:
         sys.stdout.write(__doc__ or "")
         return 0
 
+    # An explicitly-requested --install-routing that fails must flip the exit
+    # code; the advisory detect in normal/--fix runs never does.
+    explicit_install_failed = False
+
     report = run_checks()
     if fix:
+        # NOTE: --fix performs ONLY the registry/settings/cache repairs. It does
+        # NOT write the global ~/.claude/CLAUDE.md routing rule — that write is
+        # opt-in via --install-routing. The routing-rule check stays advisory.
         applied = apply_fixes(report)
-        # ADVISORY: install the opt-in global routing rule on --fix. This is
-        # separate from apply_fixes (which only acts on "fail" checks) so it
-        # never touches the pass/fail tally, yet --fix still opts the user in.
-        try:
-            applied.append(f"[Global auto-routing rule] {_fix_install_global_routing_rule()}")
-        except Exception as exc:
-            applied.append(f"[Global auto-routing rule] FIX FAILED: {exc}")
         if applied and not as_json:
             sys.stdout.write("Applying fixes:\n")
             for line in applied:
@@ -498,6 +525,18 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write("\nRe-checking…\n\n")
         # Re-run after fixes
         report = run_checks()
+
+    if install_routing:
+        # The ONLY path that writes the global routing rule. A failed explicit
+        # install (exception OR needs-manual-repair) must yield a non-zero exit.
+        try:
+            ok, msg = install_routing_rule()
+        except Exception as exc:
+            ok, msg = False, f"FAILED: {exc}"
+        if not ok:
+            explicit_install_failed = True
+        if not as_json:
+            sys.stdout.write(f"Global auto-routing rule: {msg}\n\n")
 
     if as_json:
         sys.stdout.write(render_json(report) + "\n")
@@ -512,7 +551,11 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write("\nAfter fixing, run `/reload-plugins` in Claude Code.\n")
         return 1
 
-    if fix:
+    if explicit_install_failed:
+        sys.stdout.write("\nGlobal auto-routing rule install did not succeed — see message above.\n")
+        return 1
+
+    if fix or install_routing:
         sys.stdout.write("\nRun `/reload-plugins` in Claude Code to pick up the changes.\n")
     return 0
 
