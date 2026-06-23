@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-06-23] — v0.19.0 — auto-routing: renmark is the default for build/dev work
+**Request:** Make renmark the default path for plain-English build/dev requests so the user doesn't have to remember `/renmark:*` commands (and so it wins over other skill frameworks like superpowers), without removing manual control. Built via the full pipeline (`/renmark:feature` → plan → orchestrate → verify → codereview → finish), dogfooding the 0.18.0 model.
+**Built:**
+- **Broadened pipeline triggers** — `start`/`feature`/`debug` SKILL + shim descriptions now match plain-English dev verbs (build/develop/implement/add/make/create/code up/fix/change) while keeping existing triggers + pipeline framing; `audit description-drift=0`.
+- **`routing-preference-rule`** block in the `CLAUDE.md`/`AGENTS.md` templates (+ repo mirror), back-fillable by `/renmark:init`: route build/feature/debug/ship work through renmark pipelines; use other frameworks only when named. DEFAULT, not a lock — explicit `/renmark:` always wins.
+- **`renmark/global_routing.py`** — manages a `renmark-routing` block in the GLOBAL `~/.claude/CLAUDE.md` (every-session file): `detect_global_rule`/`install_global_rule(claude_dir=None)`. Create-if-missing / append-if-present / skip-if-there; **unique non-clobbering `.bak.N` backup**; **`present-malformed`→`needs-manual-repair`** (never appends to an unbalanced/duplicate block); idempotent; hermetic tests (7).
+- **`/renmark:doctor`** — advisory `[i]` global-routing check (never flips pass/fail) + **`--install-routing`** as the ONLY write path (opt-in); non-zero exit when an explicit `--install-routing` fails.
+- **Surfaced** from `/renmark:init` (one-time non-blocking offer) and `/renmark:start` (single light nudge), both pointing at `--install-routing`.
+- **Codereview (codex) caught a Critical + 3 Major**, all fixed + independently re-verified before merge.
+**Files changed:** `plugin/skills/{start,feature,debug,init,doctor}/SKILL.md` + their `plugin/commands/*.md` shims; `plugin/templates/{CLAUDE.md,AGENTS.md}.template`; `CLAUDE.md`; `AGENTS.md`; `renmark/global_routing.py` (new); `renmark/doctor.py`; `tests/test_global_routing.py` (new); + 7 version locations.
+**Do not change:**
+- **Plain `/renmark:doctor --fix` must NEVER write `~/.claude/CLAUDE.md`** — the global routing write is opt-in via `--install-routing` ONLY (the Critical fix). Auto-routing is a model-followed instruction (not a hard interlock); explicit `/renmark:` always wins; takes effect next session; the global write is always user-approved + backed up; per-machine (WSL `~/.claude` vs Windows `%USERPROFILE%\.claude`).
+- `install_global_rule` backups must stay non-clobbering (`.bak.N`); a `present-malformed` block is reported for manual repair, NEVER auto-appended (prevents infinite-append).
+
 ## [2026-06-18] — v0.18.0 — pipeline-first model: 6 user-facing pipelines + Cursor-style concise replies
 **Request:** Align renmark to a pipeline-first mental model (Matthew Berman's "levels of AI coding" + the owner's simplified dev-stage spec): surface a few pipelines instead of 27 skills, run them autonomously and pause only at real gates, rewrite `/renmark:help` to teach the workflow, and make renmark's replies short and plain like Cursor/Codex. (A Codex patch attempted this; per owner decision it was redone fresh against the live tree.)
 **Built:**

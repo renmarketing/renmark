@@ -12,4 +12,4 @@ persists to `.renmark/state/lifecycle.json`; runtime state to
 read.
 """
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
