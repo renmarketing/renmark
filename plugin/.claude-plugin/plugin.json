@@ -1,6 +1,6 @@
 {
   "name": "renmark",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Pipeline-first build assistant for Claude Code. The user works through six pipelines — /renmark:init (adopt a repo), /renmark:start (new build), /renmark:feature (add/change), /renmark:debug (fix), /renmark:roadmap (gaps / what's next), /renmark:finish (ship) — backed by 27 guided commands and supporting skills (PRD, plan, orchestrate, verify, QA, codereview, audit, usage, recovery). Routes tasks to Haiku, Codex, Sonnet, Opus, Fable. Persistent project memory in .renmark/.",
   "author": {
     "name": "renmark"

@@ -1,6 +1,6 @@
 ---
 name: start
-description: "Use for the New Build pipeline — the plain-English entry point when a vibe coder wants to build something new and doesn't know where to begin. Adaptive: one open question, at most 2 follow-ups, then establishes a PRD and routes to plan, brainstorm, or a staged program automatically. Runs intent → PRD → roadmap → first feature → plan → build → verify → review, pausing only at real decisions."
+description: "Use for the New Build pipeline — the plain-English entry point when a vibe coder wants to build, develop, make, or create something new and doesn't know where to begin. Triggers on plain dev requests like \"build out X\", \"develop X\", \"implement X\", \"add X\", \"create X\", \"code up X\". Adaptive: one open question, at most 2 follow-ups, then establishes a PRD and routes to plan, brainstorm, or a staged program automatically. Runs intent → PRD → roadmap → first feature → plan → build → verify → review, pausing only at real decisions."
 ---
 
 # start
@@ -16,6 +16,8 @@ The **New Build pipeline** — the vibe-coder entry point for building something
 ## Steps
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'start')`. If it returns a non-None hint, surface as a one-line note (do not block — user decides). Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*
+
+Optionally, only when the global auto-routing rule is missing (`global_routing.detect_global_rule()` returns `missing` or `present-without-rule`), append one unobtrusive line to the context note — never a prompt, never a menu, and never repeated mid-build: *"tip: `/renmark:doctor --install-routing` makes renmark the default everywhere."* If the rule is already present, say nothing.
 
 ### 1. Open with one question
 

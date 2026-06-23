@@ -1,6 +1,6 @@
 ---
 name: feature
-description: "Use for the Feature pipeline — adding or changing something in an existing build, with branch isolation. Typed as /renmark:feature or phrases like \"new feature X\", \"build X\", \"start feature\". Runs setup check → PRD alignment (creates a PRD only if none exists) → reuse check → plan → check-plan → build → verify → review → finish, continuing automatically and pausing only at real decisions."
+description: "Use for the Feature pipeline — adding, developing, implementing, building out, or changing something in an existing build, with branch isolation. Typed as /renmark:feature or plain dev requests like \"new feature X\", \"build X\", \"start feature\", \"add X\", \"implement X\", \"make X\", \"create X\", \"code up X\", \"change X\". Runs setup check → PRD alignment (creates a PRD only if none exists) → reuse check → plan → check-plan → build → verify → review → finish, continuing automatically and pausing only at real decisions."
 ---
 
 # feature

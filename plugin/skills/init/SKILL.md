@@ -129,6 +129,49 @@ grep -q '^## Model tiers' .renmark/memory/routing.md
 Note: `/renmark:setup` inherits this step via its delegation to init's rule-block
 merge, and `/renmark:doctor` reports the current declaration.
 
+### 4b. Global auto-routing offer (one-time, non-blocking)
+
+Like the model-tier declaration above, this is a **one-time, idempotent offer** —
+never a gate. It asks whether renmark should become the default for build/dev work
+in **every** project on this machine by adding a `renmark-routing` rule block to the
+global, every-session `~/.claude/CLAUDE.md`.
+
+Resolve the current state first via the committed helper:
+
+```bash
+python -c "from renmark.global_routing import detect_global_rule; print(detect_global_rule())"
+```
+
+- `present-with-rule` → the rule is already installed. **Skip silently** — do not
+  re-ask, do not report. This keeps the step idempotent across re-runs.
+- `missing` or `present-without-rule` → offer **once** via `AskUserQuestion` (text
+  fallback below for non-interactive runs):
+
+  > "Want renmark to be the default for build/dev work in every project on this
+  > machine? I can add a routing rule to `~/.claude/CLAUDE.md` — it's backed up
+  > first and never overwrites your other rules.
+  >
+  > 1. [y] Yes — make renmark the default everywhere
+  > 2. [n] Skip"
+
+  - **Yes** → run `/renmark:doctor --install-routing` (the dedicated opt-in flag
+    that calls `global_routing.install_global_rule()`), or call
+    `global_routing.install_global_rule()` directly. Relay the one-line result
+    (`{action, path, backup}`) and note it takes effect next session. (Plain
+    `/renmark:doctor --fix` no longer writes the global rule — it only detects
+    and reports it.)
+  - **Skip** → continue. Do not re-offer on this run.
+
+**Non-blocking, always:** this offer NEVER halts init — whatever the answer (or on a
+non-interactive run where `AskUserQuestion` is unavailable, in which case skip the
+write and continue silently), init proceeds straight to the roadmap hand-off.
+**Honest scope:** auto-routing is a model-followed instruction, not a hard interlock;
+an explicit `/renmark:` command always wins; it is per-machine (the global write
+targets THIS machine's `~/.claude/CLAUDE.md`). The global write is always
+user-approved (offer → on yes → `--install-routing` write), backed up, and never
+silently performed — see `/renmark:doctor` for the advisory detect/report (plain
+`--fix`) and the explicit opt-in write (`--install-routing`).
+
 ### 5. What's next — roadmap hand-off (step 6)
 
 A freshly initialized or re-mapped project is exactly when "what are the uncovered
