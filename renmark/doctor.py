@@ -33,6 +33,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from . import global_routing
+
 # ── Where renmark expects to live ─────────────────────────────────────────────
 
 # Resolve the renmark source dir from this file's location.
@@ -292,6 +294,29 @@ def check_plugin_symlink() -> Check:
     return Check("Convenience symlink", "pass", str(SYMLINK_PATH))
 
 
+def check_global_routing_rule() -> Check:
+    """ADVISORY-ONLY: is the optional global auto-routing rule installed?
+
+    The renmark routing rule in ``~/.claude/CLAUDE.md`` is opt-in, so this check
+    never reports ``fail``/``warn`` — it uses the informational ``"info"`` tier,
+    which is excluded from both the failure and warning tallies. It can never
+    change doctor's overall pass/fail exit status.
+    """
+    state = global_routing.detect_global_rule()
+    path = global_routing.global_claude_path()
+    if state == "present-with-rule":
+        return Check("Global auto-routing rule", "info", f"global auto-routing rule present ({path})")
+    return Check(
+        "Global auto-routing rule",
+        "info",
+        f"global auto-routing rule not set — run `python -m renmark.doctor --fix` to add it "
+        f"(writes {path}, backed up)",
+        fix_cmd="python -m renmark.doctor --fix",
+        auto_fixable=True,
+        fix_fn=_fix_install_global_routing_rule,
+    )
+
+
 CHECKS = [
     check_cli_on_path,
     check_python_package,
@@ -302,6 +327,7 @@ CHECKS = [
     check_settings_enabled,
     check_cache_install_path,
     check_plugin_symlink,
+    check_global_routing_rule,
 ]
 
 
@@ -371,6 +397,20 @@ def _fix_cache_symlink() -> str:
     return f"cache symlink {cache_path} → {PLUGIN_SOURCE}"
 
 
+def _fix_install_global_routing_rule() -> str:
+    """ADVISORY: install the opt-in global routing rule. Never affects exit status."""
+    result = global_routing.install_global_rule()
+    action = result.get("action")
+    path = result.get("path")
+    backup = result.get("backup")
+    if action == "already-present":
+        return f"global auto-routing rule already present ({path})"
+    msg = f"global auto-routing rule {action} ({path})"
+    if backup:
+        msg += f"; prior file backed up to {backup}"
+    return msg
+
+
 def apply_fixes(report: DoctorReport) -> list[str]:
     """Run fix_fn for every check with auto_fixable=True. Returns list of applied descriptions."""
     applied: list[str] = []
@@ -387,7 +427,7 @@ def apply_fixes(report: DoctorReport) -> list[str]:
 # ── Output rendering ─────────────────────────────────────────────────────────
 
 
-_GLYPH = {"pass": "✓", "fail": "✗", "warn": "!"}
+_GLYPH = {"pass": "✓", "fail": "✗", "warn": "!", "info": "i"}
 
 
 def render_human(report: DoctorReport) -> str:
@@ -442,9 +482,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     report = run_checks()
-    if fix and report.failed():
+    if fix:
         applied = apply_fixes(report)
-        if not as_json:
+        # ADVISORY: install the opt-in global routing rule on --fix. This is
+        # separate from apply_fixes (which only acts on "fail" checks) so it
+        # never touches the pass/fail tally, yet --fix still opts the user in.
+        try:
+            applied.append(f"[Global auto-routing rule] {_fix_install_global_routing_rule()}")
+        except Exception as exc:
+            applied.append(f"[Global auto-routing rule] FIX FAILED: {exc}")
+        if applied and not as_json:
             sys.stdout.write("Applying fixes:\n")
             for line in applied:
                 sys.stdout.write(f"  • {line}\n")
