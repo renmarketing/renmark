@@ -64,6 +64,46 @@ This row is **advisory only**: it never fails the run, and `--fix` does NOT
 write the declaration. The sole remediation is the one-time declaration
 question in `/renmark:init`.
 
+**Step 1c — Global auto-routing rule (advisory).**
+
+Report whether renmark is registered as the default for build/dev work across
+**every** project on this machine — a `renmark-routing` rule block in the global,
+every-session `~/.claude/CLAUDE.md`. Resolve the state via the committed helper
+`renmark.global_routing.detect_global_rule()`:
+
+```bash
+python -c "from renmark.global_routing import detect_global_rule; print(detect_global_rule())"
+```
+
+Render the result as one row:
+
+- `✓ Global auto-routing — renmark is the default for build/dev everywhere` — when
+  `present-with-rule`
+- `! Global auto-routing — not the default everywhere` with
+  `fix: python -m renmark.doctor --fix` — when `missing` or `present-without-rule`
+
+Unlike the registration checks, this row is **advisory**: it never fails the run
+(exit stays 0). When the user runs `--fix`, doctor calls
+`global_routing.install_global_rule()`, which adds the `renmark-routing` block to
+`~/.claude/CLAUDE.md` and returns `{action, path, backup}`. Relay that line and
+note it takes effect next session.
+
+**Honest constraints (state these plainly, don't oversell):**
+
+- **It's a model-followed instruction, not a hard interlock.** The rule asks the
+  model to prefer renmark for build/dev work; it does not intercept or block
+  anything at the tooling layer.
+- **An explicit `/renmark:` command always wins.** Typing a specific command
+  overrides the default routing — the rule only governs the unprompted default.
+- **It takes effect next session.** `~/.claude/CLAUDE.md` is read at session start;
+  an already-running session won't see the new rule until it restarts.
+- **Renmark NEVER silently writes outside the project.** The global write is always
+  user-approved (`/renmark:init` offers → on yes → write; or the user runs
+  `--fix` deliberately), backed up first, and never overwrites other rules.
+- **It is per-machine.** The write targets THIS machine's global file —
+  WSL `~/.claude/CLAUDE.md` vs Windows `%USERPROFILE%\.claude\CLAUDE.md` are
+  separate; installing on one does not affect the other.
+
 **Step 2 — Offer auto-fix if any failures are flagged `auto_fixable`.**
 
 The output's final line will say something like:
@@ -86,7 +126,7 @@ Settings changes don't take effect until Claude Code reloads its plugin registry
 ## Flags
 
 - `python -m renmark.doctor` — diagnose only, no writes
-- `python -m renmark.doctor --fix` — apply safe auto-fixes (settings.json + registry + cache symlink). Each modified file gets a `.doctor.bak.<timestamp>` backup.
+- `python -m renmark.doctor --fix` — apply safe auto-fixes (settings.json + registry + cache symlink) and, when the user runs it deliberately, install the global `renmark-routing` rule into `~/.claude/CLAUDE.md` via `global_routing.install_global_rule()`. Each modified file gets a `.doctor.bak.<timestamp>` backup; the global write never overwrites existing rules.
 - `python -m renmark.doctor --json` — machine-readable output, same checks
 
 ## What it does NOT do
@@ -97,7 +137,7 @@ Settings changes don't take effect until Claude Code reloads its plugin registry
 
 ## Boundaries
 
-- Read-only by default. `--fix` writes only to `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, and `~/.claude/plugins/cache/renmark-local/`. Always with a timestamped backup of any pre-existing file.
+- Read-only by default. `--fix` writes only to `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, `~/.claude/plugins/cache/renmark-local/`, and — only on a deliberate `--fix` (or the user-approved `/renmark:init` offer) — the global `~/.claude/CLAUDE.md` (per-machine; user-approved; backed up; never overwrites other rules). Always with a timestamped backup of any pre-existing file.
 - No LLM calls. No network. No code in the project tree is touched.
 - Designed to be re-runnable. `--fix` is idempotent — applying it twice is a no-op on the second run.
 
