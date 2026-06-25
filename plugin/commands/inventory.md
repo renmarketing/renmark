@@ -1,5 +1,5 @@
 ---
-description: "Use to harvest a flat inventory of every renmark command and skill — name, domain, class, line counts, descriptions. A thin alias of `/renmark:audit --inventory-only`; writes the table to .renmark/audits/. Read-only, zero LLM."
+description: "Use to harvest a flat inventory of every renmark command and skill — typed as /renmark:inventory or \"list all commands\", \"inventory the skills\". Alias of /renmark:audit --inventory-only."
 argument-hint: ''
 ---
 

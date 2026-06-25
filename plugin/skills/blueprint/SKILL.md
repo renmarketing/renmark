@@ -1,6 +1,6 @@
 ---
 name: blueprint
-description: Use when the user wants a visual blueprint of the project — typed as /renmark:blueprint or phrases like "diagram this architecture", "draw the system", "show me a schematic", "mock up the UI", "make a prototype". Synthesizes a Container-granularity Mermaid architecture diagram (SCHEMATIC.md) and, when the build has a UI, a self-contained HTML/CSS mockup (PROTOTYPE.html) — both spliced into human-owned root docs without clobbering hand-written sections. Reads architecture ONLY from `.renmark/memory/project-map.md` (never rescans the repo) and halts to `/renmark:init` when that map is missing or stale. The diagram body is the LLM's job; the marker-splice mechanics live in `renmark/blueprint.py`.
+description: "Use when the user wants a visual blueprint of the project — typed as /renmark:blueprint or phrases like \"diagram this\", \"draw the system\", \"show me a schematic\", \"mock up the UI\", \"make a prototype\". Produces a Mermaid architecture diagram and, when the build has a UI, a self-contained HTML/CSS mockup."
 ---
 
 # blueprint

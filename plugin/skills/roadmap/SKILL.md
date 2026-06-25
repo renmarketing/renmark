@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: "Use for the Maintenance / Gap pipeline — what's stale, missing, or next. Typed as /renmark:roadmap, \"show the roadmap\", \"what's been built\", \"what's next\". Default prints a zero-cost status table (task | llm | status | tokens | $ | commit) from usage.jsonl + git log; --gaps dispatches bounded subagents to compare PRD vs shipped work and propose backlog items; --research adds web research. Also handles forward planning (PRD → staged/whole-product program) and --setup brownfield reconciliation."
+description: "Use for the Maintenance / Gap pipeline (/renmark:roadmap) to see status and decide what comes next — plain requests like \"what's next\", \"what's been built\", \"find gaps\", \"show the roadmap\". Reports shipped vs stale/missing work and also does forward planning of the next features."
 ---
 
 # roadmap

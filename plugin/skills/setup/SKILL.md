@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Thin alias — `/renmark:setup` refreshes/back-fills renmark rule blocks in an existing project by delegating to `/renmark:init`'s deterministic rule-block merge. The front-door "initialize renmark into an existing project" pipeline is now `/renmark:init`.
+description: "Use /renmark:setup to refresh or back-fill renmark's rule blocks in a project that already uses it — plain requests like \"refresh the renmark rules\", \"update the renmark config blocks\". Thin alias to /renmark:init's rule-block merge; to first adopt renmark into a repo, use /renmark:init."
 ---
 
 # setup

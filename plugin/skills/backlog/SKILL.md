@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: "Use to review, approve, and dispatch tracked work items — typed as `/renmark:backlog` or \"show the backlog\", \"what's pending review\", \"approve and build X\". An interactive intake + approval buffer: lists the backlog (title · status · source · risk · pending decision), opens a per-item detail view, and on **Approve and build** launches a bounded Loop Mode internally (max 5 iterations, default budget) to build the item on a managed branch — no user-facing --budget / --max-iterations / backlog-ID flags. Never merges or releases on its own (REQ-12); every managed branch ends in exactly one recorded disposition (no orphan branches). Reads only item metadata + verify evidence — never code or diffs."
+description: "Use when the user wants to review or act on tracked work items — typed as `/renmark:backlog` or phrases like \"show the backlog\", \"what's pending review\", \"approve and build X\". Opens an interactive list and per-item detail view; 'Approve and build' builds the item on a managed branch."
 ---
 
 # backlog

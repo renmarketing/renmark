@@ -1,5 +1,5 @@
 ---
-description: Use when you need a bounded project build-health summary — typed as /renmark:analytics. Prints shipped/blocked features, loop success rate, token/cost by feature. Zero LLM calls.
+description: "Use when the user wants a project build-health summary — typed as /renmark:analytics or \"build health\", \"feature metrics\", \"loop success rate\", \"token cost by feature\"."
 ---
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/analytics/SKILL.md` and follow its instructions exactly. The user provided this input: $ARGUMENTS

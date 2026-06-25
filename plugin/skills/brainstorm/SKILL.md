@@ -1,6 +1,6 @@
 ---
 name: brainstorm
-description: Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's brainstorm this", "I have an idea", "help me think through X". Asks one question at a time using the session's top reasoning tier (Fable 5 when available, Opus otherwise), researches best practices and prior art (similar software, live GitHub repos) before proposing approaches, establishes the shared scope contract, and writes a design doc at the end. Bootstraps fresh projects by creating CLAUDE.md, AGENTS.md, and .renmark/ when invoked in an empty folder.
+description: "Use when the user wants to flesh out a rough idea into a concrete spec — typed as /renmark:brainstorm or phrases like \"let's brainstorm this\", \"I have an idea\", \"help me think through X\". Asks one question at a time and writes a design doc at the end; also bootstraps a fresh project in an empty folder."
 ---
 
 # brainstorm

@@ -1,5 +1,5 @@
 ---
-description: Use after `/renmark:orchestrate` completes — three modes selected by flag. Default (no flag) runs the goal-backward shell smoke test. `--qa` runs one live-browser happy-path flow via Chrome DevTools MCP. `--deep-qa` runs 3 risk-ranked edge-case flows in the browser (gated behind a passing `--qa` for the current sha). All modes report a bounded ≤5-line verdict, dump heavy evidence to disk, append to `learnings.md`, and log failures to `bugs.md`. Never reads source code into conversation.
+description: Use after a build or `/renmark:orchestrate` to confirm it works — the post-build check that runs a shell smoke test by default, a live-browser happy-path flow with `--qa`, or 3 browser edge-case flows with `--deep-qa`.
 argument-hint: '[empty for shell smoke | --qa for live-browser happy path | --deep-qa for 3 live-browser edge cases]'
 ---
 

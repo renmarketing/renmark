@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "build it", "run the plan". Reads the plan, dispatches each task in an isolated subagent context (G11), aggregates per-wave summaries to `.renmark/state/wave-summaries/`, commits passing tasks, updates `pipeline.json` + `lifecycle.json`. The orchestrator NEVER reads generated code into conversation — subagent transcripts, diffs, and bodies live in artifacts only.
+description: "Use to execute a renmark plan — `/renmark:orchestrate` or \"execute the plan\", \"build it\", \"run the plan\". Dispatches each task in an isolated subagent and commits passing tasks."
 ---
 
 # orchestrate

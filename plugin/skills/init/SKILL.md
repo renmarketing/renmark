@@ -1,6 +1,6 @@
 ---
 name: init
-description: Use for the Project Setup pipeline — adopting renmark into any repo (new, in-progress, or production). The non-destructive front door. Scaffolds missing CLAUDE.md/AGENTS.md/CHANGELOG.md/.renmark/, back-fills missing rule blocks byte-verbatim, scans the repo for structure, modules, and public symbols, writes a tiny stub into CLAUDE.md/AGENTS.md (always loaded) and the full map into .renmark/memory/project-map.md (read on demand), reports standards health, then hands off to roadmap gap discovery. Renmark's analog to Claude Code's native /init. Idempotent — re-run anytime; works with or without a pre-existing CLAUDE.md and never dead-ends.
+description: "Use for the Project Setup pipeline (/renmark:init) to adopt renmark into a repo — plain requests like \"adopt renmark\", \"set renmark up here\", \"initialize renmark in this project\". The non-destructive, idempotent front door that scaffolds and maps any repo (new, in-progress, or production). Renmark's analog to Claude Code's native /init."
 ---
 
 # init

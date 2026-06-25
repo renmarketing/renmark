@@ -1,6 +1,7 @@
 ---
 name: approve
-description: "Use to clear a pending human-approval gate — `/renmark:approve` is the ONLY surface that flips `human_review_completed` in lifecycle.json. Reviews what needs approval, asks for explicit confirmation, and records the decision. Zero LLM judgment — the human decides."
+description: "Use to clear a pending human-approval gate — typed as /renmark:approve or \"approve the release\", \"what's pending approval\", \"approve this\"."
+disable-model-invocation: true
 ---
 
 # approve

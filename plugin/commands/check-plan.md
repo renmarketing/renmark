@@ -1,5 +1,5 @@
 ---
-description: "Use before executing a renmark plan — deterministic validation via renmark.plan_lint engine (shared with orchestrate pre-flight). Returns PASS, WARN, or BLOCK."
+description: "Use before executing a renmark plan to validate it — typed as /renmark:check-plan. Returns PASS, WARN, or BLOCK."
 argument-hint: '[path to plan or empty to use latest]'
 ---
 

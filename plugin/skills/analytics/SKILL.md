@@ -1,6 +1,7 @@
 ---
 name: analytics
-description: Use when you need a bounded project build-health summary — typed as /renmark:analytics. Prints shipped/blocked features, loop success rate, token/cost by feature. Zero LLM calls.
+description: "Use when the user wants a project build-health summary — typed as /renmark:analytics or \"build health\", \"feature metrics\", \"loop success rate\", \"token cost by feature\"."
+disable-model-invocation: true
 ---
 
 # analytics

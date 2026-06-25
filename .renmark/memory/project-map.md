@@ -1,16 +1,16 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-18 @ d88a017 -->
+<!-- Last refreshed: 2026-06-25 @ a886ab0 -->
 
-# Project map — ai-system
+# Project map — study-external-skills
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=98
+**Languages:** python=100
 
 ## Directory tree
 
 ```
-ai-system/
+study-external-skills/
 ├── bin/   executable scripts / wrappers
 ├── plugin/   Claude Code plugin (commands, skills, templates)
 ├── renmark/   Python runtime (CLI, dispatch, verifier, lifecycle)
@@ -36,42 +36,42 @@ ai-system/
 | `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
+| `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
 | `tests/test_reports_analytics.py` | — | `test_build_and_write_feature_report`, `test_feature_report_uses_version_path_for_release_link`, `test_record_functions_append_parseable_jsonl`, `test_aggregate_and_health_report_cover_seeded_and_empty_projects`, `test_record_feature_run_idempotent_on_rerun`, `test_close_feature_disposition_transforms_not_appends` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
 | `renmark/roadmap.py` | Roadmap reporter. | `RoadmapRow`, `build_rows`, `render_table`, `write_roadmap_md`, `render_program_table`, `reconcile_setup` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
-| `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | `PlanLintReport`, `lint_plan`, `main` |
 | `renmark/modularity.py` | Modularity / scalability health lens — pure stdlib ``ast``, zero-dep, never-rais | `analyze` |
-| `tests/test_scan.py` | --- | — |
+| `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | — |
 
 ## Commands (user-facing)
 
 | Command | Purpose |
 |---|---|
-| `/renmark:analytics` | Use when you need a bounded project build-health summary — typed as /renmark:analytics. |
-| `/renmark:approve` | "Use to clear a pending human-approval gate — `/renmark:approve` is the ONLY surface that flips `human_review_completed` |
-| `/renmark:audit` | "Use to run a deterministic plugin/registry health audit — composes the lint, modularity, and version-drift checkers and |
-| `/renmark:backlog` | Use to triage and approve backlog items — `/renmark:backlog` opens an interactive list, then a per-item detail view; 'Ap |
-| `/renmark:blueprint` | "Use when the user wants a visual blueprint of the project — typed as /renmark:blueprint or phrases like \"diagram this  |
-| `/renmark:brainstorm` | Use when the user wants to flesh out an idea into a concrete spec — typed as /renmark:brainstorm or phrases like "let's  |
-| `/renmark:check-plan` | "Use before executing a renmark plan — deterministic validation via renmark.plan_lint engine (shared with orchestrate pr |
+| `/renmark:analytics` | "Use when the user wants a project build-health summary — typed as /renmark:analytics or \"build health\", \"feature met |
+| `/renmark:approve` | "Use to clear a pending human-approval gate — typed as /renmark:approve or \"approve the release\", \"what's pending app |
+| `/renmark:audit` | "Use to run a deterministic plugin/registry health audit — typed as /renmark:audit (--quick or --inventory-only). |
+| `/renmark:backlog` | "Use when the user wants to review or act on tracked work items — typed as `/renmark:backlog` or phrases like \"show the |
+| `/renmark:blueprint` | "Use when the user wants a visual blueprint of the project — typed as /renmark:blueprint or phrases like \"diagram this\ |
+| `/renmark:brainstorm` | "Use when the user wants to flesh out a rough idea into a concrete spec — typed as /renmark:brainstorm or phrases like \ |
+| `/renmark:check-plan` | "Use before executing a renmark plan to validate it — typed as /renmark:check-plan. |
 | `/renmark:codereview` | "Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like \"review this\", \"review  |
-| `/renmark:debug` | Use for the Debug pipeline when something is broken — typed as /renmark:debug or phrases like "debug this", "why is X fa |
-| `/renmark:doctor` | Use when `/renmark:*` commands aren't appearing, the plugin seems broken, or the user just wants a sanity check on the i |
-| `/renmark:feature` | "Use for the Feature pipeline — adding or changing something in an existing build, with branch isolation. |
-| `/renmark:finish` | Use for the Ship / Readiness pipeline when implementation is complete — re-runs verifiers, shows the commit summary, rou |
+| `/renmark:debug` | "Use for the Debug pipeline (/renmark:debug) when something is broken — plain requests like \"fix X\", \"why is X failin |
+| `/renmark:doctor` | "Use when /renmark:* commands aren't appearing, the plugin seems broken, or the user wants a sanity check on the install |
+| `/renmark:feature` | "Use for the Feature pipeline (/renmark:feature) when adding to or changing an existing build, on an isolated branch — p |
+| `/renmark:finish` | "Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is done and you want to wrap up — plain req |
 | `/renmark:help` | "Use when the user types /renmark:help or asks \"what can renmark do\", \"list renmark commands\", \"renmark overview\". |
-| `/renmark:hygiene` | Use to garbage-collect stale renmark artifacts and prune append-only memory logs. |
-| `/renmark:init` | "Use for the Project Setup pipeline — adopting renmark into any repo (new, in-progress, or production). |
-| `/renmark:inventory` | "Use to harvest a flat inventory of every renmark command and skill — name, domain, class, line counts, descriptions. |
-| `/renmark:loop` | Use to run a bounded agentic loop — `/renmark:loop` or "loop on this until it passes", "keep iterating until the verifie |
-| `/renmark:orchestrate` | Use to execute a renmark plan — `/renmark:orchestrate` or "execute the plan", "build it", "run the plan". |
-| `/renmark:plan` | Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases li |
-| `/renmark:prd` | Use to create or update the project's PRD (Product Requirements Document) — the per-project source of truth that plans a |
-| `/renmark:resume` | Use after `/clear` or `/compact`, or at the start of a fresh session, to discover where the in-flight renmark feature st |
-| `/renmark:roadmap` | "Use for the Maintenance / Gap pipeline — what's stale, missing, or next. |
-| `/renmark:scan` | "Use to run a deterministic read-only QA proposer lane — runs audit + verifiers, dedupes findings, proposes backlog item |
-| `/renmark:setup` | "Thin alias — /renmark:setup refreshes/back-fills renmark rule blocks in an existing project by delegating to /renmark:i |
-| `/renmark:start` | "Use for the New Build pipeline — the plain-English entry point when a vibe coder wants to build something new and doesn |
-| `/renmark:usage` | Use when the user wants observed local usage status — typed as /renmark:usage, "show usage", "rolling 5h", "weekly limit |
-| `/renmark:verify` | Use after `/renmark:orchestrate` completes — three modes selected by flag. |
+| `/renmark:hygiene` | "Use to garbage-collect stale renmark artifacts and prune append-only memory logs — typed as /renmark:hygiene. |
+| `/renmark:init` | "Use for the Project Setup pipeline (/renmark:init) to adopt renmark into a repo — plain requests like \"adopt renmark\" |
+| `/renmark:inventory` | "Use to harvest a flat inventory of every renmark command and skill — typed as /renmark:inventory or \"list all commands |
+| `/renmark:loop` | "Use when the user wants a bounded agentic loop toward a verifier — typed as /renmark:loop or phrases like \"loop until  |
+| `/renmark:orchestrate` | "Use to execute a renmark plan — `/renmark:orchestrate` or \"execute the plan\", \"build it\", \"run the plan\". |
+| `/renmark:plan` | "Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases l |
+| `/renmark:prd` | "Use when the user wants to author or maintain the project's Product Requirements Document — typed as /renmark:prd or ph |
+| `/renmark:resume` | "Use after /clear or /compact, or at the start of a fresh session, to discover where the in-flight renmark feature stopp |
+| `/renmark:roadmap` | "Use for the Maintenance / Gap pipeline (/renmark:roadmap) to see status and decide what comes next — plain requests lik |
+| `/renmark:scan` | "Use to run the read-only QA proposer lane — typed as /renmark:scan (--propose to land backlog items, --emit-cron for th |
+| `/renmark:setup` | "Use /renmark:setup to refresh or back-fill renmark's rule blocks in a project that already uses it — plain requests lik |
+| `/renmark:start` | "Use for the New Build pipeline (/renmark:start) when starting something new from scratch — plain requests like \"build  |
+| `/renmark:usage` | "Use when the user wants observed local usage status — typed as /renmark:usage or \"show usage\", \"rolling 5h\", \"week |
+| `/renmark:verify` | Use after a build or `/renmark:orchestrate` to confirm it works — the post-build check that runs a shell smoke test by d |

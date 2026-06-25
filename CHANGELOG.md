@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-25] — v0.20.0 — trigger-only skill descriptions + disable-model-invocation (context-hygiene)
+**Request:** After a deep study of three external skill frameworks (mattpocock/skills, obra/superpowers, garrytan/gstack), apply the two highest-leverage learnings (P1+P2 from `.renmark/research/2026-06-25-external-skills-study.research.md`): rewrite every skill `description` to be trigger-only (state WHEN to invoke, not the full workflow — both repos independently showed a workflow-summary in the description gets used as a shortcut that skips the body), and reclassify the zero-LLM/meta skills as `disable-model-invocation: true` so their descriptions leave the model's per-turn context entirely. Dogfooded via the full `/renmark:feature` pipeline.
+**Built:**
+- **Trigger-only descriptions** — all 27 skill `description:` fields rewritten to lead with WHEN + distinct plain-word triggers; internal workflow/stage/model-routing recap removed (it already lives in each SKILL.md body). Synonym trigger lists collapsed to distinct branches; `start`/`feature`/`debug` now cross-reference instead of all claiming the same verbs (net disambiguation win, confirmed by review). SKILL.md + command shim kept byte-identical per skill so `audit description_drift` stays 0.
+- **`disable-model-invocation: true`** added to 11 zero-LLM/meta skills (analytics, usage, inventory, help, approve, resume, doctor, hygiene, audit, scan, check-plan) — descriptions drop from the model's context while the slash commands keep working. `audit`/`scan` correctly silenced (they run project code / are cron-driven, shouldn't auto-fire).
+- **Net effect:** skill-description context cut ~50% (12,764 → 6,764 bytes, ~1,500 tokens; ~832 tokens/turn removed entirely via the silenced set). Plain-word auto-routing preserved (focused review: no lost triggers, no ambiguity).
+- Verified: 863 pytest pass, ruff clean (mypy errors pre-existing in `browser*.py` only); independent routing-quality review clean (2 minor nits, both fixed).
+**Files changed:** `plugin/skills/*/SKILL.md` (27) + `plugin/commands/*.md` (27) descriptions; `disable-model-invocation` on 11 SKILL.md; `.renmark/research/2026-06-25-external-skills-study.research.md` (new); `.renmark/plans/2026-06-25-skill-descriptions-trigger-only.plan.md` (new); + 7 version locations.
+**Do not change:**
+- **Per-skill SKILL.md and command-shim descriptions MUST stay byte-identical** (or ≥25% token overlap) — `audit description_drift` BLOCKS otherwise. Edit both together.
+- Descriptions stay **trigger-only** — do not migrate workflow/stage recaps back into them; that recap belongs in the SKILL.md body, and a workflow-summary in the description gets used as a shortcut that skips the body.
+- The auto-routing pipeline skills (start, feature, debug, roadmap, finish, init, brainstorm, plan, orchestrate, verify, codereview, prd, backlog, blueprint, loop, setup) MUST stay model-invocable — never add `disable-model-invocation` to them. `disable-model-invocation` goes on SKILL.md only (exact hyphenated spelling; a typo silently no-ops).
+
 ## [2026-06-23] — v0.19.0 — auto-routing: renmark is the default for build/dev work
 **Request:** Make renmark the default path for plain-English build/dev requests so the user doesn't have to remember `/renmark:*` commands (and so it wins over other skill frameworks like superpowers), without removing manual control. Built via the full pipeline (`/renmark:feature` → plan → orchestrate → verify → codereview → finish), dogfooding the 0.18.0 model.
 **Built:**

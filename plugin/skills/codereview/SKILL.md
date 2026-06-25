@@ -1,6 +1,6 @@
 ---
 name: codereview
-description: "Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like \"review this\", \"review my changes\", \"check this PR\", \"code review HEAD~3..HEAD\". Review depth is proportional to the diff: a lite/doc diff runs the built-in cheap `/review` in-context by default (then offers a one-keystroke escalate to the full codex pass); a standard/full diff runs the full codex review pass in a read-only sandbox, emitting a structured markdown report at .renmark/reviews/YYYY-MM-DD-<sha>.review.md. Opus only reads the severity summary — never the diff itself, to keep context lean. Supports `--full` (force codex), `--skip` (explicit skip), and `--focus optimize`/`--focus standards` to swap the prompt template; default focus is correctness + quality."
+description: "Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or phrases like \"review this\", \"review my changes\", \"check this PR\", \"code review HEAD~3..HEAD\". Depth scales to the diff: a small/doc diff gets a quick in-context review, a larger one gets the full sandboxed review pass."
 ---
 
 # codereview

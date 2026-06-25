@@ -1,6 +1,6 @@
 ---
 name: prd
-description: "Use when the user wants to author or maintain the project's Product Requirements Document — typed as /renmark:prd or phrases like \"write the PRD\", \"what's the PRD say\", \"update the product spec\", \"keep the PRD current\". Authors and maintains a single per-project `PRD.md` at the repo root as the human-owned source of truth for what the product is and is not. Two modes: CREATE (no PRD yet) interviews one-question-at-a-time on a fresh project or synthesizes a draft from existing docs on a mature one; UPDATE (PRD exists) reconciles a requested change and presents a diff. Every write is human-gated — the PRD is a living doc the human owns, never silently rewritten by an automated stage."
+description: "Use when the user wants to author or maintain the project's Product Requirements Document — typed as /renmark:prd or phrases like \"write the PRD\", \"update requirements\", \"update the product spec\". Creates the PRD when none exists or reconciles a requested change as a human-gated diff."
 ---
 
 # prd

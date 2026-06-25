@@ -1,6 +1,6 @@
 ---
 name: loop
-description: Use to run a bounded, verified, resumable agentic loop — `/renmark:loop "<goal>"` or "keep iterating until X works", "loop until the goal is met". One upfront approval gate (goal + verify cmd + budget + max-iterations + cost preview), then autonomously cycles orchestrate → verify → decide, committing each passing iteration to the branch, until a terminal status (done / budget-hit / max-iter / awaiting-approval / stalled). Never merges, releases, PRs, or makes destructive changes on its own (REQ-12) — it stops at the gate and hands off to /renmark:finish. Reads only verify metadata + the spend ledger + bounded summaries — never code or diffs.
+description: "Use when the user wants a bounded agentic loop toward a verifier — typed as /renmark:loop or phrases like \"loop until X passes\", \"keep iterating until green\". Cycles build → verify under a budget and max-iteration cap, stopping on success or exhaustion; loop state survives /clear."
 ---
 
 # loop

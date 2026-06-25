@@ -1,5 +1,5 @@
 ---
-description: Use when `/renmark:*` commands aren't appearing, the plugin seems broken, or the user just wants a sanity check on the install. Diagnoses Claude Code plugin registration health — checks installed_plugins.json, enabledPlugins, extraKnownMarketplaces, cache path, version parity, CLI on PATH, and Python package import. Optional `--fix` mode applies safe auto-fixes.
+description: "Use when /renmark:* commands aren't appearing, the plugin seems broken, or the user wants a sanity check on the install — typed as /renmark:doctor (--fix to apply safe auto-fixes)."
 argument-hint: "[--fix]"
 ---
 

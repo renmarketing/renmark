@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Use after `/renmark:orchestrate` completes — runs goal-backward smoke tests derived from the plan's stated feature goal, cross-references open bugs for regressions, reports how many requirements were confirmed, writes a `.verification.md` artifact, and appends a learning entry. Three modes — default shell smoke, `--qa` for one live-browser happy path, `--deep-qa` for 3 live-browser edge cases; browser modes add visual/layout integrity checks and before/after UI-change tracking. Never reads source code into conversation.
+description: Use after a build or `/renmark:orchestrate` to confirm it works — the post-build check that runs a shell smoke test by default, a live-browser happy-path flow with `--qa`, or 3 browser edge-case flows with `--deep-qa`.
 ---
 
 # verify

@@ -1,5 +1,5 @@
 ---
-description: Use for the Debug pipeline when something is broken and you need to fix or change it — typed as /renmark:debug or plain dev requests like "debug this", "fix this bug", "fix X", "why is X failing", "investigate the error", "find the root cause", "make X work", "change the broken behavior". Runs reproduce → root cause → fix → regression test → verify, keeping scope tight (no feature expansion). Routes cheap investigation (greps, line counts) to Haiku/Bash, multi-file traces to Codex, and cross-system reasoning to Opus. State preserved in .renmark/debug/<session-id>/ so the session survives /clear.
+description: "Use for the Debug pipeline (/renmark:debug) when something is broken — plain requests like \"fix X\", \"why is X failing\", \"find the root cause\", \"investigate the error\", \"make X work\". Keeps scope tight to the fix (no feature expansion); for adding or changing behavior that isn't broken, use /renmark:feature."
 argument-hint: '[symptom or error message]'
 ---
 
