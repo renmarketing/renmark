@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-033 — Finished feature graduated-preamble-tier
+
+**Date:** 2026-06-25
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch worktree-feature+graduated-preamble-tier reached stage ready-to-release
+
+---
+
 ## ADR-032 — Finished feature finish-branch-disposition
 
 **Date:** 2026-06-17

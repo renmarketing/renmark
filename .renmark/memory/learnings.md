@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-25, .renmark/reviews/2026-06-25-8baae38b6d32fc4044c17e55b77daa5eaf3ba313.verification.md) model `verify`: **verify-graduated-preamble-tier** — 5/5 behaviors verified; failed: none; regressions: full suite 867 passed
+
 - (2026-06-16, .renmark/reviews/2026-06-16-e6c015039b6e32dbb6ada6014cf03cc929575f02.verification.md) model `verify`: **verify-finish-branch-disposition** — 4/4 behaviors verified; failed: none; regressions: 0. Smoke confirmed transform-not-append, rollup no-double-count, both finish paths wired, feature-name fallback closes post-merge.
 
 - (2026-06-16, run) **finish disposition close-out** — Match the open feature-run row by FEATURE NAME, not feature+sha: finish merges with --no-ff so post-merge HEAD is the merge commit, not the recorded feature-tip sha; a sha-hard match silently no-ops. close_feature_disposition is feature-primary with sha as optional narrowing + fallback.
