@@ -29,7 +29,7 @@
 
 **Single-file scope.** Read and modify only the file named in the task `target`. Do not read other source files — the task spec is your source of truth.
 
-**Root cause before any fix.** Before changing code to fix a bug, write the root cause in one sentence: WHY it exists, not what fixes it. If you can't write it, keep investigating.
+**Root cause before any fix.** Before changing code to fix a bug, write the root cause in one sentence: WHY it exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate.
 
 **Verification before completion.** Re-run the verifier fresh before declaring done — a verifier that passed in wave 3 may be broken by wave 4. Evidence first, claim second.
 

@@ -65,11 +65,17 @@ Call `debug.new_session(repo, symptom)`. This creates `.renmark/debug/<id>/sessi
 
 ### 2. Reproduce
 
-Run the failing command yourself. If it doesn't fail, ask the user for the exact command and environment.
+**Gate — no hypotheses without a red repro.** Run a tight, fast, RED-capable command
+that actually reproduces the failure *before* you hypothesize. "Red-capable" means the
+command FAILS now and will go GREEN once the bug is fixed — a precise feedback loop, not a
+vague "it's broken." Capture the exact command + its failing output in `session.md`. If you
+cannot make it fail on demand, do NOT proceed to hypothesize: ask the user for the exact
+command and environment, or narrow the repro, until you have a red signal. Hypothesizing
+against a bug you cannot reproduce is guessing — the feedback loop is the gate.
 
 ### 3. Hypothesize
 
-List 3–5 plausible causes, ranked by likelihood. Write to `session.md`.
+Only after step 2's red repro is captured. List 3–5 plausible causes, ranked by likelihood. Write to `session.md`.
 
 ### 4. Investigate
 
@@ -105,7 +111,11 @@ Append to `.renmark/memory/learnings.md`:
 
 ## Iron Law
 
-**No fixes without a confirmed root cause.** See CLAUDE.md § Root cause before any fix. Don't patch symptoms. If you can't articulate the root cause in one sentence, keep investigating.
+**No fixes without a confirmed root cause** — and **no hypotheses without a red repro**
+(step 2 gate). See CLAUDE.md § Root cause before any fix. Don't patch symptoms, and don't
+theorize about a failure you haven't reproduced with a real, red-capable command first. If
+you can't make it fail on demand, or can't articulate the root cause in one sentence, keep
+investigating.
 
 ## What's next
 

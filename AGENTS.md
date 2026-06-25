@@ -29,7 +29,7 @@
 
 **Single-file scope.** Read and modify only the file named in the task `target`. Do not read other source files — the task spec is your source of truth.
 
-**Root cause before any fix.** Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. See Iron Law in `/renmark:debug`.
+**Root cause before any fix.** Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate. See Iron Law in `/renmark:debug`.
 
 **Verification before completion.** Before claiming any task or plan complete, re-run the verifier fresh — a verifier that passed in wave 3 may be broken by wave 4. Evidence first, claim second.
 

@@ -58,7 +58,7 @@ Never read generated file contents into the conversation — only per-task summa
 <!-- END:executor-dispatch-rule -->
 <!-- BEGIN:root-cause-rule -->
 ## Root cause before any fix
-Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. See Iron Law in `/renmark:debug`.
+Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate. See Iron Law in `/renmark:debug`.
 <!-- END:root-cause-rule -->
 <!-- BEGIN:verify-before-done-rule -->
 ## Verification before completion
