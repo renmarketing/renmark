@@ -118,6 +118,10 @@ Orchestration MUST survive interruption, partial completion, executor failure,
 `/clear` mid-pipeline, and orchestrator restart. Recovery depends on persisted
 state at `.renmark/state/pipeline.json`, never conversational reconstruction. Every skill running >1 step MUST update pipeline state before returning.
 <!-- END:workflow-recovery-rule -->
+<!-- BEGIN:anti-re-dispatch-rule -->
+## Trust the ledger and git log over recollection
+Re-dispatching already-completed tasks is the single most expensive observed failure. Always trust `pipeline.json` / `lifecycle.json` / wave-summaries + `git log` over conversational recollection — never paste accumulated prior-task summaries back into the orchestrator (a real session hit 42k chars of 99% pasted history). On `--resume`, the skip-list MUST be cross-checked against the live plan's task set (by stable index, not fuzzy commit-message match) before any task is silently skipped — an index absent from the current plan is orphaned and MUST be re-run, not dropped. Code: `_cross_check_skip_list` in `renmark/cli/_engine.py`.
+<!-- END:anti-re-dispatch-rule -->
 <!-- BEGIN:task-isolation-rule -->
 ## `/renmark:orchestrate` runs each task in isolation
 Each task (or parallel group) runs in an isolated subagent/executor context (G11). The orchestrator MUST NOT carry implementation context between tasks unless the dependency graph requires it.

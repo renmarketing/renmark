@@ -313,6 +313,47 @@ def _task_signature(task: Task) -> str:
     return f"target={glob}, complexity={task.complexity}, mode={task.mode}"
 
 
+def _cross_check_skip_list(
+    done: set[int],
+    tasks: list[Task],
+) -> tuple[set[int], set[int]]:
+    """Validate the resume skip-list against the CURRENT plan's task set.
+
+    Background: completed_task_indices() scans git log with a loose regex that
+    accepts ``(task N)``-suffix commits and any bracketed prefix.  When task
+    numbers are reused across different plans, or when a previous run's commits
+    bleed into the skip-list, a task that was never run in THIS plan can be
+    silently marked "done" — the single most expensive observed failure mode.
+
+    This function makes the check deterministic:
+    - An index in ``done`` that corresponds to a valid task in the current plan
+      is safe to skip (the task ran and committed in this plan or an equivalent
+      one with the same numbering).
+    - An index in ``done`` that does NOT appear in the current plan is ORPHANED:
+      it came from a different plan (different task count, reused number, or a
+      ``(task N)``-suffix side-commit).  Return it in the ``ambiguous`` set so
+      the caller can warn and NOT silently skip real tasks.
+
+    Args:
+        done:  Indices the git-log scan reported as completed.
+        tasks: Tasks from the current live plan (parse_plan result).
+
+    Returns:
+        (safe_to_skip, ambiguous) — two disjoint subsets of ``done``.
+    """
+    plan_indices = {t.index for t in tasks}
+    safe_to_skip: set[int] = set()
+    ambiguous: set[int] = set()
+    for idx in done:
+        if idx in plan_indices:
+            safe_to_skip.add(idx)
+        else:
+            # This index has no counterpart in the current plan; treating it as
+            # "done" would silently drop a real task.  Flag it rather than skip.
+            ambiguous.add(idx)
+    return safe_to_skip, ambiguous
+
+
 def _memory_log_outcome(repo: Path, task: Task, outcome: str, run_id: str, note: str = "") -> None:
     """Append a routing.md entry after each task completes. Best-effort."""
     try:
@@ -384,7 +425,21 @@ def execute_plan(
             _print("note: no PAUSED state found; running from start")
         else:
             _print(f"resuming run {pause.run_id}; last attempted task: {pause.last_task_index}")
-        done = completed_task_indices(repo)
+        raw_done = completed_task_indices(repo)
+        # Cross-check: a git-log scan may include indices from a DIFFERENT plan
+        # (reused task numbers, ``(task N)``-suffix side commits, etc.).
+        # Silently skipping tasks that don't exist in the current plan is the
+        # single most expensive observed failure — the ledger and git log must
+        # be trusted, but ONLY for indices that unambiguously belong to THIS plan.
+        done, ambiguous = _cross_check_skip_list(raw_done, tasks)
+        if ambiguous:
+            _print(
+                f"warning: skip-list cross-check found {len(ambiguous)} orphaned "
+                f"index(es) {sorted(ambiguous)} not in current plan "
+                f"({len(tasks)} tasks).  These will NOT be silently skipped — "
+                f"re-running to avoid false completions.  "
+                f"(Likely cause: reused task numbers or commits from a different plan.)"
+            )
         if done:
             _print(f"skipping already-committed tasks: {sorted(done)}")
 
