@@ -92,7 +92,7 @@
     "domain": "debug",
     "skill_class": "gate",
     "shim_body_lines": 2,
-    "skill_lines": 329,
+    "skill_lines": 375,
     "has_skill": true
   },
   {
@@ -104,7 +104,7 @@
     "domain": "debug",
     "skill_class": "aux",
     "shim_body_lines": 2,
-    "skill_lines": 123,
+    "skill_lines": 133,
     "has_skill": true
   },
   {
@@ -144,6 +144,18 @@
     "has_skill": true
   },
   {
+    "name": "guide",
+    "shim_path": "plugin/commands/guide.md",
+    "skill_path": "plugin/skills/guide/SKILL.md",
+    "description": "Use when the user types /renmark:guide or says \\\"I don't know which command to use\\\", \\\"help me pick a pipeline\\\", \\\"where do I start\\\", \\\"what renmark command should I use\\\", \\\"guide me\\\".",
+    "argument_hint": "",
+    "domain": "meta",
+    "skill_class": "aux",
+    "shim_body_lines": 2,
+    "skill_lines": 75,
+    "has_skill": true
+  },
+  {
     "name": "help",
     "shim_path": "plugin/commands/help.md",
     "skill_path": "plugin/skills/help/SKILL.md",
@@ -152,7 +164,7 @@
     "domain": "meta",
     "skill_class": "aux",
     "shim_body_lines": 2,
-    "skill_lines": 132,
+    "skill_lines": 133,
     "has_skill": true
   },
   {

@@ -32,6 +32,8 @@ declared_at: 2026-06-12
 
 ## Learned overrides
 
+- (2026-06-25) `codereview:external-skills-p4-p12-batch (codex->sonnet)` → **sonnet** (rerouted: codex usage-limit (reset ~18:57))
+
 - (2026-06-25) `codereview:graduated-preamble-tier (codex->sonnet)` → **sonnet** (rerouted: codex usage-limit (reset ~18:57))
 
 - (2026-06-25) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260625-202040-b75a)

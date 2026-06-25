@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-06-25T18:13:45+00:00
-source_sha: a886ab075ac4cd1ba5b444d57a309db7c96f10f3
+created_at: 2026-06-25T22:40:50+00:00
+source_sha: 1a2cb9041a46014ccccb90effa75b674b84e5e43
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -26,12 +26,13 @@ schema_compliance: true
 | blueprint | build | pipeline | 2 | 176 | Use when the user wants a visual blueprint of the project — typed as /renmark:bl… |
 | brainstorm | build | pipeline | 2 | 211 | Use when the user wants to flesh out a rough idea into a concrete spec — typed a… |
 | check-plan | build | pipeline | 2 | 103 | Use before executing a renmark plan to validate it — typed as /renmark:check-pla… |
-| codereview | debug | gate | 2 | 329 | Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or … |
-| debug | debug | aux | 2 | 123 | Use for the Debug pipeline (/renmark:debug) when something is broken — plain req… |
+| codereview | debug | gate | 2 | 375 | Use when the user wants a diff or PR reviewed — typed as /renmark:codereview or … |
+| debug | debug | aux | 2 | 133 | Use for the Debug pipeline (/renmark:debug) when something is broken — plain req… |
 | doctor | meta | aux | 2 | 181 | Use when /renmark:* commands aren't appearing, the plugin seems broken, or the u… |
 | feature | build | pipeline | 2 | 275 | Use for the Feature pipeline (/renmark:feature) when adding to or changing an ex… |
 | finish | build | pipeline | 2 | 391 | Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is d… |
-| help | meta | aux | 2 | 132 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
+| guide | meta | aux | 2 | 75 | Use when the user types /renmark:guide or says \"I don't know which command to u… |
+| help | meta | aux | 2 | 133 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
 | hygiene | meta | aux | 2 | 76 | Use to garbage-collect stale renmark artifacts and prune append-only memory logs… |
 | init | meta | aux | 2 | 227 | Use for the Project Setup pipeline (/renmark:init) to adopt renmark into a repo … |
 | inventory | audit | aux | 2 | 68 | Use to harvest a flat inventory of every renmark command and skill — typed as /r… |
@@ -49,7 +50,7 @@ schema_compliance: true
 
 ## Summary
 
-- 27 commands harvested from plugin/commands/*.md
-- 27 have a backing SKILL.md, 0 missing
-- domains: audit=3, build=12, debug=2, meta=10
-- classes: aux=15, gate=2, pipeline=10
+- 28 commands harvested from plugin/commands/*.md
+- 28 have a backing SKILL.md, 0 missing
+- domains: audit=3, build=12, debug=2, meta=11
+- classes: aux=16, gate=2, pipeline=10

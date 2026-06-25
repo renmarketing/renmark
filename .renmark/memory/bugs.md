@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-06-25 — P11 proactivity toggle: persisted but not runtime-enforced
+
+**Severity:** low
+**Symptom:** is_proactive() has no runtime call-site; --set-proactive false persists the flag + documents the CLI in the routing rule, but no mechanism injects the flag into the agent per turn, so auto-routing enforcement remains doc-level (the agent honors the CLAUDE.md rule).
+**Root cause:** renmark auto-routing is implemented as agent-read doc instructions, not a code router; a persisted flag needs a SessionStart-style injection to actually gate routing.
+**Fix:** (follow-up) surface is_proactive(repo) via a session-start context injection or doctor/status read so the flag has runtime effect.
+**Lesson:** persist+document is a valid first increment, but a config flag with zero readers is half-wired — wire a real consumer or log the gap.
+
+---
+
 ### 2026-06-14 — Hand-off picker not re-rendered on continuation turns
 
 **Severity:** medium

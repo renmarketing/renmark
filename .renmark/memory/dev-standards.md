@@ -1,7 +1,7 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-25 @ 13c72f9 -->
+<!-- Last refreshed: 2026-06-25 @ 6475645 -->
 
-# Dev standards — feature+graduated-preamble-tier
+# Dev standards — feature+external-skills-p4-p12
 
 What this project enforces about itself, detected from configuration files. Read this before making non-trivial changes so you don't break gates that are silently checking your work.
 
@@ -21,7 +21,7 @@ What this project enforces about itself, detected from configuration files. Read
 ✅ **No gaps detected.** Linter, type checker, tests, and CI are all wired up.
 ## Modularity
 
-**163 modularity gaps** (24 major, 139 warn) — file-level size/complexity breaches. Advisory: these never block init.
+**167 modularity gaps** (26 major, 141 warn) — file-level size/complexity breaches. Advisory: these never block init.
 
 - 🚨 **High cognitive complexity: `renmark/memory.py` → `_parse_learning_entries()` (score 32)** — `_parse_learning_entries()` in `renmark/memory.py` has a nesting-weighted cognitive-complexity score of 32 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `_parse_learning_entries()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/release.py` → `main()` (30 branches)** — `main()` in `renmark/release.py` has a cyclomatic branch count of 30 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `main()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
@@ -42,8 +42,8 @@ What this project enforces about itself, detected from configuration files. Read
 - 🚨 **High cognitive complexity: `renmark/lifecycle.py` → `validate_artifact_refs()` (score 31)** — `validate_artifact_refs()` in `renmark/lifecycle.py` has a nesting-weighted cognitive-complexity score of 31 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `validate_artifact_refs()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/parser.py` → `parse_plan()` (28 branches)** — `parse_plan()` in `renmark/parser.py` has a cyclomatic branch count of 28 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `parse_plan()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High cognitive complexity: `renmark/parser.py` → `parse_plan()` (score 90)** — `parse_plan()` in `renmark/parser.py` has a nesting-weighted cognitive-complexity score of 90 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `parse_plan()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
-- 🚨 **Long function: `renmark/cli/_engine.py` → `execute_plan()` (243 code lines)** — `execute_plan()` in `renmark/cli/_engine.py` spans 243 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `execute_plan()` into well-named helpers. Advisory._
-- _… +143 more (re-run for the full list)_
+- 🚨 **High import fan-out: `renmark/cli/_engine.py` (25 imports)** — `renmark/cli/_engine.py` has 25 import statements (threshold 25). High fan-out signals a module coupled to many others — a change-amplifier and a refactoring hazard. _Reduce coupling in `renmark/cli/_engine.py`: extract a narrower interface, group related imports behind a facade, or move logic closer to its dependencies. Advisory._
+- _… +147 more (re-run for the full list)_
 
 
 _Run `python -m renmark.init --deep` for deeper checks (commit-message style, etc.)._
