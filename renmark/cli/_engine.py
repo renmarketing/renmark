@@ -36,7 +36,16 @@ from ..state import (
     write_pause,
 )
 from ..verifier import run_verifier
-from .commands import cmd_analytics, cmd_logs, cmd_roadmap, cmd_scan, cmd_task, cmd_usage
+from .commands import (
+    cmd_analytics,
+    cmd_logs,
+    cmd_review_package,
+    cmd_roadmap,
+    cmd_scan,
+    cmd_task,
+    cmd_task_brief,
+    cmd_usage,
+)
 
 
 @dataclass
@@ -1070,6 +1079,25 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     ap.add_argument("--output", metavar="ARTIFACT_PATH", help="(with --task) where Codex writes its artifact")
+    # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
+    ap.add_argument(
+        "--task-brief",
+        nargs=2,
+        metavar=("PLAN_PATH", "TASK_INDEX"),
+        help=(
+            "extract task N's spec/brief from PLAN_PATH, write to "
+            ".renmark/state/handoffs/<stem>-task-N.brief.md, print ONLY the path"
+        ),
+    )
+    ap.add_argument(
+        "--review-package",
+        nargs=2,
+        metavar=("BASE_REF", "HEAD_REF"),
+        help=(
+            "write git diff --stat + per-file diffs for BASE..HEAD to "
+            ".renmark/state/handoffs/review-<base>-<head>.pkg.md, print ONLY the path"
+        ),
+    )
     args = ap.parse_args(argv)
 
     if (args.propose or args.emit_cron) and not args.scan:
@@ -1092,9 +1120,22 @@ def main(argv: list[str] | None = None) -> int:
         if not args.output:
             ap.error("--task requires --output ARTIFACT_PATH")
         return cmd_task(args.task, args.output, repo=repo)
+    if args.task_brief:
+        plan_path, task_index_str = args.task_brief
+        try:
+            task_index = int(task_index_str)
+        except ValueError:
+            ap.error(f"--task-brief TASK_INDEX must be an integer, got {task_index_str!r}")
+        return cmd_task_brief(plan_path, task_index, repo=repo)
+    if args.review_package:
+        base_ref, head_ref = args.review_package
+        return cmd_review_package(base_ref, head_ref, repo=repo)
 
     if not args.plan:
-        ap.error("plan path is required unless --usage / --analytics / --roadmap / --logs / --scan / --task")
+        ap.error(
+            "plan path is required unless --usage / --analytics / --roadmap / --logs / "
+            "--scan / --task / --task-brief / --review-package"
+        )
     return execute_plan(
         args.plan,
         repo=repo,

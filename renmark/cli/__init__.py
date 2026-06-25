@@ -9,15 +9,26 @@ prior public surface so `from renmark import cli; cli.main(...)` /
 from __future__ import annotations
 
 from ._engine import Config, execute_plan, main
-from .commands import cmd_analytics, cmd_logs, cmd_roadmap, cmd_scan, cmd_task, cmd_usage
+from .commands import (
+    cmd_analytics,
+    cmd_logs,
+    cmd_review_package,
+    cmd_roadmap,
+    cmd_scan,
+    cmd_task,
+    cmd_task_brief,
+    cmd_usage,
+)
 
 __all__ = [
     "Config",
     "cmd_analytics",
     "cmd_logs",
+    "cmd_review_package",
     "cmd_roadmap",
     "cmd_scan",
     "cmd_task",
+    "cmd_task_brief",
     "cmd_usage",
     "execute_plan",
     "main",

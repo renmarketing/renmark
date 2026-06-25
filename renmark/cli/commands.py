@@ -1,4 +1,5 @@
-"""renmark-execute subcommand handlers (--usage / --roadmap / --logs / --task).
+"""renmark-execute subcommand handlers (--usage / --roadmap / --logs / --task /
+--task-brief / --review-package).
 
 Self-contained CLI reporting + ad-hoc Codex task mode. These do not touch the
 orchestrator's shared git globals, so they live apart from the execution engine.
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..state import now_iso, read_usage
+from ..state import handoffs_dir, now_iso, read_usage
 
 
 def cmd_usage(repo: Path) -> int:
@@ -259,4 +260,189 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
         "schema_compliance": validated,  # frontmatter + ## Summary both present
     }
     print(_json.dumps(output))
+    return 0
+
+
+def cmd_task_brief(plan_path: str, task_index: int, *, repo: Path) -> int:
+    """File-handoff helper: extract one task's brief from a plan and write it to
+    `.renmark/state/handoffs/<plan-stem>-task-<N>.brief.md`.
+
+    Prints ONLY the written path to stdout — the brief body never passes through
+    the orchestrator's context (REQ-5 / no-diffs rule).
+
+    Filename is deterministic (plan-stem + task-index) so repeated calls for the
+    same task are idempotent and overwrite rather than accumulate.
+
+    Returns 0 on success, 2 on any error (printed to stderr).
+    """
+    import sys
+
+    from ..parser import PlanError, parse_plan
+
+    # The CLI arg parser hands `task_index` through as a string; coerce so the
+    # `t.index == task_index` match below compares int-to-int (a str would never
+    # match an int index, producing the "not found; available: [1, 2]" paradox).
+    try:
+        task_index = int(task_index)
+    except (TypeError, ValueError):
+        print(f"ERROR: task index must be an integer, got {task_index!r}", file=sys.stderr)
+        return 2
+
+    try:
+        tasks = parse_plan(plan_path)
+    except PlanError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+
+    matching = [t for t in tasks if t.index == task_index]
+    if not matching:
+        indices = sorted(t.index for t in tasks)
+        print(
+            f"ERROR: task index {task_index} not found in plan; available: {indices}",
+            file=sys.stderr,
+        )
+        return 2
+
+    task = matching[0]
+
+    # Build the brief: everything a subagent needs, nothing more.
+    lines: list[str] = [
+        f"# Task {task.index}: {task.title}",
+        "",
+        f"**mode:** {task.mode}",
+        f"**target:** {task.target}",
+        f"**executor:** {task.executor}",
+        f"**complexity:** {task.complexity}",
+    ]
+    if task.serves:
+        lines.append(f"**serves:** {task.serves}")
+    if task.context_files:
+        lines.append(f"**context_files:** {task.context_files}")
+    if task.parallel_group is not None:
+        lines.append(f"**parallel_group:** {task.parallel_group}")
+    lines += [
+        "",
+        "## Spec",
+        "",
+        task.spec,
+        "",
+        "## Verifier",
+        "",
+        "```",
+        task.verifier,
+        "```",
+        f"verifier_timeout_s: {task.verifier_timeout_s}",
+    ]
+    brief_body = "\n".join(lines) + "\n"
+
+    # Deterministic filename: <plan-stem>-task-<N>.brief.md
+    plan_stem = Path(plan_path).stem
+    # Strip common suffixes like ".plan" so "2026-06-25-foo.plan" → "2026-06-25-foo"
+    if plan_stem.endswith(".plan"):
+        plan_stem = plan_stem[: -len(".plan")]
+    filename = f"{plan_stem}-task-{task_index}.brief.md"
+
+    out_dir = handoffs_dir(repo)
+    out_path = out_dir / filename
+    out_path.write_text(brief_body, encoding="utf-8")
+
+    # Print ONLY the path — the load-bearing property.
+    print(str(out_path))
+    return 0
+
+
+def cmd_review_package(base_ref: str, head_ref: str, *, repo: Path) -> int:
+    """File-handoff helper: write a bounded review package (git diff --stat +
+    per-file diffs) for the range ``base_ref..head_ref`` to
+    `.renmark/state/handoffs/review-<base-short>-<head-short>.pkg.md`.
+
+    Prints ONLY the written path to stdout — the diff bytes never pass through
+    the orchestrator's context (REQ-5 / no-diffs rule).
+
+    Filename is deterministic: derived from the short-SHA (or sanitised ref name)
+    of each endpoint, so repeated calls for the same range overwrite rather than
+    accumulate.
+
+    Returns 0 on success, 2 on any error (printed to stderr).
+    """
+    import subprocess
+    import sys
+
+    def _git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+        )
+
+    # Resolve each ref to a short SHA for a stable, content-based filename.
+    def _short_sha(ref: str) -> str:
+        r = _git("rev-parse", "--short", ref)
+        if r.returncode == 0:
+            return r.stdout.strip()
+        # Fallback: sanitise the ref string so it's filename-safe.
+        import re
+        return re.sub(r"[^a-zA-Z0-9._-]", "-", ref)[:20]
+
+    base_short = _short_sha(base_ref)
+    head_short = _short_sha(head_ref)
+
+    # --stat summary (always bounded).
+    stat_result = _git("diff", "--stat", f"{base_ref}..{head_ref}")
+    if stat_result.returncode != 0:
+        print(
+            f"ERROR: git diff --stat {base_ref}..{head_ref} failed: "
+            f"{stat_result.stderr.strip()[:200]}",
+            file=sys.stderr,
+        )
+        return 2
+
+    # Per-file diffs, bounded: cap total output at ~200 KB to prevent runaway
+    # packages on large branches. The reviewer subagent reads the file in one
+    # call; unbounded diffs defeat the purpose of the helper.
+    _MAX_DIFF_BYTES = 200_000
+    diff_result = _git("diff", f"{base_ref}..{head_ref}")
+    diff_body = diff_result.stdout
+    truncated = False
+    if len(diff_body.encode()) > _MAX_DIFF_BYTES:
+        # Truncate at a line boundary near the limit.
+        encoded = diff_body.encode()[:_MAX_DIFF_BYTES]
+        diff_body = encoded.decode(errors="replace").rsplit("\n", 1)[0]
+        truncated = True
+
+    lines: list[str] = [
+        f"# Review package: {base_ref}..{head_ref}",
+        "",
+        f"base: `{base_ref}` ({base_short})",
+        f"head: `{head_ref}` ({head_short})",
+        "",
+        "## Stat",
+        "",
+        "```",
+        stat_result.stdout.rstrip(),
+        "```",
+        "",
+        "## Diff",
+        "",
+        "```diff",
+        diff_body.rstrip(),
+        "```",
+    ]
+    if truncated:
+        lines += [
+            "",
+            f"_(diff truncated at {_MAX_DIFF_BYTES // 1000}KB — run "
+            f"`git diff {base_ref}..{head_ref}` locally for the full output)_",
+        ]
+
+    pkg_body = "\n".join(lines) + "\n"
+
+    filename = f"review-{base_short}-{head_short}.pkg.md"
+    out_dir = handoffs_dir(repo)
+    out_path = out_dir / filename
+    out_path.write_text(pkg_body, encoding="utf-8")
+
+    # Print ONLY the path — the load-bearing property.
+    print(str(out_path))
     return 0
