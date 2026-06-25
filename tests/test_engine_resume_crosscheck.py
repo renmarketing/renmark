@@ -172,9 +172,12 @@ def test_resume_warns_on_orphaned_skip_entry(tmp_path, monkeypatch, capsys):
         f"expected cross-check warning in output, got:\n{out}"
     )
     assert "5" in out, "the orphaned index must be named in the warning"
-    # Task 1 should NOT be printed as DONE (it wasn't completed in this plan).
-    assert "(prev run)" not in out, (
-        "orphaned task must not be shown as DONE from a previous run"
+    # Non-vacuous: the orphaned index 5 must be EXCLUDED from the safe skip-list.
+    # If the cross-check failed to exclude it, the engine would print the skip
+    # line with 5 in it ("skipping already-committed tasks: [5]"). The fix means
+    # the safe set is empty, so that exact line must never appear.
+    assert "skipping already-committed tasks: [5]" not in out, (
+        "orphaned index 5 was wrongly included in the resume skip-list"
     )
 
 

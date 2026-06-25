@@ -279,9 +279,10 @@ def cmd_task_brief(plan_path: str, task_index: int, *, repo: Path) -> int:
 
     from ..parser import PlanError, parse_plan
 
-    # The CLI arg parser hands `task_index` through as a string; coerce so the
-    # `t.index == task_index` match below compares int-to-int (a str would never
-    # match an int index, producing the "not found; available: [1, 2]" paradox).
+    # Coerce defensively: the `_engine.py` arg parser already passes an int, but
+    # direct/programmatic callers (tests, embeds) may hand a string. Without this,
+    # a str would never match an int `t.index`, producing the "not found;
+    # available: [1, 2]" paradox. int(int) is a harmless no-op for the CLI path.
     try:
         task_index = int(task_index)
     except (TypeError, ValueError):
@@ -403,6 +404,16 @@ def cmd_review_package(base_ref: str, head_ref: str, *, repo: Path) -> int:
     # call; unbounded diffs defeat the purpose of the helper.
     _MAX_DIFF_BYTES = 200_000
     diff_result = _git("diff", f"{base_ref}..{head_ref}")
+    if diff_result.returncode != 0:
+        # Symmetric with the --stat guard above: a stat-success + diff-failure
+        # must NOT write an empty-diff package and return success (silent
+        # false-success). Surface the error and bail.
+        print(
+            f"ERROR: git diff {base_ref}..{head_ref} failed: "
+            f"{diff_result.stderr.strip()[:200]}",
+            file=sys.stderr,
+        )
+        return 2
     diff_body = diff_result.stdout
     truncated = False
     if len(diff_body.encode()) > _MAX_DIFF_BYTES:
