@@ -518,6 +518,54 @@ def test_validate_artifact_refs_stale_artifact(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "stale_artifact"
 
 
+def test_preamble_tier_classifies_skills() -> None:
+    for skill in ("resume", "help", "usage", "analytics", "approve", "doctor", "hygiene", "check-plan"):
+        assert lifecycle.PREAMBLE_TIER_BY_SKILL[skill] == "minimal"
+        assert lifecycle.preamble_tier(skill) == "minimal"
+
+    for skill in ("audit", "scan", "inventory"):
+        assert lifecycle.PREAMBLE_TIER_BY_SKILL[skill] == "standard"
+        assert lifecycle.preamble_tier(skill) == "standard"
+
+    for skill in ("orchestrate", "feature", "nonesuch"):
+        assert lifecycle.preamble_tier(skill) == "full"
+
+
+def test_skill_preamble_minimal_skill_returns_none_after_cross_domain_transition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    lifecycle.skill_preamble(tmp_path, "debug")
+
+    assert lifecycle.skill_preamble(tmp_path, "resume") is None
+
+
+def test_skill_preamble_minimal_skill_still_records_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from renmark.state import last_skill_invocation
+
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    lifecycle.skill_preamble(tmp_path, "debug")
+    lifecycle.skill_preamble(tmp_path, "resume")
+
+    assert last_skill_invocation(tmp_path)["skill"] == "resume"
+
+
+def test_skill_preamble_standard_skill_surfaces_only_cross_domain_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_declared_fable_routing(tmp_path)
+    lifecycle.skill_preamble(tmp_path, "debug")
+
+    hint = lifecycle.skill_preamble(tmp_path, "audit")
+
+    assert hint is not None
+    assert "cross-domain transition" in hint
+    assert "declared top tier: fable" not in hint
+
+
 def test_validate_artifact_refs_absolute_outside_repo_warns(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     state = lifecycle.write_lifecycle(
