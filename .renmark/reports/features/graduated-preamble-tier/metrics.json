@@ -1,0 +1,21 @@
+{
+  "feature": "graduated-preamble-tier",
+  "branch": "worktree-feature+graduated-preamble-tier",
+  "sha": "9ddf6720622139baec45a445b3ff4471b5e3aee7",
+  "version_path": "",
+  "release_link": "",
+  "verification": "5/5 behaviors verified",
+  "codereview": ".renmark/reviews/2026-06-25-8baae38.review.md",
+  "files_changed": 7,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-06-25T21:37:10+00:00"
+}

@@ -32,6 +32,10 @@ declared_at: 2026-06-12
 
 ## Learned overrides
 
+- (2026-06-25) `codereview:graduated-preamble-tier (codex->sonnet)` → **sonnet** (rerouted: codex usage-limit (reset ~18:57))
+
+- (2026-06-25) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260625-202040-b75a)
+
 - (2026-06-12) `codex tasks blocked by provider usage limit (non-bulk)` → **sonnet** (owner rule 2026-06-11: reroute-first, ledgered; codex retry also valid after reset, run=20260612-124500-fr1)
 
 - (2026-06-11) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260611-142135-bcc2)
