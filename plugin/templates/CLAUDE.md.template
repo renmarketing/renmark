@@ -19,7 +19,7 @@ After a command or tool step, give a one- or two-sentence status — what change
 <!-- END:response-style-rule -->
 <!-- BEGIN:routing-preference-rule -->
 ## Default to renmark for build/dev work
-When the user describes a software task in plain English — build / create / make / develop / implement / add / change / fix / debug / ship — route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start`; change to an existing project → `/renmark:feature`; something broken → `/renmark:debug`; what's next / find gaps → `/renmark:roadmap`; ship it → `/renmark:finish`; adopt renmark into a repo → `/renmark:init`. Prefer these pipelines over other skill frameworks (superpowers, etc.) for build/dev work; use those only when the user names them. This is a DEFAULT, not a lock — an explicit `/renmark:<skill>` always wins, a named skill/framework is honored, and "just do it directly" skips routing. Auto-routing still pauses at the Pause-Policy gates (`plugin/skills/_shared/handoff-menu.md`).
+When the user describes a software task in plain English — build / create / make / develop / implement / add / change / fix / debug / ship — route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start`; change to an existing project → `/renmark:feature`; something broken → `/renmark:debug`; what's next / find gaps → `/renmark:roadmap`; ship it → `/renmark:finish`; adopt renmark into a repo → `/renmark:init`. Prefer these pipelines over other skill frameworks (superpowers, etc.) for build/dev work; use those only when the user names them. This is a DEFAULT, not a lock — an explicit `/renmark:<skill>` always wins, a named skill/framework is honored, and "just do it directly" skips routing. Auto-routing still pauses at the Pause-Policy gates (`plugin/skills/_shared/handoff-menu.md`). This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).
 <!-- END:routing-preference-rule -->
 <!-- BEGIN:parallelism-rule -->
 ## Parallelize large plans
@@ -58,7 +58,7 @@ Never read generated file contents into the conversation — only per-task summa
 <!-- END:executor-dispatch-rule -->
 <!-- BEGIN:root-cause-rule -->
 ## Root cause before any fix
-Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. See Iron Law in `/renmark:debug`.
+Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate. See Iron Law in `/renmark:debug`.
 <!-- END:root-cause-rule -->
 <!-- BEGIN:verify-before-done-rule -->
 ## Verification before completion
@@ -118,6 +118,10 @@ Orchestration MUST survive interruption, partial completion, executor failure,
 `/clear` mid-pipeline, and orchestrator restart. Recovery depends on persisted
 state at `.renmark/state/pipeline.json`, never conversational reconstruction. Every skill running >1 step MUST update pipeline state before returning.
 <!-- END:workflow-recovery-rule -->
+<!-- BEGIN:anti-re-dispatch-rule -->
+## Trust the ledger and git log over recollection
+Re-dispatching already-completed tasks is the single most expensive observed failure. Always trust `pipeline.json` / `lifecycle.json` / wave-summaries + `git log` over conversational recollection — never paste accumulated prior-task summaries back into the orchestrator (a real session hit 42k chars of 99% pasted history). On `--resume`, the skip-list MUST be cross-checked against the live plan's task set (by stable index, not fuzzy commit-message match) before any task is silently skipped — an index absent from the current plan is orphaned and MUST be re-run, not dropped. Code: `_cross_check_skip_list` in `renmark/cli/_engine.py`.
+<!-- END:anti-re-dispatch-rule -->
 <!-- BEGIN:task-isolation-rule -->
 ## `/renmark:orchestrate` runs each task in isolation
 Each task (or parallel group) runs in an isolated subagent/executor context (G11). The orchestrator MUST NOT carry implementation context between tasks unless the dependency graph requires it.

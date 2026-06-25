@@ -92,6 +92,7 @@ a blocker, or merge/release.
     /renmark:usage       — observed local usage (pause state, 5h window)
     /renmark:analytics   — build-health: shipped/blocked, loop rate, cost
     /renmark:resume      — cold-start recovery: prints the next command
+    /renmark:guide       — interactive decision-tree: picks the right pipeline for you
     /renmark:help        — this message
 
 ── Where things live ───────────────────────────────────────────────────────

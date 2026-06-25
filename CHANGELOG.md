@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-06-25] — external-skills-study batch P4/P5/P6/P9/P11/P12 (unreleased)
+**Request:** Autonomously plan + implement the remaining external-skills-study items (`.renmark/research/2026-06-25-external-skills-study.research.md`). Approved scope: build + merge stages 1–6 (P5, P4, P12, P11, P6, P9), then brainstorm the 3 design-heavy ones (P10, P7, P8). Driven as a staged program via `/renmark:feature` (each stage: implement → verify → independent review → commit).
+**Built:**
+- **P5** anti-re-dispatch ledger doctrine — rule block (CLAUDE.md/AGENTS.md + templates) + `_cross_check_skip_list()` in `_engine.py`: orphaned task indices (in git log, absent from the live plan) are excluded from the `--resume` skip-list with a warning instead of silently dropped. +8 tests.
+- **P4** file-handoff helpers — `renmark-execute --task-brief PLAN N` / `--review-package BASE HEAD` write a uniquely-named file under `.renmark/state/handoffs/` and print ONLY the path (REQ-5 as mechanism). +19 tests. (Fixed a CLI str-vs-int index bug + a silent diff-failure path in review.)
+- **P12** feedback-loop-first debug gate — debug step 2 is now a gate: a red-capable repro before hypothesizing; Iron Law + root-cause rule updated.
+- **P11** persisted proactivity toggle — `renmark/config.py` (`is_proactive`/`set_proactive`, default on, never raises) + `renmark-execute --set-proactive true|false`; `.renmark/config.json`. +11 tests. **Known limitation (logged in bugs.md):** persists + documents the flag, but runtime enforcement of auto-routing stays doc-level — no per-turn injection yet.
+- **P6** two-verdict codereview — spec-compliance (compliant/under-built/over-built) AND code-quality scored separately; `[d] Debug` fires on either.
+- **P9** `/renmark:guide` — interactive decision-tree on-ramp routing to the right pipeline (kept separate from the zero-LLM `help`); 27→28 commands.
+- Each stage independently verified + reviewed (codex usage-limited → reviews rerouted to isolated sonnet, ledgered). Final: 906 pytest pass, audit PASS (0 issues), version-drift clean.
+**Files changed:** `renmark/cli/_engine.py`, `renmark/cli/commands.py`, `renmark/config.py`, `renmark/state/_core.py`+`__init__.py`, `renmark/lifecycle.py`, `plugin/skills/{debug,codereview,help,guide}/`, `plugin/commands/guide.md`, CLAUDE.md/AGENTS.md + templates, plugin.json/marketplace.json, +5 test files.
+**Do not change:**
+- P5 cross-check is by task INDEX (commit messages carry no target info) — catches reused-number/orphan, not reused-index-different-task; don't claim more.
+- P4 helpers MUST print only the path (no body to stdout) — REQ-5 load-bearing.
+- `guide` and `help` are intentionally separate: help stays zero-LLM (`disable-model-invocation`); guide is the interactive wizard.
+- Unreleased on `main` past v0.21.0 — cut a combined version (≥v0.22.0) after P10/P7/P8.
+
 ## [2026-06-25] — v0.21.0 — graduated preamble-tier (P3)
 **Request:** Build P3 from the external-skills study (`.renmark/research/2026-06-25-external-skills-study.research.md`): make `lifecycle.skill_preamble` graduated instead of all-or-nothing, so zero-LLM/meta skills carry a minimal/no preamble while heavy pipelines get the full block. Complements v0.20.0's trigger-only descriptions + disable-model-invocation. Dogfooded via the full `/renmark:feature` pipeline.
 **Built:**

@@ -28,6 +28,7 @@ LAST_SKILL_FILE = "last-skill.json"
 WAVE_SUMMARIES_KEEP = 50  # keep last N wave summaries hot
 LOGS_KEEP = 50  # keep last N log files hot
 ESCALATIONS_KEEP = 20  # escalations are rarer but bigger
+HANDOFFS_SUBDIR = "handoffs"  # task-brief and review-package files
 
 # Back-compat alias for code that still references STATE_DIR_NAME.
 # .renmark/state/ is the canonical runtime state directory in v0.1.0+.
@@ -44,6 +45,18 @@ def now_iso() -> str:
 
 def state_dir(repo_root: str | Path) -> Path:
     d = Path(repo_root) / STATE_DIR_NAME
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def handoffs_dir(repo_root: str | Path) -> Path:
+    """Return (and create) `.renmark/state/handoffs/` — the write target for
+    task-brief and review-package files.
+
+    The orchestrator hands the *path* to a subagent; the bytes never pass
+    through the orchestrator's context (REQ-5 / no-diffs rule).
+    """
+    d = state_dir(repo_root) / HANDOFFS_SUBDIR
     d.mkdir(parents=True, exist_ok=True)
     return d
 
