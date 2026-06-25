@@ -243,7 +243,7 @@
     "name": "resume",
     "shim_path": "plugin/commands/resume.md",
     "skill_path": "plugin/skills/resume/SKILL.md",
-    "description": "Use after /clear or /compact, or at the start of a fresh session, to discover where the in-flight renmark feature stopped \u2014 typed as /renmark:resume or \\\"where was I\\\", \\\"what's next\\\".",
+    "description": "Use after /clear or /compact, or at the start of a fresh session, to discover where the in-flight renmark feature stopped \u2014 typed as /renmark:resume or \\\"where was I\\\", \\\"pick up where I left off\\\".",
     "argument_hint": "",
     "domain": "meta",
     "skill_class": "aux",
