@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-06-12
+last_reviewed: 2026-06-25
 status: draft
 ---
 
@@ -213,7 +213,10 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   the Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
   `.renmark/` state and memory; cross-platform install; the OPTIONAL Playwright
   browser-automation + session-persistence layer (opt-in, falls back to the
-  Chrome DevTools MCP channel).
+  Chrome DevTools MCP channel); graduated skill-preamble tiers that give
+  zero-LLM / meta skills minimal context injection while pipeline skills receive
+  the full preamble — a finer per-turn token dial that never compromises
+  cold-start recovery or cross-domain detection (complements REQ-5).
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
@@ -318,3 +321,11 @@ dependencies" non-goal to clarify that the *core* stays stdlib-only while
 Playwright). Proposed by the playwright-browser-control feature's PRD-alignment
 gate; reviewed and approved by the project owner on 2026-06-12 via the
 `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-06-25, human-approved diff):** Clarified the In-scope
+boundary to cover **graduated skill-preamble tiers** (zero-LLM/meta skills get a
+minimal/no preamble; pipeline skills get the full block) — a per-turn token
+optimization that complements the REQ-5 context-hygiene pillar and the v0.20.0
+trigger-only-description work. Not a new product requirement; no behavioral
+non-goal changes. Proposed by the "graduated preamble-tier" (P3) feature's
+PRD-alignment gate; reviewed and approved by the project owner on 2026-06-25.
