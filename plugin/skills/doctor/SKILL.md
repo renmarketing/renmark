@@ -1,6 +1,7 @@
 ---
 name: doctor
-description: Use when `/renmark:*` commands aren't appearing, the plugin seems broken, or the user just wants a sanity check on the install. Diagnoses Claude Code plugin registration health and proposes (or applies) fixes.
+description: "Use when /renmark:* commands aren't appearing, the plugin seems broken, or the user wants a sanity check on the install — typed as /renmark:doctor (--fix to apply safe auto-fixes)."
+disable-model-invocation: true
 ---
 
 # doctor

@@ -1,5 +1,5 @@
 ---
-description: Use to create or update the project's PRD (Product Requirements Document) — the per-project source of truth that plans and features align to. Typed as /renmark:prd or phrases like "create prd", "update prd", "write requirements".
+description: "Use when the user wants to author or maintain the project's Product Requirements Document — typed as /renmark:prd or phrases like \"write the PRD\", \"update requirements\", \"update the product spec\". Creates the PRD when none exists or reconciles a requested change as a human-gated diff."
 argument-hint: '[create | update | change description]'
 ---
 

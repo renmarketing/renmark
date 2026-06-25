@@ -1,5 +1,5 @@
 ---
-description: "Use to run a deterministic read-only QA proposer lane — runs audit + verifiers, dedupes findings, proposes backlog items. Writes artifacts only under .renmark/reviews/ and .renmark/state/, never advances lifecycle.json. Scheduling is external."
+description: "Use to run the read-only QA proposer lane — typed as /renmark:scan (--propose to land backlog items, --emit-cron for the schedule command). Never edits code, commits, or merges."
 argument-hint: '[--propose | --emit-cron]'
 ---
 

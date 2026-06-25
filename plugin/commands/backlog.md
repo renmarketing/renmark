@@ -1,5 +1,5 @@
 ---
-description: Use to triage and approve backlog items — `/renmark:backlog` opens an interactive list, then a per-item detail view; 'Approve and build' launches bounded Loop Mode internally on a managed branch.
+description: "Use when the user wants to review or act on tracked work items — typed as `/renmark:backlog` or phrases like \"show the backlog\", \"what's pending review\", \"approve and build X\". Opens an interactive list and per-item detail view; 'Approve and build' builds the item on a managed branch."
 argument-hint: '[item-id]'
 ---
 

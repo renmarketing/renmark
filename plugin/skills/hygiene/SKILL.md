@@ -1,6 +1,7 @@
 ---
 name: hygiene
-description: Use to garbage-collect stale renmark artifacts and prune append-only memory logs. Scans .renmark/specs|plans|reviews|research|state/wave-summaries for artifacts past their stale_after or TTL, archives them to .renmark/archive/YYYY-MM/ while preserving paths. Optionally dedupes and ages out entries in learnings.md/bugs.md/features.md. Default dry-run; opt-in to writes via --apply. Meta domain — never advances lifecycle.json.
+description: "Use to garbage-collect stale renmark artifacts and prune append-only memory logs — typed as /renmark:hygiene. Default dry-run; --apply to make changes."
+disable-model-invocation: true
 ---
 
 # hygiene

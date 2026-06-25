@@ -1,6 +1,7 @@
 ---
 name: check-plan
-description: Use before executing a renmark plan — validates task count, verifier presence, and parallel group safety. Returns PASS, WARN, or BLOCK. Invoked automatically by /renmark:orchestrate pre-flight.
+description: "Use before executing a renmark plan to validate it — typed as /renmark:check-plan. Returns PASS, WARN, or BLOCK."
+disable-model-invocation: true
 ---
 
 # check-plan

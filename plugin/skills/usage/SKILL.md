@@ -1,6 +1,7 @@
 ---
 name: usage
-description: Use when the user wants observed local usage status — typed as /renmark:usage, "show usage", "rolling 5h", "weekly limits", "paused runs". Reports current pause state, local limits, and rolling 5-hour window from Claude Code runtime. Zero LLM calls.
+description: "Use when the user wants observed local usage status — typed as /renmark:usage or \"show usage\", \"rolling 5h\", \"weekly limits\", \"paused runs\"."
+disable-model-invocation: true
 ---
 
 # usage

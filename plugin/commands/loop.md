@@ -1,5 +1,5 @@
 ---
-description: Use to run a bounded agentic loop — `/renmark:loop` or "loop on this until it passes", "keep iterating until the verifier is green". Drives a goal toward a verifier under an explicit budget and max-iteration cap, re-running the verifier each pass and stopping on success, budget exhaustion, or the iteration ceiling. Persists loop state so the run survives `/clear`.
+description: "Use when the user wants a bounded agentic loop toward a verifier — typed as /renmark:loop or phrases like \"loop until X passes\", \"keep iterating until green\". Cycles build → verify under a budget and max-iteration cap, stopping on success or exhaustion; loop state survives /clear."
 argument-hint: '[goal] [--verify <cmd>] [--budget <n>] [--max-iterations <n>]'
 ---
 

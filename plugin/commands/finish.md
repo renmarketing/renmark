@@ -1,5 +1,5 @@
 ---
-description: Use for the Ship / Readiness pipeline when implementation is complete — re-runs verifiers, shows the commit summary, routes failures to debug, then offers PR / merge / release / nothing. Release builds a version-anchored distribution zip + unpacked snapshot into .renmark/version/ (always, offline) and a matching git tag, plus a GitHub release when a remote + gh are available. Merge and release are Pause-Policy gates — never default. Thin branch-close wrapper around gh and git.
+description: "Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is done and you want to wrap up — plain requests like \"ship it\", \"we're done\", \"finish this up\". Re-verifies, then offers PR / merge / release; merge and release are gated and never proceed without approval."
 ---
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/finish/SKILL.md` and follow its instructions exactly. The user provided this input: $ARGUMENTS

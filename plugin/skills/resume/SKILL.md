@@ -1,6 +1,7 @@
 ---
 name: resume
-description: Use after `/clear` or `/compact`, or at the start of a fresh session, to discover where the in-flight renmark feature stopped. Reads `.renmark/state/lifecycle.json` and prints the recommended next command. Zero LLM calls — pure file IO. This is the cold-start recovery surface that makes "AI workflows survive context death."
+description: "Use after /clear or /compact, or at the start of a fresh session, to discover where the in-flight renmark feature stopped — typed as /renmark:resume or \"where was I\", \"what's next\"."
+disable-model-invocation: true
 ---
 
 # resume

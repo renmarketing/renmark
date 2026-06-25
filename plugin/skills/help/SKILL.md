@@ -1,6 +1,7 @@
 ---
 name: help
-description: Use when the user types /renmark:help or asks "what can renmark do", "list renmark commands", "renmark overview". Teaches the workflow — prints the user-facing pipelines first, then every skill grouped by purpose with its common modifiers. Zero-cost — no LLM calls.
+description: "Use when the user types /renmark:help or asks \"what can renmark do\", \"list renmark commands\", \"renmark overview\"."
+disable-model-invocation: true
 ---
 
 # help

@@ -1,6 +1,7 @@
 ---
 name: scan
-description: "Use to run the scheduled QA proposer lane — typed as /renmark:scan. Inspects the project by running verifiers (audit + pytest/ruff/mypy), writes a bounded report, and with --propose lands deduped source=qa backlog items for human triage; --emit-cron prints the direct cron/Task Scheduler command (renmark-execute --scan --propose, no LLM, no token spend). Never edits product code, commits, merges, releases, or executes fixes (REQ-14). Note: verifiers execute the project's own code — run at the same trust level as your test suite."
+description: "Use to run the read-only QA proposer lane — typed as /renmark:scan (--propose to land backlog items, --emit-cron for the schedule command). Never edits code, commits, or merges."
+disable-model-invocation: true
 ---
 
 # scan
