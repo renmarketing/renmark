@@ -97,14 +97,29 @@ the parsed focus, then pipes it to `codex exec --sandbox read-only -`.
 codex exec --sandbox read-only -
 ```
 
-### Prompt: default (correctness + quality)
+### Prompt: default (spec-compliance + correctness + quality)
 
 The skill pipes a prompt like:
 
 ```
-Review the diff <range>. Find: runtime bugs, logic errors, off-by-ones,
-race conditions, security issues (injection, auth, data leaks), bad
-assumptions, edge cases the code doesn't handle.
+You are reviewing the diff <range>. Emit TWO independently-scored verdicts.
+
+━━ VERDICT 1 — Spec-compliance ━━
+Goal: <one-paragraph task/plan intent from <plan_path> or provided inline>
+
+Did the diff build the RIGHT thing?
+  - compliant   — diff satisfies the goal; nothing missing, nothing extra
+  - under-built — one or more requirements from the goal are absent or incomplete
+  - over-built  — diff includes material scope beyond the stated goal
+
+Emit exactly one of:
+  Spec: compliant
+  Spec: under-built — <one line: what is missing>
+  Spec: over-built  — <one line: what is extra>
+
+━━ VERDICT 2 — Code-quality ━━
+Find: runtime bugs, logic errors, off-by-ones, race conditions, security issues
+(injection, auth, data leaks), bad assumptions, edge cases the code doesn't handle.
 
 For each finding:
   - file:line
@@ -112,14 +127,36 @@ For each finding:
   - one-sentence description
   - one-sentence fix suggestion
 
-Top of report: summary counts per severity.
-Do not modify any files. Do not exit until the review is complete.
+Top of quality section: summary counts per severity.
+
+Present the two verdicts at the TOP of your report, clearly labelled, before
+any per-finding details. Do not modify any files. Do not exit until the review
+is complete.
 ```
+
+**Passing spec intent to codex:** the orchestrator supplies the plan goal by
+one of two methods (preference order):
+1. `--plan <path>` flag → codex reads the goal paragraph from that plan file
+   inside the sandbox (read-only; it only reads, does not modify).
+2. Inline in the prompt as a `Goal:` paragraph when no plan file is available.
+
+Codex reads the plan path in-sandbox; the Opus orchestrator sees only the
+two verdict lines + counts in the bounded summary — never the plan body or
+the diff body. Context hygiene is preserved.
 
 ### Prompt: optimize
 
 ```
-Review the diff <range> for PERFORMANCE and IDIOM issues. Focus on:
+You are reviewing the diff <range> with focus OPTIMIZE.
+
+━━ VERDICT 1 — Spec-compliance (lite) ━━
+Goal: <one-paragraph task/plan intent from <plan_path> or provided inline>
+
+Quick scope check — did the diff build the RIGHT thing?
+  Spec: compliant | under-built — <what's missing> | over-built — <what's extra>
+
+━━ VERDICT 2 — Performance & idiom ━━
+Focus on:
   - unnecessary allocations, copies, or work inside hot loops
   - asymptotic complexity surprises (accidental O(n²) over reasonable inputs)
   - repeated computation that could be cached or hoisted
@@ -127,10 +164,9 @@ Review the diff <range> for PERFORMANCE and IDIOM issues. Focus on:
   - non-idiomatic constructs that have a clearer, faster language-native form
   - resource lifecycle issues (locks held too long, file handles, sockets)
 
-Out of scope for this pass: correctness bugs, security, edge cases.
+Out of scope: correctness bugs, security, edge cases.
   If you spot a correctness bug while looking at perf, list it as ASIDE
-  (severity: Major), but DO NOT exhaustively hunt for them — that's the
-  default focus's job.
+  (severity: Major), but DO NOT exhaustively hunt for them.
 
 For each finding:
   - file:line
@@ -138,26 +174,34 @@ For each finding:
   - one-sentence description (what's slow / non-idiomatic, and roughly why)
   - one-sentence fix suggestion
 
-Top of report: summary counts per severity, plus a single bold line
-"Focus: optimize" so the reader knows which lens this pass used.
+Present the two verdicts at the TOP of your report. Then: summary counts per
+severity, plus a single bold line "Focus: optimize".
 Do not modify any files. Do not exit until the review is complete.
 ```
 
 ### Prompt: standards
 
 ```
-Review the diff <range> for adherence to the project's UNWRITTEN code
-standards. Skip whatever the project's own pre-commit/CI gates already
-enforce (check for .pre-commit-config.yaml and CI config files — in
-renmark's own repo that is tools/precommit.sh: ruff lint, ruff format,
-mypy strict, plugin lint, pytest). Look only at conventions that exist
-in the codebase but are not enforced by tooling.
+You are reviewing the diff <range> with focus STANDARDS.
+
+━━ VERDICT 1 — Spec-compliance (lite) ━━
+Goal: <one-paragraph task/plan intent from <plan_path> or provided inline>
+
+Quick scope check — did the diff build the RIGHT thing?
+  Spec: compliant | under-built — <what's missing> | over-built — <what's extra>
+
+━━ VERDICT 2 — Code standards ━━
+Skip whatever the project's own pre-commit/CI gates already enforce (check
+for .pre-commit-config.yaml and CI config files — in renmark's own repo that
+is tools/precommit.sh: ruff lint, ruff format, mypy strict, plugin lint,
+pytest). Look only at conventions that exist in the codebase but are not
+enforced by tooling.
 
 Sources of truth:
-  - Spot-check 3–5 other files in the same module/package for
-    conventions: imports (relative vs absolute), error-handling shape
-    (raise vs return None vs Result), logging style, naming, type
-    annotation density, docstring presence and shape, where helpers go.
+  - Spot-check 3–5 other files in the same module/package for conventions:
+    imports (relative vs absolute), error-handling shape (raise vs return
+    None vs Result), logging style, naming, type annotation density,
+    docstring presence and shape, where helpers go.
   - If .renmark/memory/conventions.md exists, treat it as a hard rubric.
   - If .renmark/memory/dev-standards.md flags any "gap" the diff touches,
     call those out.
@@ -182,8 +226,8 @@ For each finding:
     majority pattern looks like)
   - one-sentence fix suggestion
 
-Top of report: summary counts per severity, plus a single bold line
-"Focus: standards" so the reader knows which lens this pass used.
+Present the two verdicts at the TOP of your report. Then: summary counts
+per severity, plus a single bold line "Focus: standards".
 Do not modify any files. Do not exit until the review is complete.
 ```
 
@@ -257,10 +301,12 @@ in-context and writes no artifact — there is no `<path>` to report for it.
 
 Tell the user — using ONLY the summary, never the diff body.
 
-**Cheap-lane hand-off (ran `/review`):** state which review ran and ALWAYS offer the
-escalate. Lead with:
+**Cheap-lane hand-off (ran `/review`):** state which review ran, emit a brief
+spec-compliance note, and ALWAYS offer the escalate. Lead with:
 
-> *"Diff tier: lite — ran cheap `/review` in-context. <N critical, M major, K minor> findings.*
+> *"Diff tier: lite — ran cheap `/review` in-context.*
+> *Spec: <compliant | under-built — … | over-built — …>*
+> *Quality: <N critical, M major, K minor> findings.*
 > *What's next?*
 > *  1. [full] Escalate — re-run as the full codex pass (`/renmark:codereview --full <range>`)*
 > *  2. [fix] Fix — kick off a new /renmark:plan built from the findings"*
@@ -268,14 +314,14 @@ escalate. Lead with:
 The `[full]` escalate is mandatory on the cheap lane — never present the cheap result
 as final without it.
 
-**Full-lane hand-off (ran codex):** lead with the codereview-specific actions, then
-render the shared quality-gate menu so re-testing from a different angle stays one
-keystroke away:
+**Full-lane hand-off (ran codex):** surface BOTH verdicts first, then the action menu:
 
-> *"Review at `<path>` (focus: <mode>). <N critical, M major, K minor> findings.*
+> *"Review at `<path>` (focus: <mode>).*
+> *Spec: <compliant | under-built — … | over-built — …>*
+> *Quality: <N critical, M major, K minor> findings.*
 > *What's next?*
 > *  1. [o] Open — open the review file to read the full findings*
-> *  2. [fix] Fix — kick off a new /renmark:plan built from the critical findings"*
+> *  2. [fix] Fix — kick off a new /renmark:plan built from the critical/spec findings"*
 
 Omit the `(focus: <mode>)` parenthetical entirely when mode is default — preserves the existing terse output for the common case.
 
@@ -284,7 +330,7 @@ Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff
 - **Omit `[c] Code review`** — we just ran it.
 - **Show `[s] Smoke`** and `[qa] QA` (a finding worth re-verifying live often lives in the just-reviewed diff).
 - **Show `[dq] Deep QA`** only if a passing `.qa.md` exists for the current sha.
-- **Show `[d] Debug`** only if any Critical findings exist (Major+ alone is informational, not a debug trigger).
+- **Show `[d] Debug`** if ANY of these are true: (a) Critical quality findings exist, OR (b) the spec verdict is `under-built`, OR (c) the spec verdict is `over-built`. Major-only quality findings with a compliant spec are informational, not a debug trigger.
 - **Show `[f] Finish`** unconditionally and `[n] Nothing` always.
 
 Treat the `[o]`/`[fix]` actions plus the filtered gate options as ONE combined
