@@ -1079,6 +1079,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     ap.add_argument("--output", metavar="ARTIFACT_PATH", help="(with --task) where Codex writes its artifact")
+    # P11 — persisted proactivity toggle
+    ap.add_argument(
+        "--set-proactive",
+        metavar="true|false",
+        help=(
+            "persist the auto-routing proactivity flag to .renmark/config.json "
+            "('true' = route plain-English build/dev tasks through renmark automatically; "
+            "'false' = skip auto-routing until re-enabled). Default: true."
+        ),
+    )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
         "--task-brief",
@@ -1120,6 +1130,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args.output:
             ap.error("--task requires --output ARTIFACT_PATH")
         return cmd_task(args.task, args.output, repo=repo)
+    if args.set_proactive is not None:
+        raw = args.set_proactive.strip().lower()
+        if raw not in ("true", "false"):
+            ap.error("--set-proactive expects 'true' or 'false'")
+        from .. import config as _config
+        value = raw == "true"
+        _config.set_proactive(repo, value)
+        state_str = "on" if value else "off"
+        print(f"renmark: proactive auto-routing {state_str} ({repo}/.renmark/config.json)")
+        return 0
     if args.task_brief:
         plan_path, task_index_str = args.task_brief
         try:
@@ -1134,7 +1154,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.plan:
         ap.error(
             "plan path is required unless --usage / --analytics / --roadmap / --logs / "
-            "--scan / --task / --task-brief / --review-package"
+            "--scan / --task / --task-brief / --review-package / --set-proactive"
         )
     return execute_plan(
         args.plan,
