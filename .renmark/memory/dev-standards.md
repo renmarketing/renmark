@@ -1,7 +1,7 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-25 @ a886ab0 -->
+<!-- Last refreshed: 2026-06-25 @ 13c72f9 -->
 
-# Dev standards — study-external-skills
+# Dev standards — feature+graduated-preamble-tier
 
 What this project enforces about itself, detected from configuration files. Read this before making non-trivial changes so you don't break gates that are silently checking your work.
 

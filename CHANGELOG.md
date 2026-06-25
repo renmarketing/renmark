@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-06-25] — v0.21.0 — graduated preamble-tier (P3)
+**Request:** Build P3 from the external-skills study (`.renmark/research/2026-06-25-external-skills-study.research.md`): make `lifecycle.skill_preamble` graduated instead of all-or-nothing, so zero-LLM/meta skills carry a minimal/no preamble while heavy pipelines get the full block. Complements v0.20.0's trigger-only descriptions + disable-model-invocation. Dogfooded via the full `/renmark:feature` pipeline.
+**Built:**
+- **`PREAMBLE_TIER_BY_SKILL` + `preamble_tier()`** in `renmark/lifecycle.py` — 3 tiers: `minimal` (resume, help, doctor, usage, analytics, approve, hygiene, check-plan), `standard` (audit, scan, inventory), `full` (default).
+- **Tier-aware `skill_preamble`** — minimal records the invocation then returns None (no hint); standard surfaces the cross-domain `/clear` hint but never the fable hint; full is byte-identical to before. `record_skill_invocation` runs for ALL tiers so cross-domain detection is never compromised; for standard/full the budget check reads last-skill state BEFORE record overwrites it (load-bearing ordering).
+- **Tests** — 43 → 48 lifecycle tests, incl. a discriminating `full→minimal→full` chain test proving a minimal mid-link stays visible to downstream cross-domain detection (codereview Minor).
+- Verified: 868 pytest pass, ruff clean; code review 0 critical/0 major (codex usage-limited → rerouted to isolated sonnet, ledgered).
+**Files changed:** `renmark/lifecycle.py` (tier map + helper + refactor); `tests/test_lifecycle.py` (+5 tests); `PRD.md` (In-scope scope note); 7 version locations; `CHANGELOG.md`.
+**Do not change:**
+- **`record_skill_invocation` MUST run for every tier** (including minimal) and BEFORE-vs-AFTER ordering relative to `context_budget_check` is load-bearing: for standard/full the budget check reads last-skill state first, then record overwrites it. Reordering breaks cross-domain `/clear` detection.
+- Minimal-tier skills returning `None` is intentional — they must stay zero-LLM/cheap; do not re-add hints to them.
+- The `tier == "full"` guard on the fable hint must stay — a `standard` skill must never emit the fable synthesis hint.
+
+## [2026-06-25] — PRD updated — graduated preamble-tier scope note
+**Request:** The `/renmark:feature graduated preamble-tier` (P3) alignment gate flagged the feature as drift — aligned with the PRD's spirit (REQ-2 cost routing, REQ-5 context hygiene) but absent from explicit scope. Reconcile with a clarifying scope note.
+**Built:** Reconciled the **Scope boundaries → In scope** list of `PRD.md` to cover graduated skill-preamble tiers (zero-LLM/meta skills get minimal/no preamble; pipeline skills get the full block); added a 2026-06-25 revision note; bumped `last_reviewed`.
+**Files changed:**
+- `PRD.md` — In-scope clause for graduated preamble tiers (complements REQ-5); revision note; `last_reviewed` → 2026-06-25.
+**Do not change:**
+- This is a scope *clarification*, not a new requirement — no new `REQ-n`, no non-goal changes. Graduated preamble tiers must never compromise cold-start zero-LLM recovery (`/renmark:resume`) or cross-domain `/clear` detection.
+
 ## [2026-06-25] — v0.20.0 — trigger-only skill descriptions + disable-model-invocation (context-hygiene)
 **Request:** After a deep study of three external skill frameworks (mattpocock/skills, obra/superpowers, garrytan/gstack), apply the two highest-leverage learnings (P1+P2 from `.renmark/research/2026-06-25-external-skills-study.research.md`): rewrite every skill `description` to be trigger-only (state WHEN to invoke, not the full workflow — both repos independently showed a workflow-summary in the description gets used as a shortcut that skips the body), and reclassify the zero-LLM/meta skills as `disable-model-invocation: true` so their descriptions leave the model's per-turn context entirely. Dogfooded via the full `/renmark:feature` pipeline.
 **Built:**

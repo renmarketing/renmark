@@ -133,6 +133,27 @@ DOMAIN_BY_SKILL: dict[str, str] = {
     "analytics": "meta",
 }
 
+# Preamble tier — controls how much boilerplate skill_preamble injects.
+# "minimal" → record invocation only; no budget check, no fragments (zero LLM
+#             context overhead; safe for meta/zero-LLM skills).
+# "standard" → budget check + cross-domain hint; NO fable synthesis hint.
+# "full" (default, not listed) → budget check + cross-domain hint + fable hint.
+PREAMBLE_TIER_BY_SKILL: dict[str, str] = {
+    # minimal — meta/zero-LLM skills
+    "resume": "minimal",
+    "help": "minimal",
+    "doctor": "minimal",
+    "usage": "minimal",
+    "analytics": "minimal",
+    "approve": "minimal",
+    "hygiene": "minimal",
+    "check-plan": "minimal",
+    # standard — audit-domain skills: budget check but no fable hint
+    "audit": "standard",
+    "scan": "standard",
+    "inventory": "standard",
+}
+
 # ── Skill classes (next-steps.md contract) ────────────────────────────────────
 #
 # Three classes from plugin/skills/_shared/next-steps.md. The class decides what
@@ -573,22 +594,49 @@ def domain_of(skill: str) -> str:
     return DOMAIN_BY_SKILL.get(skill, "build")
 
 
+def preamble_tier(skill: str) -> str:
+    """Return the preamble tier for a skill ('minimal' | 'standard' | 'full').
+
+    Unknown skills default to 'full'. Never raises.
+    """
+    return PREAMBLE_TIER_BY_SKILL.get(skill, "full")
+
+
 def skill_preamble(repo: Path | str, skill: str) -> str | None:
     """Single-call Step-0 boilerplate for every SKILL.md.
 
-    Performs the two calls every skill used to inline by hand:
-        1. cross-domain context-budget check (G4)
-        2. record this invocation so the next skill can detect transitions
+    Performs the calls every skill used to inline by hand, gated by tier:
+        - ALL tiers: record invocation (load-bearing cross-domain detection for
+          the NEXT skill — runs unconditionally so minimal-tier skills still
+          register their domain in last-skill state).
+        - minimal: returns None immediately; no budget check, no fragments.
+        - standard: cross-domain/compact hint only; no fable synthesis hint.
+        - full (default): cross-domain/compact hint + fable synthesis hint.
 
-    Returns the hint string the skill should surface to the user
-    (e.g. "context: cross-domain transition — consider /clear before continuing"),
-    or None when no hint is needed. Domain is resolved from `DOMAIN_BY_SKILL` —
-    callers do not need to pass it, so the per-skill prose can't drift.
+    Cross-domain detection for the CURRENT skill requires context_budget_check
+    to read last-skill state BEFORE record_skill_invocation overwrites it, so
+    for standard/full tier the budget check runs first. record_skill_invocation
+    is then called unconditionally to keep the state file current for the next
+    skill — this is the load-bearing ordering invariant.
+
+    Returns the hint string the skill should surface to the user, or None when
+    no hint is needed. Domain is resolved from `DOMAIN_BY_SKILL` — callers do
+    not need to pass it, so the per-skill prose can't drift.
     """
     # Imported lazily to avoid a state ↔ lifecycle circular import at module load.
     from . import state as _state
 
     domain = domain_of(skill)
+    tier = preamble_tier(skill)
+
+    if tier == "minimal":
+        # INVARIANT: record_skill_invocation runs for ALL tiers so that the next
+        # skill can detect cross-domain transitions even when this one is minimal.
+        _state.record_skill_invocation(repo, skill, domain)
+        return None
+
+    # For standard/full: budget check MUST read last-skill state before
+    # record_skill_invocation overwrites it — ordering is load-bearing.
     verdict = _state.context_budget_check(repo, skill, domain)
     _state.record_skill_invocation(repo, skill, domain)
 
@@ -601,7 +649,7 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
     elif verdict == "compact":
         fragments.append("context: approaching budget — consider `/compact` before continuing")
 
-    if skill in SYNTHESIS_SKILLS:
+    if tier == "full" and skill in SYNTHESIS_SKILLS:
         # Imported lazily to keep capability resolution off the module-load path.
         from . import capabilities as _capabilities
 

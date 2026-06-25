@@ -518,6 +518,83 @@ def test_validate_artifact_refs_stale_artifact(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "stale_artifact"
 
 
+def test_preamble_tier_classifies_skills() -> None:
+    for skill in ("resume", "help", "usage", "analytics", "approve", "doctor", "hygiene", "check-plan"):
+        assert lifecycle.PREAMBLE_TIER_BY_SKILL[skill] == "minimal"
+        assert lifecycle.preamble_tier(skill) == "minimal"
+
+    for skill in ("audit", "scan", "inventory"):
+        assert lifecycle.PREAMBLE_TIER_BY_SKILL[skill] == "standard"
+        assert lifecycle.preamble_tier(skill) == "standard"
+
+    for skill in ("orchestrate", "feature", "nonesuch"):
+        assert lifecycle.preamble_tier(skill) == "full"
+
+
+def test_skill_preamble_minimal_skill_returns_none_after_cross_domain_transition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    lifecycle.skill_preamble(tmp_path, "debug")
+
+    assert lifecycle.skill_preamble(tmp_path, "resume") is None
+
+
+def test_skill_preamble_minimal_skill_still_records_invocation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from renmark.state import last_skill_invocation
+
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    lifecycle.skill_preamble(tmp_path, "debug")
+    lifecycle.skill_preamble(tmp_path, "resume")
+
+    assert last_skill_invocation(tmp_path)["skill"] == "resume"
+
+
+def test_skill_preamble_standard_skill_surfaces_only_cross_domain_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    _write_declared_fable_routing(tmp_path)
+    lifecycle.skill_preamble(tmp_path, "debug")
+
+    hint = lifecycle.skill_preamble(tmp_path, "audit")
+
+    assert hint is not None
+    assert "cross-domain transition" in hint
+    assert "declared top tier: fable" not in hint
+
+
+def test_skill_preamble_minimal_midlink_preserves_downstream_detection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chain full(A) -> minimal(B) -> full(C): C must detect the B->C cross-domain
+    transition, which only works if the minimal mid-link B recorded its own domain.
+
+    A and C share the SAME domain ('build'); B is a different domain ('meta'). So C
+    surfaces the /clear hint ONLY if it compared against B (meta != build). If the
+    minimal mid-link had skipped record_skill_invocation, C would compare against A
+    (build == build) and stay silent — this test would then fail. It is the guard on
+    the load-bearing invariant that a minimal-tier skill is never 'transparent' to
+    downstream cross-domain detection.
+    """
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+
+    assert lifecycle.preamble_tier("orchestrate") == "full"  # A
+    assert lifecycle.preamble_tier("resume") == "minimal"  # B (mid-link)
+    assert lifecycle.preamble_tier("feature") == "full"  # C
+    assert lifecycle.domain_of("orchestrate") == lifecycle.domain_of("feature")
+    assert lifecycle.domain_of("resume") != lifecycle.domain_of("feature")
+
+    lifecycle.skill_preamble(tmp_path, "orchestrate")  # A: records build
+    assert lifecycle.skill_preamble(tmp_path, "resume") is None  # B: minimal, records meta
+    hint = lifecycle.skill_preamble(tmp_path, "feature")  # C: must see B (meta)
+
+    assert hint is not None
+    assert "cross-domain transition" in hint
+
+
 def test_validate_artifact_refs_absolute_outside_repo_warns(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     state = lifecycle.write_lifecycle(

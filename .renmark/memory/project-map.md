@@ -1,7 +1,7 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-25 @ a886ab0 -->
+<!-- Last refreshed: 2026-06-25 @ 13c72f9 -->
 
-# Project map — study-external-skills
+# Project map — feature+graduated-preamble-tier
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
@@ -10,7 +10,7 @@
 ## Directory tree
 
 ```
-study-external-skills/
+feature+graduated-preamble-tier/
 ├── bin/   executable scripts / wrappers
 ├── plugin/   Claude Code plugin (commands, skills, templates)
 ├── renmark/   Python runtime (CLI, dispatch, verifier, lifecycle)
@@ -32,10 +32,10 @@ study-external-skills/
 | `renmark/program.py` | Staged-program data model + persistence — the single source of truth for "where  | `ProgramStateError`, `program_json_path`, `program_md_path`, `TaskNode`, `StageNode`, `Program` |
 | `renmark/release.py` | Version-file drift detection — Layer 1 guardrail. | `VersionFile`, `package_basename`, `build_package`, `build_version_snapshot`, `current_version`, `check_drift` |
 | `tests/test_modularity.py` | Unit tests for renmark.modularity — the advisory code-health analyzer. | `test_module_loc_just_over_warn_is_warn`, `test_module_loc_just_over_major_is_danger`, `test_module_loc_just_under_warn_is_clean`, `test_func_loc_exactly_warn_is_warn`, `test_func_loc_just_over_warn_is_warn`, `test_func_loc_exactly_major_is_danger` |
+| `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `renmark/loop.py` | Loop Mode state machine — the deterministic core of renmark's bounded, verified, | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
 | `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
 | `tests/test_memory.py` | Unit tests for renmark.memory. | `test_ensure_memory_creates_all_files`, `test_ensure_memory_idempotent`, `test_log_feature_appends_under_shipped`, `test_log_bug_appends_under_fixed`, `test_log_decision_numbers_adrs`, `test_append_routing` |
-| `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
 | `tests/test_reports_analytics.py` | — | `test_build_and_write_feature_report`, `test_feature_report_uses_version_path_for_release_link`, `test_record_functions_append_parseable_jsonl`, `test_aggregate_and_health_report_cover_seeded_and_empty_projects`, `test_record_feature_run_idempotent_on_rerun`, `test_close_feature_disposition_transforms_not_appends` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
