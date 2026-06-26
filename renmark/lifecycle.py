@@ -721,7 +721,11 @@ def halt_for_human_review(
         EXISTING :func:`write_lifecycle` gate fields (no new state files).
     """
     decisions_dir = Path(repo) / ".renmark" / "decisions"
-    decisions_dir.mkdir(parents=True, exist_ok=True)
+    # Dir creation is best-effort too — the halt contract is "never raise". If
+    # mkdir fails (permissions/OS error) the artifact write below is suppressed
+    # and we still return the needs_input envelope; the armed gate is the safe state.
+    with contextlib.suppress(OSError):
+        decisions_dir.mkdir(parents=True, exist_ok=True)
     decision_path = decisions_dir / f"{gate}-approval.json"
 
     # Current stage is best-effort: a halt may precede any lifecycle write.

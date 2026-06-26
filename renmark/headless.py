@@ -107,7 +107,12 @@ def render_return(envelope: dict[str, Any]) -> str:
 
     status = envelope.get("status")
     if status == "success":
-        return f"result: {envelope.get('decision') or envelope.get('recommended') or 'done'}"
+        # Prefer the human-facing recommended action over the internal decision
+        # token ("auto_picked_recommended") so the prose line is descriptive.
+        rec = envelope.get("recommended")
+        if rec:
+            return f"result: auto-picked recommended option: {rec}"
+        return "result: auto-picked the recommended option"
     if status == "needs_input":
         gate = envelope.get("gate")
         return f"needs input: {gate} approval required; headless mode cannot approve {gate}"
