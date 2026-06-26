@@ -74,7 +74,25 @@ state.write_pipeline_state(repo, current_phase="orchestrate", current_plan=<plan
 
 **Changelog / decisions check** — read the last 5 entries in `CHANGELOG.md`, and when `.renmark/memory/decisions.md` is present, also read its decision titles + guard text (titles and guards only — never full bodies; REQ-5). Flag any "Do not change" guard or recorded decision the plan would contradict. A contradiction is **semantic**: the plan would undo or overwrite a guarded decision — and this binds even when there is **no target-file overlap** (a plan can violate a decision without touching the same file). On any such contradiction, surface it and **PAUSE for reconciliation** before dispatching; never silently overwrite a recorded decision.
 
-**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost. Ask: *"Proceed? [y/N]"*
+**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost.
+
+**Headless gate (cost approval).** Before the `Proceed? [y/N]` prompt below, consult the headless contract (`plugin/skills/_shared/headless-contract.md`):
+
+```python
+from renmark import headless
+envelope = headless.resolve_gate(
+    repo, "cost", kind="dangerous",
+    originating_skill="orchestrate",
+    what="~$X across N tasks",   # the dry-run estimate
+)
+```
+
+- **Headless** (`envelope["mode"] != "interactive"`) → emit the `needs_input` JSON block + `headless.render_return(envelope)` prose line and **STOP** — do not dispatch.
+- **Interactive** (`{"mode": "interactive"}`) → fall through to the prompt below, unchanged.
+
+This human cost-approval gate is **distinct** from the Tier-1 usage-limit pause in 3a-bis (which auto-pauses on an already-exceeded local limit); leave that intact.
+
+Interactive prompt: *"Proceed? [y/N]"*
 
 ### 3. Dispatch tasks in waves (G11 isolation)
 
