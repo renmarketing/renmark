@@ -101,3 +101,121 @@ def test_is_proactive_on_nonexistent_repo_does_not_raise(tmp_path: Path) -> None
     """is_proactive on a path with no .renmark/ at all must return True silently."""
     nonexistent = tmp_path / "does" / "not" / "exist"
     assert cfg.is_proactive(nonexistent) is True
+
+
+# ── P10: headless mode — env detection layer ─────────────────────────────────
+
+import pytest
+
+
+@pytest.mark.parametrize("raw", ["1", "true", "yes", "on", "TRUE", "On", "  yes  "])
+def test_env_true_values_force_headless(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """RENMARK_HEADLESS truthy value → is_headless True; source == 'env'."""
+    monkeypatch.setenv("RENMARK_HEADLESS", raw)
+    assert cfg.is_headless(tmp_path) is True
+    assert cfg.headless_source(tmp_path) == "env"
+
+
+@pytest.mark.parametrize("raw", ["0", "false", "no", "off", "FALSE", "Off"])
+def test_env_false_values_force_no_headless(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """RENMARK_HEADLESS falsy value → is_headless False; source == 'env'."""
+    monkeypatch.setenv("RENMARK_HEADLESS", raw)
+    assert cfg.is_headless(tmp_path) is False
+    assert cfg.headless_source(tmp_path) == "env"
+
+
+def test_env_false_overrides_config_true(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Explicit env OFF must win even when config.json has headless: true."""
+    cfg.set_headless(tmp_path, True)
+    monkeypatch.setenv("RENMARK_HEADLESS", "0")
+    assert cfg.is_headless(tmp_path) is False
+    assert cfg.headless_source(tmp_path) == "env"
+
+
+def test_env_true_overrides_config_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Explicit env ON must win even when config.json has headless: false."""
+    cfg.set_headless(tmp_path, False)
+    monkeypatch.setenv("RENMARK_HEADLESS", "1")
+    assert cfg.is_headless(tmp_path) is True
+    assert cfg.headless_source(tmp_path) == "env"
+
+
+@pytest.mark.parametrize("raw", ["maybe", "", "2", "enabled", "tru"])
+def test_env_unrecognized_falls_through_to_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    """An unparseable env value is ignored — fall through to config/default."""
+    monkeypatch.setenv("RENMARK_HEADLESS", raw)
+    cfg.set_headless(tmp_path, True)
+    assert cfg.is_headless(tmp_path) is True
+    assert cfg.headless_source(tmp_path) == "config"
+
+
+def test_env_unrecognized_falls_through_to_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unparseable env value with no config → default False."""
+    monkeypatch.setenv("RENMARK_HEADLESS", "maybe")
+    assert cfg.is_headless(tmp_path) is False
+    assert cfg.headless_source(tmp_path) == "default"
+
+
+# ── P10: headless mode — config layer (env unset) ────────────────────────────
+
+
+def test_config_flag_honored_when_env_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With env unset, the config flag decides; source == 'config'."""
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+    cfg.set_headless(tmp_path, True)
+    assert cfg.is_headless(tmp_path) is True
+    assert cfg.headless_source(tmp_path) == "config"
+
+
+def test_config_false_honored_when_env_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit config False (env unset) → False, source == 'config'."""
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+    cfg.set_headless(tmp_path, False)
+    assert cfg.is_headless(tmp_path) is False
+    assert cfg.headless_source(tmp_path) == "config"
+
+
+# ── P10: headless mode — default layer ───────────────────────────────────────
+
+
+def test_default_false_when_neither_env_nor_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No env, no config → is_headless False; source == 'default'."""
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+    assert cfg.is_headless(tmp_path) is False
+    assert cfg.headless_source(tmp_path) == "default"
+
+
+# ── P10: set_headless round-trip & key preservation ──────────────────────────
+
+
+def test_set_headless_preserves_other_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """set_headless must not clobber an existing 'proactive' key."""
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+    cfg.set_proactive(tmp_path, False)
+    cfg.set_headless(tmp_path, True)
+    p = tmp_path / ".renmark" / "config.json"
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["proactive"] is False
+    assert data["headless"] is True
+    assert cfg.is_proactive(tmp_path) is False
+    assert cfg.is_headless(tmp_path) is True

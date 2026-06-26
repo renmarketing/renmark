@@ -153,6 +153,21 @@ cite the file.
 
 ---
 
+## Headless mode
+
+When the run is headless (per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/headless-contract.md`
+detection), the state-derived next-step set computed above is **not** presented
+via `AskUserQuestion`. Instead the `(Recommended)` next command — always a safe,
+state-derived route — is auto-selected and the skill emits the contract's
+JSON + prose return rather than rendering rules 6–9. The one exception: if the
+recommended next step is itself a **dangerous** action (e.g. a `merge` / `release`
+gate), it is not auto-run — it defers to the dangerous-gate halt rule
+(write `.renmark/decisions/<gate>-approval.json`, set `human_review_required=true`,
+return `needs_input`). This contract's class-1/2/3 routing is unchanged; headless
+only swaps how the resolved recommendation is surfaced.
+
+---
+
 ## Why a shared file
 
 One edit point: change the next-step policy here and every skill picks it up next

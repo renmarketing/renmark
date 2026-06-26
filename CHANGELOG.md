@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-26] — P10 wave 2: menu files honor contract + tests + CLI flag
+**Request:** Wire the headless contract into the shared menu files, add tests, and expose a `--set-headless` CLI flag.
+**Built:**
+- `plugin/skills/_shared/handoff-menu.md`, `next-steps.md`, `scope-contract.md` — each now references `headless-contract.md` and honors it: headless suppresses `AskUserQuestion`, auto-picks `(Recommended)` on safe gates, halts on dangerous gates (reinforcing REQ-12).
+- `renmark/cli/_engine.py` — `--set-headless true|false` mirroring `--set-proactive` (calls `config.set_headless`).
+- `tests/test_config.py` — +24 headless detection cases (env tri-state, `=0`-overrides-config, fall-through, default, key preservation); 36 total.
+- `tests/test_lifecycle.py` — +3 cases (headless preamble note present/absent, `halt_for_human_review` writes artifact + arms gate + returns `needs_input`); 51 total.
+**Routing note:** tasks 2 & 8 (test files) rerouted codex→sonnet — codex verifier sandbox lacked `python3`/`pytest` (exit 127); ledgered in `routing.md`, not silent. Full suite 87 passed, ruff clean.
+**Files changed:** the 3 `_shared/*.md`, `renmark/cli/_engine.py`, `tests/test_config.py`, `tests/test_lifecycle.py`.
+**Do not change:** the 3 menu files defer to `headless-contract.md` as source of truth — do not duplicate the gate policy into them.
+
 ## [2026-06-26] — P10 wave 1: headless detection + contract doctrine + lifecycle halt path
 **Request:** Implement the core of the P10 headless contract (detection, the shared doctrine doc, and the dangerous-gate halt path).
 **Built:**

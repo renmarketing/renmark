@@ -627,6 +627,61 @@ def test_validate_artifact_refs_dotdot_escape_warns(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "out_of_tree"
 
 
+# ── Headless contract (P10) ───────────────────────────────────────────────────
+
+
+def test_skill_preamble_headless_env_adds_note(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With RENMARK_HEADLESS=1, skill_preamble surfaces the headless-mode note."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.setenv("RENMARK_HEADLESS", "1")
+
+    hint = lifecycle.skill_preamble(tmp_path, "orchestrate")
+
+    assert hint is not None
+    assert "headless mode active" in hint
+
+
+def test_skill_preamble_headless_off_omits_note(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Headless off (no env, no config) must NOT mention headless mode."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    hint = lifecycle.skill_preamble(tmp_path, "orchestrate")
+
+    assert "headless mode active" not in (hint or "")
+
+
+def test_halt_for_human_review_writes_artifact_and_arms_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A headless halt writes a decision artifact, arms the lifecycle gate, and
+    returns a needs_input envelope (fresh repo — write_lifecycle stays under budget)."""
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    result = lifecycle.halt_for_human_review(
+        tmp_path,
+        "merge",
+        originating_skill="finish",
+        what="merge approval",
+    )
+
+    decision_path = tmp_path / ".renmark" / "decisions" / "merge-approval.json"
+    assert decision_path.exists()
+    payload = json.loads(decision_path.read_text())
+    assert payload["gate"] == "merge"
+    assert payload["human_review_required"] is True
+
+    state = lifecycle.read_lifecycle(tmp_path)
+    assert state is not None
+    assert state.human_review_required is True
+    assert state.human_review_for == "merge"
+
+    assert result["status"] == "needs_input"
+    assert result["decision"] == "halted_for_human_review"
+    assert "merge" in result["gate"]
+    assert result["artifacts"]
+
+
 def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     state = lifecycle.write_lifecycle(

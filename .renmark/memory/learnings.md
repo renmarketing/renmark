@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-26, run) **task 2 failed on codex** — codex_verifier_failed
+
 - (2026-06-25, bug) **P11 proactivity toggle: persisted but not runtime-enforced** — persist+document is a valid first increment, but a config flag with zero readers is half-wired — wire a real consumer or log the gap.
 
 - (2026-06-25, .renmark/reviews/2026-06-25-8baae38b6d32fc4044c17e55b77daa5eaf3ba313.verification.md) model `verify`: **verify-graduated-preamble-tier** — 5/5 behaviors verified; failed: none; regressions: full suite 867 passed
