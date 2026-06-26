@@ -1,5 +1,8 @@
 # Changelog
 
+## [2026-06-26] — v0.22.0 — P10 headless / spawned-session contract
+**Release.** Ships the P10 headless-session contract (detection, doctrine, lifecycle halt path, `renmark/headless.py` `resolve_gate`/`render_return`, `--set-headless` CLI, and dangerous-gate wiring in finish/plan/orchestrate/prd) **plus** the previously-unreleased batch on `main` (P5/P4/P12/P11/P6/P9). Full suite 951 passed; version drift clean; 3 codex review passes. See the per-feature entries below for detail. P7/P8 remain queued for ≥v0.23.0.
+
 ## [2026-06-26] — P10 wire resolve_gate into dangerous-gate skills
 **Request:** Complete the "under-built" follow-up — wire the runtime helper into the skills that gate dangerous actions.
 **Scope (per gate-point audit):** NOT all 28 skills — the 22 safe-gate skills already inherit headless behavior via the shared menu files. The real surface is 5 dangerous-gate callsites in 4 skills.
@@ -64,7 +67,7 @@
 - P5 cross-check is by task INDEX (commit messages carry no target info) — catches reused-number/orphan, not reused-index-different-task; don't claim more.
 - P4 helpers MUST print only the path (no body to stdout) — REQ-5 load-bearing.
 - `guide` and `help` are intentionally separate: help stays zero-LLM (`disable-model-invocation`); guide is the interactive wizard.
-- Unreleased on `main` past v0.21.0 — cut a combined version (≥v0.22.0) after P10/P7/P8.
+- P10 shipped on its own as **v0.22.0** (2026-06-26); P5/P4/P12/P11/P6/P9 from the batch above are folded into this release. P7/P8 remain queued for a later version (≥v0.23.0).
 
 ## [2026-06-25] — v0.21.0 — graduated preamble-tier (P3)
 **Request:** Build P3 from the external-skills study (`.renmark/research/2026-06-25-external-skills-study.research.md`): make `lifecycle.skill_preamble` graduated instead of all-or-nothing, so zero-LLM/meta skills carry a minimal/no preamble while heavy pipelines get the full block. Complements v0.20.0's trigger-only descriptions + disable-model-invocation. Dogfooded via the full `/renmark:feature` pipeline.

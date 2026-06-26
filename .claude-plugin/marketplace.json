@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Local marketplace for the pipeline-first renmark build assistant.",
-    "version": "0.21.0"
+    "version": "0.22.0"
   },
   "plugins": [
     {
       "name": "renmark",
       "description": "Pipeline-first build assistant for Claude Code. Six pipelines — /renmark:init (adopt a repo), /renmark:start (new build), /renmark:feature (add/change), /renmark:debug (fix), /renmark:roadmap (gaps / what's next), /renmark:finish (ship) — over 28 guided commands (also prd, brainstorm, blueprint, plan, check-plan, orchestrate, verify, codereview, loop, backlog, audit, inventory, scan, approve, hygiene, doctor, setup, resume, usage, analytics, guide, help). Persistent project memory in .renmark/.",
-      "version": "0.21.0",
+      "version": "0.22.0",
       "author": {
         "name": "renmark"
       },
