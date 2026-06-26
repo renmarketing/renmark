@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-036 — Finished feature p10-headless-contract
+
+**Date:** 2026-06-26
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch  reached stage ready-to-release
+
+---
+
 ## ADR-035 — resolve_gate uncertainty: None = assume interactive
 
 **Date:** 2026-06-26
