@@ -120,6 +120,51 @@ classifier words so the job-list state extractor catches the outcome:
 
 ---
 
+## Runtime helper (how skills call this)
+
+The detection precedence, gate classification, return schema, and decision-artifact
+format above are all implemented once in `renmark/headless.py`. A skill does not
+reimplement them — at any gate it calls:
+
+```python
+from renmark import headless
+
+result = headless.resolve_gate(
+    repo,
+    gate,                       # e.g. "merge", "next-steps", "prd"
+    kind="safe",                # "safe" | "dangerous"
+    recommended=<the (Recommended) option>,
+    tool_available=<is AskUserQuestion available?>,   # Layer-4 signal
+    originating_skill=<skill>,  # e.g. "finish"
+    what=<one-line description of what the gate decides>,
+)
+```
+
+- `resolve_gate(...)` returns `{"mode": "interactive"}` when the run is **not**
+  headless → render the normal `AskUserQuestion` menu **exactly as today** (the
+  contract is inert; see `handoff-menu.md`).
+- On a headless **safe** gate it returns the success / `auto_picked_recommended`
+  envelope; on a headless **dangerous** gate (or any unknown/uncertain gate, per
+  the fail-safe uncertainty rule) it returns the `halt_for_human_review`
+  `needs_input` envelope and writes the decision artifact.
+- **Layer-4:** pass `tool_available=False` when `AskUserQuestion` is absent from
+  the tool list to force headless — the Python runtime can't see the model's tool
+  list, so the skill supplies this signal (see §1, layer 4).
+
+When `resolve_gate(...)` returns anything other than `{"mode": "interactive"}`,
+the skill emits the **returned envelope** as the fenced JSON block **and**
+`headless.render_return(envelope)` as the single classifier-friendly prose line
+(`result:` / `needs input:` / `failed:`; `render_return` returns `""` for the
+interactive case) — **instead of** an `AskUserQuestion` menu.
+
+> **Adoption status (tracked follow-up):** the three shared menu files already
+> reference this contract, but threading the `resolve_gate(...)` call into each of
+> the **28 individual SKILL.md gate points is a tracked follow-up — not yet wired
+> per-skill.** Headless enforcement is therefore currently **helper-available**
+> (the runtime exists and is correct) but **not yet called from every skill**.
+
+---
+
 ## 4. Decision-artifact format
 
 A dangerous-gate halt writes one JSON file at
