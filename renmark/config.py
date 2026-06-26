@@ -106,7 +106,9 @@ def is_headless(repo: str | Path) -> bool:
     Precedence:
     1. env ``RENMARK_HEADLESS`` (``1/true/yes/on`` → ``True``,
        ``0/false/no/off`` → ``False``; an explicit OFF overrides config);
-    2. else the ``.renmark/config.json`` key ``"headless"`` (bool) if present;
+    2. else the ``.renmark/config.json`` key ``"headless"`` if present **and a
+       real ``bool``** (a non-bool value is ignored, not coerced — headless is
+       fail-dangerous, so anything but a true bool falls through);
     3. else ``False``.
 
     Never raises — any OS or parse error degrades to ``False``.
@@ -114,10 +116,10 @@ def is_headless(repo: str | Path) -> bool:
     env = _env_headless()
     if env is not None:
         return env
-    val = _read_raw(repo).get("headless", False)
+    val = _read_raw(repo).get("headless")
     if isinstance(val, bool):
         return val
-    return bool(val)
+    return False
 
 
 def set_headless(repo: str | Path, value: bool) -> None:
@@ -135,11 +137,13 @@ def headless_source(repo: str | Path) -> str:
     """Return which layer decided :func:`is_headless` for *repo*.
 
     ``"env"`` if ``RENMARK_HEADLESS`` resolved the value, ``"config"`` if the
-    config file's ``"headless"`` key did, else ``"default"``.  Uses the same
-    precedence as :func:`is_headless` so the two never disagree.  Never raises.
+    config file's ``"headless"`` key did (i.e. it is a real ``bool``), else
+    ``"default"``.  Uses the same precedence as :func:`is_headless` so the two
+    never disagree — a non-bool config value reports ``"default"``.  Never
+    raises.
     """
     if _env_headless() is not None:
         return "env"
-    if "headless" in _read_raw(repo):
+    if isinstance(_read_raw(repo).get("headless"), bool):
         return "config"
     return "default"

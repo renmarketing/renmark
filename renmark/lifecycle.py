@@ -19,6 +19,7 @@ If lifecycle.json exceeds ~1KB it's a bug — runtime cruft has leaked in.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 from dataclasses import asdict, dataclass, field
@@ -735,19 +736,29 @@ def halt_for_human_review(
         "stage": stage,
         "human_review_required": True,
     }
-    with decision_path.open("w", encoding="utf-8") as fh:
+
+    # Arm the gate on existing lifecycle fields FIRST — keeps the ≤1KB budget
+    # intact. The halt contract is "RETURN needs_input, never raise"; write_lifecycle
+    # can raise (LifecycleBloatError / validation), so guard it. A halted state is
+    # the safe state — never propagate; we still return the envelope below.
+    with contextlib.suppress(Exception):
+        write_lifecycle(repo, human_review_required=True, human_review_for=gate)
+
+    # Best-effort artifact write — never raise out of a halt.
+    with contextlib.suppress(OSError), decision_path.open(
+        "w", encoding="utf-8"
+    ) as fh:
         json.dump(payload, fh, indent=2)
 
-    # Arm the gate on existing lifecycle fields — keeps the ≤1KB budget intact.
-    write_lifecycle(repo, human_review_required=True, human_review_for=gate)
-
+    # Repo-relative path per the artifact-reference convention (never absolute).
+    rel_path = f".renmark/decisions/{gate}-approval.json"
     return {
         "status": "needs_input",
         "mode": "headless",
         "gate": gate,
         "decision": "halted_for_human_review",
         "human_review_required": True,
-        "artifacts": [str(decision_path)],
+        "artifacts": [rel_path],
     }
 
 
