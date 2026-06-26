@@ -637,7 +637,7 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
         # INVARIANT: record_skill_invocation runs for ALL tiers so that the next
         # skill can detect cross-domain transitions even when this one is minimal.
         _state.record_skill_invocation(repo, skill, domain)
-        return None
+        return _with_headless_note(repo, None)
 
     # For standard/full: budget check MUST read last-skill state before
     # record_skill_invocation overwrites it — ordering is load-bearing.
@@ -663,9 +663,28 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
                 "run this session on Fable 5 (/model fable)"
             )
 
-    if fragments:
-        return " | ".join(fragments)
-    return None
+    base = " | ".join(fragments) if fragments else None
+    return _with_headless_note(repo, base)
+
+
+def _with_headless_note(repo: Path | str, hint: str | None) -> str | None:
+    """ADDITIVE: append a headless-mode note to ``hint`` when headless is active.
+
+    Runs strictly AFTER the existing tier logic — never reorders the
+    record-before-check invariant above. When headless is off this is a
+    pass-through (returns ``hint`` unchanged, including None). When on it
+    appends one line; if ``hint`` was None the note becomes the whole return.
+    Never raises — config helpers are themselves no-raise.
+    """
+    from . import config as _config
+
+    try:
+        if not _config.is_headless(repo):
+            return hint
+        note = f"headless mode active (source: {_config.headless_source(repo)})"
+    except Exception:
+        return hint
+    return note if hint is None else f"{hint} | {note}"
 
 
 def is_cross_domain_transition(prev_skill: str | None, new_skill: str) -> bool:
@@ -675,6 +694,61 @@ def is_cross_domain_transition(prev_skill: str | None, new_skill: str) -> bool:
     if prev_skill is None:
         return False
     return domain_of(prev_skill) != domain_of(new_skill)
+
+
+# ── Headless human-review gate (P10) ──────────────────────────────────────────
+
+
+def halt_for_human_review(
+    repo: Path | str,
+    gate: str,
+    *,
+    originating_skill: str,
+    what: str,
+) -> dict[str, Any]:
+    """Halt a headless run at a human-approval gate (P10 headless contract).
+
+    A headless executor cannot prompt; instead of silently proceeding through a
+    Pause-Policy gate it writes a decision artifact and arms the existing
+    lifecycle human-review gate so a later interactive ``/renmark:approve`` can
+    clear it. Returns a machine-readable ``needs_input`` envelope.
+
+    Side effects:
+      - ensures ``.renmark/decisions/`` exists (never raises if missing);
+      - writes ``.renmark/decisions/<gate>-approval.json`` (stdlib json);
+      - sets ``human_review_required=True`` / ``human_review_for=<gate>`` via the
+        EXISTING :func:`write_lifecycle` gate fields (no new state files).
+    """
+    decisions_dir = Path(repo) / ".renmark" / "decisions"
+    decisions_dir.mkdir(parents=True, exist_ok=True)
+    decision_path = decisions_dir / f"{gate}-approval.json"
+
+    # Current stage is best-effort: a halt may precede any lifecycle write.
+    state = read_lifecycle(repo)
+    stage = state.stage if state is not None else None
+
+    payload = {
+        "gate": gate,
+        "timestamp": _now(),
+        "what": what,
+        "originating_skill": originating_skill,
+        "stage": stage,
+        "human_review_required": True,
+    }
+    with decision_path.open("w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+
+    # Arm the gate on existing lifecycle fields — keeps the ≤1KB budget intact.
+    write_lifecycle(repo, human_review_required=True, human_review_for=gate)
+
+    return {
+        "status": "needs_input",
+        "mode": "headless",
+        "gate": gate,
+        "decision": "halted_for_human_review",
+        "human_review_required": True,
+        "artifacts": [str(decision_path)],
+    }
 
 
 # ── Artifact reference validation ─────────────────────────────────────────────

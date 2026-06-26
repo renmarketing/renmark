@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-26] — P10 wave 1: headless detection + contract doctrine + lifecycle halt path
+**Request:** Implement the core of the P10 headless contract (detection, the shared doctrine doc, and the dangerous-gate halt path).
+**Built:**
+- `renmark/config.py` — `is_headless` / `set_headless` / `headless_source`, mirroring the P11 proactive pattern. Precedence: env `RENMARK_HEADLESS` tri-state (`1/true/yes/on`, `0/false/no/off`, else fall-through) > `.renmark/config.json` `"headless"` > default False. Explicit `=0` overrides config. `CLAUDE_JOB_DIR`/`CLAUDECODE` deliberately NOT read.
+- `plugin/skills/_shared/headless-contract.md` (new) — single-source doctrine: detection precedence + uncertainty rule, safe/dangerous gate table, JSON return schema + 3 examples + prose vocab, decision-artifact format.
+- `renmark/lifecycle.py` — additive headless note in `skill_preamble` (P3 record-before-check ordering preserved) + `halt_for_human_review(repo, gate, *, originating_skill, what)` that writes `.renmark/decisions/<gate>-approval.json`, arms `human_review_required`/`human_review_for`, and returns the `needs_input` envelope.
+**Files changed:** `renmark/config.py`, `plugin/skills/_shared/headless-contract.md`, `renmark/lifecycle.py`.
+**Do not change:** detection never reads `CLAUDE_JOB_DIR`/`CLAUDECODE`; `=0` overrides config; `skill_preamble` record-before-check ordering is load-bearing (P3); `needs_input` ≠ `failed` for dangerous-gate halts.
+
 ## [2026-06-26] — project scope: P10 headless / spawned-session contract (spec)
 **Request:** Brainstorm P10 — a formal headless-session contract so renmark behaves when run in background jobs / driven by an outer orchestrator instead of interactively.
 **Scope (confirmed):**
