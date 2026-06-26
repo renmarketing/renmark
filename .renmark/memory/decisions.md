@@ -1,5 +1,23 @@
 # Decisions (ADRs)
 
+## ADR-034 — P10 headless / spawned-session contract (spec)
+
+**Date:** 2026-06-26
+**Status:** Accepted (spec); implementation pending plan
+
+**Context.** Renmark runs in background jobs / under outer orchestrators but every pipeline skill ends in an interactive `AskUserQuestion` menu and pauses at Pause-Policy gates — which stalls a headless run. Brainstormed via interactive Q&A; contract finalized by owner.
+
+**Decision.** Three owner-specified rules pin the contract:
+1. **Gates** — safe gates auto-pick the `(Recommended)` option in headless mode; dangerous gates (`merge`, `release`, destructive ops, PRD approval, cost/token over budget) halt, write a decision artifact, set `human_review_required=true`, and return `needs_input` (never `failed`).
+2. **Detection** — precedence `RENMARK_HEADLESS=1` (force on) > `=0` (force off) > `.renmark/config.json` `headless` > tool-availability fallback adapter (AskUserQuestion absent → headless); never inferred from `CLAUDE_JOB_DIR`/`CLAUDECODE`. **Uncertain → dangerous gates fail safe (halt + emit).**
+3. **Return** — structured JSON (`status`/`mode`/`gate`/`decision`/`human_review_required`/`artifacts`/`reason`) + one classifier-friendly prose line (`result:`/`needs input:`/`failed:`).
+
+**Alternatives rejected.** Auto-pick everything (unsupervised shipping); auto-detect from `CLAUDE_JOB_DIR` (false positive — this very session is a bg job with a live human); gstack 3-word verbatim vocabulary (second status vocab vs the repo's classifier lines); prose-only (owner chose structured JSON for programmatic outer drivers).
+
+**Consequences.** Tool-availability is a fallback adapter, not trusted truth — the stable renmark contract (env+config) is primary. Inherited via the 3 shared menu files, so the 28 SKILL.md files and v0.20.0 trigger-only frontmatter are untouched. Spec: `.renmark/specs/2026-06-26-p10-headless-contract.spec.md`.
+
+---
+
 ## ADR-033 — Finished feature graduated-preamble-tier
 
 **Date:** 2026-06-25

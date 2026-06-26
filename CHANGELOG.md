@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-26] — project scope: P10 headless / spawned-session contract (spec)
+**Request:** Brainstorm P10 — a formal headless-session contract so renmark behaves when run in background jobs / driven by an outer orchestrator instead of interactively.
+**Scope (confirmed):**
+- **Stack:** unchanged — Python ≥3.10, stdlib-only runtime (no new deps; `config.py` json pattern). Markdown skills.
+- **Deployment:** the renmark plugin itself (combined release ≥v0.22.0 with P7/P8).
+- **MVP boundary:** (1) detection precedence `RENMARK_HEADLESS=1` > `=0` > `.renmark/config.json` > tool-availability fallback, never from `CLAUDE_JOB_DIR`/`CLAUDECODE`; (2) safe gates auto-pick recommended, dangerous gates (merge/release/destructive/PRD-approval/over-budget cost) halt + write decision artifact + `human_review_required=true` + return `needs_input`; (3) structured JSON return + one classifier-friendly prose line; (4) uncertain detection → dangerous gates fail safe (halt).
+- **Out of scope:** auto-detect from ambient signals; rewriting all 28 SKILL.md (inherited via shared menu files); a daemon/HTTP API; reverse-engineering Claude Code internals as truth; P7/P8 (separate).
+**Files changed:** `.renmark/specs/2026-06-26-p10-headless-contract.spec.md` (new); `.renmark/research/2026-06-26-p10-headless-detection.research.md` (new); CHANGELOG + decisions.md.
+**Do not change:** the detection precedence and the dangerous-gate list are owner-specified (2026-06-26) — do not relax them in plan/build without re-approval.
+
 ## [2026-06-25] — external-skills-study batch P4/P5/P6/P9/P11/P12 (unreleased)
 **Request:** Autonomously plan + implement the remaining external-skills-study items (`.renmark/research/2026-06-25-external-skills-study.research.md`). Approved scope: build + merge stages 1–6 (P5, P4, P12, P11, P6, P9), then brainstorm the 3 design-heavy ones (P10, P7, P8). Driven as a staged program via `/renmark:feature` (each stage: implement → verify → independent review → commit).
 **Built:**
