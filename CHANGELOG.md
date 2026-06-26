@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-26] — P10 review fixes + runtime gate-resolution helper
+**Request:** Address the codex review (2 Major + 1 Minor) and the "under-built" verdict by adding the runtime core.
+**Built:**
+- Fixed review Major #1 (`config.py`): config `"headless"` honored only when a real bool; non-bool → default False / source `default` (was `bool(val)` coercion → fail-dangerous).
+- Fixed review Major #2 + re-review residual (`lifecycle.py`): `halt_for_human_review` arms the gate before the artifact write and suppresses `write_lifecycle` AND `mkdir` failures — now provably never raises (returns `needs_input` even on forced mkdir/lifecycle failure). Returns repo-relative `artifacts[]` (Minor #3).
+- Added `renmark/headless.py` — `resolve_gate(repo, gate, kind, recommended, tool_available, …)` bridges primitives to skills (interactive when human present, auto-pick on safe gates, halt on dangerous/uncertain); `render_return` emits the classifier prose line (re-review Minor: now descriptive, not the internal token). +12 tests.
+- Documented the helper as the canonical gate call in `headless-contract.md`.
+**Routing:** code review + re-review ran on codex (read-only sandbox). Full suite **946 passed, 28 skipped**.
+**Do not change (ADR-035):** `resolve_gate` returns interactive when `tool_available is None` (assume human present) — halting only on positive-headless. Do NOT make `None` halt dangerous gates; it breaks live merge approval. Per-skill adoption of `resolve_gate` across all 28 SKILL.md is a tracked follow-up.
+
 ## [2026-06-26] — P10 wave 2: menu files honor contract + tests + CLI flag
 **Request:** Wire the headless contract into the shared menu files, add tests, and expose a `--set-headless` CLI flag.
 **Built:**

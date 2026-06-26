@@ -1,5 +1,31 @@
 # Decisions (ADRs)
 
+## ADR-035 — resolve_gate uncertainty: None = assume interactive
+
+**Date:** 2026-06-26
+**Status:** Accepted (owner-confirmed)
+
+**Context.** Codex re-review flagged that `renmark.headless.resolve_gate` returns
+`{"mode":"interactive"}` for a dangerous gate when `is_headless` is False and
+`tool_available is None`, arguing the owner's "uncertainty → halt dangerous gates"
+rule should make it halt.
+
+**Decision.** Current behavior is correct and intentional. `tool_available=None`
+means "assume a human is present" → return interactive so the skill renders the
+`AskUserQuestion` menu and the human approves the merge/release **live**. Halting
+there would break normal interactive dangerous-gate approval. The fail-safe halt
+fires only when positively headless: `RENMARK_HEADLESS=1`, `config.headless`, or
+an explicit `tool_available=False` (AskUserQuestion provably absent → spawned
+subagent). "Uncertainty" in the owner rule means provably-headless-but-undetected,
+which true-headless callers signal via those explicit channels — not the
+default-interactive path.
+
+**Consequence.** The codex re-review finding (headless.py:73) is declined
+by-design. The two genuinely-fixed re-review items (halt mkdir guard, descriptive
+success prose) were applied (commit 80598eb).
+
+---
+
 ## ADR-034 — P10 headless / spawned-session contract (spec)
 
 **Date:** 2026-06-26
