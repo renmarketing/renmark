@@ -1,0 +1,21 @@
+{
+  "feature": "p10-headless-contract",
+  "branch": "",
+  "sha": "571b05b55d347aeefb7f1d8aa26b065b83e9e477",
+  "version_path": "",
+  "release_link": "",
+  "verification": "5/5 behaviors verified",
+  "codereview": ".renmark/reviews/2026-06-26-315041a49a07456eac16b7e68bde5859d3c335be.review.md",
+  "files_changed": 30,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-06-26T16:05:44+00:00"
+}

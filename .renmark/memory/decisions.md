@@ -1,5 +1,60 @@
 # Decisions (ADRs)
 
+## ADR-036 — Finished feature p10-headless-contract
+
+**Date:** 2026-06-26
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch  reached stage ready-to-release
+
+---
+
+## ADR-035 — resolve_gate uncertainty: None = assume interactive
+
+**Date:** 2026-06-26
+**Status:** Accepted (owner-confirmed)
+
+**Context.** Codex re-review flagged that `renmark.headless.resolve_gate` returns
+`{"mode":"interactive"}` for a dangerous gate when `is_headless` is False and
+`tool_available is None`, arguing the owner's "uncertainty → halt dangerous gates"
+rule should make it halt.
+
+**Decision.** Current behavior is correct and intentional. `tool_available=None`
+means "assume a human is present" → return interactive so the skill renders the
+`AskUserQuestion` menu and the human approves the merge/release **live**. Halting
+there would break normal interactive dangerous-gate approval. The fail-safe halt
+fires only when positively headless: `RENMARK_HEADLESS=1`, `config.headless`, or
+an explicit `tool_available=False` (AskUserQuestion provably absent → spawned
+subagent). "Uncertainty" in the owner rule means provably-headless-but-undetected,
+which true-headless callers signal via those explicit channels — not the
+default-interactive path.
+
+**Consequence.** The codex re-review finding (headless.py:73) is declined
+by-design. The two genuinely-fixed re-review items (halt mkdir guard, descriptive
+success prose) were applied (commit 80598eb).
+
+---
+
+## ADR-034 — P10 headless / spawned-session contract (spec)
+
+**Date:** 2026-06-26
+**Status:** Accepted (spec); implementation pending plan
+
+**Context.** Renmark runs in background jobs / under outer orchestrators but every pipeline skill ends in an interactive `AskUserQuestion` menu and pauses at Pause-Policy gates — which stalls a headless run. Brainstormed via interactive Q&A; contract finalized by owner.
+
+**Decision.** Three owner-specified rules pin the contract:
+1. **Gates** — safe gates auto-pick the `(Recommended)` option in headless mode; dangerous gates (`merge`, `release`, destructive ops, PRD approval, cost/token over budget) halt, write a decision artifact, set `human_review_required=true`, and return `needs_input` (never `failed`).
+2. **Detection** — precedence `RENMARK_HEADLESS=1` (force on) > `=0` (force off) > `.renmark/config.json` `headless` > tool-availability fallback adapter (AskUserQuestion absent → headless); never inferred from `CLAUDE_JOB_DIR`/`CLAUDECODE`. **Uncertain → dangerous gates fail safe (halt + emit).**
+3. **Return** — structured JSON (`status`/`mode`/`gate`/`decision`/`human_review_required`/`artifacts`/`reason`) + one classifier-friendly prose line (`result:`/`needs input:`/`failed:`).
+
+**Alternatives rejected.** Auto-pick everything (unsupervised shipping); auto-detect from `CLAUDE_JOB_DIR` (false positive — this very session is a bg job with a live human); gstack 3-word verbatim vocabulary (second status vocab vs the repo's classifier lines); prose-only (owner chose structured JSON for programmatic outer drivers).
+
+**Consequences.** Tool-availability is a fallback adapter, not trusted truth — the stable renmark contract (env+config) is primary. Inherited via the 3 shared menu files, so the 28 SKILL.md files and v0.20.0 trigger-only frontmatter are untouched. Spec: `.renmark/specs/2026-06-26-p10-headless-contract.spec.md`.
+
+---
+
 ## ADR-033 — Finished feature graduated-preamble-tier
 
 **Date:** 2026-06-25

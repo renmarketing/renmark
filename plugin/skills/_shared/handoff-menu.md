@@ -32,6 +32,25 @@ validated plan AND a shown cost preview; **REQ-12 gates** (#2 PRD writes, #4
 destructive ops, #5 budget escalation, #7 merge/release) **never default —
 silence is a no**, and `/renmark:approve` is the only grant surface.
 
+### Headless mode
+
+When renmark runs non-interactively (spawned subagent, `-p`/piped/CI, no TTY) the
+`AskUserQuestion` picker has no one to answer it. The headless behavior lives in
+one place so the skills can't drift:
+
+> *If headless (per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/headless-contract.md`
+> detection), do not render `AskUserQuestion`: auto-pick the `(Recommended)`
+> option at safe gates and continue; at dangerous gates halt, write
+> `.renmark/decisions/<gate>-approval.json`, set `human_review_required=true`, and
+> return the `needs_input` JSON + `needs input:` prose line.*
+
+A **dangerous gate** is exactly a REQ-12 gate — merge/release (#7), destructive
+ops (#4), PRD approval (#2), cost/budget escalation (#5). This does **not** relax
+the never-default-forward rule above: REQ-12 gates still never auto-proceed, and
+auto-picking the `(Recommended)` option applies only to the safe reversible gates.
+Headless halt + decision artifact is the machine-readable form of "silence is a
+no"; `/renmark:approve` remains the only grant surface.
+
 ---
 
 ## The three quality gates

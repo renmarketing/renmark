@@ -1089,6 +1089,16 @@ def main(argv: list[str] | None = None) -> int:
             "'false' = skip auto-routing until re-enabled). Default: true."
         ),
     )
+    # P10 — persisted headless toggle
+    ap.add_argument(
+        "--set-headless",
+        metavar="true|false",
+        help=(
+            "persist the headless-mode flag to .renmark/config.json "
+            "('true' = run non-interactively, suppressing interactive gates/menus; "
+            "'false' = restore interactive behavior). Default: false."
+        ),
+    )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
         "--task-brief",
@@ -1140,6 +1150,16 @@ def main(argv: list[str] | None = None) -> int:
         state_str = "on" if value else "off"
         print(f"renmark: proactive auto-routing {state_str} ({repo}/.renmark/config.json)")
         return 0
+    if args.set_headless is not None:
+        raw = args.set_headless.strip().lower()
+        if raw not in ("true", "false"):
+            ap.error("--set-headless expects 'true' or 'false'")
+        from .. import config as _config
+        value = raw == "true"
+        _config.set_headless(repo, value)
+        state_str = "on" if value else "off"
+        print(f"renmark: headless mode {state_str} ({repo}/.renmark/config.json)")
+        return 0
     if args.task_brief:
         plan_path, task_index_str = args.task_brief
         try:
@@ -1154,7 +1174,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.plan:
         ap.error(
             "plan path is required unless --usage / --analytics / --roadmap / --logs / "
-            "--scan / --task / --task-brief / --review-package / --set-proactive"
+            "--scan / --task / --task-brief / --review-package / --set-proactive / --set-headless"
         )
     return execute_plan(
         args.plan,

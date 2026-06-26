@@ -162,6 +162,16 @@ Returns server status and version. Used by load balancers and uptime monitoring.
 
 ## In progress
 
+### 2026-06-26 — p10-headless-contract
+
+**Files:** `renmark/config.py`, `renmark/lifecycle.py`, `plugin/skills/_shared/headless-contract.md`, `renmark/cli/_engine.py`
+**Spec:** `.renmark/specs/2026-06-26-p10-headless-contract.spec.md`
+**Plan:** `.renmark/plans/2026-06-26-p10-headless-contract.plan.md`
+
+Formal headless/spawned-session contract: layered detection (config.is_headless), shared doctrine, safe-gate auto-pick vs dangerous-gate halt (lifecycle.halt_for_human_review), --set-headless CLI flag.
+
+---
+
 (Features the current plan is mid-execution on. Cleared on completion.)
 
 ---

@@ -32,6 +32,12 @@ declared_at: 2026-06-12
 
 ## Learned overrides
 
+- (2026-06-26) `target=tests/test_lifecycle.py, complexity=medium, mode=B (codex->sonnet)` → **sonnet** (passed (rerouted: codex verifier-env exit 127))
+
+- (2026-06-26) `target=tests/test_config.py, complexity=medium, mode=B (codex->sonnet)` → **sonnet** (passed (rerouted: codex verifier-env exit 127))
+
+- (2026-06-26) `target=tests/**, complexity=medium, mode=B` → **codex** (failed, run=20260626-142134-1eec)
+
 - (2026-06-25) `codereview:external-skills-p4-p12-batch (codex->sonnet)` → **sonnet** (rerouted: codex usage-limit (reset ~18:57))
 
 - (2026-06-25) `codereview:graduated-preamble-tier (codex->sonnet)` → **sonnet** (rerouted: codex usage-limit (reset ~18:57))

@@ -174,6 +174,28 @@ The dispatch gate has exactly one owner per flow:
 This guarantees the wrapper flow presents **one** dispatch approval (owned by `feature`),
 never two, and orchestrate is **never** reached without an explicit human approval.
 
+**Headless gate (standalone path only).** This branch lives inside the standalone
+ownership block above — the embedded-in-`feature` path has already suppressed this
+gate and is unaffected. When `plan` **owns** the gate (standalone), before rendering
+the dispatch picker consult:
+
+```python
+from renmark import headless
+result = headless.resolve_gate(
+    repo, "dispatch", kind="dangerous",
+    originating_skill="plan",
+    what="dispatch N tasks ~$X",
+)
+```
+
+- **Headless** (`result["mode"] != "interactive"`): cost/dispatch needs a human, so
+  `resolve_gate` returns the `halt_for_human_review` `needs_input` envelope. Emit that
+  envelope as the fenced JSON block and `headless.render_return(result)` as the single
+  prose line, then **STOP** — do **not** render the dispatch menu and do **not** invoke
+  orchestrate.
+- **Interactive** (`result["mode"] == "interactive"`): the contract is inert — render
+  the existing dispatch menu unchanged (everything below).
+
 Show a clear summary:
 
 > *"Plan written to `.renmark/plans/<name>.plan.md` — validated ✓ (check-plan: PASS, W warnings)*

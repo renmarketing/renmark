@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-06-26, .renmark/reviews/2026-06-26-3a76fc4752d70decf6bc9d35f64157ea6e0467d9.verification.md) model `verify`: **verify-p10-headless-contract** — 5/5 behaviors verified; failed: none; full suite 934 passed/28 skipped; note: PATH renmark-execute points at main checkout, verify worktree code via -m renmark
+
+- (2026-06-26, run) **task 2 failed on codex** — codex_verifier_failed
+
 - (2026-06-25, bug) **P11 proactivity toggle: persisted but not runtime-enforced** — persist+document is a valid first increment, but a config flag with zero readers is half-wired — wire a real consumer or log the gap.
 
 - (2026-06-25, .renmark/reviews/2026-06-25-8baae38b6d32fc4044c17e55b77daa5eaf3ba313.verification.md) model `verify`: **verify-graduated-preamble-tier** — 5/5 behaviors verified; failed: none; regressions: full suite 867 passed

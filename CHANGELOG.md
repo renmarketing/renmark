@@ -1,5 +1,57 @@
 # Changelog
 
+## [2026-06-26] — v0.22.0 — P10 headless / spawned-session contract
+**Release.** Ships the P10 headless-session contract (detection, doctrine, lifecycle halt path, `renmark/headless.py` `resolve_gate`/`render_return`, `--set-headless` CLI, and dangerous-gate wiring in finish/plan/orchestrate/prd) **plus** the previously-unreleased batch on `main` (P5/P4/P12/P11/P6/P9). Full suite 951 passed; version drift clean; 3 codex review passes. See the per-feature entries below for detail. P7/P8 remain queued for ≥v0.23.0.
+
+## [2026-06-26] — P10 wire resolve_gate into dangerous-gate skills
+**Request:** Complete the "under-built" follow-up — wire the runtime helper into the skills that gate dangerous actions.
+**Scope (per gate-point audit):** NOT all 28 skills — the 22 safe-gate skills already inherit headless behavior via the shared menu files. The real surface is 5 dangerous-gate callsites in 4 skills.
+**Built:**
+- `finish/SKILL.md` (merge/release), `plan/SKILL.md` (dispatch — standalone path only), `orchestrate/SKILL.md` (cost approval), `prd/SKILL.md` (create + update) — each consults `renmark.headless.resolve_gate(..., kind="dangerous")` before its picker: headless emits `needs_input` JSON + `render_return` prose and STOPS; interactive renders the existing menu unchanged. Frontmatter untouched (v0.20.0 trigger-only preserved).
+- `tests/test_dangerous_gate_wiring.py` — guard test asserting each of the 4 skills references `resolve_gate` + `kind="dangerous"` (prd ≥2). Full suite 951 passed.
+**Files changed:** `finish/plan/orchestrate/prd` SKILL.md, `tests/test_dangerous_gate_wiring.py`.
+**Do not change:** safe gates stay inherited via the shared files (do not add per-skill wiring to the 22 safe-only skills); the interactive (human-present) path at each gate is unchanged.
+
+## [2026-06-26] — P10 review fixes + runtime gate-resolution helper
+**Request:** Address the codex review (2 Major + 1 Minor) and the "under-built" verdict by adding the runtime core.
+**Built:**
+- Fixed review Major #1 (`config.py`): config `"headless"` honored only when a real bool; non-bool → default False / source `default` (was `bool(val)` coercion → fail-dangerous).
+- Fixed review Major #2 + re-review residual (`lifecycle.py`): `halt_for_human_review` arms the gate before the artifact write and suppresses `write_lifecycle` AND `mkdir` failures — now provably never raises (returns `needs_input` even on forced mkdir/lifecycle failure). Returns repo-relative `artifacts[]` (Minor #3).
+- Added `renmark/headless.py` — `resolve_gate(repo, gate, kind, recommended, tool_available, …)` bridges primitives to skills (interactive when human present, auto-pick on safe gates, halt on dangerous/uncertain); `render_return` emits the classifier prose line (re-review Minor: now descriptive, not the internal token). +12 tests.
+- Documented the helper as the canonical gate call in `headless-contract.md`.
+**Routing:** code review + re-review ran on codex (read-only sandbox). Full suite **946 passed, 28 skipped**.
+**Do not change (ADR-035):** `resolve_gate` returns interactive when `tool_available is None` (assume human present) — halting only on positive-headless. Do NOT make `None` halt dangerous gates; it breaks live merge approval. Per-skill adoption of `resolve_gate` across all 28 SKILL.md is a tracked follow-up.
+
+## [2026-06-26] — P10 wave 2: menu files honor contract + tests + CLI flag
+**Request:** Wire the headless contract into the shared menu files, add tests, and expose a `--set-headless` CLI flag.
+**Built:**
+- `plugin/skills/_shared/handoff-menu.md`, `next-steps.md`, `scope-contract.md` — each now references `headless-contract.md` and honors it: headless suppresses `AskUserQuestion`, auto-picks `(Recommended)` on safe gates, halts on dangerous gates (reinforcing REQ-12).
+- `renmark/cli/_engine.py` — `--set-headless true|false` mirroring `--set-proactive` (calls `config.set_headless`).
+- `tests/test_config.py` — +24 headless detection cases (env tri-state, `=0`-overrides-config, fall-through, default, key preservation); 36 total.
+- `tests/test_lifecycle.py` — +3 cases (headless preamble note present/absent, `halt_for_human_review` writes artifact + arms gate + returns `needs_input`); 51 total.
+**Routing note:** tasks 2 & 8 (test files) rerouted codex→sonnet — codex verifier sandbox lacked `python3`/`pytest` (exit 127); ledgered in `routing.md`, not silent. Full suite 87 passed, ruff clean.
+**Files changed:** the 3 `_shared/*.md`, `renmark/cli/_engine.py`, `tests/test_config.py`, `tests/test_lifecycle.py`.
+**Do not change:** the 3 menu files defer to `headless-contract.md` as source of truth — do not duplicate the gate policy into them.
+
+## [2026-06-26] — P10 wave 1: headless detection + contract doctrine + lifecycle halt path
+**Request:** Implement the core of the P10 headless contract (detection, the shared doctrine doc, and the dangerous-gate halt path).
+**Built:**
+- `renmark/config.py` — `is_headless` / `set_headless` / `headless_source`, mirroring the P11 proactive pattern. Precedence: env `RENMARK_HEADLESS` tri-state (`1/true/yes/on`, `0/false/no/off`, else fall-through) > `.renmark/config.json` `"headless"` > default False. Explicit `=0` overrides config. `CLAUDE_JOB_DIR`/`CLAUDECODE` deliberately NOT read.
+- `plugin/skills/_shared/headless-contract.md` (new) — single-source doctrine: detection precedence + uncertainty rule, safe/dangerous gate table, JSON return schema + 3 examples + prose vocab, decision-artifact format.
+- `renmark/lifecycle.py` — additive headless note in `skill_preamble` (P3 record-before-check ordering preserved) + `halt_for_human_review(repo, gate, *, originating_skill, what)` that writes `.renmark/decisions/<gate>-approval.json`, arms `human_review_required`/`human_review_for`, and returns the `needs_input` envelope.
+**Files changed:** `renmark/config.py`, `plugin/skills/_shared/headless-contract.md`, `renmark/lifecycle.py`.
+**Do not change:** detection never reads `CLAUDE_JOB_DIR`/`CLAUDECODE`; `=0` overrides config; `skill_preamble` record-before-check ordering is load-bearing (P3); `needs_input` ≠ `failed` for dangerous-gate halts.
+
+## [2026-06-26] — project scope: P10 headless / spawned-session contract (spec)
+**Request:** Brainstorm P10 — a formal headless-session contract so renmark behaves when run in background jobs / driven by an outer orchestrator instead of interactively.
+**Scope (confirmed):**
+- **Stack:** unchanged — Python ≥3.10, stdlib-only runtime (no new deps; `config.py` json pattern). Markdown skills.
+- **Deployment:** the renmark plugin itself (combined release ≥v0.22.0 with P7/P8).
+- **MVP boundary:** (1) detection precedence `RENMARK_HEADLESS=1` > `=0` > `.renmark/config.json` > tool-availability fallback, never from `CLAUDE_JOB_DIR`/`CLAUDECODE`; (2) safe gates auto-pick recommended, dangerous gates (merge/release/destructive/PRD-approval/over-budget cost) halt + write decision artifact + `human_review_required=true` + return `needs_input`; (3) structured JSON return + one classifier-friendly prose line; (4) uncertain detection → dangerous gates fail safe (halt).
+- **Out of scope:** auto-detect from ambient signals; rewriting all 28 SKILL.md (inherited via shared menu files); a daemon/HTTP API; reverse-engineering Claude Code internals as truth; P7/P8 (separate).
+**Files changed:** `.renmark/specs/2026-06-26-p10-headless-contract.spec.md` (new); `.renmark/research/2026-06-26-p10-headless-detection.research.md` (new); CHANGELOG + decisions.md.
+**Do not change:** the detection precedence and the dangerous-gate list are owner-specified (2026-06-26) — do not relax them in plan/build without re-approval.
+
 ## [2026-06-25] — external-skills-study batch P4/P5/P6/P9/P11/P12 (unreleased)
 **Request:** Autonomously plan + implement the remaining external-skills-study items (`.renmark/research/2026-06-25-external-skills-study.research.md`). Approved scope: build + merge stages 1–6 (P5, P4, P12, P11, P6, P9), then brainstorm the 3 design-heavy ones (P10, P7, P8). Driven as a staged program via `/renmark:feature` (each stage: implement → verify → independent review → commit).
 **Built:**
@@ -15,7 +67,7 @@
 - P5 cross-check is by task INDEX (commit messages carry no target info) — catches reused-number/orphan, not reused-index-different-task; don't claim more.
 - P4 helpers MUST print only the path (no body to stdout) — REQ-5 load-bearing.
 - `guide` and `help` are intentionally separate: help stays zero-LLM (`disable-model-invocation`); guide is the interactive wizard.
-- Unreleased on `main` past v0.21.0 — cut a combined version (≥v0.22.0) after P10/P7/P8.
+- P10 shipped on its own as **v0.22.0** (2026-06-26); P5/P4/P12/P11/P6/P9 from the batch above are folded into this release. P7/P8 remain queued for a later version (≥v0.23.0).
 
 ## [2026-06-25] — v0.21.0 — graduated preamble-tier (P3)
 **Request:** Build P3 from the external-skills study (`.renmark/research/2026-06-25-external-skills-study.research.md`): make `lifecycle.skill_preamble` graduated instead of all-or-nothing, so zero-LLM/meta skills carry a minimal/no preamble while heavy pipelines get the full block. Complements v0.20.0's trigger-only descriptions + disable-model-invocation. Dogfooded via the full `/renmark:feature` pipeline.
