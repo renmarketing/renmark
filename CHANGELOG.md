@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-06-26] — P10 wire resolve_gate into dangerous-gate skills
+**Request:** Complete the "under-built" follow-up — wire the runtime helper into the skills that gate dangerous actions.
+**Scope (per gate-point audit):** NOT all 28 skills — the 22 safe-gate skills already inherit headless behavior via the shared menu files. The real surface is 5 dangerous-gate callsites in 4 skills.
+**Built:**
+- `finish/SKILL.md` (merge/release), `plan/SKILL.md` (dispatch — standalone path only), `orchestrate/SKILL.md` (cost approval), `prd/SKILL.md` (create + update) — each consults `renmark.headless.resolve_gate(..., kind="dangerous")` before its picker: headless emits `needs_input` JSON + `render_return` prose and STOPS; interactive renders the existing menu unchanged. Frontmatter untouched (v0.20.0 trigger-only preserved).
+- `tests/test_dangerous_gate_wiring.py` — guard test asserting each of the 4 skills references `resolve_gate` + `kind="dangerous"` (prd ≥2). Full suite 951 passed.
+**Files changed:** `finish/plan/orchestrate/prd` SKILL.md, `tests/test_dangerous_gate_wiring.py`.
+**Do not change:** safe gates stay inherited via the shared files (do not add per-skill wiring to the 22 safe-only skills); the interactive (human-present) path at each gate is unchanged.
+
 ## [2026-06-26] — P10 review fixes + runtime gate-resolution helper
 **Request:** Address the codex review (2 Major + 1 Minor) and the "under-built" verdict by adding the runtime core.
 **Built:**
