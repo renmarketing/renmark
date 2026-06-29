@@ -1,5 +1,21 @@
 # Decisions (ADRs)
 
+## ADR-037 — P7 template-generated SKILL.md (spec)
+
+**Date:** 2026-06-29
+**Status:** Accepted (spec); implementation pending plan
+
+**Context.** 28 SKILL.md files share cross-cutting boilerplate (Step-0 preamble + reasoning-contract/next-steps/handoff-menu citations); a doctrine change means editing up to 26 files by hand — the path by which v0.20.0's frontmatter discipline drifts.
+
+**Decision.** Three owner-confirmed choices:
+1. **Managed blocks** — marker-delimited generator-owned regions inside hand-authored SKILL.md, reusing init.py's marker-merge (`<!-- BEGIN:gen:<block> -->`). Rejected full-file generation (huge migration) and lint-only (no auto-propagation).
+2. **Scope** — generate Step-0 preamble + the 3 shared citations (pulled from `_shared`); frontmatter stays hand-authored, enforced by `--check` lint. Rejected generating frontmatter (touches v0.20.0).
+3. **Central registry** `renmark/skillmeta.py` (extends `lifecycle.DOMAIN_BY_SKILL`) read by generator + preamble + next_steps. Rejected 28 per-skill manifests and inference-from-file.
+
+**Consequence.** PRD-alignment = drift-but-benign (internal maintainability tooling, not product). Hard guard: generator NEVER writes frontmatter; lint validates only. Spec: `.renmark/specs/2026-06-29-p7-skill-templates.spec.md`. Targets ≥v0.23.0 with P8.
+
+---
+
 ## ADR-036 — Finished feature p10-headless-contract
 
 **Date:** 2026-06-26

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-29] — project scope: P7 template-generated SKILL.md (spec)
+**Request:** Brainstorm P7 — a managed-block generator so the cross-cutting SKILL.md boilerplate (Step-0 preamble + shared-contract citations) regenerates from one source across all 28 skills instead of 28 manual edits.
+**Scope (confirmed):**
+- **Stack:** unchanged — Python ≥3.10 stdlib-only; Markdown skills.
+- **Deployment:** the renmark plugin itself (P7 targets ≥v0.23.0, with P8).
+- **MVP boundary:** (1) managed-block model (marker-merge, reuse init.py); (2) generator owns Step-0 + reasoning-contract/next-steps/handoff-menu citations, pulled from `_shared`; frontmatter hand-authored + lint-checked; (3) central registry `renmark/skillmeta.py` extending `lifecycle.DOMAIN_BY_SKILL`; (4) `--check` lint fails on block-drift or frontmatter-discipline violation.
+- **Out of scope:** full-file generation; generating frontmatter/descriptions/bodies; PRD change (internal tooling — PRD-drift benign); P8.
+**Files changed:** `.renmark/specs/2026-06-29-p7-skill-templates.spec.md` (new); CHANGELOG + decisions.md.
+**Do not change:** the generator MUST NEVER write frontmatter — v0.20.0 trigger-only descriptions + `disable-model-invocation` are load-bearing; lint validates, never auto-fixes.
+
 ## [2026-06-26] — v0.22.0 — P10 headless / spawned-session contract
 **Release.** Ships the P10 headless-session contract (detection, doctrine, lifecycle halt path, `renmark/headless.py` `resolve_gate`/`render_return`, `--set-headless` CLI, and dangerous-gate wiring in finish/plan/orchestrate/prd) **plus** the previously-unreleased batch on `main` (P5/P4/P12/P11/P6/P9). Full suite 951 passed; version drift clean; 3 codex review passes. See the per-feature entries below for detail. P7/P8 remain queued for ≥v0.23.0.
 
