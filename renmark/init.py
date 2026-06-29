@@ -654,8 +654,86 @@ def _existing_stub_body(text: str) -> str | None:
     return "\n".join(body_lines).strip()
 
 
+class MarkerNotFoundError(LookupError):
+    """A requested ``BEGIN:<name>``…``END:<name>`` block is absent from the text.
+
+    Raised by :func:`merge_marked_block` when the named block does not exist.
+    Distinct from :class:`MarkerCorruptionError` (which signals malformed/
+    unbalanced markers). The caller decides whether absence means "insert" or
+    "error out" — the primitive itself never inserts a missing block.
+    """
+
+
+def count_begin_markers(text: str, marker_name: str | None = None) -> int:
+    """Count managed ``<!-- BEGIN:<name> -->`` markers in ``text``.
+
+    With ``marker_name`` ``None`` (default), counts every BEGIN marker that
+    matches the canonical convention (``renmark.lint._BEGIN_RE`` — optional
+    surrounding whitespace, ``name`` of ``[A-Za-z][A-Za-z0-9_-]*``). With a
+    ``marker_name``, counts only BEGIN markers for that exact name.
+
+    This is the public, reusable counterpart of the marker convention used by
+    :func:`merge_marked_block` and the rule-block merge; other modules (e.g. the
+    skill-template generator) import it instead of re-deriving the regex.
+    """
+    from .lint import _BEGIN_RE
+
+    if marker_name is None:
+        return sum(1 for _ in _BEGIN_RE.finditer(text))
+    return sum(1 for m in _BEGIN_RE.finditer(text) if m.group(1) == marker_name)
+
+
 def _count_begin_markers(text: str) -> int:
-    return text.count(STUB_BEGIN)
+    """Thin alias kept for internal call sites — counts the project-stub BEGIN."""
+    return count_begin_markers(text, "project-stub")
+
+
+def merge_marked_block(text: str, marker_name: str, new_body: str) -> str:
+    """Replace the content between ``BEGIN:<marker_name>`` and ``END:<marker_name>``.
+
+    General, reusable marker-merge primitive: returns a copy of ``text`` in
+    which the span from the start of the ``<!-- BEGIN:<marker_name> -->`` line
+    through the end of the ``<!-- END:<marker_name> -->`` line is rewritten as::
+
+        <!-- BEGIN:<marker_name> -->{new_body}<!-- END:<marker_name> -->
+
+    The markers themselves are preserved (regenerated in canonical form);
+    ``new_body`` is the verbatim inner content placed between them, including any
+    leading/trailing newlines the caller wants. Text outside the block is left
+    byte-for-byte unchanged.
+
+    Guard semantics match the rule-block merge: ``text`` is first validated with
+    ``renmark.lint.validate_rule_markers`` and any malformed markers — orphan
+    ``END``, unclosed ``BEGIN``, duplicate, or out-of-order — raise
+    :class:`MarkerCorruptionError` (nothing is written). If the named block is
+    absent (well-formed text, no such ``BEGIN``/``END`` pair), raises
+    :class:`MarkerNotFoundError` — the caller decides whether to insert.
+
+    Byte-equality / idempotence is the caller's concern; this just returns the
+    merged text.
+    """
+    from .lint import _BEGIN_RE, _END_RE, validate_rule_markers
+
+    issues = validate_rule_markers(text)
+    if issues:
+        raise MarkerCorruptionError({"<text>": issues})
+
+    begin = next((m for m in _BEGIN_RE.finditer(text) if m.group(1) == marker_name), None)
+    end = next((m for m in _END_RE.finditer(text) if m.group(1) == marker_name), None)
+    if begin is None or end is None:
+        raise MarkerNotFoundError(
+            f"no `BEGIN:{marker_name}`…`END:{marker_name}` block found in text"
+        )
+
+    # Expand to whole-line boundaries: start of the BEGIN line through the end
+    # of the END line (validate_rule_markers already guaranteed BEGIN<END).
+    line_start = text.rfind("\n", 0, begin.start()) + 1
+    nl = text.find("\n", end.end())
+    line_end = len(text) if nl < 0 else nl + 1
+    trailing = "" if nl < 0 else "\n"
+
+    rebuilt = f"<!-- BEGIN:{marker_name} -->{new_body}<!-- END:{marker_name} -->{trailing}"
+    return text[:line_start] + rebuilt + text[line_end:]
 
 
 def merge_stub_into(file_path: Path, scan: RepoScan) -> str:
@@ -682,12 +760,18 @@ def merge_stub_into(file_path: Path, scan: RepoScan) -> str:
         existing_body = _existing_stub_body(original) or ""
         if existing_body == new_body:
             return "unchanged"
-        # Replace the existing block
-        end_idx = original.find(STUB_END)
-        if end_idx < 0:
-            raise RuntimeError(f"{file_path}: BEGIN marker without END — file corrupted.")
-        begin_idx = original.find(STUB_BEGIN)
-        new_text = original[:begin_idx] + new_block + original[end_idx + len(STUB_END) :]
+        # Replace the existing block via the general marker-merge primitive so
+        # the marker handling lives in one place. ``render_stub`` wraps the inner
+        # content as ``{STUB_BEGIN}{inner}{STUB_END}``; hand that exact inner
+        # content to ``merge_marked_block`` so the rewritten block is identical
+        # to what ``render_stub`` would have produced (markers preserved).
+        inner = new_block[len(STUB_BEGIN) : len(new_block) - len(STUB_END)]
+        try:
+            new_text = merge_marked_block(original, "project-stub", inner)
+        except MarkerNotFoundError:
+            # n_begin == 1 but no balanced END → orphan BEGIN. Preserve the
+            # original "BEGIN marker without END" RuntimeError contract.
+            raise RuntimeError(f"{file_path}: BEGIN marker without END — file corrupted.") from None
         file_path.write_text(new_text, encoding="utf-8")
         return "refreshed"
 

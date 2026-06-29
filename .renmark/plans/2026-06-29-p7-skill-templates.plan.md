@@ -55,7 +55,7 @@ verifiers (exit 127, no writable /tmp). Ledgered, not silent.
 - **parallel_group:** 1
 - **est_tokens:** 900
 - **est_cost_usd:** 0.16
-- **verifier:** `python3 -m pytest -q tests/test_init.py >/dev/null 2>&1 && python3 -c "from renmark.init import merge_marked_block, count_begin_markers" 2>/dev/null || python3 -c "from renmark import init; assert hasattr(init,'merge_marked_block')"`
+- **verifier:** `python3 -m pytest -q tests/test_init_pipeline.py >/dev/null 2>&1 && python3 -c "from renmark import init; assert hasattr(init,'merge_marked_block') and hasattr(init,'count_begin_markers')"`
 - **serves:** P7
 - **spec:**
   init.py already has marker-merge logic (`_count_begin_markers`, `merge_stub_into`,
