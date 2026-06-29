@@ -684,8 +684,15 @@ def count_begin_markers(text: str, marker_name: str | None = None) -> int:
 
 
 def _count_begin_markers(text: str) -> int:
-    """Thin alias kept for internal call sites — counts the project-stub BEGIN."""
-    return count_begin_markers(text, "project-stub")
+    """Stub-specific corruption counter — substring count of ``STUB_BEGIN``.
+
+    Deliberately a raw ``str.count`` (not the regex-based
+    :func:`count_begin_markers`): the stub corruption check must catch a
+    ``STUB_BEGIN`` substring anywhere — inline, mid-line, or duplicated — not
+    only canonical own-line markers. Routing this through the regex primitive
+    silently changed malformed-marker behavior, so it stays a substring count.
+    """
+    return text.count(STUB_BEGIN)
 
 
 def merge_marked_block(text: str, marker_name: str, new_body: str) -> str:
@@ -760,18 +767,14 @@ def merge_stub_into(file_path: Path, scan: RepoScan) -> str:
         existing_body = _existing_stub_body(original) or ""
         if existing_body == new_body:
             return "unchanged"
-        # Replace the existing block via the general marker-merge primitive so
-        # the marker handling lives in one place. ``render_stub`` wraps the inner
-        # content as ``{STUB_BEGIN}{inner}{STUB_END}``; hand that exact inner
-        # content to ``merge_marked_block`` so the rewritten block is identical
-        # to what ``render_stub`` would have produced (markers preserved).
-        inner = new_block[len(STUB_BEGIN) : len(new_block) - len(STUB_END)]
-        try:
-            new_text = merge_marked_block(original, "project-stub", inner)
-        except MarkerNotFoundError:
-            # n_begin == 1 but no balanced END → orphan BEGIN. Preserve the
-            # original "BEGIN marker without END" RuntimeError contract.
-            raise RuntimeError(f"{file_path}: BEGIN marker without END — file corrupted.") from None
+        # Replace the existing block. Stub merge intentionally uses substring
+        # find/index splicing (NOT the regex ``merge_marked_block`` primitive):
+        # the corruption contract here is substring-based and must stay so.
+        end_idx = original.find(STUB_END)
+        if end_idx < 0:
+            raise RuntimeError(f"{file_path}: BEGIN marker without END — file corrupted.")
+        begin_idx = original.find(STUB_BEGIN)
+        new_text = original[:begin_idx] + new_block + original[end_idx + len(STUB_END) :]
         file_path.write_text(new_text, encoding="utf-8")
         return "refreshed"
 

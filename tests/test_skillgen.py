@@ -113,6 +113,30 @@ def test_quoted_phrase_counts_as_trigger() -> None:
     assert skillgen.lint_skill("example", text, _meta()) == []
 
 
+def test_apostrophe_only_description_is_flagged_as_no_trigger() -> None:
+    # An apostrophe inside a word ("repo's") is NOT a quoted invocation phrase —
+    # it must not satisfy the trigger check (the earlier ["']-matches-anything
+    # rule wrongly passed this). No /renmark: and no genuine quoted span here.
+    text = _skill_md(description="Use the repo's lint conventions.")
+    issues = skillgen.lint_skill("example", text, _meta())
+    assert any("no trigger" in i for i in issues)
+
+
+def test_single_word_quote_is_not_a_trigger() -> None:
+    # A quoted span must hold a real phrase (≥2 words) or a slash-command token;
+    # a single quoted word is not an invocation trigger.
+    text = _skill_md(description='Use the "thing" somewhere.')
+    issues = skillgen.lint_skill("example", text, _meta())
+    assert any("no trigger" in i for i in issues)
+
+
+def test_quoted_slash_command_token_counts_as_trigger() -> None:
+    # A slash-command-like token inside backticks is a genuine invocation phrase
+    # (exercises the backtick-slash-token branch, not the bare /renmark: branch).
+    text = _skill_md(description="Use `/foo` to do the thing.")
+    assert skillgen.lint_skill("example", text, _meta()) == []
+
+
 # ── 5. disable-model-invocation mismatch (both directions) ────────────────────
 
 

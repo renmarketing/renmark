@@ -350,3 +350,54 @@ def test_file_purpose_multiline_wraps_across_lines() -> None:
     assert result.endswith("sync.")
     # Should contain the wrapped content joined
     assert "pyproject," in result and "VERSION in sync" in result
+
+
+# ── 5. merge_stub_into corruption contract (substring-based) ──────────────────
+#
+# REGRESSION GUARD: merge_stub_into's corruption check counts STUB_BEGIN as a
+# raw substring (str.count), NOT canonical own-line markers. A P7 refactor once
+# routed this through the regex-based marker primitive, which only sees own-line
+# markers — silently letting inline / duplicated STUB_BEGIN slip past. These
+# tests pin the original substring behavior and the original error messages.
+
+
+def test_merge_stub_into_raises_on_two_inline_begin_markers(tmp_path: Path) -> None:
+    """Two STUB_BEGIN occurrences (even inline) → 'found N markers — file corrupted'."""
+    scan = init.scan_repo(tmp_path)
+    claude = tmp_path / "CLAUDE.md"
+    # Both markers inline on a single prose line — a regex own-line counter would
+    # see ZERO and miss the corruption; substring count sees TWO.
+    claude.write_text(
+        f"# Project\n\nprose {init.STUB_BEGIN} and again {init.STUB_BEGIN} inline\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match=r"found 2 .* markers — file corrupted"):
+        init.merge_stub_into(claude, scan)
+
+
+def test_merge_stub_into_raises_on_begin_without_end(tmp_path: Path) -> None:
+    """A single STUB_BEGIN with no STUB_END → 'BEGIN marker without END — file corrupted.'"""
+    scan = init.scan_repo(tmp_path)
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_text(
+        f"# Project\n\n{init.STUB_BEGIN}\nhalf-written stub, no closing marker\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match=r"BEGIN marker without END — file corrupted\."):
+        init.merge_stub_into(claude, scan)
+
+
+def test_stub_corruption_counts_inline_begin_substring() -> None:
+    """The stub corruption counter counts a non-own-line STUB_BEGIN substring.
+
+    Pins _count_begin_markers to substring semantics: an inline (mid-line)
+    STUB_BEGIN must still be counted, whereas the canonical own-line regex
+    counter (count_begin_markers) sees nothing.
+    """
+    inline = f"prose before {init.STUB_BEGIN} prose after — all one line\n"
+    # Stub-specific counter: substring → counted.
+    assert init._count_begin_markers(inline) == 1
+    # Public canonical counter: own-line only → not counted.
+    assert init.count_begin_markers(inline, "project-stub") == 0

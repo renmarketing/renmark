@@ -53,18 +53,22 @@ PLUGIN_SOURCE = RENMARK_ROOT / "plugin"
 SHARED_DIR = PLUGIN_SOURCE / "skills" / "_shared"
 
 # Each _shared canonical region is single-sourced and cited by pointer. To catch
-# a skill that re-inlines one verbatim, we keep a short distinctive phrase per
-# region — a contiguous substring that appears verbatim in the canonical text.
-# The phrase is VERIFIED against the live _shared file at runtime (so a wording
-# edit that drops it disables the stale check rather than false-positiving); we
-# never hardcode the whole blockquote.
-_SHARED_SIGNATURES: dict[str, str] = {
+# a skill that re-inlines one verbatim, we derive the comparison signature FROM
+# the live _shared file at runtime — never from a frozen copy. Per region we keep
+# only a short, stable *anchor*: a needle used to LOCATE the canonical line in the
+# current file. The signature actually compared against skill bodies is the live
+# text of the line carrying that anchor (whitespace/quote-normalized), so any
+# wording edit to that canonical line is tracked automatically instead of
+# silently disabling the guard. If a file is missing, or the anchor no longer
+# appears (the line was renamed away), the check degrades safely — it skips, with
+# no false positive.
+_SHARED_ANCHORS: dict[str, str] = {
     # The reasoning-contract stance clause — distinctive and stable.
-    "reasoning-contract": "Push back by default — disagree when the request is off-strategy",
+    "reasoning-contract": "Push back by default",
     # The next-steps umbrella rule.
-    "next-steps": "every skill MUST end by recommending a state-derived next",
+    "next-steps": "every skill MUST end by recommending",
     # The handoff-menu Pause Policy heading.
-    "handoff-menu": "Pause Policy — the only reasons to stop and ask",
+    "handoff-menu": "Pause Policy",
 }
 
 
@@ -83,37 +87,61 @@ def _normalize(text: str) -> str:
 
 
 def _shared_signature(name: str) -> str | None:
-    """Return the whitespace-normalized signature phrase for a ``_shared`` region.
+    """Return a live-derived, whitespace-normalized signature for a ``_shared`` region.
 
-    The phrase in :data:`_SHARED_SIGNATURES` is a distinctive contiguous
-    substring of the canonical text. It is VERIFIED to still appear (after the
-    same whitespace/quote normalization applied to skill bodies) in the live
-    ``_shared/<name>.md`` before being used. Returns ``None`` if the source is
-    missing or the phrase no longer appears — in either case there is nothing to
-    match against, which is not an error (a wording edit that drops the phrase
-    simply disables this one stale check until the phrase is refreshed).
+    The signature is DERIVED FROM the current ``_shared/<name>.md`` file content,
+    not from a frozen copy: we locate the canonical line by its short anchor in
+    :data:`_SHARED_ANCHORS`, then return that line's live text (after the same
+    whitespace/quote normalization applied to skill bodies). Because the compared
+    span is read from the file every run, a wording edit to the canonical line is
+    tracked automatically — the guard keeps matching the canonical text instead of
+    a stale literal.
+
+    Returns ``None`` (skip, not an error) when the source file is missing or the
+    anchor no longer appears anywhere in it (the canonical line was renamed away);
+    in either case there is nothing to compare against, so the check degrades
+    safely with no false positive.
     """
-    phrase = _SHARED_SIGNATURES.get(name)
-    if phrase is None:
+    anchor = _SHARED_ANCHORS.get(name)
+    if anchor is None:
         return None
     path = SHARED_DIR / f"{name}.md"
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
-    norm_phrase = _normalize(phrase)
-    if norm_phrase and norm_phrase in _normalize(text):
-        return norm_phrase
+    norm_anchor = _normalize(anchor)
+    if not norm_anchor:
+        return None
+    # Derive the signature from the live line that carries the anchor. Each raw
+    # line is normalized the same way skill bodies are (quote markers stripped,
+    # whitespace collapsed) so the comparison is apples-to-apples.
+    for raw_line in text.splitlines():
+        norm_line = _normalize(raw_line)
+        if norm_anchor in norm_line:
+            return norm_line
     return None
 
 
 # ── Frontmatter discipline ─────────────────────────────────────────────────────
 
 # A description is "trigger-only-shaped" when it opens with the imperative "Use"
-# and names at least one invocation trigger — a `/renmark:<skill>` mention or a
-# quoted natural-language trigger phrase. This is the shape every shipped
+# and names at least one invocation trigger. A trigger is EITHER a
+# `/renmark:<skill>` mention OR a *genuine* quoted invocation phrase — a balanced
+# double-quote or backtick span that holds either a slash-command-like token
+# (`/foo`) or at least two word tokens. A lone apostrophe inside a word (e.g.
+# "repo's") is NOT a quoted phrase and must not satisfy the check — that was the
+# bug in the earlier `["']`-matches-anything rule. This is the shape every shipped
 # description already has (see plugin/skills/*/SKILL.md).
-_TRIGGER_RE = re.compile(r"/renmark:|[\"']")
+_TRIGGER_RE = re.compile(
+    r"""(?sx)
+      /renmark:                              # an explicit slash-command mention, or…
+    | "\s*/[\w:\-]+\s*"                       # a slash-command token inside double quotes
+    | `\s*/[\w:\-]+\s*`                       # …or inside backticks
+    | "[^"]*?\w[\w'’\-]*\s+[^"]*?\w[\w'’\-]*[^"]*?"   # a double-quoted phrase of ≥2 word tokens
+    | `[^`]*?\w[\w'’\-]*\s+[^`]*?\w[\w'’\-]*[^`]*?`   # …or a backtick phrase of ≥2 word tokens
+    """
+)
 
 
 def _truthy(value: str | None) -> bool:
@@ -163,7 +191,7 @@ def lint_skill(skill: str, text: str, meta: SkillMeta) -> list[str]:
 
     # 2. Doc-slimming guard — no re-inlined _shared canonical blockquote.
     normalized_body = _normalize(text)
-    for name in _SHARED_SIGNATURES:
+    for name in _SHARED_ANCHORS:
         sig = _shared_signature(name)
         if sig and sig in normalized_body:
             issues.append(
