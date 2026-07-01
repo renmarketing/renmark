@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-01] — project scope: p8-behavioral-skill-testing
+**Scope contract (brainstorm).** Feature spec: `.renmark/specs/2026-07-01-p8-behavioral-skill-testing.spec.md`.
+- **Stack:** unchanged — Python ≥3.10 renmark runtime + Claude Code plugin (no new stack).
+- **Deployment:** in-repo tooling; ships in v0.23.0 alongside the P7 consistency lint (branch `worktree-p7-skill-templates`, merge-only).
+- **MVP boundary:** deterministic behavioral tier (recorded golden transcripts replayed + diffed in CI, reusing `renmark/shadow.py`) covering **2 reference skills** (roadmap read-only contract; the next-steps-menu contract); LLM-as-judge tier (`renmark/judge.py`) implemented but **escalation-only** — offered on deterministic failure, opt-in to run (~$0.15), never silent.
+- **Out of scope:** behavioral coverage of all ~30 skills; the P7 `.tmpl`→SKILL.md generator (deliberately dropped — shared blocks already single-sourced); changes to the structure audit; any auto-spend on the judge tier.
+- **Do not change:** the deterministic tier stays network-free / token-free in CI; the judge tier never auto-triggers without explicit opt-in.
+
 ## [2026-06-26] — v0.22.0 — P10 headless / spawned-session contract
 **Release.** Ships the P10 headless-session contract (detection, doctrine, lifecycle halt path, `renmark/headless.py` `resolve_gate`/`render_return`, `--set-headless` CLI, and dangerous-gate wiring in finish/plan/orchestrate/prd) **plus** the previously-unreleased batch on `main` (P5/P4/P12/P11/P6/P9). Full suite 951 passed; version drift clean; 3 codex review passes. See the per-feature entries below for detail. P7/P8 remain queued for ≥v0.23.0.
 
