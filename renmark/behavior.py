@@ -700,14 +700,35 @@ def run(
         result = _run_deterministic(case, repo_path)
         if result.status == "FAIL":
             if judge:
-                current = _current_for_judge(case, repo_path)
-                result.judge_verdict = _escalate_to_judge(
-                    repo_path, case, current=current, subagent_runner=subagent_runner
-                )
+                if _eval_golden_missing(case):
+                    # No recorded golden to adjudicate against: this is an
+                    # operational gap (ERROR), not a behavioral FAIL — and we
+                    # must NOT spend a judge call on an un-evaluable case.
+                    result.status = "ERROR"
+                    result.completion_state = "failed"
+                    result.message = f"{result.message}; eval golden missing — {ACCEPT_FIRST_HINT}"
+                else:
+                    current = _current_for_judge(case, repo_path)
+                    result.judge_verdict = _escalate_to_judge(
+                        repo_path, case, current=current, subagent_runner=subagent_runner
+                    )
             elif on_fail_offer:
                 result.judge_offered = True
         results.append(result)
     return results
+
+
+def _eval_golden_missing(case: Case) -> bool:
+    """True when the case's eval golden snapshot is absent or unreadable.
+
+    Used to short-circuit the judge escalation to an ERROR (never a wasted judge
+    call, never a silent pass) when there is no recorded golden to adjudicate
+    against — the caller must ``--accept`` a golden first.
+    """
+    try:
+        return _read_snapshot(_snapshot_path(case, case.eval.golden_ref)) is None
+    except (json.JSONDecodeError, OSError, BehaviorConfigError):
+        return True
 
 
 def _current_for_judge(case: Case, repo: Path) -> str:

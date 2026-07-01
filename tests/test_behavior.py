@@ -1,41 +1,8 @@
-"""---
-artifact_type: test_artifact
-schema_version: 1
-created_at: 2026-07-01T00:00:00-04:00
-source_sha: null
-related_plan: /home/renmark/projects/ai-system/.claude/worktrees/p8-behavioral-brainstorm/.renmark/plans/2026-07-01-p8-behavioral-skill-testing.plan.md
-generator: codex
-stale_after: null
-dependency_refs:
-  - /home/renmark/projects/ai-system/.claude/worktrees/p8-behavioral-brainstorm/renmark/behavior.py
-  - /home/renmark/projects/ai-system/.claude/worktrees/p8-behavioral-brainstorm/renmark/judge.py
-completion_state: complete
-confidence: high
-validation_status: pending
-retry_count: 0
-parser_success: true
-schema_compliance: true
----
-
-Behavior harness tests for the assertion-based replay redesign in
-`renmark/behavior.py`. Fixtures are local and deterministic: each case writes a
-`.behavior.json` file plus inline snapshot JSON in the new
-`{"transcript": str, "inputs": dict}` format.
-
-## Summary
-
-- Covers `load_cases()` parsing, snapshot-ref traversal rejection, and assertions preservation.
-- Covers replay `PASS`, assertion-driven `FAIL`, no-effect `FAIL`, and `ERROR` on missing or unusable snapshots.
-- Covers `run(..., judge=False)` never invoking the judge while still offering escalation on deterministic failures.
-- Covers `run(..., judge=True)` passing `actual=<current transcript>` to the judge and skipping escalation for `ERROR`.
-- Covers deterministic assertion operators for `contains`, `not_contains`, `matches`, and `min_lines`.
-"""
-
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -43,250 +10,221 @@ from renmark import behavior
 from renmark.judge import Verdict
 
 
+def _case(
+    *,
+    skill: str = "roadmap",
+    prompt: str = "Summarize the next steps.",
+    call: str = "lifecycle.next_steps",
+    assertions: list[str] | None = None,
+    contract: str = "Show the recommended next step and a finish fallback.",
+    golden_ref: str = "roadmap-golden",
+    source: Path | None = None,
+) -> behavior.Case:
+    return behavior.Case(
+        skill=skill,
+        prompt=prompt,
+        deterministic=behavior.DeterministicSpec(
+            call=call,
+            assertions=tuple(assertions or []),
+        ),
+        eval=behavior.EvalSpec(
+            contract=contract,
+            golden_ref=golden_ref,
+        ),
+        source=source,
+    )
+
+
 def _write_case_file(
     tmp_path: Path,
     *,
-    skill: str = "renmark:roadmap",
+    skill: str = "roadmap",
     prompt: str = "Summarize the next steps.",
+    call: str = "lifecycle.next_steps",
     assertions: list[str] | None = None,
-    baseline_ref: str = "case-baseline",
-    golden_ref: str = "case-golden",
-    filename: str = "sample.behavior.json",
+    contract: str = "Show the recommended next step and a finish fallback.",
+    golden_ref: str = "roadmap-golden",
+    filename: str = "roadmap.behavior.json",
 ) -> Path:
     payload = {
         "skill": skill,
         "prompt": prompt,
-        "assertions": assertions if assertions is not None else ["contains:next step"],
-        "baseline_ref": baseline_ref,
-        "golden_ref": golden_ref,
+        "deterministic": {
+            "call": call,
+            "assertions": assertions or [],
+        },
+        "eval": {
+            "contract": contract,
+            "golden_ref": golden_ref,
+        },
     }
-    case_path = tmp_path / filename
-    case_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    return case_path
+    path = tmp_path / filename
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
-def _write_snapshot(
-    case_path: Path,
-    ref: str,
-    transcript: str,
-    *,
-    inputs: dict[str, object] | None = None,
-) -> None:
-    snapshots_dir = case_path.parent / "snapshots"
-    snapshots_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "transcript": transcript,
-        "inputs": (
-            {
-                "skill": "renmark:roadmap",
-                "prompt": "reconstructed prompt",
-                "skill_enabled": ref.endswith("golden"),
-            }
-            if inputs is None
-            else inputs
-        ),
-    }
-    (snapshots_dir / f"{ref}.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+def _write_golden(case: behavior.Case, transcript: str) -> None:
+    assert case.source is not None
+    snapshots = case.source.parent / "snapshots"
+    snapshots.mkdir(parents=True, exist_ok=True)
+    snapshot = snapshots / f"{case.eval.golden_ref}.json"
+    snapshot.write_text(
+        json.dumps({"transcript": transcript}, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
 
-def _make_case(
-    tmp_path: Path,
-    *,
-    assertions: list[str] | None = None,
-    baseline: str | None = None,
-    golden: str | None = None,
-    baseline_inputs: dict[str, object] | None = None,
-    golden_inputs: dict[str, object] | None = None,
-    baseline_ref: str = "case-baseline",
-    golden_ref: str = "case-golden",
-) -> behavior.Case:
+def test_load_cases_parses_v2_case_schema(tmp_path: Path) -> None:
     case_path = _write_case_file(
         tmp_path,
-        assertions=assertions,
-        baseline_ref=baseline_ref,
-        golden_ref=golden_ref,
-    )
-    if baseline is not None:
-        _write_snapshot(case_path, baseline_ref, baseline, inputs=baseline_inputs)
-    if golden is not None:
-        _write_snapshot(case_path, golden_ref, golden, inputs=golden_inputs)
-    return behavior.load_cases(tmp_path)[0]
-
-
-def test_load_cases_parses_behavior_json_into_case(tmp_path: Path) -> None:
-    case_path = _write_case_file(
-        tmp_path,
-        skill="renmark:feature",
-        prompt="Add a changelog entry.",
-        assertions=["contains:Files changed", "line_ends:(Recommended)"],
-        baseline_ref="feature-baseline",
-        golden_ref="feature-golden",
-        filename="feature.behavior.json",
+        skill="roadmap",
+        prompt="What should happen next?",
+        call="plan_lint",
+        assertions=["contains:dispatch policy", "not_contains:Agent("],
+        contract="Keep dispatch policy output leak-free.",
+        golden_ref="plan-lint-golden",
+        filename="plan-lint.behavior.json",
     )
 
     loaded = behavior.load_cases(tmp_path)
 
     assert loaded == [
         behavior.Case(
-            skill="renmark:feature",
-            prompt="Add a changelog entry.",
-            assertions=("contains:Files changed", "line_ends:(Recommended)"),
-            baseline_ref="feature-baseline",
-            golden_ref="feature-golden",
+            skill="roadmap",
+            prompt="What should happen next?",
+            deterministic=behavior.DeterministicSpec(
+                call="plan_lint",
+                assertions=("contains:dispatch policy", "not_contains:Agent("),
+            ),
+            eval=behavior.EvalSpec(
+                contract="Keep dispatch policy output leak-free.",
+                golden_ref="plan-lint-golden",
+            ),
             source=case_path,
         )
     ]
 
 
-def test_replay_passes_when_assertions_hold_on_current_transcript(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:next step", "not_contains:blocked", "line_ends:(Recommended)"],
-        baseline="Plain answer with no menu.",
-        golden="First next step\nChoose review (Recommended)",
+def test_load_cases_rejects_unsafe_eval_golden_ref(tmp_path: Path) -> None:
+    _write_case_file(tmp_path, golden_ref="../escape")
+
+    with pytest.raises(behavior.BehaviorConfigError) as excinfo:
+        behavior.load_cases(tmp_path)
+
+    assert "snapshot ref '../escape'" in str(excinfo.value)
+
+
+def test_run_passes_real_next_steps_output_without_invoking_runner() -> None:
+    case = _case(
+        assertions=[
+            "contains:What's next:",
+            "contains:(Recommended)",
+            "line_ends:do nothing",
+            "min_lines:4",
+        ],
     )
 
-    result = behavior.replay(case)
+    def would_raise_runner(_: str) -> str:
+        raise AssertionError("default deterministic run must not invoke a live runner")
 
-    assert result.status == "PASS"
-    assert result.message == "all assertions hold on the current transcript and it differs from baseline"
-    assert result.failed_assertions == ()
-    assert result.completion_state == "complete"
-    assert result.validation_status == "validated"
+    results = behavior.run(cases=[case], judge=False, subagent_runner=would_raise_runner)
+
+    assert len(results) == 1
+    assert results[0].status == "PASS"
+    assert results[0].message == "all deterministic assertions hold on the current output"
+    assert results[0].judge_offered is False
+    assert results[0].judge_verdict is None
 
 
-def test_replay_fails_when_assertion_does_not_hold(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:next step", "contains:missing text"],
-        baseline="Baseline without the contract text.",
-        golden="Current transcript mentions the next step only.",
+def test_negative_deterministic_case_fails_on_real_output() -> None:
+    case = _case(
+        assertions=["contains:this token is not in the live next-steps output"],
     )
 
-    result = behavior.replay(case)
-
-    assert result.status == "FAIL"
-    assert result.message == "1 assertion(s) failed on the current transcript"
-    assert result.failed_assertions == ("contains:missing text",)
-
-
-def test_replay_fails_when_skill_had_no_effect_even_if_assertions_hold(tmp_path: Path) -> None:
-    transcript = "same current transcript\nnext step"
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:next step"],
-        baseline=transcript,
-        golden=transcript,
-    )
-
-    result = behavior.replay(case)
-
-    assert result.status == "FAIL"
-    assert result.message == "with-skill transcript does not differ from baseline (skill had no effect)"
-    assert result.failed_assertions == ()
-
-
-def test_replay_errors_when_snapshot_is_missing(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:next step"],
-        baseline="Recorded baseline exists.",
-        golden=None,
-    )
-
-    result = behavior.replay(case)
-
-    assert result.status == "ERROR"
-    assert behavior.ACCEPT_FIRST_HINT in result.message
-    assert "missing golden snapshot" in result.message
-
-
-def test_replay_errors_when_golden_snapshot_has_empty_inputs(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:next step"],
-        baseline="Recorded baseline exists.",
-        golden="Recorded golden exists but cannot replay.",
-        golden_inputs={},
-    )
-
-    result = behavior.replay(case)
-
-    assert result.status == "ERROR"
-    assert behavior.ACCEPT_FIRST_HINT in result.message
-    assert "no recorded inputs" in result.message
-
-
-def test_run_with_judge_disabled_never_invokes_judge(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:missing"],
-        baseline="Baseline transcript.",
-        golden="Current transcript without the required token.",
-    )
-    subagent_runner = Mock(name="subagent_runner")
-
-    with patch("renmark.judge.judge_behavior", autospec=True) as judge_behavior:
-        results = behavior.run(cases=[case], judge=False, subagent_runner=subagent_runner)
+    results = behavior.run(cases=[case], judge=False, on_fail_offer=False)
 
     assert len(results) == 1
     assert results[0].status == "FAIL"
-    assert results[0].judge_offered is True
-    assert results[0].judge_verdict is None
-    judge_behavior.assert_not_called()
-    subagent_runner.assert_not_called()
-
-
-def test_run_with_judge_enabled_passes_current_transcript_as_actual(tmp_path: Path) -> None:
-    current = "Current transcript mentions the next step only."
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:missing text"],
-        baseline="Baseline transcript is different.",
-        golden=current,
+    assert results[0].message == "1 assertion(s) failed on the current output"
+    assert results[0].failed_assertions == (
+        "contains:this token is not in the live next-steps output",
     )
-    subagent_runner = Mock(name="subagent_runner")
+
+
+def test_unknown_deterministic_call_fails_clearly() -> None:
+    case = _case(call="deterministic.call.that.does.not.exist")
+
+    results = behavior.run(cases=[case], judge=False, on_fail_offer=False)
+
+    assert len(results) == 1
+    assert results[0].status == "FAIL"
+    assert "unknown deterministic call" in results[0].message
+    assert "deterministic.call.that.does.not.exist" in results[0].message
+    assert "lifecycle.next_steps" in results[0].message
+
+
+def test_judge_is_not_called_when_disabled_and_not_called_for_passes(tmp_path: Path) -> None:
+    passing = _case(
+        assertions=["contains:(Recommended)"],
+        golden_ref="pass-golden",
+        source=tmp_path / "pass.behavior.json",
+    )
+    failing = _case(
+        assertions=["contains:missing from current output"],
+        golden_ref="fail-golden",
+        source=tmp_path / "fail.behavior.json",
+    )
+
+    with patch("renmark.judge.judge_behavior", autospec=True) as judge_behavior:
+        results = behavior.run(cases=[passing, failing], judge=False, on_fail_offer=True)
+
+    assert [result.status for result in results] == ["PASS", "FAIL"]
+    assert results[0].judge_offered is False
+    assert results[1].judge_offered is True
+    assert results[0].judge_verdict is None
+    assert results[1].judge_verdict is None
+    judge_behavior.assert_not_called()
+
+
+def test_judge_escalation_runs_only_for_deterministic_fail_when_enabled(tmp_path: Path) -> None:
+    passing = _case(
+        assertions=["contains:(Recommended)"],
+        golden_ref="pass-golden",
+        source=tmp_path / "pass.behavior.json",
+    )
+    failing = _case(
+        assertions=["contains:missing from current output"],
+        golden_ref="fail-golden",
+        source=tmp_path / "fail.behavior.json",
+    )
+    _write_golden(failing, "Golden transcript with the required behavior.")
+
     verdict = Verdict(
         outcome="fail",
         confidence="medium",
         validation_status="validated",
-        rationale="The current transcript still misses the required text.",
+        rationale="The current output still misses the required text.",
     )
 
     with patch("renmark.judge.judge_behavior", autospec=True, return_value=verdict) as judge_behavior:
-        results = behavior.run(
-            cases=[case],
-            judge=True,
-            on_fail_offer=False,
-            repo=tmp_path,
-            subagent_runner=subagent_runner,
-        )
+        results = behavior.run(cases=[passing, failing], judge=True, repo=tmp_path)
 
-    assert len(results) == 1
-    assert results[0].status == "FAIL"
-    assert results[0].judge_verdict == {
+    assert [result.status for result in results] == ["PASS", "FAIL"]
+    assert results[0].judge_verdict is None
+    assert results[1].judge_verdict == {
         "outcome": "fail",
         "confidence": "medium",
         "validation_status": "validated",
-        "rationale": "The current transcript still misses the required text.",
+        "rationale": "The current output still misses the required text.",
     }
-    _, kwargs = judge_behavior.call_args
-    assert kwargs["actual"] == current
-    assert kwargs["golden"] == current
-    assert kwargs["baseline"] == "Baseline transcript is different."
-    assert kwargs["contract"] == "- contains:missing text"
+    judge_behavior.assert_called_once()
 
 
-def test_run_with_judge_enabled_does_not_escalate_error_result(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["contains:next step"],
-        baseline="Recorded baseline exists.",
-        golden="Golden transcript cannot replay.",
-        golden_inputs={},
+def test_judge_mode_errors_when_eval_golden_is_missing(tmp_path: Path) -> None:
+    case = _case(
+        assertions=["contains:missing from current output"],
+        golden_ref="missing-golden",
+        source=tmp_path / "missing.behavior.json",
     )
 
     with patch("renmark.judge.judge_behavior", autospec=True) as judge_behavior:
@@ -294,46 +232,35 @@ def test_run_with_judge_enabled_does_not_escalate_error_result(tmp_path: Path) -
 
     assert len(results) == 1
     assert results[0].status == "ERROR"
-    assert results[0].judge_verdict is None
+    assert behavior.ACCEPT_FIRST_HINT in results[0].message
     judge_behavior.assert_not_called()
 
 
-def test_load_cases_rejects_unsafe_snapshot_ref(tmp_path: Path) -> None:
-    _write_case_file(tmp_path, golden_ref="../evil")
-
-    with pytest.raises(behavior.BehaviorConfigError) as excinfo:
-        behavior.load_cases(tmp_path)
-
-    assert "snapshot ref '../evil'" in str(excinfo.value)
-
-
-def test_assertion_miniformat_contains_not_contains_matches_and_min_lines(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
+def test_assertion_miniformat_uses_real_plan_lint_output() -> None:
+    case = _case(
+        call="plan_lint",
         assertions=[
-            "contains:next step",
-            "not_contains:blocked",
-            r"matches:^Alpha",
-            "min_lines:2",
+            "contains:dispatch policy for roadmap:",
+            "not_contains:Agent(",
+            r"matches:transcript-leak check: leak-free$",
+            "min_lines:3",
         ],
-        baseline="No useful output.",
-        golden="Alpha next step\nBeta follow-up",
     )
 
-    result = behavior.replay(case)
+    results = behavior.run(cases=[case], judge=False, on_fail_offer=False)
 
-    assert result.status == "PASS"
+    assert len(results) == 1
+    assert results[0].status == "PASS"
 
 
-def test_unknown_op_shaped_assertion_fails_deterministically(tmp_path: Path) -> None:
-    case = _make_case(
-        tmp_path,
-        assertions=["mystery:next step"],
-        baseline="Baseline transcript.",
-        golden="Current transcript includes next step.",
+def test_unknown_assertion_op_fails_deterministically() -> None:
+    case = _case(
+        call="plan_lint",
+        assertions=["mystery:dispatch policy"],
     )
 
-    result = behavior.replay(case)
+    results = behavior.run(cases=[case], judge=False, on_fail_offer=False)
 
-    assert result.status == "FAIL"
-    assert result.failed_assertions == ("mystery:next step",)
+    assert len(results) == 1
+    assert results[0].status == "FAIL"
+    assert results[0].failed_assertions == ("mystery:dispatch policy",)
