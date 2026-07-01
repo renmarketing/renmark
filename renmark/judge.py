@@ -148,8 +148,7 @@ def _parse_response(response: str) -> Verdict:
         )
 
     raw_outcome = str(payload.get("outcome", "")).strip().lower()
-    raw_conf = str(payload.get("confidence", "")).strip().lower()
-    rationale = str(payload.get("rationale", "")).strip() or "no rationale provided"
+    rationale = str(payload.get("rationale", "")).strip()
 
     if raw_outcome not in _VALID_OUTCOMES:
         # A response we cannot trust the verdict of is unvalidated, not a pass.
@@ -160,7 +159,32 @@ def _parse_response(response: str) -> Verdict:
             rationale=f"unrecognized outcome {raw_outcome!r} in model response",
         )
 
-    confidence: Confidence = raw_conf if raw_conf in _VALID_CONFIDENCE else "low"  # type: ignore[assignment]
+    # Confidence: a MISSING key may default to "low", but a PRESENT-but-bogus
+    # value must NOT validate — silently coercing it would let a malformed
+    # payload become a validated pass, breaking the hard contract that a
+    # malformed response never becomes a silent pass.
+    confidence: Confidence = "low"
+    if "confidence" in payload:
+        raw_conf = str(payload.get("confidence", "")).strip().lower()
+        if raw_conf not in _VALID_CONFIDENCE:
+            return Verdict(
+                outcome="fail",
+                confidence="low",
+                validation_status="unvalidated",
+                rationale=f"unrecognized confidence {raw_conf!r} in model response",
+            )
+        confidence = raw_conf  # type: ignore[assignment]
+
+    # Rationale is a required field: a missing or empty one leaves the verdict
+    # non-authoritative rather than a validated pass.
+    if not rationale:
+        return Verdict(
+            outcome="fail",
+            confidence="low",
+            validation_status="unvalidated",
+            rationale="missing or empty rationale in model response",
+        )
+
     outcome: Outcome = raw_outcome  # type: ignore[assignment]
 
     return Verdict(
