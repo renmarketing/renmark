@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-01] — P8-v2 build waves 1–2 (behavior tiers + CLI + cases + docs)
+**Request:** Implement the P8-v2 plan (`.renmark/plans/2026-07-01-p8-behavioral-skill-testing-v2.plan.md`).
+**Built:**
+- `renmark/behavior.py` (opus) — deterministic tier runs real renmark functions via explicit allow-list (`lifecycle.next_steps`, `skill_preamble`, `plan_lint`), asserting genuine current output; golden-echo path removed (Major 1 closed). Eval/judge tier gated behind an explicit live runner.
+- `renmark/cli/_engine.py` (sonnet) — `--behavior` runs the deterministic tier with no runner (zero-spend); `--accept` records eval goldens via `build_subagent_runner`+`capture`; `--judge` passes `judge=True`+live runner; `--accept`/`--judge` require `--behavior`.
+- `tests/behavioral/{next_steps_menu,roadmap}.behavior.json` (haiku) — v2 two-block cases; assertions restored to full contract force, split deterministic vs eval; both PASS live.
+- `CLAUDE.md` + `AGENTS.md` (haiku, mirrored) — honest two-tier framing.
+**Orchestrator fixes (verified independently):** `golden_ref` must be a bare stem (no path separator — `_validate_ref` prepends `snapshots/`); the recommended-first `matches:` assertion needs inline `(?m)` (`_assert_matches` uses `re.search` without `re.M`).
+**Do not change:** default `--behavior`/`run()` constructs NO live runner (network/token-free); the deterministic tier reads no snapshot; eval/judge tier never auto-spends. `behavior.py` `_validate_ref` rejects path separators in refs; `_assert_matches` is single-line unless the pattern sets `(?m)`.
+
 ## [2026-07-01] — P8-v2 redesign (brainstorm) — tests-vs-evals split
 **Request:** Re-brainstorm P8 after two code reviews found it under-built (Major 1 fatal: deterministic "replay" collapsed to asserting a golden against itself; un-bootstrappable `--accept`; weakened assertions).
 **Decided (opus synthesis lane):** split into two honestly-labelled tiers per the Google "New SDLC" tests-vs-evals doctrine. **Deterministic tier = a TEST** — runs renmark's *real* behavior-shaping functions (`lifecycle.next_steps`, `skill_preamble`, `plan_lint`) on live inputs and asserts genuine current output (recomputed every run → fixes Major 1; needs no snapshot → fixes bootstrap; CI-safe). **Eval tier = the behavioral PROOF** — live LLM-judge over a real model trajectory, wired to a `str→str` runner reachable only under `--accept`/`--judge`, out of CI. Reference-case assertions restored to full force, split across the two tiers.
