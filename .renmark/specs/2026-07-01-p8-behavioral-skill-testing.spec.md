@@ -20,6 +20,33 @@ already built on branch `worktree-p7-skill-templates` and only needs merging).
 (P8 = item 8; inspired by superpowers' TDD-authored skills + gstack's Tier-3
 LLM-judge eval).
 
+## P8-v2 revision (2026-07-01)
+
+The v1 build was reviewed twice and found under-built at its core. Three findings
+drove this redesign:
+
+1. **Major 1 (fatal):** the deterministic tier could not produce a *current*
+   model-driven transcript without a live call, so "replay" collapsed to asserting
+   a stored golden against itself — it proved nothing.
+2. **Un-bootstrappable:** `--accept`/`capture()` hard-failed and no snapshots were
+   committed, so the reference cases always ERRORed on a fresh checkout.
+3. **Weakened assertions:** a mini-format conversion dropped the real contract
+   force ("explicit choice required", "menu terminal", "roadmap read-only").
+
+**Root reframe (Google "New SDLC" tests-vs-evals split):** a skill's behavior is
+*model-driven*, not a pure function — you cannot test it deterministically without
+a live call. So P8-v2 splits into two honestly-labelled tiers:
+
+- **Deterministic tier = a TEST.** It runs renmark's *real deterministic
+  behavior-shaping code* (recomputed every run) and asserts the genuine current
+  output. It is a **scaffolding / regression guard**, CI-safe — it does NOT prove
+  the model follows the scaffolding.
+- **Eval tier = the behavioral PROOF.** The live LLM-judge over a real model
+  trajectory. Opt-in, out of CI. This is where the load-bearing proof lives.
+
+Docs and command names MUST keep this split explicit — green CI (deterministic
+tier) is **not** "the skill works"; only the eval tier proves that.
+
 ## Context
 
 Renmark's audit (`renmark-execute --audit`) and lint layer test that a skill is
@@ -57,91 +84,128 @@ ambiguous.
   `renmark/lint.py`, `renmark/skillgen.py`) — P8 is additive.
 - Auto-spending on the judge tier — it is opt-in only.
 
-## Architecture
+## Architecture (P8-v2)
 
-- **`renmark/behavior.py`** — the harness. Loads declarative cases, orchestrates
-  capture / replay / diff, and owns the escalation offer. Builds on
-  `renmark/shadow.py` (`run_subsystem` / `accept_subsystem` — golden replay+diff
-  with accept-snapshots).
-- **`renmark/judge.py`** — the LLM-as-judge tier. Given a `(baseline, golden,
-  actual)` triple and the skill's contract, returns a structured verdict
-  (`pass|fail`, confidence, rationale). Escalation-only; carries the reasoning
-  contract; reports cost.
-- **Dispatch** — live capture and judge calls go through `renmark/dispatch.py`'s
-  mockable `subagent_runner` injection point (`dispatch_task_isolated` /
-  `parse_subagent_response`), keeping tests injectable.
-- **CLI** — `renmark-execute --behavior` runs the deterministic replay tier;
-  `--behavior --judge` (or an interactive opt-in on failure) enables the judge
-  escalation; `--behavior --accept` (re)records goldens deliberately.
+- **`renmark/behavior.py`** — the harness. Loads declarative cases and, for the
+  deterministic tier, **calls renmark's real behavior-shaping functions on live
+  inputs** and asserts their genuine current output. No transcript replay; the
+  output is recomputed by current code every run, so it is a true test rather than
+  a golden echoed at itself (fixes Major 1). The eval-tier path (capture + judge)
+  is separate and only reachable under explicit flags.
+- **`renmark/judge.py`** — the LLM-as-judge / eval tier (unchanged from v1, which
+  reviewed clean). Given a `(baseline, golden, actual)` triple and the skill's
+  contract, returns a structured verdict (`pass|fail`, confidence, rationale);
+  malformed payloads become `unvalidated`, never a silent pass. Escalation-only;
+  carries the reasoning contract; reports cost.
+- **Live runner wiring** — `capture()` and the judge escalation take a `str→str`
+  subagent runner (the shape both modules already expect), wired to the real
+  provider only under `--accept` / `--judge`. The default `--behavior` path never
+  constructs a live runner, so **CI spends zero tokens** by construction.
+- **CLI** — `renmark-execute --behavior` runs the **deterministic tier only**
+  (real-code assertions, CI-safe); `--behavior --accept` records the **eval-tier**
+  golden transcripts (deliberate live step); on a deterministic FAIL the CLI
+  prints an OFFER line and escalates to the judge **only** when `--judge` is
+  passed.
 
-## Test corpus format
+## Test corpus format (P8-v2)
 
-`tests/behavioral/<skill>.behavior.json` (one file per skill), each case:
+`tests/behavioral/<skill>.behavior.json` (one file per skill), each case carries
+**both** a deterministic block (asserted in CI against real-code output) and an
+eval block (adjudicated by the judge on demand):
 
 ```
 {
   "skill": "roadmap",
   "prompt": "<representative user prompt that exercises the skill's contract>",
-  "assertions": [ "<deterministic checks over the transcript>" ],
-  "baseline_ref": "<snapshot path — subagent WITHOUT the skill>",
-  "golden_ref":   "<snapshot path — subagent WITH the skill>"
+  "deterministic": {
+    "call": "<renmark function invoked, e.g. lifecycle.next_steps>",
+    "assertions": [ "<checks over the genuine current output of that call>" ]
+  },
+  "eval": {
+    "contract": "<plain-language behavioral contract the judge adjudicates>",
+    "golden_ref": "<transcript snapshot under snapshots/ — recorded via --accept>"
+  }
 }
 ```
 
-Snapshots (recorded transcripts) live alongside as accept-snapshots, managed by
-the shadow accept pattern. A case **errors** (never silently passes) if its
-golden is missing — you must `--accept` first.
+The deterministic block needs **no snapshot** — its input is computed at test
+time, so it runs green on a fresh checkout (fixes the un-bootstrappable ERROR).
+The eval block's `golden_ref` is recorded deliberately via `--accept` and is only
+read by the judge tier.
 
-## Data flow
+## Data flow (P8-v2)
 
-1. **Capture** (`--accept`, deliberate, live): dispatch a real subagent with and
-   without the skill → record `golden_ref` and `baseline_ref`.
-2. **Replay** (default, CI, deterministic): re-run the recorded interaction,
-   diff against `golden_ref`; assert (a) the with-skill transcript matches the
-   golden and (b) it differs meaningfully from the baseline (skill had an
-   effect). Pure diff — no network, no tokens.
-3. **Escalate** (on deterministic failure): report the failure and **offer** the
-   judge tier; on explicit opt-in, `renmark/judge.py` runs live (~$0.15) and
-   returns a semantic verdict + rationale.
+1. **Deterministic tier** (default `--behavior`, CI): for each case, invoke the
+   named renmark function on live inputs and assert the current output satisfies
+   the deterministic block. No network, no tokens, no snapshot dependency.
+2. **Record eval goldens** (`--accept`, deliberate, live): dispatch a real
+   subagent with the skill → record the eval `golden_ref` transcript under
+   `snapshots/`.
+3. **Escalate** (on a deterministic FAIL, or on demand): print the OFFER line;
+   only when `--judge` is passed, `renmark/judge.py` runs live (~$0.15) over the
+   real trajectory and returns a semantic verdict + rationale.
 
-## Reference skills (MVP corpus)
+## Reference skills (MVP corpus) — P8-v2 tier split
 
-- **`roadmap`** — asserts the read-only / zero-LLM contract: status mode makes no
-  LLM calls and writes only its own snapshot (a strong, checkable behavioral
-  invariant).
-- **next-steps menu contract** — asserts a skill ends its turn with an
-  `AskUserQuestion` next-steps menu (recommended-first), a cross-cutting
-  behavioral rule the structure lint can't verify.
+Each case restores full contract force by splitting assertions across the two
+tiers (this repairs the weakened-assertion finding):
 
-(Exact second skill may be swapped during planning if a cleaner deterministic
-signal is available; the pattern is what matters.)
+- **next-steps menu contract**
+  - *Deterministic:* call `lifecycle.next_steps(repo, "roadmap")` → assert the
+    `NextSteps` struct is non-empty, `tier0` present, **recommended-first
+    ordering**, `(Recommended)` label present, and the render includes the
+    terminal Finish/Nothing fallback (menu is terminal, no dangling prose).
+  - *Eval:* the agent **actually ended its real turn** with the menu (turn
+    terminality in a live transcript — not provable from structure alone).
+- **`roadmap` read-only**
+  - *Deterministic:* the generated roadmap output `not_contains` `Agent(`,
+    `codex exec`, or `renmark-execute --task`, and `plan_lint`'s read-only
+    verdict holds (`_check_transcript_leak`).
+  - *Eval:* the agent **stayed read-only across the whole live session** — no
+    writes or commits attempted anywhere in the trajectory.
 
-## Error handling
+(Exact function bindings may be refined during planning if a cleaner
+deterministic signal exists; the two-tier split is what matters.)
 
-- Missing golden/baseline snapshot → **error**, not pass ("run --accept first").
-- Judge tier: gated behind explicit opt-in + a surfaced cost note; a judge
+## Error handling (P8-v2)
+
+- Deterministic tier: a named renmark function that errors or a failed assertion
+  is a **FAIL**, reported with the mismatch; no snapshot is involved, so there is
+  no "missing golden → ERROR" path for this tier.
+- Eval tier: a missing eval `golden_ref` when `--judge` is requested → **error**,
+  not pass ("run --accept first").
+- Judge tier: gated behind explicit `--judge` + a surfaced cost note; a judge
   failure/timeout reports as `unvalidated`, never a silent green.
-- Live capture failure → reported with the executor error; deterministic tier is
-  unaffected (it only reads recorded snapshots).
+- Live capture/judge failure → reported with the executor error; the
+  deterministic tier is unaffected (it never touches a live runner).
 
 ## Testing (the harness's own tests)
 
-- Unit tests for the replay/diff logic with a mocked `subagent_runner` (fully
-  deterministic, free).
-- The 2 reference behavioral cases themselves, runnable via `--behavior` in CI.
-- Judge tier: unit-tested with a mocked runner (assert gating/opt-in and verdict
-  parsing); the live path is exercised only on demand, never in CI.
+- Unit tests for the deterministic tier: real renmark functions asserted on fixed
+  inputs (fully deterministic, free) — plus a negative test proving a broken
+  scaffolding output FAILs.
+- The 2 reference cases' deterministic blocks, runnable via `--behavior` in CI.
+- Eval/judge tier: unit-tested with a mocked runner (assert `--accept`/`--judge`
+  gating and verdict parsing, incl. malformed→`unvalidated`); the live path runs
+  only on demand, never in CI.
 
-## Success criteria
+## Success criteria (P8-v2)
 
-- `renmark-execute --behavior` runs green and deterministically in CI — no
-  network, no token spend.
-- ≥2 reference behavioral cases prove baseline-fail → with-skill-pass.
-- LLM-judge escalation implemented, opt-in-gated, never auto-spends; cost
-  surfaced before it runs.
-- `pytest -q`, `ruff check`, `mypy .` all pass.
-- CLAUDE.md / AGENTS.md updated to describe the behavioral tier (mirror in the
-  same commit).
+- `renmark-execute --behavior` runs green and deterministically on a **fresh
+  checkout** — no network, no token spend, no snapshot dependency (the
+  un-bootstrappable ERROR is gone).
+- The deterministic tier asserts **genuine current output of real renmark
+  functions** — no golden-echoed-at-itself (Major 1 closed).
+- ≥2 reference cases carry restored full-force assertions, correctly split into a
+  deterministic block and an eval block.
+- Eval/judge tier wired to a live `str→str` runner; reachable only under
+  `--accept` / `--judge`; never auto-spends; cost surfaced before it runs.
+- **Honest labelling:** docs + command help state that green `--behavior` is a
+  scaffolding/regression guard, and the eval tier is the load-bearing behavioral
+  proof — green CI is not "the skill works".
+- `pytest -q`, `ruff check`, `mypy renmark/` all pass.
+- CLAUDE.md / AGENTS.md updated to describe both tiers with the honest split
+  (mirror in the same commit).
 
 ## Prior art & references
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-07-01] — P8-v2 redesign (brainstorm) — tests-vs-evals split
+**Request:** Re-brainstorm P8 after two code reviews found it under-built (Major 1 fatal: deterministic "replay" collapsed to asserting a golden against itself; un-bootstrappable `--accept`; weakened assertions).
+**Decided (opus synthesis lane):** split into two honestly-labelled tiers per the Google "New SDLC" tests-vs-evals doctrine. **Deterministic tier = a TEST** — runs renmark's *real* behavior-shaping functions (`lifecycle.next_steps`, `skill_preamble`, `plan_lint`) on live inputs and asserts genuine current output (recomputed every run → fixes Major 1; needs no snapshot → fixes bootstrap; CI-safe). **Eval tier = the behavioral PROOF** — live LLM-judge over a real model trajectory, wired to a `str→str` runner reachable only under `--accept`/`--judge`, out of CI. Reference-case assertions restored to full force, split across the two tiers.
+**Files changed:** `.renmark/specs/2026-07-01-p8-behavioral-skill-testing.spec.md` (v2 revision), lifecycle → `brainstorm-complete`.
+**Do not change:** docs/command names must keep the split explicit — green `--behavior` (deterministic tier) is a scaffolding/regression guard, NOT proof the skill works; the load-bearing behavioral proof lives only in the eval tier. The eval/judge tier never auto-spends without explicit `--accept`/`--judge`.
+
 ## [2026-07-01] — rewrite tests/test_behavior.py for assertion-based replay
 **Request:** Rewrite `tests/test_behavior.py` to match the redesigned `renmark/behavior.py` contract.
 **Built:** Replaced the old golden-vs-baseline tests with artifact-shaped deterministic coverage for case loading, assertion-based replay PASS/FAIL/ERROR outcomes, judge gating, unsafe ref rejection, and the assertion mini-format using inline `{transcript, inputs}` snapshots.
