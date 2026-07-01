@@ -1060,34 +1060,22 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
 
     # --accept: live capture path. The CLI is a plain subprocess with no live
     # model, so it cannot supply a SubagentRunner; capture must be driven by the
-    # host (skill/orchestrator with Agent access). Report honestly and exit
-    # non-zero rather than silently no-op or fabricate a snapshot.
+    # host (skill/orchestrator with Agent access). No runner is wired into the
+    # CLI, so recording can NEVER succeed here. Reject the flag UP FRONT with a
+    # bounded message and a usage exit code (2, matching the file's other
+    # unsupported-usage rejections) rather than entering the capture loop and
+    # failing opaquely per case (which pretended to attempt, then fabricated a
+    # "0/N recorded" summary). If a live runner is ever wired into the CLI, this
+    # is the injection point: obtain it and pass it to _behavior.capture below.
     if accept:
-        try:
-            cases = _behavior.load_cases(str(repo / "tests" / "behavioral"))
-        except _behavior.BehaviorConfigError as exc:
-            _print(f"ERROR loading behavioral cases: {exc}")
-            return 2
-        if not cases:
-            _print("no behavioral cases found under tests/behavioral/")
-            return 0
-
-        def _no_live_runner(_prompt: str) -> str:
-            raise RuntimeError(
-                "renmark-execute cannot record snapshots: --accept needs a live "
-                "model runner, which only the host skill/orchestrator can supply."
-            )
-
-        recorded = 0
-        for case in cases:
-            try:
-                _behavior.capture(case, _no_live_runner)
-                recorded += 1
-            except Exception as exc:  # no live runner in CLI context
-                stem = case.source.stem if case.source else case.skill
-                _print(f"cannot capture {case.skill}/{stem}: {str(exc)[:80]}")
-        _print(f"behavior --accept: {recorded}/{len(cases)} snapshot(s) recorded")
-        return 0 if recorded == len(cases) else 10
+        print(
+            "renmark-execute --behavior --accept requires a live subagent runner, "
+            "which is not wired into the CLI yet. Capture snapshots via the host "
+            "agent's --accept path, or provide a runner. (Deterministic replay via "
+            "`renmark-execute --behavior` works without this.)",
+            file=sys.stderr,
+        )
+        return 2
 
     # Default / --judge: deterministic replay (judge escalates FAILs on --judge).
     try:
