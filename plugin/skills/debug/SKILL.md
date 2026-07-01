@@ -17,6 +17,10 @@ The **Debug pipeline** — fix what's broken without expanding scope. Modeled af
 
 State lives in `.renmark/debug/<session-id>/`. A debug session survives `/clear`.
 
+## Operating mode
+
+**Conductor is debug's default** — hands-on, small-step, minimal context, explain the reasoning before editing. Keep the surface tight and the feedback loop short. **Orchestrator** mode may fan out scoped, read-only investigation subagents when the failure spans a large surface (many files/modules) — each subagent gets one hypothesis and a narrow file scope, and returns findings only.
+
 ## When to Use
 
 - "Why does X return 500?"

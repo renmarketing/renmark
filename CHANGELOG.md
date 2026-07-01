@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-01] — harness-modes wave 0: mode.py + skill/help framing
+**Request:** Build wave 0 of the harness operating-modes MVP (foundation + doc framing).
+**Built:**
+- `renmark/mode.py` — persisted operating-mode state (`.renmark/state/mode.json`): `read_mode`/`set_mode`(ValueError on bad value)/`clear_mode`/`default_mode_for_skill`; corrupt/missing → None, never raises.
+- `plugin/skills/help/SKILL.md` — reframed to the agentic-engineering / vibe-coding harness mission; documents Conductor/Orchestrator modes, context hygiene, subagent discipline, memory/docs, verification.
+- `plugin/skills/{feature,debug,orchestrate,start}/SKILL.md` — short "## Operating mode" behavior blocks (smart per-skill defaults).
+**Files changed:** `renmark/mode.py`, `plugin/skills/help/SKILL.md`, `plugin/skills/{feature,debug,orchestrate,start}/SKILL.md`.
+**Do not change:** mode state lives in gitignored `.renmark/state/mode.json`; `set_mode` MUST raise on values other than conductor/orchestrator; readers never raise on corrupt input.
+
 ## [2026-07-01] — project scope: harness-operating-modes (Conductor/Orchestrator MVP)
 **Scope contract (brainstorm).** Spec: `.renmark/specs/2026-07-01-harness-operating-modes.spec.md`.
 - **Stack:** unchanged — Python ≥3.10 + Claude Code plugin (markdown skills/commands). New module `renmark/mode.py`; edits to `lifecycle.skill_preamble`, `renmark-execute` CLI, pipeline SKILL.md blocks, help, CLAUDE.md/AGENTS.md.

@@ -24,6 +24,10 @@ After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (t
 - The orchestrator validates the response via `renmark.dispatch.parse_subagent_response` — any extra field (transcript, diff, generated_code, reasoning) raises `IsolationViolation` and the task is FAIL.
 - **The orchestrator never reads generated code into the conversation.** Period.
 
+## Operating mode
+
+**Orchestrator** is orchestrate's default: dispatch parallel scoped subagents, offload bulk/single-file emissions to Codex, and advance on reviewed PASS/FAIL outcomes. In **Conductor** mode, prefer serial single-task execution with tighter user checkpoints between tasks. Either mode keeps the G11 isolation/aggregation contract above unchanged.
+
 ## When to Use
 
 - User has a `.renmark/plans/*.plan.md` file ready and wants it executed

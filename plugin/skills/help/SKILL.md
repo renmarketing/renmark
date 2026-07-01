@@ -12,6 +12,42 @@ Teaches the renmark workflow. Prints the user-facing **pipelines** first (each
 with the internal stages it runs), then the full skill list grouped by purpose
 with each skill's common modifiers. Pure text output, no API calls.
 
+**What renmark is.** renmark is an agentic-engineering / vibe-coding **harness on
+top of Claude Code** — not a replacement for it. Claude Code supplies the model,
+the tools, and the interactive reasoning loop; renmark is the harness that shapes
+*how* that horsepower gets used: planning, scoping, delegation to the cheapest
+capable executor, verification, docs, and — above all — context economy. renmark
+runs in one of two **operating modes**, and the mode is asked **once** at your
+first meaningful workflow, persisted, then applied with a smart per-skill default
+thereafter. Override any time with
+`renmark-execute --set-mode conductor|orchestrator`.
+
+**Conductor Mode.** For hands-on, interactive work where you stay in the loop.
+The harness keeps you close to each decision: it does more work in the primary
+context, pauses more readily at gates, and favors visibility over throughput.
+Best when the task is small, exploratory, or when you want to steer step by step.
+
+**Orchestrator Mode.** For larger builds you want driven to completion. The
+harness decomposes the work, dispatches each task to an isolated subagent /
+executor, aggregates only compact PASS/FAIL summaries back to the primary
+context, and advances wave by wave. It maximizes throughput and protects the
+orchestrator's context window, pausing only at real gates. Best for multi-task
+plans (`/renmark:orchestrate`, `/renmark:loop`).
+
+Both modes enforce the same non-negotiables:
+
+- **Context hygiene** — the primary context is a degrading resource, not durable
+  memory. Never read generated file contents, full diffs, or large logs into the
+  conversation; work from summaries, counts, paths, and metadata.
+- **Subagent discipline** — each task runs in isolation, receiving only its spec,
+  file paths, and upstream artifact *pointers*; it returns a bounded summary
+  (≤ 5 lines) plus a durable artifact. Subagent transcripts never merge back.
+- **Memory / docs** — canonical state lives on disk under `.renmark/` (specs,
+  plans, reviews, memory logs, lifecycle/pipeline state), not in chat history.
+  These survive `/clear` and `/compact` and make every workflow resumable.
+- **Verification** — evidence before claim. Re-run the verifier fresh before
+  declaring any task or plan complete; a green earlier wave is not proof now.
+
 ## When invoked
 
 Print exactly this block (update individual entries when a command is added or
@@ -19,12 +55,18 @@ renamed — `/renmark:audit`'s `description_drift` pass catches stale entries).
 Keep it honest: only describe stages and modifiers that exist today.
 
 ```
-renmark — guided build assistant
+renmark — an agentic-engineering harness on top of Claude Code
 
 Think in pipelines, not commands. Pick the one that matches your situation and
 renmark runs the whole sequence, continuing on its own and pausing only at real
 decisions: unclear intent, PRD approval, scope change, risky action, cost,
 a blocker, or merge/release.
+
+Two operating modes shape how the work runs — Conductor (hands-on, you stay in
+the loop) or Orchestrator (decompose → dispatch isolated subagents → aggregate
+compact summaries). renmark asks once at your first real workflow, remembers it,
+and applies a smart per-skill default after. Override:
+  renmark-execute --set-mode conductor|orchestrator
 
 ── Pipelines ───────────────────────────────────────────────────────────────
   /renmark:init      Make a repo renmark-ready.
