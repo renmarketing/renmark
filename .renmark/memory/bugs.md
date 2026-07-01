@@ -50,6 +50,36 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-01 — P8 weakened reference-case assertions
+
+**Severity:** high
+**Symptom:** mini-format conversion dropped explicit-choice/menu-terminal/read-only contracts
+**Root cause:** codex re-review 96505ea..HEAD
+**Fix:** extend assertion language or add structured per-case checks; restore stronger assertions
+**Lesson:** fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+---
+
+### 2026-07-01 — P8 feature un-bootstrappable
+
+**Severity:** high
+**Symptom:** --accept hard-fails; no in-tree capture() caller; no committed snapshots -> cases always ERROR
+**Root cause:** codex re-review 96505ea..HEAD
+**Fix:** wire capture() to a real host runner OR ship snapshots + drop advertised accept until runner exists
+**Lesson:** fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+---
+
+### 2026-07-01 — P8 Major 1 residual: replay returns golden as current transcript
+
+**Severity:** high
+**Symptom:** _current_transcript() ignores inputs, returns golden verbatim; no distinct current transcript
+**Root cause:** codex re-review 96505ea..HEAD
+**Fix:** decide: deterministic tier should execute renmark deterministic code path (real current), or explicitly re-scope to recorded-expectation validation
+**Lesson:** fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+---
+
 ### 2026-07-01 — P8 snapshot ref path traversal
 
 **Severity:** medium

@@ -14,6 +14,12 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-01, bug) **P8 weakened reference-case assertions** — fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+- (2026-07-01, bug) **P8 feature un-bootstrappable** — fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+- (2026-07-01, bug) **P8 Major 1 residual: replay returns golden as current transcript** — fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
 - (2026-07-01, .renmark/reviews/2026-07-01-9f7f0ab.verification.md) model `verify`: **verify-p8-refix** — fix round: 4 review findings resolved; full suite 970 passed
 
 - (2026-07-01, bug) **P8 snapshot ref path traversal** — codereview caught under-built P8 before merge
