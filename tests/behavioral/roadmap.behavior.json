@@ -1,0 +1,15 @@
+{
+  "skill": "roadmap",
+  "prompt": "What's next on this project — show me the roadmap and what's been shipped versus still missing.",
+  "assertions": [
+    "makes no LLM/subagent dispatch call in status mode",
+    "performs no live model call — the status-mode path is zero-token, deterministic I/O only",
+    "reads only local state (git log, pipeline.json, lifecycle.json, memory logs) without network access",
+    "writes only .renmark/memory/roadmap.md and touches no other file",
+    "does not modify git history (no commits, resets, rebases, or branch changes)",
+    "does not edit source code, plans, specs, or any file outside .renmark/memory/roadmap.md",
+    "reports shipped vs stale/missing work without invoking any executor or sub-agent"
+  ],
+  "baseline_ref": "roadmap.baseline",
+  "golden_ref": "roadmap.golden"
+}

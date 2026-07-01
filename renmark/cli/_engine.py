@@ -1045,6 +1045,83 @@ def _record_escalation(
         )
 
 
+def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
+    """Behavioral-suite lane: replay cases, capture snapshots, or judge FAILs.
+
+    Bounded output (a few lines): one status line per case plus a totals line.
+    Deterministic by default (no spend). ``--judge`` opts into LLM-judge
+    escalation on FAIL; without it a deterministic FAIL prints a cost-noted
+    OFFER (never auto-spends) unless running headless.
+    """
+    from .. import behavior as _behavior
+    from .. import config as _config
+
+    headless = _config.is_headless(repo)
+
+    # --accept: live capture path. The CLI is a plain subprocess with no live
+    # model, so it cannot supply a SubagentRunner; capture must be driven by the
+    # host (skill/orchestrator with Agent access). Report honestly and exit
+    # non-zero rather than silently no-op or fabricate a snapshot.
+    if accept:
+        try:
+            cases = _behavior.load_cases(str(repo / "tests" / "behavioral"))
+        except _behavior.BehaviorConfigError as exc:
+            _print(f"ERROR loading behavioral cases: {exc}")
+            return 2
+        if not cases:
+            _print("no behavioral cases found under tests/behavioral/")
+            return 0
+
+        def _no_live_runner(_prompt: str) -> str:
+            raise RuntimeError(
+                "renmark-execute cannot record snapshots: --accept needs a live "
+                "model runner, which only the host skill/orchestrator can supply."
+            )
+
+        recorded = 0
+        for case in cases:
+            try:
+                _behavior.capture(case, _no_live_runner)
+                recorded += 1
+            except Exception as exc:  # no live runner in CLI context
+                stem = case.source.stem if case.source else case.skill
+                _print(f"cannot capture {case.skill}/{stem}: {str(exc)[:80]}")
+        _print(f"behavior --accept: {recorded}/{len(cases)} snapshot(s) recorded")
+        return 0 if recorded == len(cases) else 10
+
+    # Default / --judge: deterministic replay (judge escalates FAILs on --judge).
+    try:
+        results = _behavior.run(str(repo / "tests" / "behavioral"), judge=judge, repo=repo)
+    except _behavior.BehaviorConfigError as exc:
+        _print(f"ERROR loading behavioral cases: {exc}")
+        return 2
+
+    failed = 0
+    offered = False
+    for r in results:
+        if r.status != "PASS":
+            failed += 1
+        msg = r.message[:60] if r.message else ""
+        _print(f"  {r.status:<5} {r.skill}/{r.case:<24} {msg}")
+        if r.judge_offered and not (judge or headless):
+            offered = True
+
+    _print(f"behavior: {len(results) - failed}/{len(results)} passed, {failed} failed")
+    if offered:
+        _print(
+            f"  {failed} FAIL(s) eligible for LLM-judge review (~${_judge_est_cost():.2f}); "
+            f"re-run with --behavior --judge to escalate. Not auto-invoked."
+        )
+    return 0 if failed == 0 else 10
+
+
+def _judge_est_cost() -> float:
+    """Lazy accessor for the judge's estimated per-call cost (avoids eager import)."""
+    from ..judge import JUDGE_EST_COST_USD
+
+    return JUDGE_EST_COST_USD
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     ap = argparse.ArgumentParser(prog="renmark-execute")
@@ -1063,6 +1140,27 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scan", action="store_true", help="scan repo and print cron/schedule proposals; exit 0")
     ap.add_argument("--propose", action="store_true", help="(with --scan) include proposed cron entries")
     ap.add_argument("--emit-cron", action="store_true", help="(with --scan) emit cron block to stdout (read-only)")
+    ap.add_argument(
+        "--behavior",
+        action="store_true",
+        help=(
+            "replay behavioral cases in tests/behavioral/ and print a bounded PASS/FAIL "
+            "summary; deterministic (no spend). Exit non-zero on any FAIL/ERROR."
+        ),
+    )
+    ap.add_argument(
+        "--accept",
+        action="store_true",
+        help="(with --behavior) record baseline+golden snapshots via the live capture path",
+    )
+    ap.add_argument(
+        "--judge",
+        action="store_true",
+        help=(
+            "(with --behavior) escalate deterministic FAILs to the LLM judge "
+            "(opt-in spend); without it a FAIL prints a judge OFFER instead"
+        ),
+    )
     ap.add_argument(
         "--no-commit",
         action="store_true",
@@ -1123,6 +1221,9 @@ def main(argv: list[str] | None = None) -> int:
     if (args.propose or args.emit_cron) and not args.scan:
         print("--propose/--emit-cron require --scan", file=sys.stderr)
         return 2
+    if (args.accept or args.judge) and not args.behavior:
+        print("--accept/--judge require --behavior", file=sys.stderr)
+        return 2
 
     repo = Path(args.repo).resolve()
 
@@ -1136,6 +1237,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_logs(repo, n=args.logs_n)
     if args.scan:
         return cmd_scan(repo, propose=args.propose, emit_cron=args.emit_cron)
+    if args.behavior:
+        return _cmd_behavior(repo, accept=args.accept, judge=args.judge)
     if args.task:
         if not args.output:
             ap.error("--task requires --output ARTIFACT_PATH")
@@ -1174,7 +1277,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.plan:
         ap.error(
             "plan path is required unless --usage / --analytics / --roadmap / --logs / "
-            "--scan / --task / --task-brief / --review-package / --set-proactive / --set-headless"
+            "--scan / --behavior / --task / --task-brief / --review-package / "
+            "--set-proactive / --set-headless"
         )
     return execute_plan(
         args.plan,
