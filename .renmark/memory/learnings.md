@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-01, .renmark/reviews/2026-07-01-889330cac7a287c0e0d44f024c9ea500a2675dc1.verification.md) model `verify`: **verify-dynamic-skill-loading** — 8/8 behaviors verified; failed: none; metadata-not-body proven in prod dispatch path
+
 - (2026-07-01, .renmark/reviews/2026-07-01-d254cc8.verification.md) model `verify`: **verify-harness-operating-modes** — 7/7 behaviors verified; failed: none; full suite 1205 passed
 
 - (2026-07-01, .renmark/reviews/2026-07-01-e2ec9b4954e08cf09141f63718a1e28ae594f042.verification.md) model `verify`: **verify-p8-v2** — 6/6 behaviors verified; failed: none; regressions: 2 (Major-1, bootstrap)

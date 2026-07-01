@@ -1,5 +1,78 @@
 # Changelog
 
+## [2026-07-01] — v0.25.0 — true dynamic skill loading (AC5 / REQ-20)
+**Release.** Bumps v0.24.0 → v0.25.0. Ships the second net-new slice of the agentic-engineering harness mission: **true dynamic skill loading** with a codified context taxonomy, wired into the production dispatch path.
+- New `renmark/context.py` (stdlib-only) — a four-way context taxonomy (`ContextKind`: STATIC/DYNAMIC/MEMORY/TASK_LOCAL) + `TAXONOMY`; `classify_path` (segment-aware); metadata-upfront helpers (`skill_metadata`/`all_skill_metadata`/`fragment_names`, reuse `skillmeta.SKILLS`, never read bodies); on-demand loaders (`skill_pointer`/`fragment_pointer` refs; `load_skill_body`/`load_fragment` with traversal guard); `upfront_kinds_for_skill` (dynamic bodies never pre-loaded); `assert_metadata_only` guardrail.
+- `renmark/dispatch.py` — the production task-local packet (`SubagentInput`/`build_subagent_input`) now carries `required_skills` as METADATA refs (name + pointer, guarded), never full skill bodies. Additive + backward-compatible; function-local imports avoid cycles.
+- New `plugin/skills/_shared/context-taxonomy.md` fragment; mirrored "Context taxonomy" rule block in CLAUDE.md/AGENTS.md; PRD REQ-20.
+- `tests/test_context.py` (20 tests) incl. the metadata-not-body integration proof; isolation contract test updated to sanction `required_skills`.
+
+Full unit suite **1233 passed, 28 skipped**; ruff + mypy clean; 7/7 version locations at v0.25.0. Codereview clean (Spec: compliant; 0 Critical, 2 Major + 2 Minor all resolved). Pre-existing out-of-scope failure noted: `test_plugin_has_required_skill_files` (stale roster, also fails on origin/main). See per-change entries below.
+
+## [2026-07-01] — codereview fixes for dynamic-skill-loading (AC5)
+**Request:** Resolve the full codex review findings before finish (0 Critical, 2 Major, 2 Minor; Spec: compliant).
+**Built:**
+- Major — updated the isolation contract test `test_subagent_input_does_not_carry_orchestrator_context` to sanction `required_skills` as an intentional bounded field (it was SKIPPED without `RENMARK_SMOKE=1`, hiding that `to_dict()`'s new key broke the "only these fields" assertion). Now passes under `RENMARK_SMOKE=1`.
+- Major — `renmark/context.py`: `load_skill_body`/`load_fragment` now reject traversal-style `name` (separators / `..` / empty / NUL) via `_reject_unsafe_name` before reading.
+- Minor — `classify_path` is now segment-aware (`_has_contiguous` over path parts), so lookalikes like `xplugin/skills/foo/SKILL.md` no longer falsely classify as DYNAMIC.
+- Minor — `assert_metadata_only` now requires a slug-shaped reference (`_SKILL_REF_RE`), rejecting short prose (spaces) that previously slipped past the newline/fence/length checks.
+**Files changed:**
+- `renmark/context.py` — traversal guard, segment-aware classify_path, stricter guardrail
+- `tests/integration/test_dispatch_isolation_e2e.py` — allow the sanctioned `required_skills` field
+**Do not change:**
+- `required_skills` is a sanctioned bounded field (metadata only, guarded); the contract test's `allowed` set must include it.
+- Loaders MUST reject traversal names; `classify_path` MUST use segment matching, not substrings.
+- NOTE (pre-existing, out of scope): `test_plugin_has_required_skill_files` fails on origin/main too — stale pinned roster missing `guide`/`scan`. Not touched here.
+
+## [2026-07-01] — context taxonomy rule block, mirrored (AC5 wave 3, tasks 5 & 6)
+**Request:** Document the four-way context taxonomy + dynamic-loading contract in the project rule files (PRD REQ-20).
+**Built:** Added a byte-identical "## Context taxonomy — static / dynamic / memory / task-local" rule block to both `CLAUDE.md` and `AGENTS.md` (after the context-hygiene block): the four kinds, metadata-upfront/bodies-on-demand via `renmark/context.py`, and the dispatch-packet metadata-only contract; cites the shared fragment. Committed together to honor the mirror rule.
+**Files changed:**
+- `CLAUDE.md` — new context-taxonomy rule block
+- `AGENTS.md` — byte-identical mirror
+**Do not change:**
+- The two blocks MUST stay byte-identical (mirror rule); dynamic bodies are never pre-loaded; dispatch packets carry required-skill metadata only.
+
+## [2026-07-01] — tests for context module + dispatch integration (AC5 wave 3, task 4)
+**Request:** Prove AC5 behavior — the taxonomy/loader API and that the dispatch packet uses skill metadata without loading full bodies (PRD REQ-20).
+**Built:** New `tests/test_context.py` (20 cases) covering `ContextKind`/`TAXONOMY`, `classify_path`, metadata-upfront helpers (no body), body-on-demand loaders, `upfront_kinds_for_skill` (DYNAMIC/TASK_LOCAL excluded), the `assert_metadata_only` guardrail, and the load-bearing integration test: `build_subagent_input(required_skills=["plan"])` carries plan's metadata + pointer while the real SKILL.md body phrase is asserted ABSENT from the packet JSON.
+**Files changed:**
+- `tests/test_context.py` — new test module (codex-generated; orchestrator added one `-> None` annotation for convention)
+**Do not change:**
+- The metadata-not-body integration assertion is the behavioral proof of AC5 — keep it.
+
+## [2026-07-01] — wire context into the production dispatch packet (AC5 wave 2, task 3)
+**Request:** Make AC5 behaviorally real — connect `renmark/context.py` to a real production surface, not just a standalone helper (PRD REQ-20).
+**Built:** `renmark/dispatch.py` — `SubagentInput` gained `required_skills: list[str]` (names only); `to_dict()` renders each as a metadata reference `{name, pointer, metadata}` via a function-local `from renmark import context` (never a SKILL.md body); `build_subagent_input` gained a kw-only `required_skills` param and calls `context.assert_metadata_only` at build time. Additive + backward-compatible (12/12 dispatch tests still pass); function-local imports avoid any cycle.
+**Files changed:**
+- `renmark/dispatch.py` — the production task-local packet now consumes context.py (metadata-upfront, bodies never)
+**Do not change:**
+- The `context` imports MUST stay function-local (cycle guard); `required_skills` MUST render as metadata refs only (never a body); `build_subagent_input` MUST call `assert_metadata_only` before constructing the packet; no second packet type — `SubagentInput` is the one production dispatch packet.
+
+## [2026-07-01] — context taxonomy + dynamic-loader primitives (AC5 wave 1, task 1)
+**Request:** Codify renmark's four-way context taxonomy and metadata-upfront/body-on-demand loading (PRD REQ-20).
+**Built:** New stdlib-only `renmark/context.py` — `ContextKind` enum (STATIC/DYNAMIC/MEMORY/TASK_LOCAL); `ContextSource`/`TAXONOMY`; `classify_path`; metadata-upfront helpers `skill_metadata`/`all_skill_metadata`/`fragment_names` (reuse `skillmeta.SKILLS`, never read bodies); on-demand `skill_pointer`/`fragment_pointer` + `load_skill_body`/`load_fragment`; `upfront_kinds_for_skill` (STATIC+MEMORY only); `assert_metadata_only` guardrail. Lazy imports avoid cycles; mypy strict clean.
+**Files changed:**
+- `renmark/context.py` — new module (the codified taxonomy + dynamic-loader primitives)
+**Do not change:**
+- `skill_metadata` MUST NOT read/return SKILL.md body text; `upfront_kinds_for_skill` MUST exclude DYNAMIC and TASK_LOCAL (dynamic bodies never pre-loaded); read functions never raise (body loaders raise FileNotFoundError by design).
+
+## [2026-07-01] — shared context-taxonomy fragment (AC5 wave 1, task 2)
+**Request:** Give skills a citable single-source doc for the four-way context taxonomy (PRD REQ-20).
+**Built:** New `plugin/skills/_shared/context-taxonomy.md` — the four kinds + kind·source·persistence·load-policy table, the metadata-upfront/bodies-on-demand rule, and the dispatch-packet metadata-only contract. Cited by pointer, never inlined.
+**Files changed:**
+- `plugin/skills/_shared/context-taxonomy.md` — new reference fragment (skipped by `renmark.lint`)
+**Do not change:**
+- Reference-dir fragment: skills cite it via `${CLAUDE_PLUGIN_ROOT}/skills/_shared/context-taxonomy.md`, never re-inline it (skillgen doc-slimming guard).
+
+## [2026-07-01] — PRD updated (REQ-20, dynamic skill loading / AC5)
+**Request:** Capture the deferred harness-mission acceptance criterion AC5 (true dynamic skill loading) as a PRD requirement before building it on branch `feature/dynamic-skill-loading`.
+**Built:** Reconciled the Requirements section of PRD.md; added REQ-20 (four-way context taxonomy — static/dynamic/memory/task-local — with skill & `_shared/` fragment metadata upfront and bodies on demand; subagent packets carry task-local + required-skill metadata only). Added a 2026-07-01 revision note; bumped `last_reviewed`.
+**Files changed:**
+- `PRD.md` — new REQ-20 operationalizing the REQ-5 context-hygiene pillar; revision note; `last_reviewed` → 2026-07-01
+**Do not change:**
+- PRD.md is human-owned. REQ-20 was proposed by the feature drift gate and explicitly approved by the owner on 2026-07-01; do not re-open its scope without a new `/renmark:prd` gate.
+
 ## [2026-07-01] — v0.24.0 — harness operating modes (Conductor/Orchestrator MVP)
 **Release.** Bumps v0.23.0 → v0.24.0. Ships the first slice of the agentic-engineering harness mission: an explicit **Conductor vs Orchestrator** operating mode.
 - New `renmark/mode.py` — persisted mode (`.renmark/state/mode.json`): `read_mode`/`set_mode`/`clear_mode`/`default_mode_for_skill` + `mode_state_path`; reads never raise, writes are atomic and surface real failures.

@@ -55,6 +55,10 @@ Before any change touching >3 files or tagged "refactor"/"migrate"/"restructure"
 ## Context hygiene
 Never read generated file contents into the conversation — only per-task summaries (exit code, verifier pass/fail, path). To debug a generated file, route to `/renmark:debug`, which isolates the artifact in its own session.
 <!-- END:context-hygiene-rule -->
+
+## Context taxonomy — static / dynamic / memory / task-local
+renmark separates working context into four kinds: **static** (always-present `CLAUDE.md`/`AGENTS.md` rules), **dynamic** (skill bodies + `_shared/*.md` fragments — metadata upfront, full bodies loaded ONLY on demand), **memory** (`.renmark/memory/*`, durable across `/clear`), and **task-local** (the per-subagent dispatch packet, ephemeral). Skill/fragment metadata is exposed cheaply upfront via the `skillmeta` registry; bodies load on demand via `renmark/context.py` (`load_skill_body` / `load_fragment`) — dynamic bodies are never pre-loaded into the orchestrator. The production dispatch packet (`renmark.dispatch.build_subagent_input`) carries required-skill **metadata only** (name + pointer), never full skill bodies, guarded by `assert_metadata_only` in `renmark/context.py`. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/context-taxonomy.md`. Operationalizes REQ-5 context hygiene (REQ-20).
+
 <!-- BEGIN:executor-dispatch-rule -->
 ## Executor dispatch rules
 - `executor: codex` → `renmark-execute` (Bash subprocess). RED-FLAG: never Agent-dispatch a codex task — that burns Claude Code quota on the parent model.
