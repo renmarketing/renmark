@@ -261,12 +261,15 @@ mirror → **Group 3** tests + behavior case depending on the code.
 - **verifier:** bin/renmark-execute --behavior
 - **serves:** REQ-5
 - **spec:**
-  Add a deterministic behavior-tier case (mirror the format of tests/behavioral/roadmap.behavior.json
-  and next_steps_menu.behavior.json) that drives `skill_preamble` (already in the deterministic
-  allow-list) with mode set, asserting the Conductor rendering contains the Conductor directive and
-  the Orchestrator rendering contains the Orchestrator directive — i.e. the SAME skill's preamble
-  DIFFERS by mode. MUST carry a non-empty assertion set (P8 guard). This is the load-bearing
-  AC#3/AC#10 CI-safe proof (no model call).
+  Add a deterministic behavior-tier case (mirror tests/behavioral/roadmap.behavior.json and
+  next_steps_menu.behavior.json) with `skill: "feature"`, `deterministic.call: "lifecycle.skill_preamble"`.
+  RETARGETED (the behavior adapter calls skill_preamble on the real repo and cannot pre-set mode without
+  editing behavior.py, which is out of scope): assert the UNSET-mode entry-skill preamble emits the
+  choose-mode PROMPT — proving mode-awareness is wired into the live preamble (AC#2). Assertions
+  (non-empty per the P8 guard): `contains:Operating mode: not yet set`, `contains:Conductor vs Orchestrator`.
+  The by-mode DIRECTIVE diff (Conductor line vs Orchestrator line) is proven separately by the T12
+  unit tests, which CAN set mode via a tmp repo. Verifier `bin/renmark-execute --behavior` (deterministic
+  tier, CI-safe, no model call) must exit 0. Include an `eval` block mirroring the other cases' shape.
 
 ---
 
