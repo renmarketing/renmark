@@ -50,6 +50,76 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-01 — P8 weakened reference-case assertions
+
+**Severity:** high
+**Symptom:** mini-format conversion dropped explicit-choice/menu-terminal/read-only contracts
+**Root cause:** codex re-review 96505ea..HEAD
+**Fix:** extend assertion language or add structured per-case checks; restore stronger assertions
+**Lesson:** fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+---
+
+### 2026-07-01 — P8 feature un-bootstrappable
+
+**Severity:** high
+**Symptom:** --accept hard-fails; no in-tree capture() caller; no committed snapshots -> cases always ERROR
+**Root cause:** codex re-review 96505ea..HEAD
+**Fix:** wire capture() to a real host runner OR ship snapshots + drop advertised accept until runner exists
+**Lesson:** fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+---
+
+### 2026-07-01 — P8 Major 1 residual: replay returns golden as current transcript
+
+**Severity:** high
+**Symptom:** _current_transcript() ignores inputs, returns golden verbatim; no distinct current transcript
+**Root cause:** codex re-review 96505ea..HEAD
+**Fix:** decide: deterministic tier should execute renmark deterministic code path (real current), or explicitly re-scope to recorded-expectation validation
+**Lesson:** fix round partial; deterministic behavioral testing has a fundamental live-call constraint
+
+---
+
+### 2026-07-01 — P8 snapshot ref path traversal
+
+**Severity:** medium
+**Symptom:** baseline_ref/golden_ref interpolated into paths; ../ can escape snapshots dir
+**Root cause:** codex review 2a05fbf..HEAD
+**Fix:** validate refs as plain stems, reject resolved paths escaping snapshots/
+**Lesson:** codereview caught under-built P8 before merge
+
+---
+
+### 2026-07-01 — P8 judge silent-pass on bad confidence
+
+**Severity:** high
+**Symptom:** judge.py accepts {outcome:pass,confidence:bogus} as validated PASS, coerces confidence to low
+**Root cause:** codex review 2a05fbf..HEAD
+**Fix:** unrecognized required field -> validation_status=unvalidated, non-pass outcome
+**Lesson:** codereview caught under-built P8 before merge
+
+---
+
+### 2026-07-01 — P8 --accept cannot record from CLI
+
+**Severity:** high
+**Symptom:** _engine --accept hard-wires a runner that always raises
+**Root cause:** codex review 2a05fbf..HEAD
+**Fix:** reject --accept up-front as unsupported-without-live-runner (honest) instead of faking capture
+**Lesson:** codereview caught under-built P8 before merge
+
+---
+
+### 2026-07-01 — P8 replay does not test current behavior
+
+**Severity:** high
+**Symptom:** replay diffs stored golden vs baseline; judge gets actual=golden; cannot catch regressions
+**Root cause:** codex review 2a05fbf..HEAD
+**Fix:** assertion-based replay: run recorded inputs through current code, eval case.assertions on current transcript, pass current as actual to judge
+**Lesson:** codereview caught under-built P8 before merge
+
+---
+
 ### 2026-06-25 — P11 proactivity toggle: persisted but not runtime-enforced
 
 **Severity:** low

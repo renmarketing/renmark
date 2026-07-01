@@ -1,0 +1,19 @@
+{
+  "skill": "roadmap",
+  "prompt": "What's next on this project — show me the roadmap and what's shipped vs still missing.",
+  "deterministic": {
+    "call": "plan_lint",
+    "assertions": [
+      "not_contains:Agent(",
+      "not_contains:codex exec",
+      "not_contains:renmark-execute --task",
+      "contains:transcript-leak check: leak-free",
+      "contains:isolated subagent",
+      "contains:reads only bounded summaries"
+    ]
+  },
+  "eval": {
+    "contract": "The agent stayed read-only across the whole live session — no writes or commits attempted anywhere in the trajectory.",
+    "golden_ref": "roadmap.golden"
+  }
+}

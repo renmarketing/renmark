@@ -1,5 +1,65 @@
 # Changelog
 
+## [2026-07-01] — P8-v2 codereview fixes (4 Major + 1 Minor)
+**Request:** Fix the codex review findings on the P8-v2 diff (spec was under-built: eval tier never ran a real trajectory).
+**Built:**
+- Major 1 — `build_subagent_runner` now raises `LiveRunnerUnavailable` instead of returning the dispatch prompt text; a pure-Python process cannot issue the model call, so the eval runner is HOST-injected. CLI `--judge` degrades to the deterministic tier with a note; `--accept` reports unavailable and exits non-zero. No more prompt-as-golden.
+- Major 2 — `_case_from_dict` rejects missing/empty `deterministic.assertions` (was a vacuous PASS).
+- Major 3 — narrowed the `plan_lint` adapter docstring: it is a declared-policy scaffolding guard, NOT a live read-only proof (that's the eval tier).
+- Minor 1 — roadmap reference case gains positive read-only assertions (`isolated subagent`, `reads only bounded summaries`).
+- Major 4 — tests cover runner-unavailable, `capture()` with an injected stub runner, and missing/empty-assertion rejection.
+**Files changed:** `renmark/behavior.py`, `renmark/cli/_engine.py`, `tests/test_behavior.py`, `tests/behavioral/roadmap.behavior.json`.
+**Verification:** full suite 972 passed, 28 skipped; ruff + mypy clean.
+**Do not change:** the eval-tier live runner is HOST-injected — `build_subagent_runner` MUST raise until a real `str->str` runner is wired; never return prompt text as a transcript. Deterministic cases MUST carry a non-empty assertion set.
+
+## [2026-07-01] — P8-v2 build waves 1–2 (behavior tiers + CLI + cases + docs)
+**Request:** Implement the P8-v2 plan (`.renmark/plans/2026-07-01-p8-behavioral-skill-testing-v2.plan.md`).
+**Built:**
+- `renmark/behavior.py` (opus) — deterministic tier runs real renmark functions via explicit allow-list (`lifecycle.next_steps`, `skill_preamble`, `plan_lint`), asserting genuine current output; golden-echo path removed (Major 1 closed). Eval/judge tier gated behind an explicit live runner.
+- `renmark/cli/_engine.py` (sonnet) — `--behavior` runs the deterministic tier with no runner (zero-spend); `--accept` records eval goldens via `build_subagent_runner`+`capture`; `--judge` passes `judge=True`+live runner; `--accept`/`--judge` require `--behavior`.
+- `tests/behavioral/{next_steps_menu,roadmap}.behavior.json` (haiku) — v2 two-block cases; assertions restored to full contract force, split deterministic vs eval; both PASS live.
+- `CLAUDE.md` + `AGENTS.md` (haiku, mirrored) — honest two-tier framing.
+**Orchestrator fixes (verified independently):** `golden_ref` must be a bare stem (no path separator — `_validate_ref` prepends `snapshots/`); the recommended-first `matches:` assertion needs inline `(?m)` (`_assert_matches` uses `re.search` without `re.M`).
+**Do not change:** default `--behavior`/`run()` constructs NO live runner (network/token-free); the deterministic tier reads no snapshot; eval/judge tier never auto-spends. `behavior.py` `_validate_ref` rejects path separators in refs; `_assert_matches` is single-line unless the pattern sets `(?m)`.
+
+## [2026-07-01] — P8-v2 redesign (brainstorm) — tests-vs-evals split
+**Request:** Re-brainstorm P8 after two code reviews found it under-built (Major 1 fatal: deterministic "replay" collapsed to asserting a golden against itself; un-bootstrappable `--accept`; weakened assertions).
+**Decided (opus synthesis lane):** split into two honestly-labelled tiers per the Google "New SDLC" tests-vs-evals doctrine. **Deterministic tier = a TEST** — runs renmark's *real* behavior-shaping functions (`lifecycle.next_steps`, `skill_preamble`, `plan_lint`) on live inputs and asserts genuine current output (recomputed every run → fixes Major 1; needs no snapshot → fixes bootstrap; CI-safe). **Eval tier = the behavioral PROOF** — live LLM-judge over a real model trajectory, wired to a `str→str` runner reachable only under `--accept`/`--judge`, out of CI. Reference-case assertions restored to full force, split across the two tiers.
+**Files changed:** `.renmark/specs/2026-07-01-p8-behavioral-skill-testing.spec.md` (v2 revision), lifecycle → `brainstorm-complete`.
+**Do not change:** docs/command names must keep the split explicit — green `--behavior` (deterministic tier) is a scaffolding/regression guard, NOT proof the skill works; the load-bearing behavioral proof lives only in the eval tier. The eval/judge tier never auto-spends without explicit `--accept`/`--judge`.
+
+## [2026-07-01] — rewrite tests/test_behavior.py for assertion-based replay
+**Request:** Rewrite `tests/test_behavior.py` to match the redesigned `renmark/behavior.py` contract.
+**Built:** Replaced the old golden-vs-baseline tests with artifact-shaped deterministic coverage for case loading, assertion-based replay PASS/FAIL/ERROR outcomes, judge gating, unsafe ref rejection, and the assertion mini-format using inline `{transcript, inputs}` snapshots.
+**Files changed:** `tests/test_behavior.py`
+**Do not change:** keep these tests deterministic and snapshot-driven; missing snapshots or empty `inputs` must stay `ERROR`, and judge escalation must remain opt-in and skipped for `ERROR` results.
+
+## [2026-07-01] — P8 behavioral skill testing + LLM-judge tier (build complete)
+**Request:** Build P8 (the last queued external-skills-study item) toward v0.23.0 — a tier that proves a skill *changes agent behavior*, not just that it lints.
+**Built (8 tasks, all verified):**
+- `renmark/judge.py` — escalation-only LLM-as-judge (`judge_behavior` → `Verdict`); defensive parse (bad/timeout/garbage → `validation_status=unvalidated`, never a silent pass); `JUDGE_EST_COST_USD=0.15`; no import side effects.
+- `renmark/behavior.py` — harness on `shadow.py`'s record-replay: `load_cases`/`replay`/`capture`/`run`. Deterministic replay is pure snapshot I/O (no network/tokens); missing snapshot → ERROR ("run --accept first"); judge invoked only when `judge=True`.
+- `renmark/cli/_engine.py` — `--behavior` (deterministic replay, exit≠0 on FAIL/ERROR), `--behavior --accept` (record snapshots), `--behavior --judge` (escalate). OFFER line (~$0.15) on deterministic FAIL only; never auto-spends; `--accept`/`--judge` require `--behavior`.
+- `tests/behavioral/{roadmap,next_steps_menu}.behavior.json` — 2 reference cases (roadmap read-only/zero-LLM; next-steps-menu recommended-first).
+- `tests/test_behavior.py` (6) + `tests/test_judge.py` (5) — codex-authored; assert judge never auto-invoked, no-silent-pass, ERROR on missing snapshot.
+- Behavioral tier documented in `CLAUDE.md` + `AGENTS.md` (mirrored).
+**Verification:** all 8 task verifiers pass; ruff + mypy clean; full suite **962 passed, 28 skipped** (+11 new, no regressions).
+**Do not change:** the deterministic tier stays network-free / token-free in CI; the judge tier never auto-triggers without explicit `--judge` opt-in; `.behavior.json` cases stay snapshot-driven (no live capture in CI). Golden snapshots for the 2 reference cases are captured via `renmark-execute --behavior --accept` (a deliberate live step, not run yet).
+
+## [2026-07-01] — behavior harness unit tests
+**Request:** Add deterministic unit coverage for `renmark/behavior.py` with inline temp snapshots and mocked judge/subagent paths.
+**Built:** Added `tests/test_behavior.py` as a renmark artifact/test module covering case loading, replay PASS/FAIL/ERROR behavior, and `run()` judge gating.
+**Files changed:** `tests/test_behavior.py`.
+**Do not change:** keep these tests snapshot-driven and deterministic; they must not require live capture, network access, or automatic judge escalation.
+
+## [2026-07-01] — project scope: p8-behavioral-skill-testing
+**Scope contract (brainstorm).** Feature spec: `.renmark/specs/2026-07-01-p8-behavioral-skill-testing.spec.md`.
+- **Stack:** unchanged — Python ≥3.10 renmark runtime + Claude Code plugin (no new stack).
+- **Deployment:** in-repo tooling; ships in v0.23.0 alongside the P7 consistency lint (branch `worktree-p7-skill-templates`, merge-only).
+- **MVP boundary:** deterministic behavioral tier (recorded golden transcripts replayed + diffed in CI, reusing `renmark/shadow.py`) covering **2 reference skills** (roadmap read-only contract; the next-steps-menu contract); LLM-as-judge tier (`renmark/judge.py`) implemented but **escalation-only** — offered on deterministic failure, opt-in to run (~$0.15), never silent.
+- **Out of scope:** behavioral coverage of all ~30 skills; the P7 `.tmpl`→SKILL.md generator (deliberately dropped — shared blocks already single-sourced); changes to the structure audit; any auto-spend on the judge tier.
+- **Do not change:** the deterministic tier stays network-free / token-free in CI; the judge tier never auto-triggers without explicit opt-in.
+
 ## [2026-06-26] — v0.22.0 — P10 headless / spawned-session contract
 **Release.** Ships the P10 headless-session contract (detection, doctrine, lifecycle halt path, `renmark/headless.py` `resolve_gate`/`render_return`, `--set-headless` CLI, and dangerous-gate wiring in finish/plan/orchestrate/prd) **plus** the previously-unreleased batch on `main` (P5/P4/P12/P11/P6/P9). Full suite 951 passed; version drift clean; 3 codex review passes. See the per-feature entries below for detail. P7/P8 remain queued for ≥v0.23.0.
 

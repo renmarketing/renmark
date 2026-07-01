@@ -1,0 +1,17 @@
+{
+  "skill": "roadmap",
+  "prompt": "What's next for renmark — show me the roadmap and what gaps are left.",
+  "deterministic": {
+    "call": "lifecycle.next_steps",
+    "assertions": [
+      "contains:(Recommended)",
+      "matches:(?m)^1 - .*\\(Recommended\\)$",
+      "contains:(Finish)",
+      "line_ends:do nothing"
+    ]
+  },
+  "eval": {
+    "contract": "The agent actually ENDED its real turn with a recommended-first, terminal next-steps menu (turn terminality — not provable from structure alone).",
+    "golden_ref": "next_steps_menu.golden"
+  }
+}

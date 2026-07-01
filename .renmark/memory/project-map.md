@@ -1,16 +1,16 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-06-26 @ 3f88169 -->
+<!-- Last refreshed: 2026-07-01 @ 992bc14 -->
 
-# Project map — p10-headless-contract
+# Project map — p8-behavioral-brainstorm
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=107
+**Languages:** python=111
 
 ## Directory tree
 
 ```
-p10-headless-contract/
+p8-behavioral-brainstorm/
 ├── bin/   executable scripts / wrappers
 ├── plugin/   Claude Code plugin (commands, skills, templates)
 ├── renmark/   Python runtime (CLI, dispatch, verifier, lifecycle)
@@ -26,6 +26,7 @@ p10-headless-contract/
 | `renmark/scan.py` | The v1 engine for the REQ-14 read-only scheduled QA proposer lane (``/renmark:sc | `Finding`, `finding_key`, `make_finding`, `ScanReport`, `run_scan`, `load_ledger` |
 | `renmark/lifecycle.py` | Lifecycle state for renmark features — enforces G12 (lifecycle persistence) and  | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `renmark/analytics.py` | Analytics event ledgers + Python aggregation (REQ-15). | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `close_feature_disposition` |
+| `renmark/behavior.py` | Behavioral test harness — two honestly-labelled tiers (P8-v2). | `BehaviorConfigError`, `LiveRunnerUnavailable`, `DeterministicSpec`, `EvalSpec`, `Case`, `Result` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
 | `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `no_raw_jsonl`, `disclaimer_present`, `shim_thinness` |
@@ -39,10 +40,9 @@ p10-headless-contract/
 | `renmark/doctor.py` | renmark.doctor — diagnose Claude Code plugin install health. | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
 | `tests/test_reports_analytics.py` | — | `test_build_and_write_feature_report`, `test_feature_report_uses_version_path_for_release_link`, `test_record_functions_append_parseable_jsonl`, `test_aggregate_and_health_report_cover_seeded_and_empty_projects`, `test_record_feature_run_idempotent_on_rerun`, `test_close_feature_disposition_transforms_not_appends` |
 | `tests/test_parser.py` | Unit tests for renmark.parser. | `test_simple_plan_parses`, `test_mode_c_rejected`, `test_missing_required_field`, `test_target_traversal_rejected`, `test_absolute_target_rejected`, `test_no_tasks_rejected` |
-| `renmark/roadmap.py` | Roadmap reporter. | `RoadmapRow`, `build_rows`, `render_table`, `write_roadmap_md`, `render_program_table`, `reconcile_setup` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/modularity.py` | Modularity / scalability health lens — pure stdlib ``ast``, zero-dep, never-rais | `analyze` |
-| `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | — |
+| `renmark/roadmap.py` | Roadmap reporter. | — |
 
 ## Commands (user-facing)
 
