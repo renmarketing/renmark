@@ -1,16 +1,16 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-01 @ 3ef6280 -->
+<!-- Last refreshed: 2026-07-01 @ 7572872 -->
 
-# Project map — harness-operating-modes
+# Project map — feature+dynamic-skill-loading
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=118
+**Languages:** python=120
 
 ## Directory tree
 
 ```
-harness-operating-modes/
+feature+dynamic-skill-loading/
 ├── bin/   executable scripts / wrappers
 ├── plugin/   Claude Code plugin (commands, skills, templates)
 ├── renmark/   Python runtime (CLI, dispatch, verifier, lifecycle)
