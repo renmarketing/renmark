@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-06-25
+last_reviewed: 2026-07-01
 status: draft
 ---
 
@@ -183,6 +183,14 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     back to the existing Chrome DevTools MCP browser channel used by
     `/renmark:verify --qa`. Persisted browser session state lives inside
     `.renmark/` (REQ-6) and never enters orchestrator context (REQ-5).
+20. `REQ-20` renmark separates its working context into four explicit kinds —
+    **static** (always-present `CLAUDE.md` rules), **dynamic** (skill bodies and
+    `_shared/` fragments loaded on demand), **memory** (`.renmark/memory/*`), and
+    **task-local** (the per-subagent dispatch packet) — and exposes skill /
+    fragment **metadata upfront while full instructions/bodies load only on
+    demand**. Subagent dispatch packets carry task-local context + required-skill
+    metadata only, never full skill bodies. Infrastructure that operationalizes
+    the REQ-5 context-hygiene pillar (extends REQ-5).
 
 ## Success metrics
 
@@ -329,3 +337,13 @@ optimization that complements the REQ-5 context-hygiene pillar and the v0.20.0
 trigger-only-description work. Not a new product requirement; no behavioral
 non-goal changes. Proposed by the "graduated preamble-tier" (P3) feature's
 PRD-alignment gate; reviewed and approved by the project owner on 2026-06-25.
+
+**Revision note (2026-07-01, human-approved diff):** Added REQ-20 (dynamic skill
+loading — a four-way context taxonomy of static / dynamic / memory / task-local,
+with skill & `_shared/` fragment metadata exposed upfront while full bodies load
+only on demand, and subagent dispatch packets carrying task-local context +
+required-skill metadata only). Captures the deferred harness-mission acceptance
+criterion AC5 as an infrastructure requirement that operationalizes the REQ-5
+context-hygiene pillar. Proposed by the "dynamic-skill-loading" feature's
+PRD-alignment gate; reviewed and approved by the project owner on 2026-07-01 via
+the `/renmark:prd` UPDATE gate.

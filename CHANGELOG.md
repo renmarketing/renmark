@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-01] — PRD updated (REQ-20, dynamic skill loading / AC5)
+**Request:** Capture the deferred harness-mission acceptance criterion AC5 (true dynamic skill loading) as a PRD requirement before building it on branch `feature/dynamic-skill-loading`.
+**Built:** Reconciled the Requirements section of PRD.md; added REQ-20 (four-way context taxonomy — static/dynamic/memory/task-local — with skill & `_shared/` fragment metadata upfront and bodies on demand; subagent packets carry task-local + required-skill metadata only). Added a 2026-07-01 revision note; bumped `last_reviewed`.
+**Files changed:**
+- `PRD.md` — new REQ-20 operationalizing the REQ-5 context-hygiene pillar; revision note; `last_reviewed` → 2026-07-01
+**Do not change:**
+- PRD.md is human-owned. REQ-20 was proposed by the feature drift gate and explicitly approved by the owner on 2026-07-01; do not re-open its scope without a new `/renmark:prd` gate.
+
 ## [2026-07-01] — v0.24.0 — harness operating modes (Conductor/Orchestrator MVP)
 **Release.** Bumps v0.23.0 → v0.24.0. Ships the first slice of the agentic-engineering harness mission: an explicit **Conductor vs Orchestrator** operating mode.
 - New `renmark/mode.py` — persisted mode (`.renmark/state/mode.json`): `read_mode`/`set_mode`/`clear_mode`/`default_mode_for_skill` + `mode_state_path`; reads never raise, writes are atomic and surface real failures.
