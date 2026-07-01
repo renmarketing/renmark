@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-07-01] — P8-v2 codereview fixes (4 Major + 1 Minor)
+**Request:** Fix the codex review findings on the P8-v2 diff (spec was under-built: eval tier never ran a real trajectory).
+**Built:**
+- Major 1 — `build_subagent_runner` now raises `LiveRunnerUnavailable` instead of returning the dispatch prompt text; a pure-Python process cannot issue the model call, so the eval runner is HOST-injected. CLI `--judge` degrades to the deterministic tier with a note; `--accept` reports unavailable and exits non-zero. No more prompt-as-golden.
+- Major 2 — `_case_from_dict` rejects missing/empty `deterministic.assertions` (was a vacuous PASS).
+- Major 3 — narrowed the `plan_lint` adapter docstring: it is a declared-policy scaffolding guard, NOT a live read-only proof (that's the eval tier).
+- Minor 1 — roadmap reference case gains positive read-only assertions (`isolated subagent`, `reads only bounded summaries`).
+- Major 4 — tests cover runner-unavailable, `capture()` with an injected stub runner, and missing/empty-assertion rejection.
+**Files changed:** `renmark/behavior.py`, `renmark/cli/_engine.py`, `tests/test_behavior.py`, `tests/behavioral/roadmap.behavior.json`.
+**Verification:** full suite 972 passed, 28 skipped; ruff + mypy clean.
+**Do not change:** the eval-tier live runner is HOST-injected — `build_subagent_runner` MUST raise until a real `str->str` runner is wired; never return prompt text as a transcript. Deterministic cases MUST carry a non-empty assertion set.
+
 ## [2026-07-01] — P8-v2 build waves 1–2 (behavior tiers + CLI + cases + docs)
 **Request:** Implement the P8-v2 plan (`.renmark/plans/2026-07-01-p8-behavioral-skill-testing-v2.plan.md`).
 **Built:**
