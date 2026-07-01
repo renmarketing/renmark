@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-01] — v0.25.0 — true dynamic skill loading (AC5 / REQ-20)
+**Release.** Bumps v0.24.0 → v0.25.0. Ships the second net-new slice of the agentic-engineering harness mission: **true dynamic skill loading** with a codified context taxonomy, wired into the production dispatch path.
+- New `renmark/context.py` (stdlib-only) — a four-way context taxonomy (`ContextKind`: STATIC/DYNAMIC/MEMORY/TASK_LOCAL) + `TAXONOMY`; `classify_path` (segment-aware); metadata-upfront helpers (`skill_metadata`/`all_skill_metadata`/`fragment_names`, reuse `skillmeta.SKILLS`, never read bodies); on-demand loaders (`skill_pointer`/`fragment_pointer` refs; `load_skill_body`/`load_fragment` with traversal guard); `upfront_kinds_for_skill` (dynamic bodies never pre-loaded); `assert_metadata_only` guardrail.
+- `renmark/dispatch.py` — the production task-local packet (`SubagentInput`/`build_subagent_input`) now carries `required_skills` as METADATA refs (name + pointer, guarded), never full skill bodies. Additive + backward-compatible; function-local imports avoid cycles.
+- New `plugin/skills/_shared/context-taxonomy.md` fragment; mirrored "Context taxonomy" rule block in CLAUDE.md/AGENTS.md; PRD REQ-20.
+- `tests/test_context.py` (20 tests) incl. the metadata-not-body integration proof; isolation contract test updated to sanction `required_skills`.
+
+Full unit suite **1233 passed, 28 skipped**; ruff + mypy clean; 7/7 version locations at v0.25.0. Codereview clean (Spec: compliant; 0 Critical, 2 Major + 2 Minor all resolved). Pre-existing out-of-scope failure noted: `test_plugin_has_required_skill_files` (stale roster, also fails on origin/main). See per-change entries below.
+
 ## [2026-07-01] — codereview fixes for dynamic-skill-loading (AC5)
 **Request:** Resolve the full codex review findings before finish (0 Critical, 2 Major, 2 Minor; Spec: compliant).
 **Built:**
