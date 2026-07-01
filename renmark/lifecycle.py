@@ -655,7 +655,74 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
             )
 
     base = " | ".join(fragments) if fragments else None
-    return _with_headless_note(repo, base)
+    return _with_mode_note(repo, skill, _with_headless_note(repo, base))
+
+
+# ── Operating-mode directive (Conductor vs Orchestrator) ──────────────────────
+#
+# Set-mode directive lines (persisted mode → one hint line). Kept as module
+# constants so the behavior test (T14) and unit test (T12) can assert the exact
+# text without duplicating string literals.
+_MODE_DIRECTIVE: dict[str, str] = {
+    "conductor": (
+        "Operating mode: Conductor — hands-on; prefer single-file scoped edits, "
+        "avoid subagents unless necessary, explain the next move before editing."
+    ),
+    "orchestrator": (
+        "Operating mode: Orchestrator — goal-level; use narrow scoped subagents "
+        "where useful, load skills on demand, review outcomes not keystrokes."
+    ),
+}
+
+# Entry-point skills that must PROMPT for a mode when none is set yet.
+_MODE_ENTRY_SKILLS: frozenset[str] = frozenset(
+    {"start", "feature", "debug", "roadmap", "finish", "orchestrate"}
+)
+
+
+def _choose_mode_hint(skill: str) -> str:
+    """Choose-mode instruction emitted for an entry-point skill with no mode set.
+
+    Tells the orchestrator to ask the user Conductor vs Orchestrator via
+    AskUserQuestion, recommending the per-skill default, then persist the choice.
+    """
+    from . import mode as _mode
+
+    recommended = _mode.default_mode_for_skill(skill)
+    return (
+        "Operating mode: not yet set — ask the user Conductor vs Orchestrator via "
+        f"AskUserQuestion (recommend: {recommended}), then persist with "
+        "renmark.mode.set_mode(repo, <choice>)."
+    )
+
+
+def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | None:
+    """ADDITIVE: append the operating-mode directive to ``hint``.
+
+    Runs strictly AFTER the existing tier logic and the headless note — never
+    reorders the record-before-check invariant. DEGRADES GRACEFULLY: any
+    exception in mode resolution falls back to ``hint`` unchanged, so mode is a
+    pure enhancement and never a hard dependency of the preamble.
+
+    - Mode SET  → append the Conductor/Orchestrator directive line.
+    - Mode UNSET + entry-point skill → append a choose-mode instruction.
+    - Mode UNSET + non-entry skill → no mode line (returns ``hint`` unchanged).
+    """
+    try:
+        from . import mode as _mode
+
+        current = _mode.read_mode(repo)
+        if current is not None:
+            line = _MODE_DIRECTIVE.get(current)
+            if line is None:  # unrecognised (read_mode shouldn't yield this)
+                return hint
+        elif skill in _MODE_ENTRY_SKILLS:
+            line = _choose_mode_hint(skill)
+        else:
+            return hint
+    except Exception:
+        return hint
+    return line if hint is None else f"{hint} | {line}"
 
 
 def _with_headless_note(repo: Path | str, hint: str | None) -> str | None:
