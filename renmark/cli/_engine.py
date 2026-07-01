@@ -1046,40 +1046,40 @@ def _record_escalation(
 
 
 def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
-    """Behavioral-suite lane: replay cases, capture snapshots, or judge FAILs.
+    """Behavioral-suite lane: run the deterministic tier, record eval goldens, or judge FAILs.
 
     Bounded output (a few lines): one status line per case plus a totals line.
-    Deterministic by default (no spend). ``--judge`` opts into LLM-judge
-    escalation on FAIL; without it a deterministic FAIL prints a cost-noted
-    OFFER (never auto-spends) unless running headless.
+
+    Two honestly-labelled tiers (P8-v2):
+
+    - Default ``--behavior``: the DETERMINISTIC tier ONLY. Calls ``behavior.run``
+      without constructing or passing any live subagent runner, guaranteeing zero
+      token spend and no network in CI. Exit non-zero on any FAIL/ERROR.
+    - ``--behavior --accept``: the eval tier's live capture path. Constructs a live
+      runner via ``behavior.build_subagent_runner`` and calls ``behavior.capture``
+      per case to record its golden transcript (a deliberate live step).
+    - ``--behavior --judge``: escalate deterministic FAILs to the LLM judge by
+      passing ``judge=True`` AND the live runner into ``behavior.run``. Without it a
+      deterministic FAIL prints a cost-noted OFFER (never auto-spends) unless headless.
     """
     from .. import behavior as _behavior
     from .. import config as _config
 
+    behavioral_dir = str(repo / "tests" / "behavioral")
+
+    if accept:
+        return _behavior_accept(repo, behavioral_dir)
+
     headless = _config.is_headless(repo)
 
-    # --accept: live capture path. The CLI is a plain subprocess with no live
-    # model, so it cannot supply a SubagentRunner; capture must be driven by the
-    # host (skill/orchestrator with Agent access). No runner is wired into the
-    # CLI, so recording can NEVER succeed here. Reject the flag UP FRONT with a
-    # bounded message and a usage exit code (2, matching the file's other
-    # unsupported-usage rejections) rather than entering the capture loop and
-    # failing opaquely per case (which pretended to attempt, then fabricated a
-    # "0/N recorded" summary). If a live runner is ever wired into the CLI, this
-    # is the injection point: obtain it and pass it to _behavior.capture below.
-    if accept:
-        print(
-            "renmark-execute --behavior --accept requires a live subagent runner, "
-            "which is not wired into the CLI yet. Capture snapshots via the host "
-            "agent's --accept path, or provide a runner. (Deterministic replay via "
-            "`renmark-execute --behavior` works without this.)",
-            file=sys.stderr,
-        )
-        return 2
-
-    # Default / --judge: deterministic replay (judge escalates FAILs on --judge).
+    # Default / --judge: deterministic tier. On the default path we pass NO live
+    # runner, so run() spends zero tokens and touches no network. Only --judge
+    # constructs the live runner and forwards it so a FAIL can escalate.
+    runner = _behavior.build_subagent_runner(repo) if judge else None
     try:
-        results = _behavior.run(str(repo / "tests" / "behavioral"), judge=judge, repo=repo)
+        results = _behavior.run(
+            behavioral_dir, judge=judge, repo=repo, subagent_runner=runner
+        )
     except _behavior.BehaviorConfigError as exc:
         _print(f"ERROR loading behavioral cases: {exc}")
         return 2
@@ -1100,6 +1100,38 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
             f"  {failed} FAIL(s) eligible for LLM-judge review (~${_judge_est_cost():.2f}); "
             f"re-run with --behavior --judge to escalate. Not auto-invoked."
         )
+    return 0 if failed == 0 else 10
+
+
+def _behavior_accept(repo: Path, behavioral_dir: str) -> int:
+    """Record eval-tier golden transcripts (the ``--behavior --accept`` path).
+
+    A deliberate live step: constructs a live subagent runner via
+    ``behavior.build_subagent_runner`` and calls ``behavior.capture`` for each
+    case to write its ``snapshots/<golden_ref>.json`` golden. Bounded output.
+    """
+    from .. import behavior as _behavior
+
+    try:
+        cases = _behavior.load_cases(behavioral_dir)
+    except _behavior.BehaviorConfigError as exc:
+        _print(f"ERROR loading behavioral cases: {exc}")
+        return 2
+
+    runner = _behavior.build_subagent_runner(repo)
+    recorded = 0
+    failed = 0
+    for case in cases:
+        try:
+            _behavior.capture(case, runner)
+        except Exception as exc:  # a bad case shouldn't abort the whole capture
+            failed += 1
+            _print(f"  ERROR {case.skill}/{case.eval.golden_ref:<24} {type(exc).__name__}: {exc}")
+            continue
+        recorded += 1
+        _print(f"  RECORD {case.skill}/{case.eval.golden_ref}")
+
+    _print(f"behavior --accept: {recorded}/{len(cases)} golden transcripts recorded, {failed} failed")
     return 0 if failed == 0 else 10
 
 
@@ -1139,7 +1171,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--accept",
         action="store_true",
-        help="(with --behavior) record baseline+golden snapshots via the live capture path",
+        help="(with --behavior) record eval-tier golden transcripts via the live capture path (deliberate spend)",
     )
     ap.add_argument(
         "--judge",
