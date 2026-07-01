@@ -104,6 +104,31 @@ def test_judge_behavior_marks_malformed_payload_unvalidated_and_not_a_pass() -> 
     assert "unrecognized outcome" in verdict.rationale
 
 
+def test_judge_behavior_rejects_pass_with_bogus_confidence() -> None:
+    # Regression for codereview Major 3: a valid outcome with an unrecognized
+    # confidence must NOT be a silent validated PASS (was coerced to "low").
+    verdict = judge_behavior(
+        subagent_runner=lambda prompt: (
+            '{"outcome": "pass", "confidence": "bogus", "rationale": "looks ok"}'
+        ),
+        **_judge_kwargs(),
+    )
+
+    assert verdict.validation_status == "unvalidated"
+    assert verdict.outcome != "pass"
+
+
+def test_judge_behavior_rejects_missing_rationale() -> None:
+    # A present, recognized outcome/confidence but no rationale must not validate.
+    verdict = judge_behavior(
+        subagent_runner=lambda prompt: '{"outcome": "pass", "confidence": "high"}',
+        **_judge_kwargs(),
+    )
+
+    assert verdict.validation_status == "unvalidated"
+    assert verdict.outcome != "pass"
+
+
 def test_judge_est_cost_usd_is_a_positive_float() -> None:
     assert isinstance(JUDGE_EST_COST_USD, float)
     assert JUDGE_EST_COST_USD > 0.0
