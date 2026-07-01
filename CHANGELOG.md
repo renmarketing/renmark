@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-07-01] — context taxonomy + dynamic-loader primitives (AC5 wave 1, task 1)
+**Request:** Codify renmark's four-way context taxonomy and metadata-upfront/body-on-demand loading (PRD REQ-20).
+**Built:** New stdlib-only `renmark/context.py` — `ContextKind` enum (STATIC/DYNAMIC/MEMORY/TASK_LOCAL); `ContextSource`/`TAXONOMY`; `classify_path`; metadata-upfront helpers `skill_metadata`/`all_skill_metadata`/`fragment_names` (reuse `skillmeta.SKILLS`, never read bodies); on-demand `skill_pointer`/`fragment_pointer` + `load_skill_body`/`load_fragment`; `upfront_kinds_for_skill` (STATIC+MEMORY only); `assert_metadata_only` guardrail. Lazy imports avoid cycles; mypy strict clean.
+**Files changed:**
+- `renmark/context.py` — new module (the codified taxonomy + dynamic-loader primitives)
+**Do not change:**
+- `skill_metadata` MUST NOT read/return SKILL.md body text; `upfront_kinds_for_skill` MUST exclude DYNAMIC and TASK_LOCAL (dynamic bodies never pre-loaded); read functions never raise (body loaders raise FileNotFoundError by design).
+
+## [2026-07-01] — shared context-taxonomy fragment (AC5 wave 1, task 2)
+**Request:** Give skills a citable single-source doc for the four-way context taxonomy (PRD REQ-20).
+**Built:** New `plugin/skills/_shared/context-taxonomy.md` — the four kinds + kind·source·persistence·load-policy table, the metadata-upfront/bodies-on-demand rule, and the dispatch-packet metadata-only contract. Cited by pointer, never inlined.
+**Files changed:**
+- `plugin/skills/_shared/context-taxonomy.md` — new reference fragment (skipped by `renmark.lint`)
+**Do not change:**
+- Reference-dir fragment: skills cite it via `${CLAUDE_PLUGIN_ROOT}/skills/_shared/context-taxonomy.md`, never re-inline it (skillgen doc-slimming guard).
+
 ## [2026-07-01] — PRD updated (REQ-20, dynamic skill loading / AC5)
 **Request:** Capture the deferred harness-mission acceptance criterion AC5 (true dynamic skill loading) as a PRD requirement before building it on branch `feature/dynamic-skill-loading`.
 **Built:** Reconciled the Requirements section of PRD.md; added REQ-20 (four-way context taxonomy — static/dynamic/memory/task-local — with skill & `_shared/` fragment metadata upfront and bodies on demand; subagent packets carry task-local + required-skill metadata only). Added a 2026-07-01 revision note; bumped `last_reviewed`.
