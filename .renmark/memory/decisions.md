@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-039 — Finished feature harness-operating-modes
+
+**Date:** 2026-07-01
+**Status:** Accepted
+
+**Context.** Completed stages: brainstorm-complete, plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch  reached stage ready-to-release
+
+---
+
 ## ADR-038 — P7 pivot: generator → consistency lint (doc-slimming already DRY'd skills)
 
 **Date:** 2026-06-29
