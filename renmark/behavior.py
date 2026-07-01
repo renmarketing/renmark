@@ -1,89 +1,65 @@
-"""Behavioral test harness — did the skill actually change the behavior?
+"""Behavioral test harness — two honestly-labelled tiers (P8-v2).
 
-Shadow tests (:mod:`renmark.shadow`) answer *did this subsystem's deterministic
-output drift?* This harness answers a different, skill-level question: *when the
-skill is enabled, does its behavior both (a) satisfy the skill's declared
-behavioral contract AND (b) differ meaningfully from the skill-disabled
-baseline?* A skill that changes nothing versus baseline is a no-op and fails.
+This harness answers a skill-level question the structure audit (a linter) can
+never answer: *does enabling the skill actually change agent behavior in the way
+the skill's contract promises?* The earlier (v1) design tried to answer it
+deterministically by asserting a recorded golden transcript against itself — a
+golden replayed as "current" and diffed against a recorded baseline. That proved
+nothing: an assertion that holds on a snapshot merely confirms the snapshot was
+written the way it was written, not that any live skill still behaves that way.
+That was the fatal flaw ("Major 1") this rewrite removes.
 
-Assertion-based replay (the honest design)
--------------------------------------------
+The two tiers are now split by what each can *honestly* prove:
 
-The earlier design diffed the recorded golden against the recorded baseline and
-passed ``actual=golden`` to the judge — so it re-checked the *snapshot* and never
-exercised anything *current*, and could not catch a regression in how the
-contract is evaluated. It also could accidentally "pass" a golden that merely
-coincided with the baseline.
+Deterministic tier (default; the ONLY thing ``run()`` does without flags)
+    CI-safe scaffolding / regression guard. For each case it resolves
+    ``deterministic.call`` to a REAL renmark function via an explicit allow-list
+    dispatch table, invokes it on live inputs derived from the case
+    (``repo``, ``skill``), and evaluates the case's ``assertions`` against the
+    GENUINE CURRENT output — recomputed every run, reading NO snapshot and
+    constructing NO live model runner. It therefore spends zero tokens, touches
+    no network, and never ERRORs on a fresh checkout. What it proves is narrow:
+    that the deterministic renmark surfaces a skill relies on (menu rendering,
+    dispatch policy, leak checks) still produce the shape the skill's contract
+    requires. It is NOT proof the skill, driven by a live model, works.
 
-This module now evaluates a case's ``assertions`` — a declarative contract the
-skill's output must satisfy — against a CURRENT transcript reconstructed from the
-case's recorded ``inputs``:
+Eval / judge tier (gated — reachable ONLY via explicit flags/args)
+    The actual behavioral proof, and it is opt-in and out of CI because it costs
+    money and needs a live model. :func:`capture` records an eval golden
+    transcript (the ``--accept`` path, the sole model-calling entry point), and
+    :func:`run` escalates a deterministic FAIL to :func:`renmark.judge.judge_behavior`
+    ONLY when ``judge=True`` and a live ``subagent_runner`` is provided. Neither
+    path is ever reached by the default deterministic run.
 
-    1. ``capture`` (the ``--accept`` path) makes the *only* live model calls in
-       this module. It runs the shared prompt twice through an injected
-       ``subagent_runner`` — once skill-disabled (baseline), once skill-enabled
-       (golden) — and records both transcripts AND the exact inputs that produced
-       them (the composed prompts) so replay can reproduce a current transcript
-       deterministically, with no further model call.
-    2. ``replay`` is deterministic and network-/token-free. It reconstructs the
-       CURRENT transcript from the recorded inputs (shadow-style: fixed recorded
-       inputs replayed through the current deterministic transcript builder),
-       then evaluates every ``assertion`` against that CURRENT transcript.
-       PASS iff **(a)** every assertion holds on the current transcript AND
-       **(b)** the recorded golden differs meaningfully from the recorded
-       baseline (proving the skill had an effect). A case with no recorded inputs
-       cannot produce a current transcript and returns an ``ERROR`` carrying
-       :data:`ACCEPT_FIRST_HINT` — never a silent PASS, and never the old
-       golden-vs-baseline-only shortcut.
-
-Why replay can be deterministic even though skills are model-driven: this Python
-process cannot call a Claude model (see :mod:`renmark.judge`). So the "current
-transcript" replay evaluates is reconstructed from the recorded inputs — the same
-record-and-replay contract :mod:`renmark.shadow` uses. The recorded golden
-response is the transcript body; the recorded inputs pin it so replay is a pure
-function of on-disk state. Semantic/novel-input judgement is the escalation-only
-judge's job (see ``run(..., judge=True)``), not replay's.
-
-Assertion mini-format
----------------------
-
-Each assertion is a string checked deterministically against the current
-transcript. Two forms are supported:
+Assertion mini-format (unchanged)
+---------------------------------
+Each assertion is a string checked deterministically against the rendered
+current output:
 
     * ``"<op>:<argument>"`` — a structured predicate. Supported ops:
-        - ``contains:<substr>``      transcript contains ``<substr>``
-        - ``not_contains:<substr>``  transcript does NOT contain ``<substr>``
-        - ``matches:<regex>``        ``re.search(<regex>, transcript)`` matches
+        - ``contains:<substr>``      output contains ``<substr>``
+        - ``not_contains:<substr>``  output does NOT contain ``<substr>``
+        - ``matches:<regex>``        ``re.search(<regex>, output)`` matches
         - ``line_ends:<substr>``     some non-empty line ends with ``<substr>``
-        - ``min_lines:<int>``        transcript has >= N non-empty lines
-      (op names are matched case-insensitively; unknown ops are a FAIL, never a
-      silent pass.)
-    * any other string — treated as ``contains:<the whole string>`` (a plain
-      substring check), so human-readable assertions still evaluate
-      deterministically instead of being ignored.
+        - ``min_lines:<int>``        output has >= N non-empty lines
+      (op names match case-insensitively; an unknown op-shaped token — a single
+      leading ``word:`` with no spaces — is a FAIL, never a silent pass.)
+    * any other string — a plain ``contains`` substring check.
 
-Cases are declarative JSON at ``tests/behavioral/*.behavior.json``:
-
+Case schema (``tests/behavioral/*.behavior.json``)
+--------------------------------------------------
     {
-      "skill": "renmark:brainstorm",
-      "prompt": "<the shared input>",
-      "assertions": ["line_ends:(Recommended)", "contains:next step", ...],
-      "baseline_ref": "brainstorm-baseline",   # snapshot stem under snapshots/
-      "golden_ref": "brainstorm-golden"
+      "skill": "roadmap",
+      "prompt": "<the shared input, carried to the judge as context>",
+      "deterministic": {
+        "call": "lifecycle.next_steps",
+        "assertions": ["contains:(Recommended)", "min_lines:3"]
+      },
+      "eval": {
+        "contract": "<what the skill promises to change>",
+        "golden_ref": "roadmap.golden"
+      }
     }
-
-``run`` replays every case. On a deterministic FAIL it does NOT touch the
-escalation-only LLM judge unless ``judge=True`` was passed explicitly; with the
-default ``on_fail_offer=True`` it merely flags ``judge_offered`` so the CLI can
-prompt the human for an opt-in escalation (see :mod:`renmark.judge`, which costs
-:data:`renmark.judge.JUDGE_EST_COST_USD` per call). On that escalation path the
-judge receives ``actual=<current transcript>`` (NOT the golden), and its verdict
-is trusted only when ``validation_status == "validated"``.
-
-Like the rest of the renmark runtime, this Python process cannot itself call a
-Claude model; the live model call in ``capture`` is routed through an injectable
-``subagent_runner: Callable[[str], str]`` (a fully-composed prompt in, the raw
-response out) — the same shape :mod:`renmark.judge` uses.
 """
 
 from __future__ import annotations
@@ -91,13 +67,14 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 # The live-model injection point, identical in shape to renmark.judge's runner:
 # a fully-composed prompt string in, the raw model response string out. Used
-# ONLY by ``capture`` — the deterministic replay path never touches it.
+# ONLY by the eval/judge tier (``capture`` / ``_escalate_to_judge``) — the
+# default deterministic path NEVER constructs or touches one.
 SubagentRunner = Callable[[str], str]
 
 Status = Literal["PASS", "FAIL", "ERROR"]
@@ -105,73 +82,82 @@ CompletionState = Literal["complete", "partial", "failed"]
 Confidence = Literal["low", "medium", "high"]
 ValidationStatus = Literal["validated", "unvalidated", "failed"]
 
-# Message surfaced (via a Result's ``message`` field) when the recorded inputs a
-# deterministic replay needs have never been recorded. The CLI keys off this.
+# Message surfaced when the eval tier needs a recorded golden transcript that
+# has never been recorded. Applies ONLY to the judge/eval path — the
+# deterministic tier reads no snapshots and can never raise this.
 ACCEPT_FIRST_HINT = "run --accept first"
 
 
 class BehaviorConfigError(ValueError):
     """A ``*.behavior.json`` case file is missing required fields or malformed,
-    or a snapshot ref is unsafe (would escape the snapshots directory)."""
+    or an eval ``golden_ref`` is unsafe (would escape the snapshots directory)."""
+
+
+# ── Case model ─────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class DeterministicSpec:
+    """The deterministic tier's config for one case.
+
+    - ``call``: an allow-listed renmark function key (see :data:`_DISPATCH`).
+    - ``assertions``: the declarative contract evaluated against the CURRENT
+      rendered output of that call (see the module docstring's mini-format).
+    """
+
+    call: str
+    assertions: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EvalSpec:
+    """The eval/judge tier's config for one case.
+
+    - ``contract``: the skill's stated behavioral promise, handed to the judge.
+    - ``golden_ref``: snapshot stem (a bare filename stem — no path separators,
+      no ``..``) under the case directory's ``snapshots/`` folder where
+      :func:`capture` records the with-skill transcript.
+    """
+
+    contract: str
+    golden_ref: str
 
 
 @dataclass(frozen=True)
 class Case:
     """One declarative behavioral case, mirroring the on-disk JSON schema.
 
-    - ``skill``: the skill under test, e.g. ``"renmark:brainstorm"``.
-    - ``prompt``: the shared input given to BOTH the baseline and golden runs.
-    - ``assertions``: the skill's declarative behavioral contract — each entry is
-      a deterministic predicate (see the module docstring's assertion
-      mini-format) checked against the CURRENT transcript in :func:`replay`, and
-      also carried to the judge prompt as the contract when escalated.
-    - ``baseline_ref`` / ``golden_ref``: snapshot stems (a plain filename stem —
-      no path separators, no ``..``) under the case directory's ``snapshots/``
-      folder locating the recorded transcripts + inputs.
+    - ``skill``: the skill under test (bare name, e.g. ``"roadmap"``), used both
+      as the deterministic call's live input and as the judge's subject.
+    - ``prompt``: the shared input carried to the judge as context.
+    - ``deterministic``: the CI-safe tier spec (call + assertions).
+    - ``eval``: the opt-in judge tier spec (contract + golden_ref).
     - ``source``: the case file path (populated by :func:`load_cases`).
     """
 
     skill: str
     prompt: str
-    assertions: tuple[str, ...]
-    baseline_ref: str
-    golden_ref: str
+    deterministic: DeterministicSpec
+    eval: EvalSpec
     source: Path | None = None
 
 
 @dataclass
-class Snapshot:
-    """A recorded run: its transcript plus the exact inputs that produced it.
-
-    ``inputs`` pins the transcript so :func:`replay` can reconstruct a current
-    transcript as a pure function of on-disk state (no model call). At minimum it
-    carries the composed ``prompt`` fed to the runner. An empty ``inputs`` means
-    the snapshot predates the assertion-based format and cannot be replayed.
-    """
-
-    transcript: str
-    inputs: dict[str, object] = field(default_factory=dict)
-
-
-@dataclass
 class Result:
-    """Outcome of replaying one case, exposing the artifact-contract fields.
+    """Outcome of running one case's deterministic tier.
 
-    - ``status``: ``"PASS"`` (all assertions held on the CURRENT transcript AND
-      golden differed from baseline), ``"FAIL"`` (ran but a check failed), or
-      ``"ERROR"`` (could not run — e.g. missing recorded inputs, whose
-      ``message`` is :data:`ACCEPT_FIRST_HINT`).
+    - ``status``: ``"PASS"`` (all assertions held on the CURRENT rendered
+      output), ``"FAIL"`` (ran but a check failed, or the ``call`` is unknown),
+      or ``"ERROR"`` (could not run — reserved; the deterministic tier never
+      ERRORs on a fresh checkout).
     - ``completion_state`` / ``confidence`` / ``validation_status``: the standard
-      renmark artifact-contract fields. A missing snapshot/inputs is
-      ``failed``/``low``/``unvalidated`` — never a silent success.
-    - ``failed_assertions``: assertions that did NOT hold on the current
-      transcript (empty on PASS).
+      renmark artifact-contract fields.
+    - ``failed_assertions``: assertions that did NOT hold (empty on PASS).
     - ``judge_offered``: set True when a deterministic FAIL is eligible for an
       opt-in escalation to the LLM judge and ``judge=True`` was NOT passed. The
       CLI reads this to prompt the human; the judge is never auto-invoked.
     - ``judge_verdict``: populated only when ``run(..., judge=True)`` escalated a
-      FAIL — a :class:`renmark.judge.Verdict` serialized to a plain dict. Its
-      verdict is authoritative only when ``validation_status == "validated"``.
+      FAIL — a :class:`renmark.judge.Verdict` serialized to a plain dict.
     """
 
     skill: str
@@ -196,35 +182,52 @@ def _behavioral_root() -> Path:
 
 
 def _snapshots_dir(case_dir: Path) -> Path:
-    """Where recorded baseline/golden snapshots live for cases in ``case_dir``."""
+    """Where recorded eval golden snapshots live for cases in ``case_dir``."""
     return case_dir / "snapshots"
 
 
 def _case_from_dict(data: dict[str, object], source: Path | None) -> Case:
     """Build a :class:`Case` from a parsed JSON object, validating the schema."""
-    missing = [k for k in ("skill", "prompt", "baseline_ref", "golden_ref") if k not in data]
+    where = f" ({source})" if source else ""
+
+    missing = [k for k in ("skill", "prompt", "deterministic", "eval") if k not in data]
     if missing:
-        where = f" ({source})" if source else ""
         raise BehaviorConfigError(f"behavior case missing required field(s) {missing}{where}")
 
-    raw_assertions = data.get("assertions", [])
+    det_raw = data["deterministic"]
+    if not isinstance(det_raw, dict):
+        raise BehaviorConfigError(f"'deterministic' must be an object{where}")
+    if "call" not in det_raw:
+        raise BehaviorConfigError(f"'deterministic' missing required field 'call'{where}")
+    raw_assertions = det_raw.get("assertions", [])
     if not isinstance(raw_assertions, list):
-        where = f" ({source})" if source else ""
-        raise BehaviorConfigError(f"'assertions' must be a list{where}")
+        raise BehaviorConfigError(f"'deterministic.assertions' must be a list{where}")
 
-    baseline_ref = str(data["baseline_ref"])
-    golden_ref = str(data["golden_ref"])
-    # Reject unsafe refs at load time (MINOR 4): a ref that is not a plain
-    # filename stem could escape the snapshots directory once interpolated.
-    _validate_ref(baseline_ref, source)
+    eval_raw = data["eval"]
+    if not isinstance(eval_raw, dict):
+        raise BehaviorConfigError(f"'eval' must be an object{where}")
+    eval_missing = [k for k in ("contract", "golden_ref") if k not in eval_raw]
+    if eval_missing:
+        raise BehaviorConfigError(f"'eval' missing required field(s) {eval_missing}{where}")
+
+    golden_ref = str(eval_raw["golden_ref"])
+    # Reject an unsafe ref at load time: a ref that is not a plain filename stem
+    # could escape the snapshots directory once interpolated.
     _validate_ref(golden_ref, source)
 
+    deterministic = DeterministicSpec(
+        call=str(det_raw["call"]),
+        assertions=tuple(str(a) for a in raw_assertions),
+    )
+    eval_spec = EvalSpec(
+        contract=str(eval_raw["contract"]),
+        golden_ref=golden_ref,
+    )
     return Case(
         skill=str(data["skill"]),
         prompt=str(data["prompt"]),
-        assertions=tuple(str(a) for a in raw_assertions),
-        baseline_ref=baseline_ref,
-        golden_ref=golden_ref,
+        deterministic=deterministic,
+        eval=eval_spec,
         source=source,
     )
 
@@ -233,9 +236,9 @@ def load_cases(directory: str | Path | None = None) -> list[Case]:
     """Load every ``*.behavior.json`` case from ``directory`` (sorted by name).
 
     Defaults to ``tests/behavioral/`` at the repo root. A malformed or
-    incomplete case file — including one with an unsafe ``baseline_ref`` /
-    ``golden_ref`` — raises :class:`BehaviorConfigError`; loading is strict so a
-    typo or a traversal attempt can't silently drop or mis-resolve a case.
+    incomplete case file — including one with an unsafe eval ``golden_ref`` —
+    raises :class:`BehaviorConfigError`; loading is strict so a typo or a
+    traversal attempt can't silently drop or mis-resolve a case.
     """
     base = Path(directory) if directory is not None else _behavioral_root()
     cases: list[Case] = []
@@ -252,7 +255,7 @@ def load_cases(directory: str | Path | None = None) -> list[Case]:
     return cases
 
 
-# ── Snapshot path safety (MINOR 4) ───────────────────────────────────────────
+# ── Snapshot path safety (eval tier only) ─────────────────────────────────────
 
 
 def _validate_ref(ref: str, source: Path | None = None) -> None:
@@ -275,18 +278,14 @@ def _validate_ref(ref: str, source: Path | None = None) -> None:
         raise BehaviorConfigError(f"snapshot ref {ref!r} must be a bare filename stem{where}")
 
 
-# ── Snapshot I/O ─────────────────────────────────────────────────────────────
-
-
 def _snapshot_path(case: Case, ref: str) -> Path:
     """Resolve a snapshot stem to its ``.json`` path under the case's snapshots
-    dir, rejecting any resolved path that escapes that directory (MINOR 4)."""
+    dir, rejecting any resolved path that escapes that directory."""
     _validate_ref(ref, case.source)
     case_dir = case.source.parent if case.source is not None else _behavioral_root()
     snapshots = _snapshots_dir(case_dir)
     candidate = (snapshots / f"{ref}.json").resolve()
     root = snapshots.resolve()
-    # Belt-and-suspenders: confirm the resolved path is inside the snapshots dir.
     if root != candidate and root not in candidate.parents:
         raise BehaviorConfigError(
             f"snapshot ref {ref!r} resolves outside the snapshots directory ({candidate})"
@@ -294,94 +293,62 @@ def _snapshot_path(case: Case, ref: str) -> Path:
     return snapshots / f"{ref}.json"
 
 
-def _read_snapshot(path: Path) -> Snapshot | None:
-    """Read a recorded snapshot; return None if it does not exist.
+def _read_snapshot(path: Path) -> str | None:
+    """Read a recorded eval transcript; return None if it does not exist.
 
-    Snapshots are stored as ``{"transcript": "<text>", "inputs": {...}}`` so the
-    format can grow without breaking readers. A bare-string or transcript-only
-    payload (the pre-assertion format) round-trips with empty ``inputs``, which
-    replay treats as "not replayable — run --accept first".
+    Snapshots are stored as ``{"transcript": "<text>"}`` (bare-string and legacy
+    payloads are tolerated). Used ONLY by the eval/judge tier.
     """
     if not path.exists():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(payload, dict) and "transcript" in payload:
-        raw_inputs = payload.get("inputs", {})
-        inputs = dict(raw_inputs) if isinstance(raw_inputs, dict) else {}
-        return Snapshot(transcript=str(payload["transcript"]), inputs=inputs)
-    # Tolerate a bare string / legacy payload for backward compatibility.
+        return str(payload["transcript"])
     if isinstance(payload, str):
-        return Snapshot(transcript=payload, inputs={})
-    return Snapshot(transcript=json.dumps(payload, sort_keys=True), inputs={})
+        return payload
+    return json.dumps(payload, sort_keys=True)
 
 
-def _write_snapshot(path: Path, transcript: str, inputs: dict[str, object]) -> None:
+def _write_snapshot(path: Path, transcript: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps({"transcript": transcript, "inputs": inputs}, indent=2, sort_keys=True) + "\n",
+        json.dumps({"transcript": transcript}, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-
-
-def _differs_meaningfully(baseline: str, golden: str) -> bool:
-    """True when ``golden`` differs from ``baseline`` beyond whitespace noise.
-
-    "The skill had an effect" is defined as a non-whitespace-only difference in
-    the transcript text. Kept intentionally simple and deterministic; semantic
-    equivalence is the judge's job, not replay's.
-    """
-    return " ".join(baseline.split()) != " ".join(golden.split())
-
-
-# ── Current transcript reconstruction (deterministic — shadow-style) ─────────
-
-
-def _current_transcript(golden: Snapshot) -> str | None:
-    """Reconstruct the CURRENT transcript from a golden snapshot's recorded inputs.
-
-    Deterministic and network-free: this Python process cannot call a model, so
-    the "current" transcript is the recorded golden transcript pinned by its
-    recorded inputs — the record-and-replay contract shadow uses. Returns None
-    when there are no recorded inputs to replay (nothing to reproduce a current
-    transcript from) — the caller turns that into an ERROR, never a silent PASS.
-    """
-    if not golden.inputs:
-        return None
-    return golden.transcript
 
 
 # ── Assertion evaluation (deterministic predicate table) ─────────────────────
 
 
-def _assert_contains(transcript: str, arg: str) -> bool:
-    return arg in transcript
+def _assert_contains(output: str, arg: str) -> bool:
+    return arg in output
 
 
-def _assert_not_contains(transcript: str, arg: str) -> bool:
-    return arg not in transcript
+def _assert_not_contains(output: str, arg: str) -> bool:
+    return arg not in output
 
 
-def _assert_matches(transcript: str, arg: str) -> bool:
+def _assert_matches(output: str, arg: str) -> bool:
     try:
-        return re.search(arg, transcript) is not None
+        return re.search(arg, output) is not None
     except re.error:
         return False
 
 
-def _assert_line_ends(transcript: str, arg: str) -> bool:
-    return any(line.rstrip().endswith(arg) for line in transcript.splitlines() if line.strip())
+def _assert_line_ends(output: str, arg: str) -> bool:
+    return any(line.rstrip().endswith(arg) for line in output.splitlines() if line.strip())
 
 
-def _assert_min_lines(transcript: str, arg: str) -> bool:
+def _assert_min_lines(output: str, arg: str) -> bool:
     try:
         want = int(arg.strip())
     except ValueError:
         return False
-    non_empty = [ln for ln in transcript.splitlines() if ln.strip()]
+    non_empty = [ln for ln in output.splitlines() if ln.strip()]
     return len(non_empty) >= want
 
 
-# op name (lowercase) -> predicate(transcript, argument) -> bool
+# op name (lowercase) -> predicate(output, argument) -> bool
 _ASSERTION_OPS: dict[str, Callable[[str, str], bool]] = {
     "contains": _assert_contains,
     "not_contains": _assert_not_contains,
@@ -391,165 +358,236 @@ _ASSERTION_OPS: dict[str, Callable[[str, str], bool]] = {
 }
 
 
-def _eval_assertion(assertion: str, transcript: str) -> bool:
-    """Evaluate one assertion against a transcript deterministically.
+def _eval_assertion(assertion: str, output: str) -> bool:
+    """Evaluate one assertion against ``output`` deterministically.
 
     A ``"<op>:<arg>"`` form dispatches through :data:`_ASSERTION_OPS`; an unknown
-    op is a FAIL (never a silent pass). Any other string is a plain
-    ``contains`` substring check so human-readable assertions still evaluate.
+    op-shaped token (a single leading ``word:`` with no spaces) is a FAIL, never
+    a silent pass. Any other string is a plain ``contains`` substring check.
     """
     if ":" in assertion:
         op_part, _, arg = assertion.partition(":")
         op = op_part.strip().lower()
         if op in _ASSERTION_OPS:
-            return _ASSERTION_OPS[op](transcript, arg)
-        # Unknown op prefix: fall through to a literal substring check only when
-        # the prefix is not a recognized op-shaped token. To stay honest, an op
-        # that *looks* structured (single leading token, no spaces) but is
-        # unrecognized is a FAIL rather than a coincidental substring pass.
+            return _ASSERTION_OPS[op](output, arg)
         if op and " " not in op:
             return False
-    return _assert_contains(transcript, assertion)
+    return _assert_contains(output, assertion)
 
 
-def _evaluate_assertions(assertions: Sequence[str], transcript: str) -> tuple[str, ...]:
-    """Return the tuple of assertions that did NOT hold on ``transcript``."""
-    return tuple(a for a in assertions if not _eval_assertion(a, transcript))
+def _evaluate_assertions(assertions: Sequence[str], output: str) -> tuple[str, ...]:
+    """Return the tuple of assertions that did NOT hold on ``output``."""
+    return tuple(a for a in assertions if not _eval_assertion(a, output))
 
 
-# ── Replay (deterministic — no network, no tokens) ───────────────────────────
+# ── Deterministic dispatch (explicit allow-list of live renmark functions) ────
 
 
-def replay(case: Case) -> Result:
-    """Deterministically replay one case and evaluate its assertion contract.
+def _render_next_steps(repo: Path, case: Case) -> str:
+    """Render ``lifecycle.next_steps(repo, skill)`` to a stable menu text.
 
-    Reconstructs the CURRENT transcript from the golden snapshot's recorded
-    inputs (network-/token-free), then PASSes iff **(a)** every assertion in
-    ``case.assertions`` holds on that current transcript AND **(b)** the recorded
-    golden differs meaningfully from the recorded baseline (proving the skill had
-    an effect). If a required snapshot is missing, or the golden snapshot carries
-    no recorded inputs to replay, returns an ``ERROR`` result whose message is
-    :data:`ACCEPT_FIRST_HINT` — never a silent pass, and never the old
-    golden-vs-baseline-only shortcut.
+    Produces a textual menu the assertions can match: the tier-0 (recommended)
+    option marked ``(Recommended)``, then each remaining suggestion, then a
+    terminal Finish/Nothing fallback line so a menu-terminality assertion can
+    pass. Recomputed live every call — no snapshot.
     """
-    try:
-        baseline_path = _snapshot_path(case, case.baseline_ref)
-        golden_path = _snapshot_path(case, case.golden_ref)
-    except BehaviorConfigError as exc:
-        return _error_result(case, f"unsafe snapshot ref: {exc}")
+    from . import lifecycle
 
-    try:
-        baseline_snap = _read_snapshot(baseline_path)
-        golden_snap = _read_snapshot(golden_path)
-    except (json.JSONDecodeError, OSError) as exc:
-        return _error_result(case, f"failed to read snapshot: {exc}")
+    steps = lifecycle.next_steps(repo, case.skill)
+    lines: list[str] = ["What's next:"]
+    seen: set[str] = set()
+    tier0 = steps.tier0
+    lines.append(f"1 - {tier0} (Recommended)")
+    seen.add(tier0)
+    n = 2
+    for suggestion in steps.suggestions:
+        if suggestion in seen:
+            continue
+        seen.add(suggestion)
+        lines.append(f"{n} - {suggestion}")
+        n += 1
+    lines.append(f"[skill_class: {steps.skill_class}]")
+    # Terminal fallback so menu-terminality assertions have something to match.
+    lines.append(f"{n} - /renmark:finish (Finish) / do nothing")
+    return "\n".join(lines)
 
-    if baseline_snap is None or golden_snap is None:
-        which = "baseline" if baseline_snap is None else "golden"
-        return _error_result(case, f"missing {which} snapshot — {ACCEPT_FIRST_HINT}")
 
-    # Reconstruct the CURRENT transcript from the recorded inputs.
-    current = _current_transcript(golden_snap)
-    if current is None:
-        return _error_result(
-            case,
-            f"golden snapshot has no recorded inputs to replay — {ACCEPT_FIRST_HINT}",
-        )
+def _render_skill_preamble(repo: Path, case: Case) -> str:
+    """Render ``lifecycle.skill_preamble(repo, skill)`` to text (empty if None)."""
+    from . import lifecycle
 
-    # (b) The skill must have had an effect versus the baseline.
-    if not _differs_meaningfully(baseline_snap.transcript, golden_snap.transcript):
+    hint = lifecycle.skill_preamble(repo, case.skill)
+    return hint if hint is not None else ""
+
+
+def _render_plan_lint(repo: Path, case: Case) -> str:
+    """Render the read-only transcript-leak / dispatch-policy check to text.
+
+    A behavior case does not carry a plan path, so instead of linting a file we
+    exercise the leak check on a synthetic task built from the skill's dispatch
+    policy and render both the verdict and the dispatch-policy text. That policy
+    text describes WHAT the skill routes (isolated subagents, artifact pointers)
+    WITHOUT ever containing the forbidden orchestration tokens, so the case's
+    ``not_contains:Agent(`` / ``not_contains:codex exec`` /
+    ``not_contains:renmark-execute --task`` assertions are meaningful — they
+    prove the rendered dispatch policy stays leak-free.
+    """
+    from . import plan_lint
+    from .parser import Task
+
+    # A minimal, honest dispatch-policy description for the skill under test.
+    # Deliberately free of the forbidden tokens the assertions guard against.
+    policy = (
+        f"skill {case.skill}: dispatches each task in an isolated subagent; the "
+        "orchestrator reads only bounded summaries (status, artifact path, token "
+        "count) and never merges back generated code or diffs. Downstream tasks "
+        "reference upstream artifacts by path, not by prior-task output."
+    )
+
+    # Build a synthetic Task and run the authoritative leak check over it so the
+    # rendered verdict reflects the live plan_lint logic, not a hand-copy.
+    task = Task(
+        index=1,
+        title=f"{case.skill} dispatch policy",
+        mode="B",
+        target="(policy)",
+        executor="sonnet",
+        spec=policy,
+        verifier="true",
+    )
+    leak_issues = plan_lint._check_transcript_leak([task])
+    verdict = "leak-free" if not leak_issues else "LEAK"
+    lines = [
+        f"dispatch policy for {case.skill}:",
+        policy,
+        f"transcript-leak check: {verdict}",
+    ]
+    return "\n".join(lines)
+
+
+# call key -> adapter(repo, case) -> rendered current output text.
+# EXPLICIT allow-list: an unresolved key is a FAIL (see _run_deterministic),
+# never an import-time surprise or a silent pass.
+_DISPATCH: dict[str, Callable[[Path, Case], str]] = {
+    "lifecycle.next_steps": _render_next_steps,
+    "lifecycle.skill_preamble": _render_skill_preamble,
+    "plan_lint": _render_plan_lint,
+}
+
+
+# ── Deterministic tier (default — no network, no tokens, no snapshots) ────────
+
+
+def _run_deterministic(case: Case, repo: Path) -> Result:
+    """Run one case's deterministic tier and evaluate its assertion contract.
+
+    Resolves ``case.deterministic.call`` through the explicit :data:`_DISPATCH`
+    allow-list, invokes it on live inputs (``repo``, ``case.skill``) to get the
+    GENUINE CURRENT rendered output (recomputed every run — no snapshot read, no
+    live runner constructed), then evaluates every assertion against it. An
+    unknown ``call`` is a FAIL with a clear message (never an exception that
+    aborts the whole run); a raising adapter is likewise a FAIL, not a crash.
+    """
+    adapter = _DISPATCH.get(case.deterministic.call)
+    if adapter is None:
         return Result(
             skill=case.skill,
-            case=case.golden_ref,
+            case=case.eval.golden_ref,
             status="FAIL",
-            completion_state="complete",
+            completion_state="failed",
             confidence="high",
             validation_status="validated",
-            message="with-skill transcript does not differ from baseline (skill had no effect)",
+            message=(
+                f"unknown deterministic call {case.deterministic.call!r}; "
+                f"allowed: {sorted(_DISPATCH)}"
+            ),
         )
 
-    # (a) Every assertion must hold on the CURRENT transcript.
-    failed = _evaluate_assertions(case.assertions, current)
+    try:
+        output = adapter(repo, case)
+    except Exception as exc:  # a broken adapter fails this case, not the suite
+        return Result(
+            skill=case.skill,
+            case=case.eval.golden_ref,
+            status="FAIL",
+            completion_state="failed",
+            confidence="high",
+            validation_status="validated",
+            message=f"deterministic call {case.deterministic.call!r} raised: {type(exc).__name__}: {exc}",
+        )
+
+    failed = _evaluate_assertions(case.deterministic.assertions, output)
     if failed:
         return Result(
             skill=case.skill,
-            case=case.golden_ref,
+            case=case.eval.golden_ref,
             status="FAIL",
             completion_state="complete",
             confidence="high",
             validation_status="validated",
-            message=f"{len(failed)} assertion(s) failed on the current transcript",
+            message=f"{len(failed)} assertion(s) failed on the current output",
             failed_assertions=failed,
         )
 
     return Result(
         skill=case.skill,
-        case=case.golden_ref,
+        case=case.eval.golden_ref,
         status="PASS",
         completion_state="complete",
         confidence="high",
         validation_status="validated",
-        message="all assertions hold on the current transcript and it differs from baseline",
+        message="all deterministic assertions hold on the current output",
     )
 
 
-def _error_result(case: Case, message: str) -> Result:
-    """A non-runnable case: failed/low/unvalidated — never a silent pass."""
-    return Result(
-        skill=case.skill,
-        case=case.golden_ref,
-        status="ERROR",
-        completion_state="failed",
-        confidence="low",
-        validation_status="unvalidated",
-        message=message,
-    )
+# ── Eval / judge tier (gated — the ONLY model-calling paths) ──────────────────
 
 
-# ── Capture (the live --accept path — the ONLY model-calling function) ────────
+def build_subagent_runner(repo: Path, model: str = "sonnet") -> SubagentRunner:
+    """Adapt ``renmark.providers.claude_agent`` into a :data:`SubagentRunner`.
 
-
-def capture(case: Case, subagent_runner: SubagentRunner) -> tuple[str, str]:
-    """Record the baseline + golden transcripts (and their inputs) for one case.
-
-    This is the ``--accept`` path and the sole model-calling function in this
-    module. It runs ``case.prompt`` twice through ``subagent_runner`` — first
-    skill-disabled (baseline), then skill-enabled (golden) — and writes both
-    snapshots to disk, each recording the transcript AND the exact composed
-    prompt (``inputs``) that produced it so :func:`replay` can later reproduce a
-    current transcript deterministically. Returns the ``(baseline, golden)``
-    transcripts.
-
-    The caller (CLI, host-injected) is responsible for supplying a runner that
-    actually toggles the skill between the two calls; the toggle is encoded in
-    the composed prompt here so the runner stays a plain ``str -> str``.
+    Returns a ``str -> str`` callable the eval/judge tier can inject. It composes
+    an Agent-tool dispatch spec via ``build_agent_dispatch`` and returns its
+    ``prompt`` body; the HOST (a Claude turn with Agent access) is what actually
+    issues the Agent call and feeds the response back — this Python process
+    cannot call a model. Invoked ONLY by :func:`capture` / :func:`_escalate_to_judge`,
+    NEVER by the default deterministic path.
     """
-    baseline_prompt = (
-        f"[skill DISABLED] Respond to the following as a plain assistant with the "
-        f"'{case.skill}' skill turned OFF.\n\n{case.prompt}"
-    )
+    from .parser import Task
+    from .providers.claude_agent import build_agent_dispatch
+
+    def runner(prompt: str) -> str:
+        task = Task(
+            index=0,
+            title="behavioral eval",
+            mode="B",
+            target="(behavioral eval — no file)",
+            executor=model,
+            spec=prompt,
+            verifier="true",
+        )
+        dispatch = build_agent_dispatch(task, repo)
+        return dispatch.prompt
+
+    return runner
+
+
+def capture(case: Case, subagent_runner: SubagentRunner) -> str:
+    """Record the eval golden transcript for one case (the ``--accept`` path).
+
+    The sole model-calling entry point for the with-skill golden. Runs
+    ``case.prompt`` (skill-enabled) through the injected ``subagent_runner`` and
+    writes the transcript under ``snapshots/<golden_ref>.json``. Returns the
+    recorded golden transcript. NEVER called by the default deterministic run —
+    only a caller that explicitly supplies a live runner reaches this.
+    """
     golden_prompt = (
         f"[skill ENABLED: {case.skill}] Respond to the following with the skill "
         f"active.\n\n{case.prompt}"
     )
-
-    baseline = subagent_runner(baseline_prompt)
     golden = subagent_runner(golden_prompt)
-
-    _write_snapshot(
-        _snapshot_path(case, case.baseline_ref),
-        baseline,
-        {"skill": case.skill, "prompt": baseline_prompt, "skill_enabled": False},
-    )
-    _write_snapshot(
-        _snapshot_path(case, case.golden_ref),
-        golden,
-        {"skill": case.skill, "prompt": golden_prompt, "skill_enabled": True},
-    )
-    return baseline, golden
-
-
-# ── Run over all cases ────────────────────────────────────────────────────────
+    _write_snapshot(_snapshot_path(case, case.eval.golden_ref), golden)
+    return golden
 
 
 def _escalate_to_judge(
@@ -561,44 +599,47 @@ def _escalate_to_judge(
 ) -> dict[str, object]:
     """Escalate a deterministic FAIL to the LLM judge (LAZY import).
 
-    Called ONLY when ``run(..., judge=True)``. Reads the recorded snapshots and
-    asks :func:`renmark.judge.judge_behavior` whether the with-skill output
-    honors the contract (the case's assertions) relative to the baseline, passing
-    ``actual=<current transcript>`` (NOT the golden). Returns the verdict
-    serialized to a plain dict; the caller trusts it only when its
-    ``validation_status == "validated"``. Any snapshot-read failure is reported as
-    an unvalidated verdict rather than raising.
+    Called ONLY when ``run(..., judge=True)``. Reads the recorded eval golden and
+    asks :func:`renmark.judge.judge_behavior` whether the with-skill output honors
+    the eval contract. A missing golden yields an unvalidated verdict carrying
+    :data:`ACCEPT_FIRST_HINT` — never a silent pass.
     """
     from dataclasses import asdict
 
     from renmark.judge import judge_behavior  # lazy — avoid import cycle
 
     try:
-        baseline_snap = _read_snapshot(_snapshot_path(case, case.baseline_ref))
-        golden_snap = _read_snapshot(_snapshot_path(case, case.golden_ref))
+        golden = _read_snapshot(_snapshot_path(case, case.eval.golden_ref))
     except (json.JSONDecodeError, OSError, BehaviorConfigError) as exc:
         return {
             "outcome": "fail",
             "confidence": "low",
             "validation_status": "unvalidated",
-            "rationale": f"judge could not read snapshots: {exc}",
+            "rationale": f"judge could not read golden snapshot: {exc}",
         }
 
-    baseline = baseline_snap.transcript if baseline_snap else ""
-    golden = golden_snap.transcript if golden_snap else ""
+    if golden is None:
+        return {
+            "outcome": "fail",
+            "confidence": "low",
+            "validation_status": "unvalidated",
+            "rationale": f"no recorded eval golden — {ACCEPT_FIRST_HINT}",
+        }
 
-    contract = "\n".join(f"- {a}" for a in case.assertions) or "(no assertions declared)"
     verdict = judge_behavior(
         repo,
         skill=case.skill,
         prompt=case.prompt,
-        baseline=baseline,
+        baseline="",  # v2 has no recorded baseline; the judge weighs contract vs actual
         golden=golden,
-        actual=current,  # the CURRENT transcript replay evaluated, not the golden
-        contract=contract,
+        actual=current,
+        contract=case.eval.contract,
         subagent_runner=subagent_runner,
     )
     return asdict(verdict)
+
+
+# ── Run over all cases ────────────────────────────────────────────────────────
 
 
 def run(
@@ -610,24 +651,28 @@ def run(
     subagent_runner: SubagentRunner | None = None,
     cases: Sequence[Case] | None = None,
 ) -> list[Result]:
-    """Replay every behavioral case and return one :class:`Result` each.
+    """Run every behavioral case's deterministic tier and return one Result each.
 
-    Deterministic first: each case runs through :func:`replay` (no model call),
-    evaluating its assertion contract against a CURRENT transcript reconstructed
-    from recorded inputs. On a deterministic FAIL:
+    The default path runs the DETERMINISTIC tier only: each case's
+    ``deterministic.call`` is resolved to a live renmark function, invoked on
+    live inputs, and its assertions evaluated against the genuine current output.
+    This path reads no snapshot, constructs no live runner, spends no tokens, and
+    touches no network.
+
+    On a deterministic FAIL:
 
     - if ``judge=True``, escalate to the LLM judge via a LAZY
       :func:`renmark.judge.judge_behavior` import (costs
-      :data:`renmark.judge.JUDGE_EST_COST_USD`) with ``actual=<current
-      transcript>``, stashing the verdict on ``result.judge_verdict``. The
-      verdict is authoritative only when its ``validation_status ==
-      "validated"``;
+      :data:`renmark.judge.JUDGE_EST_COST_USD`), comparing the case's recorded
+      eval golden against the ``actual`` current output under the eval contract,
+      and stash the verdict on ``result.judge_verdict``. A missing eval golden
+      yields an unvalidated verdict carrying :data:`ACCEPT_FIRST_HINT` — never a
+      silent pass;
     - else if ``on_fail_offer`` (the default), set ``result.judge_offered=True``
       so the CLI can prompt for an opt-in escalation.
 
-    ERROR results (missing snapshot / no recorded inputs) are NOT escalated — the
-    judge cannot rescue a case that never recorded a transcript to compare.
-    The judge is NEVER auto-invoked unless ``judge=True`` is passed explicitly.
+    The judge is NEVER auto-invoked unless ``judge=True`` is passed explicitly,
+    and it only runs on the gated eval path.
 
     Parameters
     ----------
@@ -638,10 +683,12 @@ def run(
     on_fail_offer:
         When not escalating, flag FAILs as judge-eligible for the CLI to prompt.
     repo:
-        Project root passed to the judge (defaults to the repo containing this
-        module). Only read when ``judge=True``.
+        Project root; the deterministic tier's live inputs derive from it, and it
+        is forwarded to the judge on the ``judge=True`` path. Defaults to the repo
+        containing this module.
     subagent_runner:
-        Live-model runner forwarded to the judge when ``judge=True``.
+        Live-model runner forwarded to the judge when ``judge=True``. NEVER used
+        or constructed on the default deterministic path.
     cases:
         Pre-loaded cases to run instead of loading from ``directory`` (testing).
     """
@@ -650,10 +697,10 @@ def run(
 
     results: list[Result] = []
     for case in loaded:
-        result = replay(case)
+        result = _run_deterministic(case, repo_path)
         if result.status == "FAIL":
             if judge:
-                current = _current_for_judge(case)
+                current = _current_for_judge(case, repo_path)
                 result.judge_verdict = _escalate_to_judge(
                     repo_path, case, current=current, subagent_runner=subagent_runner
                 )
@@ -663,31 +710,33 @@ def run(
     return results
 
 
-def _current_for_judge(case: Case) -> str:
-    """Best-effort current transcript for the judge escalation path.
+def _current_for_judge(case: Case, repo: Path) -> str:
+    """Best-effort current output for the judge escalation path.
 
-    Reconstructs the current transcript the same way :func:`replay` does. Returns
-    an empty string if the snapshot/inputs are unavailable — the judge then sees
-    an empty actual and, per its contract, cannot return a validated pass.
+    Re-renders the deterministic call the same way :func:`_run_deterministic`
+    does (no model call — deterministic surface). Returns an empty string if the
+    call is unknown or the adapter raises, so the judge sees an empty actual and,
+    per its contract, cannot return a validated pass.
     """
+    adapter = _DISPATCH.get(case.deterministic.call)
+    if adapter is None:
+        return ""
     try:
-        golden_snap = _read_snapshot(_snapshot_path(case, case.golden_ref))
-    except (json.JSONDecodeError, OSError, BehaviorConfigError):
+        return adapter(repo, case)
+    except Exception:
         return ""
-    if golden_snap is None:
-        return ""
-    return _current_transcript(golden_snap) or ""
 
 
 __all__ = [
     "ACCEPT_FIRST_HINT",
     "BehaviorConfigError",
     "Case",
+    "DeterministicSpec",
+    "EvalSpec",
     "Result",
-    "Snapshot",
     "SubagentRunner",
+    "build_subagent_runner",
     "capture",
     "load_cases",
-    "replay",
     "run",
 ]
