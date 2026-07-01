@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-01] — wire context into the production dispatch packet (AC5 wave 2, task 3)
+**Request:** Make AC5 behaviorally real — connect `renmark/context.py` to a real production surface, not just a standalone helper (PRD REQ-20).
+**Built:** `renmark/dispatch.py` — `SubagentInput` gained `required_skills: list[str]` (names only); `to_dict()` renders each as a metadata reference `{name, pointer, metadata}` via a function-local `from renmark import context` (never a SKILL.md body); `build_subagent_input` gained a kw-only `required_skills` param and calls `context.assert_metadata_only` at build time. Additive + backward-compatible (12/12 dispatch tests still pass); function-local imports avoid any cycle.
+**Files changed:**
+- `renmark/dispatch.py` — the production task-local packet now consumes context.py (metadata-upfront, bodies never)
+**Do not change:**
+- The `context` imports MUST stay function-local (cycle guard); `required_skills` MUST render as metadata refs only (never a body); `build_subagent_input` MUST call `assert_metadata_only` before constructing the packet; no second packet type — `SubagentInput` is the one production dispatch packet.
+
 ## [2026-07-01] — context taxonomy + dynamic-loader primitives (AC5 wave 1, task 1)
 **Request:** Codify renmark's four-way context taxonomy and metadata-upfront/body-on-demand loading (PRD REQ-20).
 **Built:** New stdlib-only `renmark/context.py` — `ContextKind` enum (STATIC/DYNAMIC/MEMORY/TASK_LOCAL); `ContextSource`/`TAXONOMY`; `classify_path`; metadata-upfront helpers `skill_metadata`/`all_skill_metadata`/`fragment_names` (reuse `skillmeta.SKILLS`, never read bodies); on-demand `skill_pointer`/`fragment_pointer` + `load_skill_body`/`load_fragment`; `upfront_kinds_for_skill` (STATIC+MEMORY only); `assert_metadata_only` guardrail. Lazy imports avoid cycles; mypy strict clean.

@@ -219,21 +219,46 @@ SUBAGENT_MAX_CHARS_PER_LINE = 1200
 
 @dataclass(frozen=True)
 class SubagentInput:
-    """The ONLY fields a per-task subagent receives. Anything else is a leak."""
+    """The ONLY fields a per-task subagent receives. Anything else is a leak.
+
+    ``required_skills`` carries skill NAMES only. It is rendered as bounded
+    metadata references (name + ``${CLAUDE_PLUGIN_ROOT}`` pointer + non-body
+    metadata) — never a SKILL.md body. The subagent loads the body itself
+    from the pointer; the packet stays metadata-only (dynamic skill loading).
+    """
 
     task_spec: str
     required_files: list[str] = field(default_factory=list)
     upstream_artifact_pointers: list[str] = field(default_factory=list)
     dependency_summaries: list[str] = field(default_factory=list)
     verifier_expectations: str = ""
+    required_skills: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        # Function-local import mirrors the schemas import below, avoiding any
+        # context ↔ dispatch import cycle.
+        from renmark import context
+
+        skill_refs: list[dict[str, object]] = []
+        for n in self.required_skills:
+            meta = context.skill_metadata(n)
+            if meta is None:
+                skill_refs.append({"name": n, "pointer": context.skill_pointer(n)})
+            else:
+                skill_refs.append(
+                    {
+                        "name": n,
+                        "pointer": context.skill_pointer(n),
+                        "metadata": meta,
+                    }
+                )
         return {
             "task_spec": self.task_spec,
             "required_files": list(self.required_files),
             "upstream_artifact_pointers": list(self.upstream_artifact_pointers),
             "dependency_summaries": list(self.dependency_summaries),
             "verifier_expectations": self.verifier_expectations,
+            "required_skills": skill_refs,
         }
 
     def to_json(self) -> str:
@@ -358,17 +383,26 @@ def build_subagent_input(
     *,
     dependency_summaries: list[str] | None = None,
     upstream_artifact_pointers: list[str] | None = None,
+    required_skills: list[str] | None = None,
 ) -> SubagentInput:
     """Construct the bounded input for a single task's subagent.
 
     Pulls only the task spec + explicit file paths from the Task dataclass.
-    No other Task fields cross the boundary."""
+    No other Task fields cross the boundary. ``required_skills`` are skill
+    NAMES; they are validated as metadata-only at build time (an inlined
+    SKILL.md body is rejected) and rendered as pointers, never bodies."""
+    # Function-local import mirrors the schemas import in parse_subagent_response,
+    # avoiding any context ↔ dispatch import cycle.
+    from renmark import context
+
+    context.assert_metadata_only(required_skills or [])
     return SubagentInput(
         task_spec=task.spec,
         required_files=[task.target, *list(task.context_files or [])],
         upstream_artifact_pointers=list(upstream_artifact_pointers or []),
         dependency_summaries=list(dependency_summaries or []),
         verifier_expectations=task.verifier or "",
+        required_skills=list(required_skills or []),
     )
 
 
