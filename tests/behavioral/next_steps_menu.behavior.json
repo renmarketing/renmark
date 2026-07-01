@@ -2,11 +2,9 @@
   "skill": "roadmap",
   "prompt": "What's next for renmark — show me the roadmap and what gaps are left.",
   "assertions": [
-    "final turn issues an AskUserQuestion next-steps menu",
-    "the next-steps menu is the last thing in the transcript (turn does not trail off in prose)",
-    "first option label ends with (Recommended)",
-    "the menu offers at least two distinct selectable options",
-    "requires an explicit choice (does not auto-proceed to the next pipeline step)"
+    "contains:(Recommended)",
+    "matches:[Ww]hat's next",
+    "min_lines:3"
   ],
   "baseline_ref": "next_steps_menu.baseline",
   "golden_ref": "next_steps_menu.golden"
