@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-01] — v0.23.0 — P8 behavioral eval tier + P7 skill-consistency lint
+**Release.** Bumps v0.22.0 → v0.23.0. Ships two external-skills-study items:
+- **P8-v2** — behavioral skill testing, tests-vs-evals split. `renmark-execute --behavior` runs the **deterministic tier** (renmark's real behavior-shaping functions asserted live, CI-safe, zero tokens); the **eval/judge tier** (`--accept`/`--judge`) is honestly HOST-pending (`build_subagent_runner` raises rather than faking transcripts — a pure-Python process can't issue the model call). Reviewed clean (0 Critical/Major after fixes).
+- **P7** — `skillgen --check`, a read-only skill-consistency lint (frontmatter discipline + doc-slimming guard) wired as precommit gate 5/7; central `skillmeta.py` registry. Clean on all 28 skills.
+
+Full suite **1175 passed, 28 skipped**; ruff + mypy + skillgen lint clean; version drift clean (7/7 at v0.23.0). See the per-feature entries below.
+
 ## [2026-07-01] — P8-v2 codereview fixes (4 Major + 1 Minor)
 **Request:** Fix the codex review findings on the P8-v2 diff (spec was under-built: eval tier never ran a real trajectory).
 **Built:**
