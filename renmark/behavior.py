@@ -93,6 +93,16 @@ class BehaviorConfigError(ValueError):
     or an eval ``golden_ref`` is unsafe (would escape the snapshots directory)."""
 
 
+class LiveRunnerUnavailable(RuntimeError):
+    """The eval tier's live model runner was requested but is not wired.
+
+    A pure-Python process cannot issue the Agent/model call the eval tier needs;
+    a real ``str -> str`` runner must be injected by the HOST (an agent turn with
+    Agent-tool access). Until then the eval tier (``--accept`` / ``--judge``) is
+    unavailable, and the deterministic tier (``--behavior``) is the CI-safe
+    default. Raised by :func:`build_subagent_runner`."""
+
+
 # ── Case model ─────────────────────────────────────────────────────────────
 
 
@@ -199,9 +209,17 @@ def _case_from_dict(data: dict[str, object], source: Path | None) -> Case:
         raise BehaviorConfigError(f"'deterministic' must be an object{where}")
     if "call" not in det_raw:
         raise BehaviorConfigError(f"'deterministic' missing required field 'call'{where}")
-    raw_assertions = det_raw.get("assertions", [])
-    if not isinstance(raw_assertions, list):
-        raise BehaviorConfigError(f"'deterministic.assertions' must be a list{where}")
+    if "assertions" not in det_raw:
+        raise BehaviorConfigError(
+            f"'deterministic' missing required field 'assertions'{where}"
+        )
+    raw_assertions = det_raw["assertions"]
+    # A missing/empty assertion set would let a case vacuously PASS (no failures),
+    # so require a non-empty list — a case must assert something.
+    if not isinstance(raw_assertions, list) or not raw_assertions:
+        raise BehaviorConfigError(
+            f"'deterministic.assertions' must be a non-empty list{where}"
+        )
 
     eval_raw = data["eval"]
     if not isinstance(eval_raw, dict):
@@ -421,16 +439,17 @@ def _render_skill_preamble(repo: Path, case: Case) -> str:
 
 
 def _render_plan_lint(repo: Path, case: Case) -> str:
-    """Render the read-only transcript-leak / dispatch-policy check to text.
+    """Render a NARROW, declared-policy read-only check to text (scaffolding tier).
 
-    A behavior case does not carry a plan path, so instead of linting a file we
-    exercise the leak check on a synthetic task built from the skill's dispatch
-    policy and render both the verdict and the dispatch-policy text. That policy
-    text describes WHAT the skill routes (isolated subagents, artifact pointers)
-    WITHOUT ever containing the forbidden orchestration tokens, so the case's
-    ``not_contains:Agent(`` / ``not_contains:codex exec`` /
-    ``not_contains:renmark-execute --task`` assertions are meaningful — they
-    prove the rendered dispatch policy stays leak-free.
+    Honest scope (do not overstate): a behavior case carries no plan path and the
+    real roadmap trajectory is model-driven, so this deterministic adapter does
+    NOT prove that live roadmap OUTPUT is read-only — that is the eval tier's job
+    (``case.eval.contract``). What it DOES prove, via the authoritative
+    :func:`plan_lint._check_transcript_leak`, is a scaffolding-level invariant:
+    the skill's declared dispatch policy renders leak-free (no ``Agent(`` /
+    ``codex exec`` / ``renmark-execute --task`` tokens) AND positively describes
+    read-only routing (isolated subagents, bounded-summary reads). It is a
+    regression guard on the declared contract, not a live-behavior proof.
     """
     from . import plan_lint
     from .parser import Task
@@ -544,32 +563,26 @@ def _run_deterministic(case: Case, repo: Path) -> Result:
 
 
 def build_subagent_runner(repo: Path, model: str = "sonnet") -> SubagentRunner:
-    """Adapt ``renmark.providers.claude_agent`` into a :data:`SubagentRunner`.
+    """The eval tier's live runner is HOST-injected — there is no Python factory.
 
-    Returns a ``str -> str`` callable the eval/judge tier can inject. It composes
-    an Agent-tool dispatch spec via ``build_agent_dispatch`` and returns its
-    ``prompt`` body; the HOST (a Claude turn with Agent access) is what actually
-    issues the Agent call and feeds the response back — this Python process
-    cannot call a model. Invoked ONLY by :func:`capture` / :func:`_escalate_to_judge`,
-    NEVER by the default deterministic path.
+    A pure-Python process cannot issue the Agent/model call the eval tier needs,
+    so there is no honest ``str -> str`` runner to return here. (An earlier
+    version returned the dispatch PROMPT text, which made ``--accept`` record
+    prompts as "goldens" and ``--judge`` feed a prompt into the judge instead of a
+    real transcript — never a real model trajectory.) Callers that need the eval
+    tier must inject a real runner supplied by the HOST (an agent turn with
+    Agent-tool access); absent that, this raises :class:`LiveRunnerUnavailable`.
+    The deterministic tier (:func:`run` with no runner) is the CI-safe default and
+    never reaches here.
+
+    ``repo`` / ``model`` are kept for the eventual host-injection signature.
     """
-    from .parser import Task
-    from .providers.claude_agent import build_agent_dispatch
-
-    def runner(prompt: str) -> str:
-        task = Task(
-            index=0,
-            title="behavioral eval",
-            mode="B",
-            target="(behavioral eval — no file)",
-            executor=model,
-            spec=prompt,
-            verifier="true",
-        )
-        dispatch = build_agent_dispatch(task, repo)
-        return dispatch.prompt
-
-    return runner
+    del repo, model  # unused until a host runner is wired; kept for signature
+    raise LiveRunnerUnavailable(
+        "eval-tier live runner not wired: a host-injected str->str runner is "
+        "required (this Python process cannot issue the model call). The "
+        "deterministic tier (--behavior) is the CI-safe default."
+    )
 
 
 def capture(case: Case, subagent_runner: SubagentRunner) -> str:
@@ -754,6 +767,7 @@ __all__ = [
     "Case",
     "DeterministicSpec",
     "EvalSpec",
+    "LiveRunnerUnavailable",
     "Result",
     "SubagentRunner",
     "build_subagent_runner",

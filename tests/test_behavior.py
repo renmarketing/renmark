@@ -50,8 +50,10 @@ def _write_case_file(
         "skill": skill,
         "prompt": prompt,
         "deterministic": {
+            # Non-empty by default: the v2 schema rejects empty/missing assertions,
+            # so helpers that don't care about assertions still load a valid case.
             "call": call,
-            "assertions": assertions or [],
+            "assertions": assertions or ["contains:What's next"],
         },
         "eval": {
             "contract": contract,
@@ -264,3 +266,54 @@ def test_unknown_assertion_op_fails_deterministically() -> None:
     assert len(results) == 1
     assert results[0].status == "FAIL"
     assert results[0].failed_assertions == ("mystery:dispatch policy",)
+
+
+def test_build_subagent_runner_is_unavailable_by_default() -> None:
+    # The eval tier's live runner is host-injected; the built-in Python factory
+    # cannot issue a model call, so it must raise rather than return prompt text.
+    with pytest.raises(behavior.LiveRunnerUnavailable):
+        behavior.build_subagent_runner(Path("."))
+
+
+def test_capture_records_injected_runner_output(tmp_path: Path) -> None:
+    # capture() must record exactly what a REAL injected runner returns — proving
+    # the golden is a transcript, not a prompt template.
+    case = _case(
+        assertions=["contains:x"],
+        golden_ref="captured",
+        source=tmp_path / "roadmap.behavior.json",
+    )
+    (tmp_path / "roadmap.behavior.json").write_text("{}", encoding="utf-8")
+
+    def stub_runner(prompt: str) -> str:
+        return "REAL-TRANSCRIPT for: " + prompt[:10]
+
+    recorded = behavior.capture(case, stub_runner)
+
+    assert recorded.startswith("REAL-TRANSCRIPT")
+    snapshot = tmp_path / "snapshots" / "captured.json"
+    assert snapshot.exists()
+    assert "REAL-TRANSCRIPT" in snapshot.read_text(encoding="utf-8")
+
+
+def test_load_cases_rejects_missing_assertions(tmp_path: Path) -> None:
+    payload = {
+        "skill": "roadmap",
+        "prompt": "p",
+        "deterministic": {"call": "lifecycle.next_steps"},  # no assertions key
+        "eval": {"contract": "c", "golden_ref": "g"},
+    }
+    (tmp_path / "roadmap.behavior.json").write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(behavior.BehaviorConfigError, match="assertions"):
+        behavior.load_cases(str(tmp_path))
+
+
+def test_load_cases_rejects_empty_assertions(tmp_path: Path) -> None:
+    # An empty assertion set would vacuously PASS — reject it at load time.
+    path = _write_case_file(tmp_path, assertions=[])
+    # _write_case_file defaults non-empty; force the empty case explicitly:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["deterministic"]["assertions"] = []
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(behavior.BehaviorConfigError, match="non-empty"):
+        behavior.load_cases(str(tmp_path))

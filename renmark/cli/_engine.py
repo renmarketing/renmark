@@ -1074,8 +1074,17 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
 
     # Default / --judge: deterministic tier. On the default path we pass NO live
     # runner, so run() spends zero tokens and touches no network. Only --judge
-    # constructs the live runner and forwards it so a FAIL can escalate.
-    runner = _behavior.build_subagent_runner(repo) if judge else None
+    # constructs the live runner and forwards it so a FAIL can escalate — but the
+    # eval-tier live runner is host-injected and may be unavailable, in which case
+    # we degrade honestly to the deterministic tier rather than fake it.
+    runner = None
+    if judge:
+        try:
+            runner = _behavior.build_subagent_runner(repo)
+        except _behavior.LiveRunnerUnavailable as exc:
+            _print(f"  eval tier unavailable: {exc}")
+            _print("  running the deterministic tier only.")
+            judge = False
     try:
         results = _behavior.run(
             behavioral_dir, judge=judge, repo=repo, subagent_runner=runner
@@ -1118,7 +1127,11 @@ def _behavior_accept(repo: Path, behavioral_dir: str) -> int:
         _print(f"ERROR loading behavioral cases: {exc}")
         return 2
 
-    runner = _behavior.build_subagent_runner(repo)
+    try:
+        runner = _behavior.build_subagent_runner(repo)
+    except _behavior.LiveRunnerUnavailable as exc:
+        _print(f"eval tier unavailable — cannot record goldens: {exc}")
+        return 3
     recorded = 0
     failed = 0
     for case in cases:
