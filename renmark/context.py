@@ -40,9 +40,39 @@ from __future__ import annotations
 
 import enum
 import os
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+
+# A bare skill/fragment reference: a leading alphanumeric then name-shaped
+# characters only (kebab, snake, dotted, namespaced ``plugin:skill``). No
+# whitespace, newlines, or fences — those signal an inlined body, not a name.
+_SKILL_REF_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
+
+
+def _has_contiguous(parts: tuple[str, ...], seq: tuple[str, ...]) -> bool:
+    """True if *seq* appears as a contiguous run of segments within *parts*."""
+    if not seq:
+        return False
+    return any(
+        parts[i : i + len(seq)] == seq
+        for i in range(len(parts) - len(seq) + 1)
+    )
+
+
+def _reject_unsafe_name(name: str) -> None:
+    """Reject a skill/fragment *name* that could escape its namespace.
+
+    Loaders build ``<root>/skills/<name>/...`` — a ``name`` containing a path
+    separator or ``..`` could traverse out and read arbitrary files. Raises
+    :class:`ValueError` on any separator, parent ref, or empty name.
+    """
+    if not name or "/" in name or "\\" in name or ".." in name or "\x00" in name:
+        raise ValueError(
+            f"unsafe skill/fragment name {name!r}: names must be a single "
+            "path segment with no separators or parent references."
+        )
 
 __all__ = [
     "FRAGMENT_NAMES",
@@ -170,17 +200,22 @@ def classify_path(path: str | os.PathLike[str]) -> ContextKind:
         s = os.fspath(path)
     except TypeError:
         return ContextKind.TASK_LOCAL
-    # Normalise separators so Windows-style paths classify identically.
+    # Normalise separators so Windows-style paths classify identically, then
+    # classify from path SEGMENTS (not substrings) so lookalikes such as
+    # ``xplugin/skills/foo/SKILL.md`` do not falsely match ``plugin/skills``.
     norm = s.replace("\\", "/")
     base = norm.rsplit("/", 1)[-1]
+    parts = tuple(p for p in norm.split("/") if p and p != ".")
 
     if base in ("CLAUDE.md", "AGENTS.md"):
         return ContextKind.STATIC
-    if "plugin/skills/_shared/" in norm and norm.endswith(".md"):
+    if _has_contiguous(parts, ("plugin", "skills", "_shared")) and base.endswith(
+        ".md"
+    ):
         return ContextKind.DYNAMIC
-    if "plugin/skills/" in norm and base == "SKILL.md":
+    if _has_contiguous(parts, ("plugin", "skills")) and base == "SKILL.md":
         return ContextKind.DYNAMIC
-    if ".renmark/memory/" in norm:
+    if _has_contiguous(parts, (".renmark", "memory")):
         return ContextKind.MEMORY
     return ContextKind.TASK_LOCAL
 
@@ -249,8 +284,10 @@ def load_skill_body(plugin_root: str | os.PathLike[str], name: str) -> str:
     """Read and return the body of ``<plugin_root>/skills/<name>/SKILL.md``.
 
     This is the on-demand load — call it only when the body is actually needed.
-    Raises :class:`FileNotFoundError` if the SKILL.md does not exist.
+    Raises :class:`ValueError` for an unsafe (traversal) *name* and
+    :class:`FileNotFoundError` if the SKILL.md does not exist.
     """
+    _reject_unsafe_name(name)
     return (Path(plugin_root) / "skills" / name / "SKILL.md").read_text(
         encoding="utf-8"
     )
@@ -259,8 +296,10 @@ def load_skill_body(plugin_root: str | os.PathLike[str], name: str) -> str:
 def load_fragment(plugin_root: str | os.PathLike[str], name: str) -> str:
     """Read and return ``<plugin_root>/skills/_shared/<name>.md``.
 
-    On-demand load; raises :class:`FileNotFoundError` if the fragment is absent.
+    On-demand load; raises :class:`ValueError` for an unsafe (traversal) *name*
+    and :class:`FileNotFoundError` if the fragment is absent.
     """
+    _reject_unsafe_name(name)
     return (Path(plugin_root) / "skills" / "_shared" / f"{name}.md").read_text(
         encoding="utf-8"
     )
@@ -295,16 +334,18 @@ def assert_metadata_only(skills: Iterable[str]) -> None:
 
     This is the dynamic-loading guardrail: a dispatch packet may carry required
     *skill names* (metadata), never inlined full skill *bodies*.  Raises
-    :class:`ValueError` if any entry looks like a body rather than a name —
-    heuristically, if it contains a newline, exceeds ~80 characters, or contains
-    a triple-backtick fence.
+    :class:`ValueError` if any entry is not a bare skill-name-shaped reference.
+    An entry must match :data:`_SKILL_REF_RE` (leading alphanumeric, then only
+    name-shaped characters — no whitespace, newlines, or fences) and stay within
+    80 characters. This rejects not just fenced/multiline blobs but also short
+    prose snippets (which contain spaces), closing the earlier bypass.
     """
     for item in skills:
         text = str(item)
-        if "\n" in text or len(text) > 80 or "```" in text:
+        if len(text) > 80 or "```" in text or not _SKILL_REF_RE.match(text):
             preview = text[:40].replace("\n", "\\n")
             raise ValueError(
                 "assert_metadata_only: expected a bare skill-name reference, got "
-                f"what looks like a full body ({preview!r}...): dispatch packets "
-                "carry skill-name metadata only, never inlined skill bodies."
+                f"what looks like non-metadata text ({preview!r}...): dispatch "
+                "packets carry skill-name metadata only, never inlined bodies."
             )

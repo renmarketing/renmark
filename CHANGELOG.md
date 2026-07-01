@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-07-01] — codereview fixes for dynamic-skill-loading (AC5)
+**Request:** Resolve the full codex review findings before finish (0 Critical, 2 Major, 2 Minor; Spec: compliant).
+**Built:**
+- Major — updated the isolation contract test `test_subagent_input_does_not_carry_orchestrator_context` to sanction `required_skills` as an intentional bounded field (it was SKIPPED without `RENMARK_SMOKE=1`, hiding that `to_dict()`'s new key broke the "only these fields" assertion). Now passes under `RENMARK_SMOKE=1`.
+- Major — `renmark/context.py`: `load_skill_body`/`load_fragment` now reject traversal-style `name` (separators / `..` / empty / NUL) via `_reject_unsafe_name` before reading.
+- Minor — `classify_path` is now segment-aware (`_has_contiguous` over path parts), so lookalikes like `xplugin/skills/foo/SKILL.md` no longer falsely classify as DYNAMIC.
+- Minor — `assert_metadata_only` now requires a slug-shaped reference (`_SKILL_REF_RE`), rejecting short prose (spaces) that previously slipped past the newline/fence/length checks.
+**Files changed:**
+- `renmark/context.py` — traversal guard, segment-aware classify_path, stricter guardrail
+- `tests/integration/test_dispatch_isolation_e2e.py` — allow the sanctioned `required_skills` field
+**Do not change:**
+- `required_skills` is a sanctioned bounded field (metadata only, guarded); the contract test's `allowed` set must include it.
+- Loaders MUST reject traversal names; `classify_path` MUST use segment matching, not substrings.
+- NOTE (pre-existing, out of scope): `test_plugin_has_required_skill_files` fails on origin/main too — stale pinned roster missing `guide`/`scan`. Not touched here.
+
 ## [2026-07-01] — context taxonomy rule block, mirrored (AC5 wave 3, tasks 5 & 6)
 **Request:** Document the four-way context taxonomy + dynamic-loading contract in the project rule files (PRD REQ-20).
 **Built:** Added a byte-identical "## Context taxonomy — static / dynamic / memory / task-local" rule block to both `CLAUDE.md` and `AGENTS.md` (after the context-hygiene block): the four kinds, metadata-upfront/bodies-on-demand via `renmark/context.py`, and the dispatch-packet metadata-only contract; cites the shared fragment. Committed together to honor the mirror rule.

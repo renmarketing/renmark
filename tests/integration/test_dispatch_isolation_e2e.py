@@ -132,8 +132,13 @@ def test_failing_subagent_still_contracts():
 
 
 def test_subagent_input_does_not_carry_orchestrator_context():
-    """SubagentInput must contain ONLY the five permitted fields — no
-    orchestrator transcripts or session metadata leaks downstream."""
+    """SubagentInput must contain ONLY sanctioned bounded fields — no
+    orchestrator transcripts or session metadata leaks downstream.
+
+    ``required_skills`` (AC5 / REQ-20) is a deliberate, bounded addition: it
+    carries required-skill *metadata* (name + pointer), never full skill bodies,
+    and is guarded at build time by ``context.assert_metadata_only``. It is a
+    sanctioned field, not a leak — hence it is in ``allowed``."""
     inp = build_subagent_input(_task())
     allowed = {
         "task_spec",
@@ -141,6 +146,7 @@ def test_subagent_input_does_not_carry_orchestrator_context():
         "upstream_artifact_pointers",
         "dependency_summaries",
         "verifier_expectations",
+        "required_skills",
     }
     d = inp.to_dict()
     extra = set(d.keys()) - allowed
