@@ -1242,7 +1242,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=("conductor", "orchestrator"),
         metavar="conductor|orchestrator",
         help=(
-            "persist the operating mode to .renmark/mode.json "
+            "persist the operating mode to .renmark/state/mode.json "
             "('conductor' = high-touch interactive drive; "
             "'orchestrator' = hands-off autonomous plan execution)."
         ),
@@ -1255,7 +1255,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--clear-mode",
         action="store_true",
-        help="clear the persisted operating mode from .renmark/mode.json, then exit",
+        help="clear the persisted operating mode from .renmark/state/mode.json, then exit",
     )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
@@ -1325,11 +1325,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.set_mode is not None:
         from .. import mode as _mode
+        mode_path = _mode.mode_state_path(repo)
         try:
             _mode.set_mode(repo, args.set_mode)
         except ValueError as exc:
             ap.error(str(exc))
-        print(f"renmark: operating mode set to {args.set_mode} ({repo}/.renmark/mode.json)")
+        except OSError as exc:
+            print(
+                f"renmark: failed to persist operating mode to {mode_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: operating mode set to {args.set_mode} ({mode_path})")
         return 0
     if args.get_mode:
         from .. import mode as _mode
@@ -1338,8 +1345,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.clear_mode:
         from .. import mode as _mode
-        _mode.clear_mode(repo)
-        print(f"renmark: operating mode cleared ({repo}/.renmark/mode.json)")
+        mode_path = _mode.mode_state_path(repo)
+        try:
+            _mode.clear_mode(repo)
+        except OSError as exc:
+            print(
+                f"renmark: failed to clear operating mode at {mode_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: operating mode cleared ({mode_path})")
         return 0
     if args.task_brief:
         plan_path, task_index_str = args.task_brief

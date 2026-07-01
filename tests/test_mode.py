@@ -30,11 +30,20 @@ small helpers only where needed, and no writes outside the temporary repo.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from renmark import mode
+
+
+def test_mode_state_path_points_at_state_subdir(tmp_path: Path) -> None:
+    path = mode.mode_state_path(tmp_path)
+    assert path == tmp_path / ".renmark" / "state" / "mode.json"
+    # The public helper must agree with the module-relative constant.
+    assert str(path).endswith(os.path.join(".renmark", "state", "mode.json"))
+    assert mode.MODE_REL == ".renmark/state/mode.json"
 
 
 def test_set_mode_round_trip_conductor(tmp_path: Path) -> None:
@@ -114,6 +123,84 @@ def test_set_mode_bogus_preserves_prior_value(tmp_path: Path) -> None:
 def test_clear_mode_when_absent_is_idempotent(tmp_path: Path) -> None:
     mode.clear_mode(tmp_path)
     assert mode.read_mode(tmp_path) is None
+
+
+def test_set_mode_write_failure_propagates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A genuine filesystem write failure must NOT be swallowed."""
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise OSError("read-only file system")
+
+    # Fail the atomic temp-file write.
+    monkeypatch.setattr(Path, "write_text", _boom)
+
+    with pytest.raises(OSError):
+        mode.set_mode(tmp_path, "conductor")
+
+    # Nothing landed at the real path, and no temp file is left behind.
+    state_dir = tmp_path / ".renmark" / "state"
+    assert not (state_dir / "mode.json").exists()
+    leftovers = list(state_dir.glob("mode.json.tmp.*")) if state_dir.exists() else []
+    assert leftovers == []
+
+
+def test_set_mode_replace_failure_propagates_and_cleans_tmp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the atomic rename fails, the error surfaces and the temp file is removed."""
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise OSError("cannot replace")
+
+    monkeypatch.setattr(os, "replace", _boom)
+
+    with pytest.raises(OSError):
+        mode.set_mode(tmp_path, "orchestrator")
+
+    state_dir = tmp_path / ".renmark" / "state"
+    assert not (state_dir / "mode.json").exists()
+    leftovers = list(state_dir.glob("mode.json.tmp.*")) if state_dir.exists() else []
+    assert leftovers == []
+
+
+def test_set_mode_is_atomic_no_partial_file(tmp_path: Path) -> None:
+    """The final file appears only via os.replace of a temp file in the same dir."""
+    replaced: list[tuple[str, str]] = []
+    real_replace = os.replace
+
+    def _record(src: os.PathLike[str] | str, dst: os.PathLike[str] | str) -> None:
+        replaced.append((str(src), str(dst)))
+        real_replace(src, dst)
+
+    import unittest.mock as _mock
+
+    with _mock.patch.object(os, "replace", _record):
+        mode.set_mode(tmp_path, "conductor")
+
+    assert len(replaced) == 1
+    src, dst = replaced[0]
+    # temp file lived in the same state dir as the destination (atomic rename requirement)
+    assert Path(src).parent == Path(dst).parent
+    assert ".tmp." in Path(src).name
+    assert dst.endswith(os.path.join(".renmark", "state", "mode.json"))
+    assert mode.read_mode(tmp_path) == "conductor"
+
+
+def test_clear_mode_delete_failure_propagates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real delete failure (not FileNotFound) must surface, not be swallowed."""
+    mode.set_mode(tmp_path, "conductor")
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError("cannot unlink")
+
+    monkeypatch.setattr(Path, "unlink", _boom)
+
+    with pytest.raises(OSError):
+        mode.clear_mode(tmp_path)
 
 
 @pytest.mark.parametrize("skill", ["debug", "brainstorm"])

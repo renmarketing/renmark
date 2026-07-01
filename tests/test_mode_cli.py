@@ -31,6 +31,7 @@ temporary repo root.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -49,6 +50,48 @@ def _run_cli(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
     )
+
+
+def _expected_path_fragment(repo: Path) -> str:
+    return os.path.join(".renmark", "state", "mode.json")
+
+
+def test_set_mode_success_prints_real_state_path(tmp_path: Path) -> None:
+    result = _run_cli(tmp_path, "--set-mode", "conductor")
+    assert result.returncode == 0
+    # The printed path must be the real write location, not ".renmark/mode.json".
+    assert _expected_path_fragment(tmp_path) in result.stdout
+    assert ".renmark/mode.json)" not in result.stdout
+
+
+def test_clear_mode_success_prints_real_state_path(tmp_path: Path) -> None:
+    assert _run_cli(tmp_path, "--set-mode", "conductor").returncode == 0
+    result = _run_cli(tmp_path, "--clear-mode")
+    assert result.returncode == 0
+    assert _expected_path_fragment(tmp_path) in result.stdout
+    assert ".renmark/mode.json)" not in result.stdout
+
+
+def test_set_mode_write_failure_exits_nonzero_no_success(tmp_path: Path) -> None:
+    """Simulate a write failure: pre-create mode.json as a directory so the
+    atomic os.replace() cannot land the file. The CLI must exit non-zero, emit
+    an error to stderr, and NOT print a success message."""
+    state_dir = tmp_path / ".renmark" / "state"
+    state_dir.mkdir(parents=True)
+    (state_dir / "mode.json").mkdir()  # occupy the target with a directory
+
+    result = _run_cli(tmp_path, "--set-mode", "conductor")
+    assert result.returncode != 0
+    assert "operating mode set to" not in result.stdout
+    assert "failed to persist operating mode" in result.stderr
+    assert _expected_path_fragment(tmp_path) in result.stderr
+    # The occupying directory is untouched (no valid mode was written).
+    assert (state_dir / "mode.json").is_dir()
+
+    # And the persisted state is still unset from renmark's point of view.
+    get_result = _run_cli(tmp_path, "--get-mode")
+    assert get_result.returncode == 0
+    assert get_result.stdout.strip() == "unset"
 
 
 def test_set_mode_conductor_then_get_mode(tmp_path: Path) -> None:

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-01] — harness-modes codereview fixes (1 Major + 2 Minor)
+**Request:** Fix the codex review findings on the harness-modes diff.
+**Built:**
+- Major — `set_mode`/`clear_mode` no longer swallow filesystem errors: `set_mode` lets OSError propagate (atomic temp-write + `os.replace()`), `clear_mode` surfaces genuine delete failures but stays idempotent when the file is absent. The CLI `--set-mode`/`--clear-mode` now catch OSError, print to stderr, and exit 1 — no more false success. `read_mode` still never raises; invalid value still argparse-exit-2.
+- Minor — added `renmark.mode.mode_state_path(repo)` + `MODE_REL` constant; the CLI sources every user-facing path string (help + success + error) from it, so `.renmark/state/mode.json` can't drift.
+- Minor — mode writes are now atomic (temp file + `os.replace()`), closing the partial-read → transient-None window.
+**Files changed:** `renmark/mode.py`, `renmark/cli/_engine.py`, `tests/test_mode.py`, `tests/test_mode_cli.py`.
+**Verification:** full suite 1213 passed, 28 skipped; mypy + ruff clean; behavior tier 3/3; write-failure repro confirms CLI exit 1 (no false success).
+**Do not change:** `read_mode` must never raise; the write mutators MUST surface real OSError (never swallow) while `clear_mode` stays idempotent on an absent file; all user-facing path strings source from `mode_state_path`/`MODE_REL`.
+
 ## [2026-07-01] — harness-modes waves 1–2: preamble/CLI wiring + tests
 **Request:** Finish the harness operating-modes MVP — wire mode into skill_preamble + CLI, and prove behavior with tests.
 **Built:**
