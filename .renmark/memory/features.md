@@ -4,6 +4,16 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-07-01 — harness-operating-modes: Conductor/Orchestrator mode selection (MVP)
+
+**Files:** `renmark/mode.py`, `renmark/lifecycle.py`, `renmark/cli/_engine.py`, `CLAUDE.md`, `AGENTS.md`, `plugin/skills/help/SKILL.md`
+**Spec:** `.renmark/specs/2026-07-01-harness-operating-modes.spec.md`
+**Plan:** `.renmark/plans/2026-07-01-harness-operating-modes.plan.md`
+
+Persisted operating mode (ask-once, smart default, --set-mode override); skill_preamble emits mode directive/choose-prompt; help + rule-block harness framing. Dynamic skill loading deferred.
+
+---
+
 ### 2026-06-09 — reporting-and-usage-analytics: local usage reporting and analytics layer
 
 **Files:** `renmark/analytics.py`, `renmark/reports.py`, `plugin/skills/usage/SKILL.md`, `plugin/skills/analytics/SKILL.md`, `plugin/commands/usage.md`, `plugin/commands/analytics.md`
