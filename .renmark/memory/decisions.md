@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-040 — Finished feature dynamic-skill-loading
+
+**Date:** 2026-07-01
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch worktree-feature+dynamic-skill-loading reached stage ready-to-release
+
+---
+
 ## ADR-039 — Finished feature harness-operating-modes
 
 **Date:** 2026-07-01
