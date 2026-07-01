@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-07-01] — P8 behavioral skill testing + LLM-judge tier (build complete)
+**Request:** Build P8 (the last queued external-skills-study item) toward v0.23.0 — a tier that proves a skill *changes agent behavior*, not just that it lints.
+**Built (8 tasks, all verified):**
+- `renmark/judge.py` — escalation-only LLM-as-judge (`judge_behavior` → `Verdict`); defensive parse (bad/timeout/garbage → `validation_status=unvalidated`, never a silent pass); `JUDGE_EST_COST_USD=0.15`; no import side effects.
+- `renmark/behavior.py` — harness on `shadow.py`'s record-replay: `load_cases`/`replay`/`capture`/`run`. Deterministic replay is pure snapshot I/O (no network/tokens); missing snapshot → ERROR ("run --accept first"); judge invoked only when `judge=True`.
+- `renmark/cli/_engine.py` — `--behavior` (deterministic replay, exit≠0 on FAIL/ERROR), `--behavior --accept` (record snapshots), `--behavior --judge` (escalate). OFFER line (~$0.15) on deterministic FAIL only; never auto-spends; `--accept`/`--judge` require `--behavior`.
+- `tests/behavioral/{roadmap,next_steps_menu}.behavior.json` — 2 reference cases (roadmap read-only/zero-LLM; next-steps-menu recommended-first).
+- `tests/test_behavior.py` (6) + `tests/test_judge.py` (5) — codex-authored; assert judge never auto-invoked, no-silent-pass, ERROR on missing snapshot.
+- Behavioral tier documented in `CLAUDE.md` + `AGENTS.md` (mirrored).
+**Verification:** all 8 task verifiers pass; ruff + mypy clean; full suite **962 passed, 28 skipped** (+11 new, no regressions).
+**Do not change:** the deterministic tier stays network-free / token-free in CI; the judge tier never auto-triggers without explicit `--judge` opt-in; `.behavior.json` cases stay snapshot-driven (no live capture in CI). Golden snapshots for the 2 reference cases are captured via `renmark-execute --behavior --accept` (a deliberate live step, not run yet).
+
+## [2026-07-01] — behavior harness unit tests
+**Request:** Add deterministic unit coverage for `renmark/behavior.py` with inline temp snapshots and mocked judge/subagent paths.
+**Built:** Added `tests/test_behavior.py` as a renmark artifact/test module covering case loading, replay PASS/FAIL/ERROR behavior, and `run()` judge gating.
+**Files changed:** `tests/test_behavior.py`.
+**Do not change:** keep these tests snapshot-driven and deterministic; they must not require live capture, network access, or automatic judge escalation.
+
 ## [2026-07-01] — project scope: p8-behavioral-skill-testing
 **Scope contract (brainstorm).** Feature spec: `.renmark/specs/2026-07-01-p8-behavioral-skill-testing.spec.md`.
 - **Stack:** unchanged — Python ≥3.10 renmark runtime + Claude Code plugin (no new stack).
