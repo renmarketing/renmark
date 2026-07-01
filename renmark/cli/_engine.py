@@ -1236,6 +1236,27 @@ def main(argv: list[str] | None = None) -> int:
             "'false' = restore interactive behavior). Default: false."
         ),
     )
+    # P8 harness — persisted operating-mode (conductor|orchestrator)
+    ap.add_argument(
+        "--set-mode",
+        choices=("conductor", "orchestrator"),
+        metavar="conductor|orchestrator",
+        help=(
+            "persist the operating mode to .renmark/mode.json "
+            "('conductor' = high-touch interactive drive; "
+            "'orchestrator' = hands-off autonomous plan execution)."
+        ),
+    )
+    ap.add_argument(
+        "--get-mode",
+        action="store_true",
+        help="print the persisted operating mode (or 'unset' if none), then exit",
+    )
+    ap.add_argument(
+        "--clear-mode",
+        action="store_true",
+        help="clear the persisted operating mode from .renmark/mode.json, then exit",
+    )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
         "--task-brief",
@@ -1302,6 +1323,24 @@ def main(argv: list[str] | None = None) -> int:
         state_str = "on" if value else "off"
         print(f"renmark: headless mode {state_str} ({repo}/.renmark/config.json)")
         return 0
+    if args.set_mode is not None:
+        from .. import mode as _mode
+        try:
+            _mode.set_mode(repo, args.set_mode)
+        except ValueError as exc:
+            ap.error(str(exc))
+        print(f"renmark: operating mode set to {args.set_mode} ({repo}/.renmark/mode.json)")
+        return 0
+    if args.get_mode:
+        from .. import mode as _mode
+        current = _mode.read_mode(repo)
+        print(current if current is not None else "unset")
+        return 0
+    if args.clear_mode:
+        from .. import mode as _mode
+        _mode.clear_mode(repo)
+        print(f"renmark: operating mode cleared ({repo}/.renmark/mode.json)")
+        return 0
     if args.task_brief:
         plan_path, task_index_str = args.task_brief
         try:
@@ -1317,7 +1356,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.error(
             "plan path is required unless --usage / --analytics / --roadmap / --logs / "
             "--scan / --behavior / --task / --task-brief / --review-package / "
-            "--set-proactive / --set-headless"
+            "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode"
         )
     return execute_plan(
         args.plan,
