@@ -25,6 +25,10 @@ blind override): `--full` always escalates to full, but `--lite` only narrows a
 full signals (lite must never skip the full review on a risky change).
 **plan validation and goal-backward verify (REQ-7) run on every tier, no exceptions.**
 
+## Operating mode
+
+`feature` defaults to **Orchestrator** mode: execute at the goal level, dispatching narrow scoped subagents where useful. In **Conductor** mode, keep each change single-file/tight and explain the next move before editing. The mode is selected once (ask-once) and persisted; override it durably via `renmark-execute --set-mode`.
+
 ## When to Use
 
 - New functionality that warrants isolation before merging

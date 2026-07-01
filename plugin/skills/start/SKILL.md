@@ -13,6 +13,10 @@ The **New Build pipeline** — the vibe-coder entry point for building something
 
 **Adaptive routing (Step 7) stays intact:** a clear single-purpose build → straight to `/renmark:plan`; a fuzzy or multi-part idea → `/renmark:brainstorm` first; a whole greenfield product → the staged program. A `PRD.md` is established before the first feature is built (Step 5a); a blueprint is offered only when the architecture is non-trivial (Step 5b).
 
+## Operating mode
+
+`start` defaults to **Orchestrator** mode for goal-level build-out — it drives the whole pipeline to a working deliverable, not one edit at a time. The first meaningful workflow is where the mode is chosen: ask once, persist the choice, and don't re-ask. Either mode (Orchestrator or **Conductor**) is overridable at any time via `renmark-execute --set-mode`.
+
 ## Steps
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'start')`. If it returns a non-None hint, surface as a one-line note (do not block — user decides). Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*

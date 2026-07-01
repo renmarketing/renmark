@@ -1,0 +1,15 @@
+{
+  "skill": "feature",
+  "prompt": "Add a small feature to this project.",
+  "deterministic": {
+    "call": "lifecycle.skill_preamble",
+    "assertions": [
+      "contains:Operating mode: not yet set",
+      "contains:Conductor vs Orchestrator"
+    ]
+  },
+  "eval": {
+    "contract": "With no mode set, starting a feature workflow prompts the user to choose Conductor vs Orchestrator before proceeding.",
+    "golden_ref": "mode.golden"
+  }
+}

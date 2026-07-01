@@ -1,5 +1,44 @@
 # Changelog
 
+## [2026-07-01] — harness-modes codereview fixes (1 Major + 2 Minor)
+**Request:** Fix the codex review findings on the harness-modes diff.
+**Built:**
+- Major — `set_mode`/`clear_mode` no longer swallow filesystem errors: `set_mode` lets OSError propagate (atomic temp-write + `os.replace()`), `clear_mode` surfaces genuine delete failures but stays idempotent when the file is absent. The CLI `--set-mode`/`--clear-mode` now catch OSError, print to stderr, and exit 1 — no more false success. `read_mode` still never raises; invalid value still argparse-exit-2.
+- Minor — added `renmark.mode.mode_state_path(repo)` + `MODE_REL` constant; the CLI sources every user-facing path string (help + success + error) from it, so `.renmark/state/mode.json` can't drift.
+- Minor — mode writes are now atomic (temp file + `os.replace()`), closing the partial-read → transient-None window.
+**Files changed:** `renmark/mode.py`, `renmark/cli/_engine.py`, `tests/test_mode.py`, `tests/test_mode_cli.py`.
+**Verification:** full suite 1213 passed, 28 skipped; mypy + ruff clean; behavior tier 3/3; write-failure repro confirms CLI exit 1 (no false success).
+**Do not change:** `read_mode` must never raise; the write mutators MUST surface real OSError (never swallow) while `clear_mode` stays idempotent on an absent file; all user-facing path strings source from `mode_state_path`/`MODE_REL`.
+
+## [2026-07-01] — harness-modes waves 1–2: preamble/CLI wiring + tests
+**Request:** Finish the harness operating-modes MVP — wire mode into skill_preamble + CLI, and prove behavior with tests.
+**Built:**
+- `renmark/lifecycle.py` — `skill_preamble` now emits a mode directive line (Conductor/Orchestrator) when set, or a choose-mode prompt for entry skills when unset; appended after existing tiers (record-before-check ordering preserved); mode logic wrapped in try/except (graceful degrade).
+- `renmark/cli/_engine.py` — `--set-mode {conductor,orchestrator}` / `--get-mode` / `--clear-mode` (mirrors `--set-proactive`; invalid value exits 2, state unchanged).
+- `CLAUDE.md` + `AGENTS.md` — mirrored "Operating modes" rule block.
+- Tests: `tests/test_mode.py` (19), mode cases in `tests/test_lifecycle.py` (+5, incl. by-mode diff + graceful degrade), `tests/test_mode_cli.py` (6), `tests/behavioral/mode.behavior.json` (deterministic tier: unset-entry preamble emits the choose-mode prompt).
+**Files changed:** `renmark/lifecycle.py`, `renmark/cli/_engine.py`, `CLAUDE.md`, `AGENTS.md`, `tests/test_mode.py`, `tests/test_lifecycle.py`, `tests/test_mode_cli.py`, `tests/behavioral/mode.behavior.json`.
+**Verification:** full suite 1205 passed, 28 skipped; ruff clean; mypy clean on renmark/mode.py; behavior tier 3/3.
+**Do not change:** the mode directive is additive-only in skill_preamble (never reorder the existing record-before-check tiers); behavior adapter reads real-repo mode (case asserts the unset-mode choose-prompt, not a by-mode diff — the diff is covered by test_lifecycle unit tests).
+**Known (deferrable):** CLI confirmation message prints `.renmark/mode.json` instead of `.renmark/state/mode.json` (cosmetic; the write is correct) — see `.renmark/memory/bugs.md`.
+
+## [2026-07-01] — harness-modes wave 0: mode.py + skill/help framing
+**Request:** Build wave 0 of the harness operating-modes MVP (foundation + doc framing).
+**Built:**
+- `renmark/mode.py` — persisted operating-mode state (`.renmark/state/mode.json`): `read_mode`/`set_mode`(ValueError on bad value)/`clear_mode`/`default_mode_for_skill`; corrupt/missing → None, never raises.
+- `plugin/skills/help/SKILL.md` — reframed to the agentic-engineering / vibe-coding harness mission; documents Conductor/Orchestrator modes, context hygiene, subagent discipline, memory/docs, verification.
+- `plugin/skills/{feature,debug,orchestrate,start}/SKILL.md` — short "## Operating mode" behavior blocks (smart per-skill defaults).
+**Files changed:** `renmark/mode.py`, `plugin/skills/help/SKILL.md`, `plugin/skills/{feature,debug,orchestrate,start}/SKILL.md`.
+**Do not change:** mode state lives in gitignored `.renmark/state/mode.json`; `set_mode` MUST raise on values other than conductor/orchestrator; readers never raise on corrupt input.
+
+## [2026-07-01] — project scope: harness-operating-modes (Conductor/Orchestrator MVP)
+**Scope contract (brainstorm).** Spec: `.renmark/specs/2026-07-01-harness-operating-modes.spec.md`.
+- **Stack:** unchanged — Python ≥3.10 + Claude Code plugin (markdown skills/commands). New module `renmark/mode.py`; edits to `lifecycle.skill_preamble`, `renmark-execute` CLI, pipeline SKILL.md blocks, help, CLAUDE.md/AGENTS.md.
+- **Deployment:** unchanged — plugin package; mode state at `.renmark/state/mode.json` (gitignored runtime).
+- **MVP boundary:** Conductor/Orchestrator mode selection (ask-once, persisted, smart per-skill default, override via `--set-mode`) + mode-conditioned `skill_preamble` line + short SKILL.md behavior blocks + help/rule-block reframing + tests (unit + behavior tier).
+- **Out of scope:** true dynamic skill loading (deferred follow-up); hard dispatch guards; rework of context-hygiene / memory / verification / Codex routing (already exist).
+- **Do not change:** the mode ask must stay ask-once (not a per-entry gate) so auto-routing keeps working; no programmatic subagent blocking.
+
 ## [2026-07-01] — v0.23.0 — P8 behavioral eval tier + P7 skill-consistency lint
 **Release.** Bumps v0.22.0 → v0.23.0. Ships two external-skills-study items:
 - **P8-v2** — behavioral skill testing, tests-vs-evals split. `renmark-execute --behavior` runs the **deterministic tier** (renmark's real behavior-shaping functions asserted live, CI-safe, zero tokens); the **eval/judge tier** (`--accept`/`--judge`) is honestly HOST-pending (`build_subagent_runner` raises rather than faking transcripts — a pure-Python process can't issue the model call). Reviewed clean (0 Critical/Major after fixes).

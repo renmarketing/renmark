@@ -50,6 +50,14 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-01 — harness-modes: mode mutators silently swallowed write failures + wrong CLI path
+
+**Severity:** medium (was Major in codereview)
+**Symptom:** set_mode/clear_mode swallowed OSError while the CLI printed success + exited 0; CLI help/success text printed .renmark/mode.json instead of .renmark/state/mode.json; writes were non-atomic.
+**Root cause:** best-effort no-raise mutators + hardcoded wrong path strings + plain-write (no atomic replace).
+**Fix:** set_mode raises OSError (atomic temp + os.replace); clear_mode surfaces delete failures but idempotent on absent; CLI catches OSError → stderr + exit 1; path sourced from mode_state_path()/MODE_REL; read_mode still never raises.
+**Lesson:** a "never raises" convention is right for reads but wrong for mutators — a write that can silently fail while the UI reports success is a trust bug.
+
 ### 2026-07-01 — P8 weakened reference-case assertions
 
 **Severity:** high

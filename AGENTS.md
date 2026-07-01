@@ -63,6 +63,14 @@
 
 **Executor dispatch.** `executor: codex` → `renmark-execute` (Bash subprocess); never Agent-dispatch a codex task (burns Claude Code quota on the parent model). `executor: haiku / sonnet / opus` → Agent calls, no model override. `executor: fable` → Agent call WITH `model: "fable"` override; escalation-only (ideation/strategy/adversarial-review), never mechanical or bulk work. Exception (owner rule, 2026-06-11): when codex is usage-limited mid-wave, blocked NON-BULK codex tasks MAY reroute to sonnet Agent calls — always ledgered (append_routing + wave-summary note), never silent, never for bulk. See `CLAUDE.md` § `executor-dispatch-rule`.
 
+<!-- BEGIN:operating-modes-rule -->
+## Operating modes (Conductor / Orchestrator)
+Renmark runs in one of two modes that shape how the agent behaves. **Conductor** = hands-on, small-step: single-file/tight scope, avoid subagents unless necessary, explain the next move before editing — best for exploration, debugging, small fixes, and learning. **Orchestrator** = async/goal-level: dispatch parallel scoped subagents with narrow missions, load skills dynamically, offload bounded tasks to Codex, and review outcomes rather than keystrokes — best for features, migrations, QA, docs, and deploy prep.
+**Selection:** asked once at the first meaningful workflow of a session and persisted (survives `/clear`). Smart per-skill default: `debug`/`brainstorm` → Conductor; `start`/`feature`/`orchestrate`/`finish` → Orchestrator. Override anytime via `renmark-execute --set-mode conductor|orchestrator` (also `--get-mode`, `--clear-mode`).
+**Guardrails:** the mode ask MUST stay ask-once — never a per-entry gate that would break the auto-routing default. Conductor guides via prose/preamble and NEVER programmatically blocks subagent dispatch.
+*Mirrored in `CLAUDE.md`.*
+<!-- END:operating-modes-rule -->
+
 ## Tooling — renmark workflow
 
 Full command list → run `/renmark:help`. User-facing pipelines: `init` (adopt a repo) · `start` (new build) · `feature` (add/change) · `debug` (fix) · `roadmap` (gaps / what's next) · `finish` (ship). Each runs its internal stages (PRD → plan → build → verify → QA → review → ship) and pauses only at the gates in the Pause Policy (`plugin/skills/_shared/handoff-menu.md`).
