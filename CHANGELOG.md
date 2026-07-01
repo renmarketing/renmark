@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-01] — v0.24.0 — harness operating modes (Conductor/Orchestrator MVP)
+**Release.** Bumps v0.23.0 → v0.24.0. Ships the first slice of the agentic-engineering harness mission: an explicit **Conductor vs Orchestrator** operating mode.
+- New `renmark/mode.py` — persisted mode (`.renmark/state/mode.json`): `read_mode`/`set_mode`/`clear_mode`/`default_mode_for_skill` + `mode_state_path`; reads never raise, writes are atomic and surface real failures.
+- `skill_preamble` emits a mode-specific directive when set, or a choose-mode prompt for entry skills when unset (ask-once, smart per-skill default; additive after existing tiers, degrades gracefully).
+- CLI `renmark-execute --set-mode {conductor,orchestrator}` / `--get-mode` / `--clear-mode` (invalid value exits 2; write failure exits 1, no false success).
+- Harness mission framing in `/renmark:help` + an "Operating modes" rule block mirrored in CLAUDE.md/AGENTS.md; short mode blocks in the pipeline skills.
+- Deferred to a follow-up: true dynamic skill loading (AC5). No hard dispatch guards (guidance only).
+
+Full suite **1213 passed, 28 skipped**; ruff + mypy clean; behavior tier 3/3; version drift clean (7/7 at v0.24.0). Codereview: spec-compliant, 0 open findings. See the per-change entries below.
+
 ## [2026-07-01] — harness-modes codereview fixes (1 Major + 2 Minor)
 **Request:** Fix the codex review findings on the harness-modes diff.
 **Built:**
