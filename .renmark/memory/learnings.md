@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-01, .renmark/reviews/2026-07-01-60eddc0.verification.md) model `verify`: **verify-p8-behavioral-skill-testing** — 6/6 behaviors verified; failed: none; regressions: full suite 962 passed
+
 - (2026-06-26, .renmark/reviews/2026-06-26-3a76fc4752d70decf6bc9d35f64157ea6e0467d9.verification.md) model `verify`: **verify-p10-headless-contract** — 5/5 behaviors verified; failed: none; full suite 934 passed/28 skipped; note: PATH renmark-execute points at main checkout, verify worktree code via -m renmark
 
 - (2026-06-26, run) **task 2 failed on codex** — codex_verifier_failed
