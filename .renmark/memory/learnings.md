@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-01, .renmark/reviews/2026-07-01-e2ec9b4954e08cf09141f63718a1e28ae594f042.verification.md) model `verify`: **verify-p8-v2** — 6/6 behaviors verified; failed: none; regressions: 2 (Major-1, bootstrap)
+
 - (2026-07-01, bug) **P8 weakened reference-case assertions** — fix round partial; deterministic behavioral testing has a fundamental live-call constraint
 
 - (2026-07-01, bug) **P8 feature un-bootstrappable** — fix round partial; deterministic behavioral testing has a fundamental live-call constraint
