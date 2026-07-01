@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-07-01] — harness-modes waves 1–2: preamble/CLI wiring + tests
+**Request:** Finish the harness operating-modes MVP — wire mode into skill_preamble + CLI, and prove behavior with tests.
+**Built:**
+- `renmark/lifecycle.py` — `skill_preamble` now emits a mode directive line (Conductor/Orchestrator) when set, or a choose-mode prompt for entry skills when unset; appended after existing tiers (record-before-check ordering preserved); mode logic wrapped in try/except (graceful degrade).
+- `renmark/cli/_engine.py` — `--set-mode {conductor,orchestrator}` / `--get-mode` / `--clear-mode` (mirrors `--set-proactive`; invalid value exits 2, state unchanged).
+- `CLAUDE.md` + `AGENTS.md` — mirrored "Operating modes" rule block.
+- Tests: `tests/test_mode.py` (19), mode cases in `tests/test_lifecycle.py` (+5, incl. by-mode diff + graceful degrade), `tests/test_mode_cli.py` (6), `tests/behavioral/mode.behavior.json` (deterministic tier: unset-entry preamble emits the choose-mode prompt).
+**Files changed:** `renmark/lifecycle.py`, `renmark/cli/_engine.py`, `CLAUDE.md`, `AGENTS.md`, `tests/test_mode.py`, `tests/test_lifecycle.py`, `tests/test_mode_cli.py`, `tests/behavioral/mode.behavior.json`.
+**Verification:** full suite 1205 passed, 28 skipped; ruff clean; mypy clean on renmark/mode.py; behavior tier 3/3.
+**Do not change:** the mode directive is additive-only in skill_preamble (never reorder the existing record-before-check tiers); behavior adapter reads real-repo mode (case asserts the unset-mode choose-prompt, not a by-mode diff — the diff is covered by test_lifecycle unit tests).
+**Known (deferrable):** CLI confirmation message prints `.renmark/mode.json` instead of `.renmark/state/mode.json` (cosmetic; the write is correct) — see `.renmark/memory/bugs.md`.
+
 ## [2026-07-01] — harness-modes wave 0: mode.py + skill/help framing
 **Request:** Build wave 0 of the harness operating-modes MVP (foundation + doc framing).
 **Built:**

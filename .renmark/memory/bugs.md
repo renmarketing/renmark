@@ -4,6 +4,15 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ## Open
 
+### 2026-07-01 — CLI --set-mode message misreports mode.json path
+
+**Severity:** low
+**Symptom:** renmark --set-mode prints (.renmark/mode.json) but the actual write is .renmark/state/mode.json
+**Root cause:** confirmation f-string hardcodes wrong subpath; write itself delegates to mode.set_mode which is correct
+**Fix:** update the printed path to .renmark/state/mode.json
+
+---
+
 ### 2026-06-09 — classify_usage_pause: unparseable now yields 1970 resume_after
 
 **Severity:** nit

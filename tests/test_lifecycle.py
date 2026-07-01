@@ -627,6 +627,104 @@ def test_validate_artifact_refs_dotdot_escape_warns(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "out_of_tree"
 
 
+# ── Operating-mode preamble (Conductor vs Orchestrator) ───────────────────────
+
+_CONDUCTOR_DIRECTIVE = (
+    "Operating mode: Conductor — hands-on; prefer single-file scoped edits, "
+    "avoid subagents unless necessary, explain the next move before editing."
+)
+_ORCHESTRATOR_DIRECTIVE = (
+    "Operating mode: Orchestrator — goal-level; use narrow scoped subagents "
+    "where useful, load skills on demand, review outcomes not keystrokes."
+)
+
+
+def test_skill_preamble_mode_conductor_emits_conductor_directive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mode=conductor → the conductor directive, never the orchestrator one."""
+    from renmark import mode
+
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+    mode.set_mode(tmp_path, "conductor")
+
+    hint = lifecycle.skill_preamble(tmp_path, "feature")
+
+    assert hint is not None
+    assert "Operating mode: Conductor" in hint
+    assert _CONDUCTOR_DIRECTIVE in hint
+    assert _ORCHESTRATOR_DIRECTIVE not in hint
+
+
+def test_skill_preamble_mode_orchestrator_differs_from_conductor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC#3 by-mode diff: orchestrator directive differs from conductor output."""
+    from renmark import mode
+
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    mode.set_mode(tmp_path, "conductor")
+    conductor_hint = lifecycle.skill_preamble(tmp_path, "feature")
+
+    mode.set_mode(tmp_path, "orchestrator")
+    orchestrator_hint = lifecycle.skill_preamble(tmp_path, "feature")
+
+    assert orchestrator_hint is not None
+    assert "Operating mode: Orchestrator" in orchestrator_hint
+    assert _ORCHESTRATOR_DIRECTIVE in orchestrator_hint
+    assert orchestrator_hint != conductor_hint
+
+
+def test_skill_preamble_mode_unset_entry_skill_prompts_choice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unset mode + entry skill → prompt the user to pick Conductor vs Orchestrator."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    hint = lifecycle.skill_preamble(tmp_path, "feature")
+
+    assert hint is not None
+    assert "Operating mode: not yet set" in hint
+    assert "Conductor vs Orchestrator" in hint
+
+
+def test_skill_preamble_mode_unset_non_entry_skill_omits_mode_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unset mode + a non-entry skill emits NO operating-mode line at all."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    hint = lifecycle.skill_preamble(tmp_path, "help")
+
+    assert "Operating mode" not in (hint or "")
+
+
+def test_skill_preamble_mode_read_failure_degrades_gracefully(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If reading mode raises, skill_preamble still returns the base hint without
+    crashing (and without emitting a mode line)."""
+    from renmark import mode
+
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    def _boom(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("mode read failed")
+
+    monkeypatch.setattr(mode, "read_mode", _boom)
+
+    # Must not raise; a bare repo with no other triggers yields None.
+    hint = lifecycle.skill_preamble(tmp_path, "feature")
+
+    assert "Operating mode" not in (hint or "")
+
+
 # ── Headless contract (P10) ───────────────────────────────────────────────────
 
 
