@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-07-01] — context taxonomy rule block, mirrored (AC5 wave 3, tasks 5 & 6)
+**Request:** Document the four-way context taxonomy + dynamic-loading contract in the project rule files (PRD REQ-20).
+**Built:** Added a byte-identical "## Context taxonomy — static / dynamic / memory / task-local" rule block to both `CLAUDE.md` and `AGENTS.md` (after the context-hygiene block): the four kinds, metadata-upfront/bodies-on-demand via `renmark/context.py`, and the dispatch-packet metadata-only contract; cites the shared fragment. Committed together to honor the mirror rule.
+**Files changed:**
+- `CLAUDE.md` — new context-taxonomy rule block
+- `AGENTS.md` — byte-identical mirror
+**Do not change:**
+- The two blocks MUST stay byte-identical (mirror rule); dynamic bodies are never pre-loaded; dispatch packets carry required-skill metadata only.
+
+## [2026-07-01] — tests for context module + dispatch integration (AC5 wave 3, task 4)
+**Request:** Prove AC5 behavior — the taxonomy/loader API and that the dispatch packet uses skill metadata without loading full bodies (PRD REQ-20).
+**Built:** New `tests/test_context.py` (20 cases) covering `ContextKind`/`TAXONOMY`, `classify_path`, metadata-upfront helpers (no body), body-on-demand loaders, `upfront_kinds_for_skill` (DYNAMIC/TASK_LOCAL excluded), the `assert_metadata_only` guardrail, and the load-bearing integration test: `build_subagent_input(required_skills=["plan"])` carries plan's metadata + pointer while the real SKILL.md body phrase is asserted ABSENT from the packet JSON.
+**Files changed:**
+- `tests/test_context.py` — new test module (codex-generated; orchestrator added one `-> None` annotation for convention)
+**Do not change:**
+- The metadata-not-body integration assertion is the behavioral proof of AC5 — keep it.
+
 ## [2026-07-01] — wire context into the production dispatch packet (AC5 wave 2, task 3)
 **Request:** Make AC5 behaviorally real — connect `renmark/context.py` to a real production surface, not just a standalone helper (PRD REQ-20).
 **Built:** `renmark/dispatch.py` — `SubagentInput` gained `required_skills: list[str]` (names only); `to_dict()` renders each as a metadata reference `{name, pointer, metadata}` via a function-local `from renmark import context` (never a SKILL.md body); `build_subagent_input` gained a kw-only `required_skills` param and calls `context.assert_metadata_only` at build time. Additive + backward-compatible (12/12 dispatch tests still pass); function-local imports avoid any cycle.
