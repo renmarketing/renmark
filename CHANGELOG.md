@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-01] — project scope: harness-operating-modes (Conductor/Orchestrator MVP)
+**Scope contract (brainstorm).** Spec: `.renmark/specs/2026-07-01-harness-operating-modes.spec.md`.
+- **Stack:** unchanged — Python ≥3.10 + Claude Code plugin (markdown skills/commands). New module `renmark/mode.py`; edits to `lifecycle.skill_preamble`, `renmark-execute` CLI, pipeline SKILL.md blocks, help, CLAUDE.md/AGENTS.md.
+- **Deployment:** unchanged — plugin package; mode state at `.renmark/state/mode.json` (gitignored runtime).
+- **MVP boundary:** Conductor/Orchestrator mode selection (ask-once, persisted, smart per-skill default, override via `--set-mode`) + mode-conditioned `skill_preamble` line + short SKILL.md behavior blocks + help/rule-block reframing + tests (unit + behavior tier).
+- **Out of scope:** true dynamic skill loading (deferred follow-up); hard dispatch guards; rework of context-hygiene / memory / verification / Codex routing (already exist).
+- **Do not change:** the mode ask must stay ask-once (not a per-entry gate) so auto-routing keeps working; no programmatic subagent blocking.
+
 ## [2026-07-01] — v0.23.0 — P8 behavioral eval tier + P7 skill-consistency lint
 **Release.** Bumps v0.22.0 → v0.23.0. Ships two external-skills-study items:
 - **P8-v2** — behavioral skill testing, tests-vs-evals split. `renmark-execute --behavior` runs the **deterministic tier** (renmark's real behavior-shaping functions asserted live, CI-safe, zero tokens); the **eval/judge tier** (`--accept`/`--judge`) is honestly HOST-pending (`build_subagent_runner` raises rather than faking transcripts — a pure-Python process can't issue the model call). Reviewed clean (0 Critical/Major after fixes).
