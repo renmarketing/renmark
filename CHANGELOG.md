@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-07-01] — rewrite tests/test_behavior.py for assertion-based replay
+**Request:** Rewrite `tests/test_behavior.py` to match the redesigned `renmark/behavior.py` contract.
+**Built:** Replaced the old golden-vs-baseline tests with artifact-shaped deterministic coverage for case loading, assertion-based replay PASS/FAIL/ERROR outcomes, judge gating, unsafe ref rejection, and the assertion mini-format using inline `{transcript, inputs}` snapshots.
+**Files changed:** `tests/test_behavior.py`
+**Do not change:** keep these tests deterministic and snapshot-driven; missing snapshots or empty `inputs` must stay `ERROR`, and judge escalation must remain opt-in and skipped for `ERROR` results.
+
 ## [2026-07-01] — P8 behavioral skill testing + LLM-judge tier (build complete)
 **Request:** Build P8 (the last queued external-skills-study item) toward v0.23.0 — a tier that proves a skill *changes agent behavior*, not just that it lints.
 **Built (8 tasks, all verified):**

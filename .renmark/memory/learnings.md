@@ -14,6 +14,16 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-01, .renmark/reviews/2026-07-01-9f7f0ab.verification.md) model `verify`: **verify-p8-refix** — fix round: 4 review findings resolved; full suite 970 passed
+
+- (2026-07-01, bug) **P8 snapshot ref path traversal** — codereview caught under-built P8 before merge
+
+- (2026-07-01, bug) **P8 judge silent-pass on bad confidence** — codereview caught under-built P8 before merge
+
+- (2026-07-01, bug) **P8 --accept cannot record from CLI** — codereview caught under-built P8 before merge
+
+- (2026-07-01, bug) **P8 replay does not test current behavior** — codereview caught under-built P8 before merge
+
 - (2026-07-01, .renmark/reviews/2026-07-01-60eddc0.verification.md) model `verify`: **verify-p8-behavioral-skill-testing** — 6/6 behaviors verified; failed: none; regressions: full suite 962 passed
 
 - (2026-06-26, .renmark/reviews/2026-06-26-3a76fc4752d70decf6bc9d35f64157ea6e0467d9.verification.md) model `verify`: **verify-p10-headless-contract** — 5/5 behaviors verified; failed: none; full suite 934 passed/28 skipped; note: PATH renmark-execute points at main checkout, verify worktree code via -m renmark
