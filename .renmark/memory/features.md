@@ -162,6 +162,16 @@ Returns server status and version. Used by load balancers and uptime monitoring.
 
 ## In progress
 
+### 2026-06-29 — p7-skill-consistency-lint
+
+**Files:** `renmark/skillmeta.py`, `renmark/skillgen.py`, `renmark/init.py`, `tools/precommit.sh`
+**Spec:** `.renmark/specs/2026-06-29-p7-skill-templates.spec.md`
+**Plan:** `.renmark/plans/2026-06-29-p7-skill-templates.plan.md`
+
+Pivoted from template-generation to a consistency lint: skillmeta registry + skillgen --check (frontmatter discipline + doc-slimming guard) wired into precommit. Generation/migration dropped (doc-slimming already single-sourced everything).
+
+---
+
 ### 2026-06-26 — p10-headless-contract
 
 **Files:** `renmark/config.py`, `renmark/lifecycle.py`, `plugin/skills/_shared/headless-contract.md`, `renmark/cli/_engine.py`

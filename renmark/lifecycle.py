@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import skillmeta
 from .summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
@@ -105,35 +106,11 @@ NEXT_BY_STAGE: dict[str, str] = {
 }
 
 # Domain classification for context-contamination detection (G4).
+# Back-compat alias DERIVED from the skillmeta registry — `skillmeta.SKILLS`
+# is the single source of truth for per-skill domains (P7). Existing importers
+# (`audit.py`, tests) and `monkeypatch.setattr` on this attribute keep working.
 DOMAIN_BY_SKILL: dict[str, str] = {
-    "debug": "debug",
-    "codereview": "debug",
-    "start": "build",
-    "brainstorm": "build",
-    "plan": "build",
-    "check-plan": "build",
-    "orchestrate": "build",
-    "verify": "build",
-    "finish": "build",
-    "feature": "build",
-    "prd": "build",
-    "blueprint": "build",
-    "backlog": "build",
-    "loop": "build",
-    "audit": "audit",
-    "inventory": "audit",
-    "scan": "audit",
-    "setup": "meta",
-    "roadmap": "meta",
-    "help": "meta",
-    "guide": "meta",
-    "resume": "meta",
-    "approve": "meta",
-    "hygiene": "meta",
-    "doctor": "meta",
-    "init": "meta",
-    "usage": "meta",
-    "analytics": "meta",
+    name: meta.domain for name, meta in skillmeta.SKILLS.items()
 }
 
 # Preamble tier — controls how much boilerplate skill_preamble injects.
@@ -595,8 +572,21 @@ def _gates_not_run(repo: Path | str) -> list[str]:
 
 
 def domain_of(skill: str) -> str:
-    """Return the domain bucket for a skill name (G4 contamination detection)."""
-    return DOMAIN_BY_SKILL.get(skill, "build")
+    """Return the domain bucket for a skill name (G4 contamination detection).
+
+    Resolves via the `skillmeta` registry (single source of truth, P7);
+    unknown skills default to ``"build"``. `DOMAIN_BY_SKILL` remains a derived
+    back-compat alias, but is consulted first so a test `monkeypatch` of that
+    attribute still takes effect.
+    """
+    if skill in DOMAIN_BY_SKILL:
+        return DOMAIN_BY_SKILL[skill]
+    meta = skillmeta.get(skill)
+    return meta.domain if meta is not None else "build"
+
+
+# Back-compat alias: `domain_for_skill` is the registry-facing name.
+domain_for_skill = domain_of
 
 
 def preamble_tier(skill: str) -> str:

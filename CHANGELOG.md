@@ -59,6 +59,27 @@
 - **MVP boundary:** deterministic behavioral tier (recorded golden transcripts replayed + diffed in CI, reusing `renmark/shadow.py`) covering **2 reference skills** (roadmap read-only contract; the next-steps-menu contract); LLM-as-judge tier (`renmark/judge.py`) implemented but **escalation-only** — offered on deterministic failure, opt-in to run (~$0.15), never silent.
 - **Out of scope:** behavioral coverage of all ~30 skills; the P7 `.tmpl`→SKILL.md generator (deliberately dropped — shared blocks already single-sourced); changes to the structure audit; any auto-spend on the judge tier.
 - **Do not change:** the deterministic tier stays network-free / token-free in CI; the judge tier never auto-triggers without explicit opt-in.
+## [2026-06-29] — P7 skill-consistency lint (pivoted from generator)
+**Request:** Build P7 (template-generated SKILL.md).
+**Pivot (mid-build, owner-approved):** the premise — duplicated boilerplate to DRY via a generator — proved FALSE. Doc-slimming (ADR-027/028) already single-sourced all shared boilerplate into `_shared/*` via pointer citations; the 28 skills carry no byte-identical duplicated block. Generating managed blocks would *re-inline* what doc-slimming removed. So generation + the 28-file migration were DROPPED.
+**Built:**
+- `renmark/skillmeta.py` — central per-skill metadata registry (28 skills: domain, next_steps_class, cites, has_handoff, disable_model_invocation); `lifecycle.domain_for_skill`/`DOMAIN_BY_SKILL` now derive from it (single source).
+- `renmark/init.py` — extracted reusable `merge_marked_block`/`count_begin_markers` marker primitive (init behavior unchanged; tests green).
+- `renmark/skillgen.py` — **pure consistency lint** (`--check`): frontmatter discipline (trigger-only description + `disable-model-invocation` == registry) + doc-slimming guard (flags any skill that re-inlines a `_shared` blockquote verbatim). Clean on all 28.
+- `tools/precommit.sh` — `skillgen --check` wired as gate 5/7.
+- Tests: `test_skillmeta.py` (registry vs disk), `test_skillgen.py` (lint categories). Full suite 1148 passed.
+**Files changed:** `renmark/skillmeta.py`, `renmark/skillgen.py`, `renmark/init.py`, `renmark/lifecycle.py`, `tools/precommit.sh`, `tests/test_skillmeta.py`, `tests/test_skillgen.py`.
+**Do not change:** skillgen is READ-ONLY (never writes SKILL.md / frontmatter) — re-introducing generation would reverse doc-slimming; the doc-slimming guard exists to prevent re-inlining single-sourced blockquotes.
+
+## [2026-06-29] — project scope: P7 template-generated SKILL.md (spec)
+**Request:** Brainstorm P7 — a managed-block generator so the cross-cutting SKILL.md boilerplate (Step-0 preamble + shared-contract citations) regenerates from one source across all 28 skills instead of 28 manual edits.
+**Scope (confirmed):**
+- **Stack:** unchanged — Python ≥3.10 stdlib-only; Markdown skills.
+- **Deployment:** the renmark plugin itself (P7 targets ≥v0.23.0, with P8).
+- **MVP boundary:** (1) managed-block model (marker-merge, reuse init.py); (2) generator owns Step-0 + reasoning-contract/next-steps/handoff-menu citations, pulled from `_shared`; frontmatter hand-authored + lint-checked; (3) central registry `renmark/skillmeta.py` extending `lifecycle.DOMAIN_BY_SKILL`; (4) `--check` lint fails on block-drift or frontmatter-discipline violation.
+- **Out of scope:** full-file generation; generating frontmatter/descriptions/bodies; PRD change (internal tooling — PRD-drift benign); P8.
+**Files changed:** `.renmark/specs/2026-06-29-p7-skill-templates.spec.md` (new); CHANGELOG + decisions.md.
+**Do not change:** the generator MUST NEVER write frontmatter — v0.20.0 trigger-only descriptions + `disable-model-invocation` are load-bearing; lint validates, never auto-fixes.
 
 ## [2026-06-26] — v0.22.0 — P10 headless / spawned-session contract
 **Release.** Ships the P10 headless-session contract (detection, doctrine, lifecycle halt path, `renmark/headless.py` `resolve_gate`/`render_return`, `--set-headless` CLI, and dangerous-gate wiring in finish/plan/orchestrate/prd) **plus** the previously-unreleased batch on `main` (P5/P4/P12/P11/P6/P9). Full suite 951 passed; version drift clean; 3 codex review passes. See the per-feature entries below for detail. P7/P8 remain queued for ≥v0.23.0.
