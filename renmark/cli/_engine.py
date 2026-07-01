@@ -1078,6 +1078,7 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
     # eval-tier live runner is host-injected and may be unavailable, in which case
     # we degrade honestly to the deterministic tier rather than fake it.
     runner = None
+    judge_unavailable = False
     if judge:
         try:
             runner = _behavior.build_subagent_runner(repo)
@@ -1085,6 +1086,7 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
             _print(f"  eval tier unavailable: {exc}")
             _print("  running the deterministic tier only.")
             judge = False
+            judge_unavailable = True
     try:
         results = _behavior.run(
             behavioral_dir, judge=judge, repo=repo, subagent_runner=runner
@@ -1100,7 +1102,7 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
             failed += 1
         msg = r.message[:60] if r.message else ""
         _print(f"  {r.status:<5} {r.skill}/{r.case:<24} {msg}")
-        if r.judge_offered and not (judge or headless):
+        if r.judge_offered and not (judge or headless or judge_unavailable):
             offered = True
 
     _print(f"behavior: {len(results) - failed}/{len(results)} passed, {failed} failed")
@@ -1109,6 +1111,10 @@ def _cmd_behavior(repo: Path, *, accept: bool, judge: bool) -> int:
             f"  {failed} FAIL(s) eligible for LLM-judge review (~${_judge_est_cost():.2f}); "
             f"re-run with --behavior --judge to escalate. Not auto-invoked."
         )
+    elif judge_unavailable and failed:
+        # Don't point the user back at --judge: the live runner is host-injected
+        # and just reported unavailable, so escalation isn't possible from here.
+        _print(f"  {failed} FAIL(s); LLM-judge escalation unavailable from this CLI (host runner not wired).")
     return 0 if failed == 0 else 10
 
 
