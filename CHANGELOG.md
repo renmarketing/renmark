@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-07-02] — agent-turn eval runner (/renmark:eval, in-session eval path)
+**Request:** Add the deferred in-session eval path (the agent drives the eval turn) as a new /renmark:eval skill.
+**Built:**
+- New agent-driven `/renmark:eval` skill (plugin/skills/eval/SKILL.md + plugin/commands/eval.md): the current agent composes the eval prompt, issues a real in-session Agent tool call, and feeds the transcript to the existing capture/judge path. disable-model-invocation: true.
+- `behavior.compose_eval_prompt` + `behavior.capture_from_transcript` extracted from `capture()` (behavior-preserving); `judge.compose_judge_prompt` + `judge.parse_judge_verdict` public wrappers.
+- Registered eval in skillmeta.SKILLS (build/aux, class 3) + lifecycle IMPLEMENTED_SKILLS/AUX_SKILLS.
+**Verified:** tests/test_eval_agent_turn.py (6) + behavior/judge suites green; renmark.audit --quick clean.
+**Do not change:**
+- Subprocess runner (eval_runner.py), the deterministic tier, dynamic skill loading, mode, Codex routing, and the dispatch-packet schema are all UNTOUCHED.
+- /renmark:eval stays opt-in (disable-model-invocation: true), out-of-CI, no auto token spend.
+
 ## [2026-07-02] — v0.26.0 — live-eval-runner (P8 eval-tier execution bridge)
 **Release.** Bumps v0.25.0 → v0.26.0. Wires the deferred P8 **eval-tier live runner** so `renmark-execute --behavior --accept/--judge` can run real model trajectories when explicitly configured — the missing execution bridge for the mission's behavioral-proof acceptance criterion (NOT a P8-v2 reopen).
 **Built:**
