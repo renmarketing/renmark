@@ -4,6 +4,18 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-07-02 — cost-control-finish-lanes: cost/context/routing/finish-lane infra (v0.28.0)
+Finish lanes (`renmark/finish_lanes.py`: quick/release/self-update/full; `recommend_lane`
+picks cheapest-safe, self-update when the repo IS renmark; `resolve_lane` menu-alias aware).
+Reusable cost preview + escalation gate (`renmark/cost.py`: `estimate_cost`/`cost_band`/
+`requires_escalation`; `CostPreview.roles`). Absolute context thresholds 100k/120k/150k
+(`state/skills.py::context_budget_hint`, additive to the 60/80% logic). Specialized subagent
+profiles (`renmark/subagent_profiles.py`: 8 roles + general-purpose fallback; `SubagentInput.role`
+in the serialized packet; `append_routing(role=...)`). `finish/SKILL.md` wired to lanes
+(self-update workflow preserved: merge->release->zip->WSL install->verify->clean worktree->document).
+5 `_shared` fragments + mirrored CLAUDE.md/AGENTS.md rule blocks. Codex-reviewed (5 findings
+fixed); 1277 tests pass, lint clean. Prereq for Agency Mode (queued). Tag v0.28.0.
+
 ### 2026-07-01 — harness-operating-modes: Conductor/Orchestrator mode selection (MVP)
 
 **Files:** `renmark/mode.py`, `renmark/lifecycle.py`, `renmark/cli/_engine.py`, `CLAUDE.md`, `AGENTS.md`, `plugin/skills/help/SKILL.md`
