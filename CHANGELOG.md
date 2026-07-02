@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-07-02] — profiles tests (Task 10)
+**Request:** Add deterministic coverage for subagent profiles, role propagation, routing persistence, and cost-preview role exposure in `tests/test_subagent_profiles.py`.
+**Built:**
+- New `tests/test_subagent_profiles.py` covering `PROFILES` field completeness plus specialized `model_tier` assertions for the non-fallback roles called out by the spec.
+- Verifies `resolve_profile` maps test targets to `test-writer`, markdown targets to `docs-editor`, core code targets to `code-implementer`, and unmatched targets to `general-purpose`.
+- Verifies `build_subagent_input` populates `role`, `memory.append_routing(..., role=...)` persists the role string, and `estimate_cost` returns sorted unique `roles`.
+**Files changed:**
+- `tests/test_subagent_profiles.py` — new deterministic pytest module
+**Do not change:**
+- Keep this file hermetic and `tmp_path`-scoped; no network, no non-deterministic time dependence.
+- Preserve the fallback contract: unmatched tasks still resolve to `general-purpose`, while cost preview reports distinct roles via `preview.roles`.
+
 ## [2026-07-02] — v0.27.0 — agent-turn eval runner (/renmark:eval in-session path)
 **Release.** Bumps v0.26.0 → v0.27.0. Ships the deferred SECOND eval-tier injection path from
 live-eval-runner: the **in-session, agent-driven** `/renmark:eval` skill. Where v0.26.0's

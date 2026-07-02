@@ -340,3 +340,92 @@ missing declarative/reusable layer around them:
 - AC7 cost previews before expensive work → Task 2, Task 5 (cost-preview), Task 6, Task 7(c).
 - AC8 Agency Mode can reuse infra → Task 7 (agency spec cross-ref) + reusable modules.
 - AC9 existing workflows still pass tests → whole-plan verifier + Task 4.
+
+---
+
+## Addendum (2026-07-02) — specialized subagent profiles
+
+Owner-directed extension of the subagent-budget discipline (aligned, no PRD drift):
+reduce generic `general-purpose` subagents; prefer specialized role profiles;
+dispatch packets carry `role`/`profile`; cost/routing summaries report the role;
+general-purpose is fallback-only; specialized agents get narrower context.
+
+Roles: docs-editor, code-implementer, test-writer, reviewer, release-manager,
+researcher, audit-reader, finish-lane-specialist (+ `general-purpose` fallback).
+
+### Task 8: subagent_profiles.py + dispatch role wiring
+- **mode:** B
+- **target:** renmark/subagent_profiles.py
+- **complexity:** medium
+- **executor:** sonnet
+- **parallel_group:** 3
+- **est_tokens:** 2600
+- **est_cost_usd:** 0.08
+- **verifier:** python3 -m pytest tests/test_subagent_profiles.py tests/test_dispatch.py -q 2>&1 | tail -n 3 && python3 -m py_compile renmark/subagent_profiles.py renmark/dispatch.py
+- **serves:** REQ-5
+- **spec:** New `renmark/subagent_profiles.py` (deterministic, never-raises, sizing.py
+  style) with a frozen `ProfileSpec` (role, model_tier, allowed_targets, output_format,
+  stop_condition, verification, context_scope) and `PROFILES` for the 8 roles +
+  `general-purpose`. `resolve_profile(task)->role` heuristic (test targets→test-writer,
+  docs/md→docs-editor, core code→code-implementer, review kind→reviewer, etc.), falling
+  back to `general-purpose` ONLY when nothing fits. `profile_tier(role)`. Wire
+  `SubagentInput.role: str = "general-purpose"` and `build_subagent_input(..., role=None)`
+  resolving via `resolve_profile(task)` when None. Keep packet metadata-only.
+
+### Task 9: role reporting in ledger + cost summary
+- **mode:** B
+- **target:** renmark/memory.py
+- **complexity:** medium
+- **executor:** sonnet
+- **parallel_group:** 3
+- **est_tokens:** 1800
+- **est_cost_usd:** 0.06
+- **verifier:** python3 -m pytest tests/test_memory.py tests/test_cost.py -q 2>&1 | tail -n 3 && python3 -m py_compile renmark/memory.py renmark/cost.py
+- **serves:** REQ-2
+- **spec:** Add optional `role: str | None = None` to `memory.append_routing` and record
+  it in the ledger line (backward-compatible; omitted → today's format). Add role
+  awareness to `renmark/cost.py::estimate_cost`: items may carry `role`; expose
+  `CostPreview.roles: tuple[str, ...]` (distinct roles seen, sorted) so cost summaries
+  report role/profile not just generic agent usage. Never raises; existing calls unchanged.
+
+### Task 10: profiles tests
+- **mode:** B
+- **target:** tests/test_subagent_profiles.py
+- **complexity:** medium
+- **executor:** codex
+- **parallel_group:** 4
+- **est_tokens:** 2200
+- **est_cost_usd:** 0.07
+- **verifier:** python3 -m pytest tests/test_subagent_profiles.py -q 2>&1 | tail -n 3
+- **serves:** REQ-5
+- **spec:** Cover: every role in PROFILES has all fields + a non-general model_tier where
+  appropriate; `resolve_profile` maps a test-target task→test-writer, a .md-target→
+  docs-editor, a core-code task→code-implementer, and an unmatched task→general-purpose
+  (fallback only); `build_subagent_input` populates `role`; `append_routing(role=...)`
+  writes the role; `estimate_cost` exposes `roles`. Deterministic, tmp_path.
+
+### Task 11: profiles docs + rule + agency note
+- **mode:** B
+- **target:** plugin/skills/_shared/subagent-profiles.md
+- **complexity:** simple
+- **executor:** haiku
+- **parallel_group:** 3
+- **est_tokens:** 1500
+- **est_cost_usd:** 0.001
+- **verifier:** test -s plugin/skills/_shared/subagent-profiles.md && python3 -m renmark.lint 2>&1 | tail -n 3
+- **serves:** REQ-5
+- **spec:** New `_shared/subagent-profiles.md` describing the 8 roles + fallback, each
+  with mission/context/targets/output/stop/tier/verification, and the "prefer
+  specialized, general-purpose is fallback, UI may still show general-purpose but
+  renmark logs the intended role" rule. Add a one-line pointer + role list to
+  `_shared/subagent-budget.md`, a mirrored one-line rule to CLAUDE.md AND AGENTS.md
+  (subagent-profiles), and a one-line note to the agency-mode spec that Agency agents
+  reuse these profiles. `renmark/subagent_profiles.py` is the source of truth.
+
+### Addendum acceptance mapping
+- AC1 avoid generic when a role fits → Task 8 (resolve_profile fallback-only).
+- AC2 packets include role/profile → Task 8 (SubagentInput.role).
+- AC3 profiles map to cheaper/default tiers → Task 8 (ProfileSpec.model_tier).
+- AC4 general-purpose only fallback → Task 8 (resolve_profile).
+- AC5 cost summaries report role → Task 9 (ledger role + CostPreview.roles).
+- AC6 specialized get less context → Task 8 (ProfileSpec.context_scope; packet stays bounded).

@@ -52,6 +52,12 @@ When a workflow requires MANY subagents (5+):
 
 ---
 
+## Specialized subagent profiles
+
+**Subagent-profiles** (`_shared/subagent-profiles.md`) is the registry of 9 dispatch roles: 8 specialized profiles (docs-editor, code-implementer, test-writer, reviewer, release-manager, researcher, audit-reader, finish-lane-specialist) + `general-purpose` fallback-only. Prefer a specialized profile before a generic agent; every dispatch packet carries a `role` field (string) and renmark logs the intended role in routing ledgers and cost summaries.
+
+---
+
 ## Interaction with reuse-check and context-taxonomy
 
 **Reuse-check** (`_shared/reuse-check.md`) is a special subagent: it searches a large surface (registry, specs, plans) in bounded time. It is **not** a violation of the local-first rule — it's the gate that prevents reinventing wheels.

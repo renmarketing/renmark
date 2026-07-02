@@ -142,6 +142,7 @@ Agency Mode MUST reuse — not re-implement — the following infrastructure shi
 - `renmark/finish_lanes.py` — lane selection logic (quick/release/self-update/full); Agency finish uses `recommend_lane()` (+ `resolve_lane()` for explicit overrides) to pick the cheapest-safe lane per milestone.
 - `renmark/cost.py` — `estimate_cost()` for pre-dispatch cost previews; `requires_escalation()` to gate Opus/Fable use; Agency mode shows cost band before any expensive multi-agent wave.
 - `renmark.state.skills.context_budget_hint` — absolute token-count thresholds (100k/120k/150k); Agency mode's long delivery loops MUST respect these checkpoints.
+- `renmark/subagent_profiles.py` — specialized role profiles; Agency background agents pick a specialized profile (general-purpose fallback-only) and inherit its narrow context/tier.
 - `plugin/skills/_shared/model-routing.md` — executor tier rules; Agency agents inherit the same Haiku/Sonnet/Codex/Opus/Fable discipline.
 - `plugin/skills/_shared/subagent-budget.md` — scoped subagent packet contract; all Agency background agents follow this format.
 - `plugin/skills/_shared/finish-lanes.md` — lane descriptions; Agency finish step references this fragment.

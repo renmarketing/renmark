@@ -95,6 +95,8 @@ class CostPreview:
     requires_expensive_model: bool
     #: One-line suggestion when opus/fable is routed on non-hard work, else None.
     cheaper_alternative: str | None
+    #: Sorted tuple of distinct role/profile strings seen across items (empty when none provided).
+    roles: tuple[str, ...] = ()
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -139,6 +141,7 @@ def estimate_cost(items: list) -> CostPreview:
         uses_subagents: bool = False
         requires_expensive_model: bool = False
         has_expensive_non_hard: bool = False
+        seen_roles: set[str] = set()
 
         for item in items:
             try:
@@ -169,6 +172,10 @@ def estimate_cost(items: list) -> CostPreview:
                     if complexity != "hard":
                         has_expensive_non_hard = True
 
+                raw_role = _get(item, "role", None)
+                if isinstance(raw_role, str) and raw_role.strip():
+                    seen_roles.add(raw_role.strip())
+
             except Exception:  # noqa: BLE001 — item-level failure degrades, never propagates
                 pass
 
@@ -183,6 +190,7 @@ def estimate_cost(items: list) -> CostPreview:
             uses_subagents=uses_subagents,
             requires_expensive_model=requires_expensive_model,
             cheaper_alternative=cheaper_alternative,
+            roles=tuple(sorted(seen_roles)),
         )
     except Exception:  # noqa: BLE001 — top-level guard; return a safe zero preview
         return CostPreview(

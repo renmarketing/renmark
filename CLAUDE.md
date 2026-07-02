@@ -182,6 +182,10 @@ See `plugin/skills/_shared/finish-lanes.md` + `renmark/finish_lanes.py`.
 Before dispatching multiple agents: do one local grep/read first; one scoped Explore before spawning many agents. Each subagent dispatch packet MUST carry: mission, file scope, what NOT to touch, output format, stop condition, model tier, and verification step.
 See `plugin/skills/_shared/subagent-budget.md`.
 <!-- END:subagent-budget-rule -->
+<!-- BEGIN:subagent-profiles-rule -->
+## Subagent profiles
+Prefer specialized dispatch roles (docs-editor, code-implementer, test-writer, reviewer, release-manager, researcher, audit-reader, finish-lane-specialist) over generic `general-purpose` agents. Every dispatch packet carries a `role` field; renmark logs and costs by role. Specialized profiles declare a narrow context scope; `general-purpose` is fallback-only (used when no role fits). See `plugin/skills/_shared/subagent-profiles.md`.
+<!-- END:subagent-profiles-rule -->
 <!-- BEGIN:lifecycle-rule -->
 ## Lifecycle persistence (G12)
 Every workflow stage transition MUST write `.renmark/state/lifecycle.json` before the skill returns; skills that don't are bugs. Canonical stage order:

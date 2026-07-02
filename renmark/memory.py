@@ -267,6 +267,7 @@ def append_routing(
     outcome: str,  # "passed" | "failed" | "retried"
     run_id: str | None = None,
     date: str | None = None,
+    role: str | None = None,
 ) -> None:
     """Append a routing observation to `routing.md` under 'Learned overrides'."""
     ensure_memory(repo)
@@ -275,6 +276,8 @@ def append_routing(
     line = f"- ({date or _today()}) `{signature}` → **{executor}** ({outcome}"
     if run_id:
         line += f", run={run_id}"
+    if role and role.strip():
+        line += f", role={role.strip()}"
     line += ")"
     if line in text:
         # Idempotent on the exact entry: routing.md is curated (hygiene refuses
