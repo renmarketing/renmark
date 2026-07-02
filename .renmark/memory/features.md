@@ -200,6 +200,17 @@ Formal headless/spawned-session contract: layered detection (config.is_headless)
 
 (Backlog. Hand-edited or written by `/renmark:brainstorm` when scoping future work.)
 
+### agency-mode — Agency Mode delivery modality (QUEUED, blocked by cost-control)
+
+Third, higher-level modality above Conductor/Orchestrator: a full project-delivery
+loop (discovery → PRD → roadmap/milestones → build loops → demos → feedback →
+signoff → release) where the owner gives intent and signs off milestones while
+background agents do scoped work. Explicitly **reuses the cost-control /
+finish-lane / context-budget / model-routing infrastructure** — so it is blocked
+until `cost-control-finish-lanes` ships. First deliverable when picked up is a
+spec/plan answering the 6 design questions + smallest MVP, **not** a large build.
+Full request: `.renmark/specs/2026-07-02-agency-mode.request.md`.
+
 *(init-as-front-door pipeline + setup consolidation — SHIPPED 2026-06-08, see Shipped section above.)*
 
 *(acceptance criteria in the PRD — SHIPPED 2026-06-08 as v0.7.3, see Shipped above.)*
