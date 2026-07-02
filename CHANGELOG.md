@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-07-02] — v0.31.0 — Agency Mode full pipeline coverage
+**Release.** Bumps v0.30.0 → v0.31.0. Releases the Agency Mode fast-follow: agency-awareness
+now spans ALL 10 pipeline skills (the v0.30.0 spine start/prd/roadmap/finish/resume PLUS
+feature/plan/orchestrate/verify/codereview). Completes REQ-22 pipeline coverage.
+**Request:** Extend Agency Mode to the 5 deferred pipelines and release it.
+**Built:**
+- `renmark/lifecycle.py` — `_AGENCY_SPINE_SKILLS` → `_AGENCY_AWARE_SKILLS` (all 10 pipelines;
+  back-compat alias retained); `_with_agency_note` surfaces the hint for the newly-covered pipelines.
+- Agency blocks in `plugin/skills/{feature,plan,orchestrate,verify,codereview}/SKILL.md`
+  (pointer to `_shared/agency-delivery.md` via `${CLAUDE_PLUGIN_ROOT}`, never inline).
+- `tests/test_agency_behavior.py` — iterates the full agency-aware set (asserts all 10 gain the
+  hint when active; non-aware skills stay clean; inactive path byte-identical).
+- Codex-reviewed (fixed test-coverage gap + docstring); portability bug caught (absolute path → ${CLAUDE_PLUGIN_ROOT}).
+**Files changed:** renmark/lifecycle.py, 5 SKILL.md, tests/test_agency_behavior.py, version files, CHANGELOG.md.
+**Do not change:** agency hint only for `_AGENCY_AWARE_SKILLS`; inactive path byte-identical;
+bodies load on demand (pointer only); reuses cost-control/finish-lanes/deterministic-first infra.
+
 ## [2026-07-02] — Agency Mode fast-follow (full pipeline coverage)
 **Request:** Extend Agency Mode awareness to the 5 pipelines the v0.30.0 walking-skeleton MVP deferred (feature, plan, orchestrate, verify, codereview) so the whole delivery loop is agency-aware.
 **Built:**
