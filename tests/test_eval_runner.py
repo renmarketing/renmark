@@ -90,6 +90,9 @@ def test_build_subprocess_runner_round_trips_stdin_to_stdout() -> None:
         ('sh -c "exit 3"', "hello", "exited 3"),
         ("command-that-definitely-does-not-exist-renmark", "hello", "not found on PATH"),
         ("   ", None, "empty after shlex.split"),
+        # Regression (codereview re-review Major): a non-executable path like "/"
+        # raises PermissionError/OSError at launch — must surface as EvalRunnerError.
+        ("/", "hello", "could not be launched"),
     ],
 )
 def test_build_subprocess_runner_failure_modes_raise_eval_runner_error(

@@ -60,6 +60,9 @@ def build_subprocess_runner(cmd: str, *, timeout: float = 120.0) -> EvalRunner:
       * a malformed ``cmd`` that ``shlex.split`` cannot parse (e.g. an unbalanced
         quote) — at build time;
       * the command not being on PATH (``FileNotFoundError``);
+      * any other launch failure (``OSError`` — e.g. ``PermissionError`` /
+        ``IsADirectoryError`` when the command resolves to a non-executable
+        path like ``/`` or ``.``);
       * a non-zero exit (message includes truncated stderr);
       * a timeout (``subprocess.TimeoutExpired``).
     """
@@ -89,6 +92,13 @@ def build_subprocess_runner(cmd: str, *, timeout: float = 120.0) -> EvalRunner:
         except subprocess.TimeoutExpired as e:
             raise EvalRunnerError(
                 f"eval runner command timed out after {timeout}s: {argv[0]!r}"
+            ) from e
+        except OSError as e:
+            # Any other launch failure — e.g. PermissionError / IsADirectoryError
+            # when the command resolves to a non-executable path like "/" or ".".
+            # Wrap it so the module contract is uniformly EvalRunnerError.
+            raise EvalRunnerError(
+                f"eval runner command could not be launched ({e}): {argv[0]!r}"
             ) from e
 
         if proc.returncode != 0:
