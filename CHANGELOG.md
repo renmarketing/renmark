@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-07-02] — v0.32.0 — enforced subagent-justification gate
+**Release.** Bumps v0.31.0 → v0.32.0. Ships the enforced subagent gate (strengthens
+REQ-21) in response to a usage report (subagent-heavy, >150k-context sessions running
+unchallenged). Of Codex's 6 cost-control recs, 4 were already shipped (context
+thresholds, finish lanes, model routing, deterministic/model cost split); this releases
+the 2 real gaps.
+**Built:**
+- `renmark/subagent_gate.py` — pure zero-LLM gate: `justify_task` (4-question verdict with
+  structured `challenge_code`), `challenge_plan` (rollup), `preview_line`, and a
+  `python -m renmark.subagent_gate <plan>` CLI (exit 0 clean / 1 challenged / 2 usage,
+  mirroring `plan_lint`). Composes `cost`/`subagent_profiles`; never raises.
+- Real enforcement: `renmark-execute --dry-run` runs the gate and prints the verdict; the
+  orchestrate pre-flight surfaces it and requires acknowledgment on a challenged plan.
+- General-purpose reduction: `parser.Task` gained `role`/`role_reason` so plans can justify
+  a general-purpose spawn; unexplained general-purpose is challenged.
+- Docs: `_shared/{deterministic-first,subagent-budget,cost-preview}.md` mark the gate enforced;
+  CLAUDE.md/AGENTS.md deterministic-first rule names the helper.
+- Codex-reviewed: 4 Major findings all fixed (wiring, parser role_reason, challenge_code, est_tokens).
+**Files changed:** renmark/subagent_gate.py (new), tests/test_subagent_gate.py (new), renmark/parser.py, renmark/cli/_engine.py, orchestrate/SKILL.md, 3 _shared/*.md, CLAUDE.md, AGENTS.md, version files, CHANGELOG.md.
+**Do not change:** gate is deterministic/zero-LLM, must never raise; composes cost/subagent_profiles (no reimplementation); general-purpose without role_reason is challenged. It surfaces+acks, does NOT hard-block dispatch (agent-driven). Codex recs #2/#3/#4/#6 already shipped — not re-touched.
+
 ## [2026-07-02] — enforced subagent-justification gate (REQ-21 strengthening)
 **Request:** Usage report showed subagent-heavy, >150k-context sessions running unchallenged (general-purpose subagents recurring). Turn the advisory deterministic-first / subagent gate into an ENFORCED pre-dispatch check.
 **Built:**

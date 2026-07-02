@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-02 @ 3daa860 -->
+<!-- Last refreshed: 2026-07-02 @ 1a3ac74 -->
 
 # Dev standards — ai-system
 
@@ -21,7 +21,7 @@ What this project enforces about itself, detected from configuration files. Read
 ✅ **No gaps detected.** Linter, type checker, tests, and CI are all wired up.
 ## Modularity
 
-**186 modularity gaps** (31 major, 155 warn) — file-level size/complexity breaches. Advisory: these never block init.
+**192 modularity gaps** (32 major, 160 warn) — file-level size/complexity breaches. Advisory: these never block init.
 
 - 🚨 **High cognitive complexity: `renmark/memory.py` → `_parse_learning_entries()` (score 32)** — `_parse_learning_entries()` in `renmark/memory.py` has a nesting-weighted cognitive-complexity score of 32 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `_parse_learning_entries()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/release.py` → `main()` (30 branches)** — `main()` in `renmark/release.py` has a cyclomatic branch count of 30 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `main()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
@@ -30,6 +30,7 @@ What this project enforces about itself, detected from configuration files. Read
 - 🚨 **High cyclomatic complexity: `renmark/bootstrap.py` → `bootstrap()` (25 branches)** — `bootstrap()` in `renmark/bootstrap.py` has a cyclomatic branch count of 25 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `bootstrap()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High cognitive complexity: `renmark/bootstrap.py` → `bootstrap()` (score 35)** — `bootstrap()` in `renmark/bootstrap.py` has a nesting-weighted cognitive-complexity score of 35 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `bootstrap()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cognitive complexity: `renmark/shadow.py` → `main()` (score 31)** — `main()` in `renmark/shadow.py` has a nesting-weighted cognitive-complexity score of 31 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `main()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
+- 🚨 **High cyclomatic complexity: `renmark/subagent_gate.py` → `justify_task()` (21 branches)** — `justify_task()` in `renmark/subagent_gate.py` has a cyclomatic branch count of 21 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `justify_task()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High cognitive complexity: `renmark/summary.py` → `read_metadata()` (score 34)** — `read_metadata()` in `renmark/summary.py` has a nesting-weighted cognitive-complexity score of 34 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `read_metadata()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **Oversized module: `renmark/init.py` (1270 code lines)** — `renmark/init.py` has 1270 code lines (threshold 1000). Large modules are hard to navigate, review, and test, and tend to accrete unrelated responsibilities. _Split `renmark/init.py` into focused modules along its natural seams (one cohesive responsibility per file). Advisory — never auto-refactored._
 - 🚨 **High cyclomatic complexity: `renmark/init.py` → `_file_purpose()` (23 branches)** — `_file_purpose()` in `renmark/init.py` has a cyclomatic branch count of 23 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `_file_purpose()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
@@ -42,8 +43,7 @@ What this project enforces about itself, detected from configuration files. Read
 - 🚨 **High cognitive complexity: `renmark/lint.py` → `lint_frontmatter_values()` (score 40)** — `lint_frontmatter_values()` in `renmark/lint.py` has a nesting-weighted cognitive-complexity score of 40 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `lint_frontmatter_values()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cognitive complexity: `renmark/lifecycle.py` → `validate_artifact_refs()` (score 31)** — `validate_artifact_refs()` in `renmark/lifecycle.py` has a nesting-weighted cognitive-complexity score of 31 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `validate_artifact_refs()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/parser.py` → `parse_plan()` (28 branches)** — `parse_plan()` in `renmark/parser.py` has a cyclomatic branch count of 28 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `parse_plan()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
-- 🚨 **High cognitive complexity: `renmark/parser.py` → `parse_plan()` (score 90)** — `parse_plan()` in `renmark/parser.py` has a nesting-weighted cognitive-complexity score of 90 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `parse_plan()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
-- _… +166 more (re-run for the full list)_
+- _… +172 more (re-run for the full list)_
 
 
 _Run `python -m renmark.init --deep` for deeper checks (commit-message style, etc.)._

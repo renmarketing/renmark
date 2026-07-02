@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-02 @ e940c70 -->
+<!-- Last refreshed: 2026-07-02 @ 1a3ac74 -->
 
 # Project map — ai-system
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=135
+**Languages:** python=137
 
 ## Directory tree
 
