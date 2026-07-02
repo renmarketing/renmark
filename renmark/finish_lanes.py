@@ -219,15 +219,15 @@ def resolve_lane(recommended: Lane, override: str | None) -> Lane:
 def lane_table() -> str:
     """Return a compact Markdown table of all lanes and their capabilities.
 
-    Columns: ``Lane | Merges | Releases | Packages | WSL | Verification | Cost``.
+    Columns: ``Lane | Merges | Releases | Packages | WSL | Worktree | Verification | Cost``.
     Booleans are rendered as ``✓`` / ``✗``.  Pure, never raises.
     """
     try:
         _yes = "✓"
         _no = "✗"
 
-        header = "| Lane | Merges | Releases | Packages | WSL | Verification | Cost |"
-        sep = "|------|--------|----------|----------|-----|--------------|------|"
+        header = "| Lane | Merges | Releases | Packages | WSL | Worktree | Verification | Cost |"
+        sep = "|------|--------|----------|----------|-----|----------|--------------|------|"
         rows = [header, sep]
         for lane_name in (LANE_QUICK, LANE_RELEASE, LANE_SELF_UPDATE, LANE_FULL):
             spec = LANES[lane_name]
@@ -237,6 +237,7 @@ def lane_table() -> str:
                 f"| {_yes if spec.releases else _no} "
                 f"| {_yes if spec.packages else _no} "
                 f"| {_yes if spec.updates_wsl else _no} "
+                f"| {_yes if spec.cleans_worktrees else _no} "
                 f"| {spec.verification} "
                 f"| {spec.cost_level} |"
             )

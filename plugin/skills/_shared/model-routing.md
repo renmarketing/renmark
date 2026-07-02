@@ -15,6 +15,12 @@
 
 ---
 
+## Deterministic-first gate (before model choice)
+
+Before choosing a model tier, **apply the deterministic-first gate** — see `_shared/deterministic-first.md` for the 4-question sequence. Do not spawn a model call for state checks, file validation, or git operations; use `renmark/worktree.py`, git commands, or parsers instead.
+
+---
+
 ## Hard escalation gate
 
 Before dispatching to Opus or Fable, **consult `renmark.cost.requires_escalation(task_spec)` deterministically** — the function returns `True` only when:

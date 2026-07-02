@@ -147,6 +147,7 @@ Agency Mode MUST reuse — not re-implement — the following infrastructure shi
 - `plugin/skills/_shared/subagent-budget.md` — scoped subagent packet contract; all Agency background agents follow this format.
 - `plugin/skills/_shared/finish-lanes.md` — lane descriptions; Agency finish step references this fragment.
 - `plugin/skills/_shared/cost-preview.md` — cost-preview display contract; Agency pre-wave display follows this format.
+- `plugin/skills/_shared/deterministic-first.md` — deterministic-first principle + 4-question gate; Agency milestone verification reuses this for worktree state checks (clean tree, diffs, merge status, test baseline) via `renmark/worktree.py`; no model calls for infra validation (AC6).
 
 ## Acceptance criteria
 
