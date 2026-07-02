@@ -212,6 +212,14 @@ Formal headless/spawned-session contract: layered detection (config.is_headless)
 
 (Backlog. Hand-edited or written by `/renmark:brainstorm` when scoping future work.)
 
+### deterministic-first — prefer code/state/git/grep/parser before AI (QUEUED)
+
+Extends v0.28.0 cost-control: an explicit "try deterministic first" gate before any
+model call (state/files/git/grep/parser → deterministic script → reusable check → AI
+only for judgment). Finish lanes use deterministic release/package/install checks;
+cost preview tags deterministic vs model-driven; Agency Mode reuses the gates.
+Full request: `.renmark/specs/2026-07-02-deterministic-first.request.md`.
+
 ### agency-mode — Agency Mode delivery modality (QUEUED, blocked by cost-control)
 
 Third, higher-level modality above Conductor/Orchestrator: a full project-delivery
