@@ -4,6 +4,16 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-07-02 — Agency Mode (walking-skeleton MVP)
+
+**Files:** `renmark/agency.py`, `plugin/skills/_shared/agency-delivery.md`, `renmark/context.py`, `renmark/lifecycle.py`, `tests/test_agency.py`, `tests/test_agency_behavior.py`
+**Spec:** `.renmark/specs/2026-07-02-agency-mode.spec.md`
+**Plan:** `.renmark/plans/2026-07-02-agency-mode.plan.md`
+
+REQ-22: higher-level delivery workflow above Conductor/Orchestrator; agency state (renmark/agency.py) + on-demand agency-delivery fragment + mode-conditioned preamble + agency-aware spine (start/prd/roadmap/finish/resume) + behavior tests
+
+---
+
 ### 2026-07-02 — deterministic-first: prefer code/tools before AI/subagents (v0.29.0)
 REQ-21 deterministic-first routing. New `plugin/skills/_shared/deterministic-first.md`
 fragment (4-question gate + task-example catalog) + mirrored CLAUDE.md/AGENTS.md rule
