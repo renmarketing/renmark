@@ -60,10 +60,13 @@ seam only (not built now). Spec: `.renmark/specs/2026-07-02-live-eval-runner.spe
   New module defining the pluggable eval-runner seam and the shipped subprocess impl.
   Reuse the `Callable[[str], str]` runner shape (alias `EvalRunner`). Provide:
   (a) `build_subprocess_runner(cmd: str, *, timeout: float = 120.0) -> EvalRunner` — returns
-  a closure that runs `cmd` via `subprocess.run` with `shell=True`, feeding the prompt on
-  **stdin** (`input=prompt`, `text=True`, `capture_output=True`), returning `stdout`. On
-  non-zero exit raise a clear `EvalRunnerError` (define it here) including a truncated
-  stderr; on `subprocess.TimeoutExpired` raise `EvalRunnerError`. Never return silently on
+  a closure that runs `cmd` via `subprocess.run` with **`shell=False`** on
+  **`shlex.split(cmd)`** (NO shell interpretation — the safer default for a
+  command-execution surface; `claude -p` still works, complex shell needs a wrapper
+  script), feeding the prompt on **stdin** (`input=prompt`, `text=True`,
+  `capture_output=True`), returning `stdout`. Raise `EvalRunnerError` (define it here) on: an
+  empty/blank `cmd` after split, `FileNotFoundError` (command not on PATH), non-zero exit
+  (include truncated stderr), and `subprocess.TimeoutExpired`. Never return silently on
   failure. (b) `resolve_eval_runner(repo, model="sonnet") -> EvalRunner | None` — reads
   `renmark.config.eval_runner_cmd(repo)`; returns `build_subprocess_runner(cmd)` when
   configured, else `None`. Document the seam: an agent-turn runner can be injected later by
@@ -102,8 +105,10 @@ seam only (not built now). Spec: `.renmark/specs/2026-07-02-live-eval-runner.spe
   Cover the full seam (unit + delegation), using `monkeypatch` for env and a real trivial
   shell command for the subprocess path. Cases: (1) `eval_runner_cmd` precedence — env wins
   over config, config over default `None`; (2) `build_subprocess_runner('cat')('hello') ==
-  'hello'` (stdin→stdout round-trip); (3) non-zero command (e.g. `'false'` or
-  `'sh -c "exit 3"'`) raises `EvalRunnerError`; (4) `resolve_eval_runner` returns `None` when
+  'hello'` (stdin→stdout round-trip; confirm `shlex.split` + `shell=False`); (3) failure
+  modes each raise `EvalRunnerError` — non-zero exit (`'sh -c "exit 3"'`), a
+  missing/unknown command (`FileNotFoundError`), and an empty/blank `cmd`; (4)
+  `resolve_eval_runner` returns `None` when
   unconfigured and a callable when `RENMARK_EVAL_RUNNER_CMD` is set; (5)
   `behavior.build_subagent_runner` raises `LiveRunnerUnavailable` when unconfigured and
   returns a working runner when configured (monkeypatch env, assert `capture` writes a
