@@ -1,0 +1,212 @@
+"""Lightweight, resumable Agency project state persisted to ``.renmark/state/agency.json``.
+
+Agency Mode is the third delivery modality above Conductor/Orchestrator.  This
+module persists its runtime state — active flag, current phase, milestone
+tracking, signoff status, cost lane, and a roadmap reference — to a small JSON
+file under ``.renmark/state/``.
+
+Design constraints (mirroring :mod:`renmark.mode` and :mod:`renmark.lifecycle`):
+- stdlib json only (no third-party deps).
+- Reads NEVER raise — a missing, unreadable, or corrupt file always returns the
+  default inactive state so callers can safely call ``is_active`` without
+  guarding against exceptions.
+- Writes ARE NOT swallowed: an oversize file raises :class:`AgencyBloatError`
+  so callers never report success on a persistence that did not happen.  The
+  write is atomic — a temp file in the same ``.renmark/state`` dir is
+  ``os.replace``d into place so a concurrent reader never sees a partial write.
+- :data:`AGENCY_JSON_BYTE_BUDGET` mirrors ``LIFECYCLE_JSON_BYTE_BUDGET`` from
+  :mod:`renmark.lifecycle` (both 1 KB).  Exceeding the budget means runtime
+  cruft has leaked in — move it to ``pipeline.json``.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import json
+import os
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+# ── Budget / error ────────────────────────────────────────────────────────────
+
+AGENCY_JSON_BYTE_BUDGET: int = 1024  # 1 KB — exceeding this is a bug
+
+
+class AgencyBloatError(RuntimeError):
+    """Raised when the serialised agency.json would exceed the byte budget.
+
+    Mirrors :class:`renmark.lifecycle.LifecycleBloatError`.
+    """
+
+
+# ── Path helper ───────────────────────────────────────────────────────────────
+
+_AGENCY_REL = ".renmark/state/agency.json"
+
+
+def agency_state_path(repo: str | Path) -> Path:
+    """Return the absolute path where agency state is persisted.
+
+    This is the single source of truth for the agency-state location
+    (``<repo>/.renmark/state/agency.json``).  User-facing strings MUST derive
+    their path text from here so they can never drift from the actual write
+    location.
+
+    Note: the parent directory is NOT created here — only :func:`write_agency`
+    does that, on first write.
+    """
+    return Path(repo) / _AGENCY_REL
+
+
+# ── Schema (dataclass) ────────────────────────────────────────────────────────
+
+@dataclass
+class AgencyState:
+    """Minimal runtime state for an active Agency Mode workflow.
+
+    All string fields default to ``""`` so the JSON remains small even when
+    most fields are unused.  ``active`` defaults to ``False`` — the initial
+    state is always inactive.
+    """
+
+    active: bool = False
+    current_phase: str = ""
+    current_milestone: str = ""
+    next_checkpoint: str = ""
+    signoff_status: str = ""
+    cost_lane: str = ""
+    roadmap_ref: str = ""
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2) + "\n"
+
+
+# ── Field type registry (used for safe read deserialisation) ──────────────────
+
+_AGENCY_FIELD_TYPES: dict[str, type] = {
+    "active": bool,
+    "current_phase": str,
+    "current_milestone": str,
+    "next_checkpoint": str,
+    "signoff_status": str,
+    "cost_lane": str,
+    "roadmap_ref": str,
+}
+
+# ── Read ──────────────────────────────────────────────────────────────────────
+
+
+def read_agency(repo: str | Path) -> AgencyState:
+    """Return the persisted :class:`AgencyState` for the project at *repo*.
+
+    Returns the default inactive state (``active=False``, all strings ``""``)
+    when the file is MISSING or CORRUPT (bad JSON, wrong type) — NEVER raises
+    into a caller.
+    """
+    try:
+        text = agency_state_path(repo).read_text(encoding="utf-8")
+        data = json.loads(text)
+    except Exception:
+        return AgencyState()
+
+    if not isinstance(data, dict):
+        return AgencyState()
+
+    # Accept only recognised fields with the right type — ignore extras to
+    # survive schema drift without crashing.
+    filtered: dict[str, object] = {
+        k: v
+        for k, v in data.items()
+        if k in _AGENCY_FIELD_TYPES and isinstance(v, _AGENCY_FIELD_TYPES[k])
+    }
+    return AgencyState(**filtered)  # type: ignore[arg-type]
+
+
+# ── Write ─────────────────────────────────────────────────────────────────────
+
+
+def write_agency(repo: str | Path, state: AgencyState) -> None:
+    """Atomically persist *state* to ``.renmark/state/agency.json``.
+
+    Creates ``.renmark/state/`` if missing.  Raises :class:`AgencyBloatError`
+    when the serialised JSON exceeds :data:`AGENCY_JSON_BYTE_BUDGET` — runtime
+    cruft has leaked in.  A genuine write failure (read-only FS, ENOSPC,
+    permission denied) is NOT swallowed; it propagates as :class:`OSError` so
+    callers never report success on a persistence that did not happen.
+
+    The write is atomic: a temp file in the same ``.renmark/state`` directory is
+    ``os.replace``d into place so a concurrent reader never observes a
+    partially-written file.
+    """
+    payload = state.to_json()
+    if len(payload.encode("utf-8")) > AGENCY_JSON_BYTE_BUDGET:
+        raise AgencyBloatError(
+            f"agency.json would be {len(payload.encode('utf-8'))} bytes; "
+            f"budget {AGENCY_JSON_BYTE_BUDGET}. "
+            "Runtime cruft has leaked in — move it to pipeline.json."
+        )
+
+    p = agency_state_path(repo)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + f".tmp.{os.getpid()}")
+    try:
+        tmp.write_text(payload, encoding="utf-8")
+        os.replace(tmp, p)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+
+
+# ── Convenience helpers ───────────────────────────────────────────────────────
+
+
+def is_active(repo: str | Path) -> bool:
+    """Return ``True`` when Agency Mode is currently active for *repo*.
+
+    Convenience wrapper over :func:`read_agency` — never raises.
+    """
+    return read_agency(repo).active
+
+
+def activate(repo: str | Path, **fields: str) -> AgencyState:
+    """Set ``active=True``, optionally updating other string fields, and persist.
+
+    Keyword arguments map to :class:`AgencyState` string fields:
+    ``current_phase``, ``current_milestone``, ``next_checkpoint``,
+    ``signoff_status``, ``cost_lane``, ``roadmap_ref``.  Unknown keys are
+    silently ignored to allow forward-compatible callers.
+
+    Returns the updated :class:`AgencyState`.
+    Raises :class:`AgencyBloatError` or :class:`OSError` on write failure.
+    """
+    state = read_agency(repo)
+    state.active = True
+    _string_fields = {
+        "current_phase",
+        "current_milestone",
+        "next_checkpoint",
+        "signoff_status",
+        "cost_lane",
+        "roadmap_ref",
+    }
+    for key, value in fields.items():
+        if key in _string_fields:
+            setattr(state, key, value)
+    write_agency(repo, state)
+    return state
+
+
+def deactivate(repo: str | Path) -> AgencyState:
+    """Set ``active=False`` and persist, preserving all other fields.
+
+    Returns the updated :class:`AgencyState`.
+    Raises :class:`AgencyBloatError` or :class:`OSError` on write failure.
+    """
+    state = read_agency(repo)
+    state.active = False
+    write_agency(repo, state)
+    return state
