@@ -107,6 +107,27 @@ def test_build_subprocess_runner_failure_modes_raise_eval_runner_error(
         runner(prompt)
 
 
+def test_build_subprocess_runner_unparseable_cmd_raises_eval_runner_error() -> None:
+    # Regression (codereview Major): an unbalanced quote must surface as the
+    # module's EvalRunnerError, not a raw shlex ValueError leaking the contract.
+    with pytest.raises(EvalRunnerError, match="not parseable"):
+        build_subprocess_runner('foo "bar')
+
+
+def test_blank_config_eval_runner_cmd_degrades_to_unavailable(tmp_path: Path) -> None:
+    # Regression (codereview Major): a whitespace-only config value must be
+    # treated as unset so build_subagent_runner degrades to LiveRunnerUnavailable
+    # (not a spurious EvalRunnerError). Env is cleared by the autouse fixture.
+    (tmp_path / ".renmark").mkdir()
+    (tmp_path / ".renmark" / "config.json").write_text(
+        json.dumps({"eval_runner_cmd": "   "}), encoding="utf-8"
+    )
+    assert config.eval_runner_cmd(tmp_path) is None
+    assert config.eval_runner_source(tmp_path) == "default"
+    with pytest.raises(behavior.LiveRunnerUnavailable):
+        behavior.build_subagent_runner(tmp_path)
+
+
 def test_resolve_eval_runner_returns_none_when_unconfigured(tmp_path: Path) -> None:
     assert resolve_eval_runner(tmp_path) is None
 

@@ -57,11 +57,18 @@ def build_subprocess_runner(cmd: str, *, timeout: float = 120.0) -> EvalRunner:
 
     Raises ``EvalRunnerError`` (never returns silently) on:
       * a blank/empty ``cmd`` (nothing after ``shlex.split``) — at build time;
+      * a malformed ``cmd`` that ``shlex.split`` cannot parse (e.g. an unbalanced
+        quote) — at build time;
       * the command not being on PATH (``FileNotFoundError``);
       * a non-zero exit (message includes truncated stderr);
       * a timeout (``subprocess.TimeoutExpired``).
     """
-    argv = shlex.split(cmd)
+    try:
+        argv = shlex.split(cmd)
+    except ValueError as e:
+        raise EvalRunnerError(
+            f"eval runner command is not parseable ({e}): {cmd!r}"
+        ) from e
     if not argv:
         raise EvalRunnerError("eval runner command is empty after shlex.split")
 

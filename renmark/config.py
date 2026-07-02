@@ -166,14 +166,32 @@ def _env_eval_runner_cmd() -> str | None:
     return None
 
 
+def _config_eval_runner_cmd(repo: str | Path) -> str | None:
+    """Return the ``.renmark/config.json`` ``eval_runner_cmd`` value, normalized.
+
+    Mirrors :func:`_env_eval_runner_cmd`: returns the stripped value only when
+    the key is present, a real ``str``, and non-blank; a non-str or
+    whitespace-only value is treated as unset (``None``) so the caller degrades
+    to ``LiveRunnerUnavailable`` rather than a spurious empty-command error.
+    Never raises.
+    """
+    val = _read_raw(repo).get("eval_runner_cmd")
+    if isinstance(val, str):
+        norm = val.strip()
+        if norm:
+            return norm
+    return None
+
+
 def eval_runner_cmd(repo: str | Path) -> str | None:
     """Return the command used to launch the eval-tier runner for *repo*.
 
     Precedence:
     1. env ``RENMARK_EVAL_RUNNER_CMD`` if set and non-blank (whitespace is
        stripped; a blank value is treated as unset and falls through);
-    2. else the ``.renmark/config.json`` key ``"eval_runner_cmd"`` if present
-       **and a real ``str``** (a non-str value is ignored, not coerced);
+    2. else the ``.renmark/config.json`` key ``"eval_runner_cmd"`` if present,
+       a real ``str``, **and non-blank** (whitespace is stripped; a non-str or
+       blank value is ignored, not coerced);
     3. else ``None``.
 
     Never raises — any OS or parse error degrades to ``None``.
@@ -181,10 +199,7 @@ def eval_runner_cmd(repo: str | Path) -> str | None:
     env = _env_eval_runner_cmd()
     if env is not None:
         return env
-    val = _read_raw(repo).get("eval_runner_cmd")
-    if isinstance(val, str):
-        return val
-    return None
+    return _config_eval_runner_cmd(repo)
 
 
 def set_eval_runner_cmd(repo: str | Path, value: str) -> None:
@@ -209,6 +224,6 @@ def eval_runner_source(repo: str | Path) -> str:
     """
     if _env_eval_runner_cmd() is not None:
         return "env"
-    if isinstance(_read_raw(repo).get("eval_runner_cmd"), str):
+    if _config_eval_runner_cmd(repo) is not None:
         return "config"
     return "default"
