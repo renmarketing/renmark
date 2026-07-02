@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-02] — PRD updated
+**Request:** Add REQ-22 (Agency Mode) to the PRD, resolving the drift verdict from the agency-mode brainstorm.
+**Built:** Reconciled the Requirements + Scope-boundaries sections of PRD.md; added REQ-22 (optional higher-level project-delivery workflow above Conductor/Orchestrator), an In-scope clause, and a 2026-07-02 revision note; bumped last_reviewed.
+**Files changed:**
+- `PRD.md` — added REQ-22 (Agency Mode), In-scope clause, revision note; last_reviewed → 2026-07-02.
+**Do not change:**
+- Agency Mode must NOT replace Conductor/Orchestrator; explicit opt-in only (no auto-detect); reuses cost-control/finish-lane/deterministic-first infra; agency bodies load on demand. PRD.md is human-owned — automated stages propose, never write without approval.
+
 ## [2026-07-02] — project scope: agency-mode (spec)
 **Request:** Brainstorm/spec for Agency Mode — a higher-level project-delivery workflow above Conductor/Orchestrator. Spec-first, no implementation this session.
 **Stack:** Python >=3.10 + Claude Code plugin (fixed — renmark-internal feature; no new stack).

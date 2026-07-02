@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-07-01
+last_reviewed: 2026-07-02
 status: draft
 ---
 
@@ -202,6 +202,22 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     included. Cost preview labels each task step as deterministic vs
     model-driven. **Deterministic-first execution**: git / grep / state /
     parser checks before subagents; deterministic checks before model calls.
+22. `REQ-22` **Agency Mode** is an OPTIONAL higher-level project-delivery
+    workflow — it does NOT replace Conductor or Orchestrator (they remain the
+    execution engines it drives) — that adds sustained, owner-facing project
+    governance: owner intent → PRD agreement → tech-stack recommendation →
+    roadmap/milestones → iterative build → demo/feedback → verification →
+    signoff → release. It carries lightweight, resumable agency phase state
+    (current phase, current milestone, next checkpoint, signoff status, cost
+    lane, roadmap ref), owner-level approval gates distinct from technical
+    gates, and milestone checkpoints that pause for owner feedback. Activation
+    is explicit opt-in (via `/renmark:start`), never auto-detected; a main agent
+    communicates with the owner while scoped background agents do the work.
+    Agency behavior loads dynamically — agency metadata upfront, full agency
+    instructions only when Agency Mode is active (extends REQ-20). Agency Mode
+    REUSES, never re-implements, the cost-control, finish-lane, and
+    deterministic-first infrastructure; milestone-readiness checks run
+    deterministically (extends REQ-3, REQ-4, REQ-5, REQ-21).
 
 ## Success metrics
 
@@ -235,7 +251,10 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   Chrome DevTools MCP channel); graduated skill-preamble tiers that give
   zero-LLM / meta skills minimal context injection while pipeline skills receive
   the full preamble — a finer per-turn token dial that never compromises
-  cold-start recovery or cross-domain detection (complements REQ-5).
+  cold-start recovery or cross-domain detection (complements REQ-5); the
+  OPTIONAL Agency Mode delivery workflow — an opt-in, higher-level
+  project-delivery loop that drives Orchestrator internally and does not
+  replace Conductor/Orchestrator (REQ-22).
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   managing user secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
@@ -358,3 +377,13 @@ criterion AC5 as an infrastructure requirement that operationalizes the REQ-5
 context-hygiene pillar. Proposed by the "dynamic-skill-loading" feature's
 PRD-alignment gate; reviewed and approved by the project owner on 2026-07-01 via
 the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-07-02, human-approved diff):** Added REQ-22 (Agency Mode —
+an optional higher-level project-delivery workflow above Conductor/Orchestrator
+that drives the discovery → PRD → roadmap → milestones → build → demo → feedback
+→ signoff → release loop; explicit opt-in, lightweight resumable agency state,
+owner-level gates, dynamic agency-body loading, reuse of cost-control/finish-
+lane/deterministic-first infra) and a matching In-scope clause. Proposed by the
+agency-mode feature's PRD-alignment gate; spec at
+`.renmark/specs/2026-07-02-agency-mode.spec.md`. Reviewed and approved by the
+project owner on 2026-07-02 via the `/renmark:prd` UPDATE gate.
