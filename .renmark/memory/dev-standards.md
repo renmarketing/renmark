@@ -1,7 +1,7 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-02 @ 5d3f878 -->
+<!-- Last refreshed: 2026-07-02 @ 3daa860 -->
 
-# Dev standards — deterministic-first
+# Dev standards — ai-system
 
 What this project enforces about itself, detected from configuration files. Read this before making non-trivial changes so you don't break gates that are silently checking your work.
 

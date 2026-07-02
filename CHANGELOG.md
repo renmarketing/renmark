@@ -1,5 +1,34 @@
 # Changelog
 
+## [2026-07-02] — v0.30.0 — Agency Mode (walking-skeleton MVP)
+**Release.** Bumps v0.29.0 → v0.30.0. Ships **Agency Mode** (REQ-22) — an OPTIONAL
+higher-level project-delivery workflow ABOVE Conductor/Orchestrator (does not replace
+them), the third delivery modality. Walking-skeleton MVP over the core pipeline spine.
+**Request:** Build Agency Mode — owner gives intent + signs off milestones while renmark
+runs discovery → PRD → roadmap → milestones → build → demo → feedback → signoff → release.
+**Built:**
+- `renmark/agency.py` — lightweight resumable agency state (`.renmark/state/agency.json`):
+  `AgencyState`, `read_agency`/`write_agency` (atomic via `tempfile.mkstemp`), `is_active`,
+  `activate`/`deactivate`; `AGENCY_JSON_BYTE_BUDGET`=1KB + `AgencyBloatError` (mirrors lifecycle).
+- `plugin/skills/_shared/agency-delivery.md` — shared agency delivery contract, loaded ON
+  DEMAND only (registered in `context.FRAGMENT_NAMES`); never eager.
+- `renmark/lifecycle.py` — mode-conditioned `skill_preamble`: when agency active, appends an
+  agency hint + fragment POINTER (not body) for the 5 spine skills only; byte-identical when
+  inactive (`_with_agency_note`, `_AGENCY_SPINE_SKILLS`, `_AGENCY_HINT_MARKER`).
+- Agency blocks in the 5 spine skills (start/prd/roadmap/finish/resume); `/renmark:start` is
+  the explicit opt-in entry (seeds agency.json via `agency.activate`). help + CLAUDE.md/AGENTS.md.
+- Tests: `tests/test_agency.py` (state) + `tests/test_agency_behavior.py` (AC11 — proves agency
+  changes behavior without loading skill bodies; inactive path byte-identical).
+- Standalone lint hotfix: cleared pre-existing ruff debt in cost.py/subagent_profiles.py.
+**Files changed:** renmark/agency.py (new), plugin/skills/_shared/agency-delivery.md (new),
+renmark/context.py, renmark/lifecycle.py, 5 spine SKILL.md, help/SKILL.md, CLAUDE.md, AGENTS.md,
+PRD.md (REQ-22), tests/test_agency*.py (new), cost.py, subagent_profiles.py, version files.
+**Do not change:** Agency Mode must NOT replace Conductor/Orchestrator; explicit opt-in only
+(no auto-detect); agency bodies load on demand (never eager); `cites` in skillmeta is a CLOSED
+3-block vocab (reasoning-contract/next-steps/handoff-menu) — spine source of truth is
+`lifecycle._AGENCY_SPINE_SKILLS`. Reuses cost-control/finish-lanes/deterministic-first infra.
+Fast-follow (deferred): feature/plan/orchestrate/verify/codereview agency-awareness.
+
 ## [2026-07-02] — PRD updated
 **Request:** Add REQ-22 (Agency Mode) to the PRD, resolving the drift verdict from the agency-mode brainstorm.
 **Built:** Reconciled the Requirements + Scope-boundaries sections of PRD.md; added REQ-22 (optional higher-level project-delivery workflow above Conductor/Orchestrator), an In-scope clause, and a 2026-07-02 revision note; bumped last_reviewed.
