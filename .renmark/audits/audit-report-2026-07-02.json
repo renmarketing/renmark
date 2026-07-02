@@ -1,5 +1,5 @@
 {
-  "quick": true,
+  "quick": false,
   "passes": {
     "registry-sync": [],
     "shim-thinness": [],
@@ -18,7 +18,10 @@
     "lint": 0,
     "version-drift": 0
   },
-  "modularity_counts": {},
+  "modularity_counts": {
+    "danger": 31,
+    "warn": 155
+  },
   "inventory_count": 29,
   "total_issues": 0,
   "verdict": "PASS"

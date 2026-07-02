@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-07-02T21:39:58+00:00
-source_sha: 402dec132b43f6aa2f5f59fb2513bac6849e18fa
+created_at: 2026-07-02T22:37:00+00:00
+source_sha: 6510265af1be965ad10c6223ed85edca364cca3a
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -37,6 +37,9 @@ schema_compliance: true
 
 ## version-drift (0 issues)
 - (clean)
+
+## modularity (advisory)
+- danger=31 warn=155 info=0
 
 ## Summary
 

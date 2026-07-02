@@ -92,7 +92,7 @@
     "domain": "debug",
     "skill_class": "gate",
     "shim_body_lines": 2,
-    "skill_lines": 375,
+    "skill_lines": 377,
     "has_skill": true
   },
   {
@@ -140,7 +140,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 279,
+    "skill_lines": 283,
     "has_skill": true
   },
   {
@@ -236,7 +236,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 345,
+    "skill_lines": 349,
     "has_skill": true
   },
   {
@@ -248,7 +248,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 266,
+    "skill_lines": 270,
     "has_skill": true
   },
   {
@@ -344,7 +344,7 @@
     "domain": "build",
     "skill_class": "gate",
     "shim_body_lines": 6,
-    "skill_lines": 583,
+    "skill_lines": 587,
     "has_skill": true
   }
 ]
