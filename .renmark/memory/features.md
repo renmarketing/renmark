@@ -217,7 +217,9 @@ Formal headless/spawned-session contract: layered detection (config.is_headless)
 Extends v0.28.0 cost-control: an explicit "try deterministic first" gate before any
 model call (state/files/git/grep/parser → deterministic script → reusable check → AI
 only for judgment). Finish lanes use deterministic release/package/install checks;
-cost preview tags deterministic vs model-driven; Agency Mode reuses the gates.
+cost preview tags deterministic vs model-driven; Agency Mode reuses the gates. Includes worktree cost-control sub-scope: deterministic-first worktree
+lifecycle (git for status/staleness/divergence/diff/cleanup, AI only for judgment); adds a
+Worktree column to finish lane_table.
 Full request: `.renmark/specs/2026-07-02-deterministic-first.request.md`.
 
 ### agency-mode — Agency Mode delivery modality (QUEUED, blocked by cost-control)

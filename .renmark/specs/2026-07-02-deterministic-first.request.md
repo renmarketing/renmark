@@ -66,3 +66,39 @@ checks; release readiness checklist.
 - Tests proving the gates run code (not a model) and the cost preview reports the
   deterministic/model split.
 - Agency Mode spec cross-ref (AC6): note deterministic gates back milestone verification.
+
+---
+
+## Sub-scope (2026-07-02) — Worktree cost control (deterministic-first lifecycle)
+
+Worktrees stay REQUIRED for safe isolated development (esp. renmark-on-renmark).
+**Do not remove worktree isolation.** But worktree lifecycle management must be
+deterministic-first:
+
+- create worktree via git commands
+- check current branch via git
+- detect stale worktrees via `git worktree list`
+- check divergence via `merge-base` / `rev-list`
+- check diff size via `git diff --stat`
+- verify clean tree via `git status --porcelain`
+- cleanup via deterministic commands
+
+Use AI ONLY when: branch history is ambiguous; merge risk needs interpretation;
+conflicts require judgment; release readiness needs owner-level explanation.
+
+### Worktree acceptance criteria
+1. Worktree safety remains intact (isolation not removed).
+2. Routine worktree checks are deterministic (git, not a model).
+3. AI is not used for simple branch/status/diff checks.
+4. Finish lanes SHOW whether worktree cleanup is included — NOTE: `LaneSpec.cleans_worktrees`
+   already exists but `finish_lanes.lane_table()` does not render it; add a "Worktree"
+   column (deterministic, tiny).
+5. Renmark-on-renmark self-update finish keeps worktree cleanup but avoids unnecessary
+   model calls (the merged-vs-branch check that gated ExitWorktree is exactly a
+   `git branch --merged` / `rev-list` check — deterministic).
+
+### Note from the v0.28.0 finish (evidence this is needed)
+During the v0.28.0 self-update finish, the merged-branch safety check before worktree
+removal was done with `git branch --merged` + comparing the merge's 2nd parent to the
+branch tip — purely deterministic, no model call. That pattern should be codified as a
+reusable `finish_lanes`/worktree helper so every self-update finish reuses it.
