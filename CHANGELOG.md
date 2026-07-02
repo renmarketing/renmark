@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-07-02] — v0.26.0 — live-eval-runner (P8 eval-tier execution bridge)
+**Release.** Bumps v0.25.0 → v0.26.0. Wires the deferred P8 **eval-tier live runner** so `renmark-execute --behavior --accept/--judge` can run real model trajectories when explicitly configured — the missing execution bridge for the mission's behavioral-proof acceptance criterion (NOT a P8-v2 reopen).
+**Built:**
+- New `renmark/providers/eval_runner.py` — pluggable `EvalRunner` seam + shipped subprocess-command runner (`build_subprocess_runner`: `shlex.split` + `shell=False`, prompt on stdin → stdout; uniformly raises `EvalRunnerError` on unparseable/empty cmd, not-on-PATH, any launch `OSError`, non-zero exit, timeout). Agent-turn runner left as a documented seam.
+- `renmark/config.py` — `eval_runner_cmd` accessor (`RENMARK_EVAL_RUNNER_CMD` env > `.renmark` config key > `None`; both stripped, blank = unset) + `eval_runner_source`, via shared `_config_eval_runner_cmd`.
+- `renmark/behavior.py` — `build_subagent_runner` delegates to `eval_runner.resolve_eval_runner`; returns the configured runner or raises `LiveRunnerUnavailable` when unconfigured. Deterministic tier untouched.
+- Docs: P8 tier note refreshed in CLAUDE.md/AGENTS.md (byte-identical). Tests: `tests/test_eval_runner.py` (12).
+**Verified:** smoke 7/7; full suite 1245 passed / 28 skipped; ruff + mypy clean. Codereview: 3 Major + 1 Minor found across 3 codex passes, all fixed + regression-tested.
+**Do not change:**
+- Default MUST stay unavailable / CI-safe / no auto token spend — unconfigured `build_subagent_runner` raises `LiveRunnerUnavailable`.
+- Do not touch the deterministic tier or the dispatch-packet schema; keep `shell=False` on the subprocess runner.
+
 ## [2026-07-02] — eval-runner seam tests (Task 4)
 **Request:** Add focused coverage for the eval-runner seam and behavior-layer delegation in `tests/test_eval_runner.py`.
 **Built:**
