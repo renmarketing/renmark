@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-07-02] — eval-runner seam tests (Task 4)
+**Request:** Add focused coverage for the eval-runner seam and behavior-layer delegation in `tests/test_eval_runner.py`.
+**Built:**
+- New `tests/test_eval_runner.py` covers env/config/default precedence for `config.eval_runner_cmd`.
+- Verifies the subprocess runner path with a real `cat` stdin→stdout round-trip and failure modes for blank, missing, and non-zero commands via `EvalRunnerError`.
+- Covers `resolve_eval_runner` returning `None` when unconfigured and a working callable when `RENMARK_EVAL_RUNNER_CMD` is set.
+- Covers `behavior.build_subagent_runner` raising `LiveRunnerUnavailable` when unconfigured and delegating successfully into `behavior.capture` when configured, including snapshot write assertions.
+**Files changed:**
+- `tests/test_eval_runner.py` — new pytest module with artifact docstring + seam/delegation coverage
+**Do not change:**
+- Keep these tests hermetic: env var cleared per test, temp repo only, no network.
+- Preserve the real subprocess seam coverage with `cat`; do not replace it with a pure mock.
+
 ## [2026-07-01] — v0.25.0 — true dynamic skill loading (AC5 / REQ-20)
 **Release.** Bumps v0.24.0 → v0.25.0. Ships the second net-new slice of the agentic-engineering harness mission: **true dynamic skill loading** with a codified context taxonomy, wired into the production dispatch path.
 - New `renmark/context.py` (stdlib-only) — a four-way context taxonomy (`ContextKind`: STATIC/DYNAMIC/MEMORY/TASK_LOCAL) + `TAXONOMY`; `classify_path` (segment-aware); metadata-upfront helpers (`skill_metadata`/`all_skill_metadata`/`fragment_names`, reuse `skillmeta.SKILLS`, never read bodies); on-demand loaders (`skill_pointer`/`fragment_pointer` refs; `load_skill_body`/`load_fragment` with traversal guard); `upfront_kinds_for_skill` (dynamic bodies never pre-loaded); `assert_metadata_only` guardrail.
