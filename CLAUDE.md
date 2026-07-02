@@ -150,6 +150,38 @@ Orchestrator runs on Sonnet 200k; the window degrades before it fills, so act ea
   `loop`, `audit`) until `/compact` or `/clear`; short skills still run.
 - **Cross-domain transition:** recommend `/clear` (memory survives). The %-side is enforced by orchestrator self-monitoring; the cross-domain side is automated via `renmark.lifecycle.skill_preamble(repo, skill)` (resolves domain from `DOMAIN_BY_SKILL`, runs `context_budget_check`, returns the hint).
 <!-- END:context-budget-rule -->
+<!-- BEGIN:context-thresholds-rule -->
+## Context thresholds (absolute token counts)
+Complement the %-based budget above with absolute hard stops (see `renmark.state.skills.context_budget_hint`):
+- **100k tokens:** summarize in-flight reasoning; prefer artifact pointers over inline output.
+- **120k tokens:** surface `/compact` suggestion — do NOT auto-run.
+- **150k tokens:** checkpoint to `.renmark/state/`; refuse new long skills until `/compact` or `/clear`.
+Cross-domain transition always recommends `/clear` regardless of count.
+<!-- END:context-thresholds-rule -->
+<!-- BEGIN:model-routing-discipline-rule -->
+## Model-routing discipline
+Route each task to the cheapest capable executor. Do NOT default to Opus or Fable for routine work.
+- **Haiku** — docs, grep, summaries, changelog entries, small audits, simple format checks.
+- **Sonnet** — normal planning, implementation, review, dispatch, documentation.
+- **Codex** — bounded code/test generation (single file or tight scope).
+- **Opus / Fable** — escalation-only: high-risk architecture decisions, major design forks, adversarial review, judgment-heavy synthesis requiring frontier reasoning. Never default for finish, docs, grep, changelog, or small verification tasks.
+See `plugin/skills/_shared/model-routing.md` + `renmark/cost.py::requires_escalation`.
+<!-- END:model-routing-discipline-rule -->
+<!-- BEGIN:cost-preview-rule -->
+## Cost preview before expensive work
+Before dispatching any expensive or multi-model operation, show: tier / estimated token+cost band / whether subagents are used / whether expensive models (Opus/Fable) are required / and a cheaper alternative if one exists. Gate on user acknowledgment for escalated-tier work.
+See `plugin/skills/_shared/cost-preview.md` + `renmark/cost.py::estimate_cost`.
+<!-- END:cost-preview-rule -->
+<!-- BEGIN:finish-lanes-rule -->
+## Finish lanes
+`/renmark:finish` supports four lanes — **quick** (re-verify + report only), **release** (verify + PR/tag), **self-update** (for renmark-on-renmark runs: update plugin install + Windows clone), and **full** (all of the above). Default: cheapest-safe lane based on lifecycle state. When the project being finished IS renmark itself, recommend **self-update** to keep both installs in sync.
+See `plugin/skills/_shared/finish-lanes.md` + `renmark/finish_lanes.py`.
+<!-- END:finish-lanes-rule -->
+<!-- BEGIN:subagent-budget-rule -->
+## Subagent budget
+Before dispatching multiple agents: do one local grep/read first; one scoped Explore before spawning many agents. Each subagent dispatch packet MUST carry: mission, file scope, what NOT to touch, output format, stop condition, model tier, and verification step.
+See `plugin/skills/_shared/subagent-budget.md`.
+<!-- END:subagent-budget-rule -->
 <!-- BEGIN:lifecycle-rule -->
 ## Lifecycle persistence (G12)
 Every workflow stage transition MUST write `.renmark/state/lifecycle.json` before the skill returns; skills that don't are bugs. Canonical stage order:

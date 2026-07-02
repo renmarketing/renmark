@@ -89,6 +89,8 @@ and applies a smart per-skill default after. Override:
   /renmark:finish            Verify, review, and ship.
       re-verify → QA/review as needed → report → debug if it fails →
       PR / merge / release menu
+      Lanes: quick (re-verify + report) · release (verify + PR/tag) ·
+             self-update (renmark-on-renmark install sync) · full (all)
 
   Which one?
     new app → start          existing app → feature     broke → debug
