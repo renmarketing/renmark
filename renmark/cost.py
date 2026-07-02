@@ -72,6 +72,12 @@ _EXPENSIVE_EXECUTORS: frozenset[str] = frozenset({"opus", "fable"})
 #: Task kinds that always warrant escalation to opus/fable.
 _ESCALATION_KINDS: frozenset[str] = frozenset({"architecture", "adversarial-review", "design-fork"})
 
+#: Executor names that denote a deterministic (code/tool/script) step — no model call.
+#: Any executor not in this set (including all model names) is classified model-driven.
+_DETERMINISTIC_EXECUTORS: frozenset[str] = frozenset(
+    {"deterministic", "script", "check", "tool", "code", "none"}
+)
+
 # ── Public types ──────────────────────────────────────────────────────────────
 
 
@@ -97,6 +103,14 @@ class CostPreview:
     cheaper_alternative: str | None
     #: Sorted tuple of distinct role/profile strings seen across items (empty when none provided).
     roles: tuple[str, ...] = ()
+    #: Number of items classified as deterministic (code/tool/script steps — no model call).
+    deterministic_count: int = 0
+    #: Number of items classified as model-driven (any model executor).
+    model_driven_count: int = 0
+    #: Estimated tokens attributed to deterministic items (base tokens only, no agent overhead).
+    deterministic_tokens: int = 0
+    #: Estimated tokens attributed to model-driven items (base tokens only, no agent overhead).
+    model_driven_tokens: int = 0
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -142,6 +156,10 @@ def estimate_cost(items: list) -> CostPreview:
         requires_expensive_model: bool = False
         has_expensive_non_hard: bool = False
         seen_roles: set[str] = set()
+        deterministic_count: int = 0
+        model_driven_count: int = 0
+        deterministic_tokens: int = 0
+        model_driven_tokens: int = 0
 
         for item in items:
             try:
@@ -182,6 +200,13 @@ def estimate_cost(items: list) -> CostPreview:
                 if isinstance(raw_role, str) and raw_role.strip():
                     seen_roles.add(raw_role.strip())
 
+                if is_deterministic_item(item):
+                    deterministic_count += 1
+                    deterministic_tokens += base_tokens
+                else:
+                    model_driven_count += 1
+                    model_driven_tokens += base_tokens
+
             except Exception:  # noqa: BLE001 — item-level failure degrades, never propagates
                 pass
 
@@ -197,6 +222,10 @@ def estimate_cost(items: list) -> CostPreview:
             requires_expensive_model=requires_expensive_model,
             cheaper_alternative=cheaper_alternative,
             roles=tuple(sorted(seen_roles)),
+            deterministic_count=deterministic_count,
+            model_driven_count=model_driven_count,
+            deterministic_tokens=deterministic_tokens,
+            model_driven_tokens=model_driven_tokens,
         )
     except Exception:  # noqa: BLE001 — top-level guard; return a safe zero preview
         return CostPreview(
@@ -232,6 +261,36 @@ def requires_escalation(*, complexity: str | None = None, kind: str | None = Non
 
 
 # ── Internal helpers ─────────────────────────────────────────────────────────
+
+
+def is_deterministic_item(item: object) -> bool:
+    """Return True iff ``item`` represents a deterministic (non-model) execution step.
+
+    Classification priority:
+
+    1. Explicit ``mode`` field: ``'deterministic'`` → True, ``'model-driven'`` → False.
+    2. ``executor`` field in :data:`_DETERMINISTIC_EXECUTORS` → True.
+    3. All other executors (model names: haiku/sonnet/opus/fable/codex) → False.
+
+    Degrades safely: unknown or missing fields default to ``False`` (model-driven),
+    the conservative/expensive assumption.  Never raises.
+    """
+    try:
+        raw_mode = _get(item, "mode", None)
+        if isinstance(raw_mode, str) and raw_mode.strip():
+            mode = raw_mode.strip().lower()
+            if mode == "deterministic":
+                return True
+            if mode == "model-driven":
+                return False
+
+        raw_exec = _get(item, "executor", None)
+        if isinstance(raw_exec, str) and raw_exec.strip():
+            return raw_exec.strip().lower() in _DETERMINISTIC_EXECUTORS
+
+        return False
+    except Exception:
+        return False
 
 
 def _get(item: object, key: str, default: object) -> object:
