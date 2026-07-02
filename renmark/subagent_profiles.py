@@ -22,7 +22,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-
 # ── Profile dataclass ─────────────────────────────────────────────────────────
 
 
@@ -162,7 +161,7 @@ PROFILES: dict[str, ProfileSpec] = {
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-def resolve_profile(task: Any) -> str:  # noqa: ANN401
+def resolve_profile(task: Any) -> str:
     """Infer the best-fit role name from a Task (or any task-shaped object/dict).
 
     Accepts objects with attributes *or* plain dicts. Heuristic priority order:
@@ -207,7 +206,7 @@ def resolve_profile(task: Any) -> str:  # noqa: ANN401
 
         # ── 6. Fallback ───────────────────────────────────────────────────────
         return "general-purpose"
-    except Exception:  # noqa: BLE001 — never raise into the caller
+    except Exception:
         return "general-purpose"
 
 
@@ -219,7 +218,7 @@ def profile_tier(role: str) -> str:
     try:
         spec = PROFILES.get(role)
         return spec.model_tier if spec is not None else "sonnet"
-    except Exception:  # noqa: BLE001
+    except Exception:
         return "sonnet"
 
 
@@ -227,20 +226,20 @@ def profile_of(role: str) -> ProfileSpec | None:
     """Safe lookup — returns ``None`` when *role* is not in ``PROFILES``."""
     try:
         return PROFILES.get(role)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
-def _get_field(task: Any, field: str, default: str) -> str:  # noqa: ANN401
+def _get_field(task: Any, field: str, default: str) -> str:
     """Retrieve a field from an object-or-dict, returning *default* on miss."""
     try:
         if isinstance(task, dict):
             return str(task.get(field, default))
         return str(getattr(task, field, default))
-    except Exception:  # noqa: BLE001
+    except Exception:
         return default
 
 
@@ -260,9 +259,7 @@ def _is_test_target(target: str) -> bool:
     if name.startswith("test_"):
         return True
     stem = p.stem
-    if stem.endswith("_test"):
-        return True
-    return False
+    return stem.endswith("_test")
 
 
 def _is_doc_target(target: str) -> bool:
@@ -276,9 +273,7 @@ def _is_doc_target(target: str) -> bool:
         return True
     if norm.startswith("plugin/skills/") or "/plugin/skills/" in norm:
         return True
-    if norm.startswith("docs/") or "/docs/" in norm:
-        return True
-    return False
+    return norm.startswith("docs/") or "/docs/" in norm
 
 
 def _is_core_code_target(target: str) -> bool:

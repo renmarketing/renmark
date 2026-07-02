@@ -207,7 +207,7 @@ def estimate_cost(items: list) -> CostPreview:
                     model_driven_count += 1
                     model_driven_tokens += base_tokens
 
-            except Exception:  # noqa: BLE001 — item-level failure degrades, never propagates
+            except Exception:
                 pass
 
         cheaper_alternative: str | None = None
@@ -227,7 +227,7 @@ def estimate_cost(items: list) -> CostPreview:
             deterministic_tokens=deterministic_tokens,
             model_driven_tokens=model_driven_tokens,
         )
-    except Exception:  # noqa: BLE001 — top-level guard; return a safe zero preview
+    except Exception:
         return CostPreview(
             est_tokens=0,
             est_cost_usd=0.0,
@@ -253,10 +253,8 @@ def requires_escalation(*, complexity: str | None = None, kind: str | None = Non
     try:
         if isinstance(complexity, str) and complexity.strip().lower() == "hard":
             return True
-        if isinstance(kind, str) and kind.strip().lower() in _ESCALATION_KINDS:
-            return True
-        return False
-    except Exception:  # noqa: BLE001
+        return isinstance(kind, str) and kind.strip().lower() in _ESCALATION_KINDS
+    except Exception:
         return False
 
 
@@ -303,5 +301,5 @@ def _get(item: object, key: str, default: object) -> object:
         if isinstance(item, dict):
             return item.get(key, default)
         return getattr(item, key, default)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return default
