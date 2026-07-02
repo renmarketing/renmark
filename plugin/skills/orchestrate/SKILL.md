@@ -28,6 +28,10 @@ After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (t
 
 **Orchestrator** is orchestrate's default: dispatch parallel scoped subagents, offload bulk/single-file emissions to Codex, and advance on reviewed PASS/FAIL outcomes. In **Conductor** mode, prefer serial single-task execution with tighter user checkpoints between tasks. Either mode keeps the G11 isolation/aggregation contract above unchanged.
 
+## When Agency Mode is active
+
+In Agency Mode, orchestrate runs tasks via scoped background agents and advances to the next milestone **checkpoint** rather than halting after each task. The owner agent continues coordination while background agents execute in parallel; progress emits compact summaries only. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for the delivery contract. When Agency is off, orchestrate behaves as above — no changes to isolation or task dispatch.
+
 ## When to Use
 
 - User has a `.renmark/plans/*.plan.md` file ready and wants it executed

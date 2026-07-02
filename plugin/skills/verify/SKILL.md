@@ -52,6 +52,10 @@ In projects where `capabilities.top_tier == "fable"` (per `renmark.capabilities.
 
 State it plainly: **deterministic smoke remains the always-run default** — the fable pass is additive and never replaces verifiers (REQ-7).
 
+## When Agency Mode is active
+
+In Agency Mode, verify escalates from feature-level smoke to milestone-readiness assessment. Runs smoke tests plus browser QA (`--qa`) / edge-case checks (`--deep-qa`) when the milestone surfaces user-visible behavior. Reports DEMO-readiness against the milestone acceptance criteria (what passed, what remains unverified, confidence level) and feeds the owner's signoff checkpoint. See contract pointer: `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`. Additive — existing verify behavior unchanged when agency is off.
+
 ## When to Use
 
 - **Automatically by `/renmark:orchestrate`** after a fully clean run (v0.3.3+) — orchestrate clears pipeline state, sets stage `created`, then invokes this. You rarely run it by hand.

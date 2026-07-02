@@ -29,6 +29,10 @@ full signals (lite must never skip the full review on a risky change).
 
 `feature` defaults to **Orchestrator** mode: execute at the goal level, dispatching narrow scoped subagents where useful. In **Conductor** mode, keep each change single-file/tight and explain the next move before editing. The mode is selected once (ask-once) and persisted; override it durably via `renmark-execute --set-mode`.
 
+## When Agency Mode is active
+
+In Agency Mode, **feature selects the next milestone/feature from the roadmap** rather than treating each feature request as an isolated change. The PRD-alignment check (Step 2) runs against the selected milestone, and scope drift is surfaced immediately — feedback that changes scope updates the roadmap and PRD rather than silently expanding the feature. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for the full delivery contract.
+
 ## When to Use
 
 - New functionality that warrants isolation before merging

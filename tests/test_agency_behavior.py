@@ -2,7 +2,7 @@
 
 Tests pin the observable contracts:
 - AC2: inactive agency leaves preamble byte-identical (no-op)
-- Spine vs non-spine routing (_AGENCY_SPINE_SKILLS)
+- Agency-aware vs non-aware routing (_AGENCY_AWARE_SKILLS)
 - AC4/REQ-20: active preamble carries fragment POINTER not inlined body
 - Fragment registration and on-demand loadability
 - Mode selection stays independent of agency state
@@ -62,13 +62,34 @@ def test_inactive_agency_note_is_byte_identical_passthrough(tmp_path: Path) -> N
         assert lifecycle._with_agency_note(tmp_path, skill, None) is None
 
 
-def test_agency_note_noop_for_nonspine_even_when_active(tmp_path: Path) -> None:
-    """Non-spine skills are passed through unchanged even when agency is ACTIVE."""
+def test_agency_note_noop_for_nonaware_even_when_active(tmp_path: Path) -> None:
+    """Skills NOT in the agency-aware set pass through unchanged even when active.
+
+    (debug/audit are non-pipeline skills — they never get an agency hint.)"""
     _init_state_dir(tmp_path)
     agency.activate(tmp_path, current_phase="alpha", current_milestone="M1")
     sentinel = "SENTINEL-preamble-xyz"
-    assert lifecycle._with_agency_note(tmp_path, "orchestrate", sentinel) == sentinel
-    assert lifecycle._with_agency_note(tmp_path, "debug", None) is None
+    assert "debug" not in lifecycle._AGENCY_AWARE_SKILLS
+    assert lifecycle._with_agency_note(tmp_path, "debug", sentinel) == sentinel
+    assert lifecycle._with_agency_note(tmp_path, "audit", None) is None
+
+
+def test_all_pipeline_skills_gain_hint_when_active(tmp_path: Path) -> None:
+    """Fast-follow: EVERY agency-aware pipeline skill — the full set (spine
+    start/prd/roadmap/finish/resume PLUS feature/plan/orchestrate/verify/
+    codereview) — surfaces the agency hint + fragment pointer when active.
+    Iterates the live set so it can never silently under-cover."""
+    _init_state_dir(tmp_path)
+    agency.activate(tmp_path, current_phase="alpha", current_milestone="M1")
+    pointer = context.fragment_pointer("agency-delivery")
+    covered = sorted(lifecycle._AGENCY_AWARE_SKILLS)
+    assert len(covered) == 10, f"expected 10 agency-aware skills, got {covered}"
+    for skill in covered:
+        note = lifecycle._with_agency_note(tmp_path, skill, None)
+        assert note is not None and lifecycle._AGENCY_HINT_MARKER in note, (
+            f"{skill} did not gain the agency hint when active: {note!r}"
+        )
+        assert pointer in note, f"{skill} note missing fragment pointer: {note!r}"
 
 
 # ── 2. Active spine preamble gains the hint ────────────────────────────────────
@@ -97,19 +118,19 @@ def test_active_spine_preamble_gains_hint(tmp_path: Path) -> None:
 # ── 3. Active non-spine preamble stays clean ──────────────────────────────────
 
 
-def test_active_nonspine_preamble_stays_clean(tmp_path: Path) -> None:
-    """With agency active, a NON-spine skill ('orchestrate') preamble must NOT
+def test_active_nonaware_preamble_stays_clean(tmp_path: Path) -> None:
+    """With agency active, a NON-agency-aware skill ('debug') preamble must NOT
     contain the agency hint marker."""
     _init_state_dir(tmp_path)
     agency.activate(tmp_path, current_phase="beta", current_milestone="M2")
 
-    # 'orchestrate' is NOT in _AGENCY_SPINE_SKILLS
-    assert "orchestrate" not in lifecycle._AGENCY_SPINE_SKILLS
+    # 'debug' is NOT in the agency-aware pipeline set
+    assert "debug" not in lifecycle._AGENCY_AWARE_SKILLS
 
-    result = lifecycle.skill_preamble(tmp_path, "orchestrate")
+    result = lifecycle.skill_preamble(tmp_path, "debug")
     if result is not None:
         assert lifecycle._AGENCY_HINT_MARKER not in result, (
-            f"Agency hint leaked into non-spine skill 'orchestrate': {result!r}"
+            f"Agency hint leaked into non-aware skill 'debug': {result!r}"
         )
 
 

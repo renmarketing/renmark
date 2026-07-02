@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-02] — Agency Mode fast-follow (full pipeline coverage)
+**Request:** Extend Agency Mode awareness to the 5 pipelines the v0.30.0 walking-skeleton MVP deferred (feature, plan, orchestrate, verify, codereview) so the whole delivery loop is agency-aware.
+**Built:**
+- `renmark/lifecycle.py` — `_AGENCY_SPINE_SKILLS` → `_AGENCY_AWARE_SKILLS` (now all 10 pipeline skills; back-compat alias kept). `_with_agency_note` surfaces the agency hint for the newly-covered pipelines when agency is active.
+- Agency blocks added to `plugin/skills/{feature,plan,orchestrate,verify,codereview}/SKILL.md` — each referencing `_shared/agency-delivery.md` by pointer (never inline): feature=select-next-milestone + PRD-alignment + no drift; plan=atomic tasks + milestone acceptance criteria + cost preview; orchestrate=background agents + continue-until-checkpoint + progress summaries; verify=tests/browser + demo-readiness + unverified; codereview=full review before signoff + merge readiness.
+- `tests/test_agency_behavior.py` — asserts all 10 pipeline skills gain the hint when active; non-aware skills (debug/audit) stay clean; inactive path still byte-identical.
+**Files changed:** renmark/lifecycle.py, 5 SKILL.md, tests/test_agency_behavior.py, CHANGELOG.md.
+**Do not change:** agency hint only for `_AGENCY_AWARE_SKILLS`; inactive path byte-identical; bodies load on demand (pointer only); reuses cost-control/finish-lanes/deterministic-first infra.
+
 ## [2026-07-02] — v0.30.0 — Agency Mode (walking-skeleton MVP)
 **Release.** Bumps v0.29.0 → v0.30.0. Ships **Agency Mode** (REQ-22) — an OPTIONAL
 higher-level project-delivery workflow ABOVE Conductor/Orchestrator (does not replace

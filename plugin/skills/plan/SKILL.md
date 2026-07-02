@@ -31,6 +31,10 @@ The plan is consumed by `/renmark:orchestrate`.
 - Without a spec or clear feature description — route to `/renmark:brainstorm` first
 - For executing — that's `/renmark:orchestrate`
 
+## When Agency Mode is active
+
+In Agency Mode, `plan` decomposes the assigned **milestone** (not the full PRD) into atomic tasks, attaches the milestone's **acceptance criteria** as the verifier success target (what "done + demo-ready" means for the owner), and **always displays a cost preview before dispatch**. Reference the full agency delivery contract by pointer only — `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`. This behavior is additive; existing plan behavior is unchanged when agency is off.
+
 ## Steps
 
 **Step 0a — Context check.** Call `lifecycle.skill_preamble(repo, 'plan')`. If it returns a non-None hint, surface as a one-line note.

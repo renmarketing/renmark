@@ -75,6 +75,8 @@ tier-override flag:
 - **`standard` / `full` tier, OR `--full` on any tier** → run the full codex pass
   below.
 
+**When Agency Mode is active:** codereview runs a full review before each milestone signoff, reports both merge-readiness and risk findings, and gates the owner signoff on review verdict. The review blocks premature "done" declarations until findings are addressed. See the Agency Mode contract at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for gating rules and escalation conditions. When Agency Mode is off, existing codereview behavior is unchanged.
+
 **Adversarial escalation (REQ-2 — highest-stakes diffs only).** For release-gating,
 security-sensitive, or engine/state code, adversarial verification subagents MAY be
 dispatched on `fable` (Agent tool, `model: "fable"`) to attempt to refute the review's
