@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-07-02] — project scope: agency-mode (spec)
+**Request:** Brainstorm/spec for Agency Mode — a higher-level project-delivery workflow above Conductor/Orchestrator. Spec-first, no implementation this session.
+**Stack:** Python >=3.10 + Claude Code plugin (fixed — renmark-internal feature; no new stack).
+**Deployment:** Plugin install (WSL + Windows clone), same as all renmark features.
+**MVP boundary (walking skeleton):** agency state (`renmark/agency.py` + `.renmark/state/agency.json`) + shared `agency-delivery.md` fragment (loaded on demand) + mode-conditioned preamble + agency-aware CORE SPINE only (start → prd → roadmap → finish → resume) + behavior tests + help/docs.
+**Out of scope:** third `mode.py` value (decided: higher-level workflow, NOT a mode); auto-detection (explicit opt-in via /renmark:start); full 9-pipeline coverage (feature/plan/orchestrate/verify/codereview = fast-follow); any new execution/inference engine.
+**Do not change:** Agency Mode must NOT replace Conductor/Orchestrator; must reuse cost-control/finish-lanes/deterministic-first infra, not re-implement it; agency bodies load on demand only (never eager). PRD gate: REQ-22 addition is human-gated via /renmark:prd before build. Spec: `.renmark/specs/2026-07-02-agency-mode.spec.md`.
+
 ## [2026-07-02] — deterministic-first (REQ-21 + worktree cost-control sub-scope)
 **Request:** Deterministic-first execution discipline (REQ-21 AC2) — wire into existing gate docs + establish worktree-backed release readiness checks for Agency Mode (AC6).
 **Built:**
