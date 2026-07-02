@@ -31,6 +31,10 @@ LANE_RELEASE: Lane = "release"
 LANE_SELF_UPDATE: Lane = "self-update"
 LANE_FULL: Lane = "full"
 
+# Canonical menu order — the position a numbered finish-menu selection maps to
+# (1=quick, 2=release, 3=self-update, 4=full). Cheapest → most expensive.
+LANE_ORDER: tuple[Lane, ...] = (LANE_QUICK, LANE_RELEASE, LANE_SELF_UPDATE, LANE_FULL)
+
 # ── LaneSpec dataclass ────────────────────────────────────────────────────────
 
 
@@ -177,16 +181,35 @@ def recommend_lane(
 def resolve_lane(recommended: Lane, override: str | None) -> Lane:
     """Resolve a user override against the recommended lane.
 
-    - If *override* is a valid lane name in :data:`LANES` → return it (explicit
-      override wins, including ``"full"``).
-    - If *override* is ``None`` or not a recognized lane name → return
-      *recommended* unchanged.
+    Accepts the forms the finish menu actually offers, so a numbered or
+    lettered selection is honored instead of silently collapsing to the
+    recommended lane:
 
-    Never raises.
+    - exact lane name in :data:`LANES` (e.g. ``"self-update"``) → that lane;
+    - the menu position ``"1".."4"`` in :data:`LANE_ORDER` order
+      (quick / release / self-update / full) → the lane at that position;
+    - a unique case-insensitive prefix of a lane name (e.g. ``"self"``,
+      ``"rel"``, ``"q"``) → that lane;
+    - ``None`` / empty / whitespace / unrecognized → *recommended* unchanged.
+
+    Explicit override wins, including ``"full"``. Never raises.
     """
     try:
-        if override is not None and override in LANES:
-            return override  # type: ignore[return-value]
+        if override is None:
+            return recommended
+        token = override.strip().lower()
+        if not token:
+            return recommended
+        if token in LANES:
+            return token  # type: ignore[return-value]
+        if token.isdigit():
+            idx = int(token) - 1
+            if 0 <= idx < len(LANE_ORDER):
+                return LANE_ORDER[idx]
+            return recommended
+        matches = [name for name in LANE_ORDER if name.startswith(token)]
+        if len(matches) == 1:
+            return matches[0]
         return recommended
     except Exception:
         return recommended

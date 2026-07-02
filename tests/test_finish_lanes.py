@@ -101,3 +101,24 @@ def test_lane_text_helpers_return_non_empty_strings() -> None:
 
     assert describe_lane("unknown")
 
+
+
+def test_resolve_lane_accepts_menu_aliases() -> None:
+    from renmark.finish_lanes import resolve_lane
+
+    # numbered menu positions (1=quick .. 4=full)
+    assert resolve_lane(LANE_QUICK, "1") == LANE_QUICK
+    assert resolve_lane(LANE_QUICK, "3") == LANE_SELF_UPDATE
+    assert resolve_lane(LANE_QUICK, "4") == LANE_FULL
+    # exact name and unique prefix
+    assert resolve_lane(LANE_QUICK, "self-update") == LANE_SELF_UPDATE
+    assert resolve_lane(LANE_QUICK, "self") == LANE_SELF_UPDATE
+    assert resolve_lane(LANE_QUICK, "rel") == LANE_RELEASE
+    # explicit full always honored
+    assert resolve_lane(LANE_QUICK, "full") == LANE_FULL
+    # empty / whitespace / None / out-of-range / unknown → recommended (no silent collapse to a WRONG lane)
+    assert resolve_lane(LANE_RELEASE, "") == LANE_RELEASE
+    assert resolve_lane(LANE_RELEASE, "   ") == LANE_RELEASE
+    assert resolve_lane(LANE_RELEASE, None) == LANE_RELEASE
+    assert resolve_lane(LANE_RELEASE, "9") == LANE_RELEASE
+    assert resolve_lane(LANE_RELEASE, "bogus") == LANE_RELEASE

@@ -91,3 +91,16 @@ def test_estimate_cost_exposes_sorted_unique_roles() -> None:
     )
 
     assert preview.roles == ("docs-editor", "test-writer")
+
+
+def test_subagent_input_to_dict_serializes_role() -> None:
+    # AC2: the *serialized* dispatch packet must carry the role, not just the dataclass field.
+    task = Task(
+        index=1, title="write tests", mode="B", target="tests/test_x.py",
+        context_files=[], model=None, verifier="pytest -q", spec="...",
+        executor="codex", complexity="medium", parallel_group=1,
+    )
+    packet = build_subagent_input(task)
+    payload = packet.to_dict()
+    assert "role" in payload
+    assert payload["role"] == packet.role == "test-writer"

@@ -266,6 +266,7 @@ class SubagentInput:
             "dependency_summaries": list(self.dependency_summaries),
             "verifier_expectations": self.verifier_expectations,
             "required_skills": skill_refs,
+            "role": self.role,
         }
 
     def to_json(self) -> str:

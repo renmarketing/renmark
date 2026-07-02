@@ -15,7 +15,7 @@ Finish runs in one of four lanes that control how much it does. The lane is chos
 
 | Lane | Merges | Releases | Packages | WSL | Verification | Cost |
 |---|---|---|---|---|---|---|
-| **quick** | No | No | No | No | Confirm existing artifacts | Low |
+| **quick** | No | No | No | No | Confirm artifacts (re-verify if stale) | Low |
 | **release** | Yes* | Yes | No | No | Re-verify | Medium |
 | **self-update** | Yes* | Yes | Yes | Yes | Re-verify + release QA | High |
 | **full** | Yes* | Yes | Yes | Yes | Deepest | High |
@@ -42,7 +42,7 @@ Finish runs in one of four lanes that control how much it does. The lane is chos
 Compute the recommended lane and show a cost preview before asking the user to choose. This reuses the existing merge/release human gate — do NOT add a second independent gate. `full` is explicit-only and never recommended.
 
 ```python
-from renmark import finish_lanes, cost, lifecycle
+from renmark import finish_lanes, lifecycle
 from pathlib import Path
 
 repo = Path('.')
@@ -51,8 +51,11 @@ stage = s.stage if s else None
 recommended = finish_lanes.recommend_lane(repo, lifecycle_stage=stage)
 lane_spec = finish_lanes.LANES[recommended]
 
-# Build cost preview for the recommended lane
-preview = cost.estimate_cost([{"lane": recommended, "cost_level": lane_spec.cost_level}])
+# The lane declares its own expected cost band — there is no task list to price
+# at finish time, so read the qualitative level straight off the LaneSpec.
+# (renmark/cost.py::estimate_cost is for pricing a *plan's* task list — in
+# /renmark:plan and orchestrate pre-flight — not the finish lane itself.)
+cost_level = lane_spec.cost_level  # 'low' | 'medium' | 'high'
 ```
 
 Present to the user:
@@ -66,7 +69,7 @@ Present to the user:
 > | self-update | Yes | Yes | Yes | Yes | High |
 > | full | Yes | Yes | Yes | Yes | High (explicit-only) |
 >
-> Cost preview for `<recommended>`: `<preview.cost_band>` (~`<preview.estimated_cost>`)
+> Expected cost for `<recommended>`: **`<cost_level>`** (per the lane's declared `cost_level`)
 >
 > Choose a lane — or press Enter to accept the recommendation:
 > `1. quick` · `2. release` · `3. self-update` · `4. full` · `5. <recommended> (Recommended)`
@@ -74,7 +77,7 @@ Present to the user:
 Resolve the choice: `finish_lanes.resolve_lane(recommended, user_input)`. Store the resolved lane name; all subsequent steps gate on it. Do NOT proceed past this step without an explicit choice (or Enter = accept recommended).
 
 **Lane-to-step mapping:**
-- **quick** → skip §1 re-verify (confirm existing artifacts only), skip §4 Release, skip §3.5 WSL install, skip §3.6 worktree cleanup. Present summary + artifact confirmation only.
+- **quick** → confirm the verify/review artifacts exist **and are current for the working-tree sha**; if they are missing or stale, run §1 re-verify (quick never *skips* verification — that would weaken it, a stated non-goal). It only skips the *release ceremony*: skip §4 Release, skip §3.5 WSL install, skip §3.6 worktree cleanup. Then present the state summary + the (confirmed or freshly-run) verification result.
 - **release** → run §1 re-verify, run §3 merge/release machinery (steps [m] and [r]), skip §3.5 WSL install, skip §3.6 worktree cleanup.
 - **self-update** → run §1 re-verify + release QA, run §3 merge/release, run §3.5 WSL install, run §3.6 worktree cleanup.
 - **full** → deepest verify + everything in self-update.

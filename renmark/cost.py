@@ -151,7 +151,13 @@ def estimate_cost(items: list) -> CostPreview:
                     executor = "sonnet"
 
                 raw_tokens = _get(item, "est_tokens", None)
-                base_tokens = raw_tokens if isinstance(raw_tokens, int) and raw_tokens > 0 else 0
+                base_tokens = (
+                    raw_tokens
+                    if isinstance(raw_tokens, int)
+                    and not isinstance(raw_tokens, bool)
+                    and raw_tokens > 0
+                    else 0
+                )
 
                 overhead = AGENT_OVERHEAD_TOKENS if executor in _AGENT_EXECUTORS else 0
                 item_tokens = base_tokens + overhead

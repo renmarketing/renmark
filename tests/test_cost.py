@@ -59,3 +59,11 @@ def test_requires_escalation_flags_hard_and_adversarial_review_only() -> None:
     assert requires_escalation(kind="adversarial-review") is True
     assert requires_escalation(complexity="routine", kind="doc") is False
 
+
+
+def test_estimate_cost_rejects_bool_est_tokens() -> None:
+    # bool subclasses int; True must NOT count as 1 token (degrade to 0 base tokens).
+    with_bool = estimate_cost([{"executor": "codex", "est_tokens": True}])
+    baseline = estimate_cost([{"executor": "codex", "est_tokens": 0}])
+    assert with_bool.est_tokens == baseline.est_tokens
+    assert with_bool.est_cost_usd == baseline.est_cost_usd
