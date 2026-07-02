@@ -133,7 +133,7 @@ SKILLS: dict[str, SkillMeta] = {
     "finish": SkillMeta(
         domain="build",
         next_steps_class=1,
-        cites=("reasoning-contract", "next-steps", "handoff-menu", "agency-delivery"),
+        cites=("reasoning-contract", "next-steps", "handoff-menu"),
         has_handoff=True,
         disable_model_invocation=False,
     ),
@@ -196,21 +196,21 @@ SKILLS: dict[str, SkillMeta] = {
     "prd": SkillMeta(
         domain="build",
         next_steps_class=1,
-        cites=("reasoning-contract", "next-steps", "handoff-menu", "agency-delivery"),
+        cites=("reasoning-contract", "next-steps", "handoff-menu"),
         has_handoff=True,
         disable_model_invocation=False,
     ),
     "resume": SkillMeta(
         domain="meta",
         next_steps_class=3,
-        cites=("next-steps", "handoff-menu", "agency-delivery"),
+        cites=("next-steps", "handoff-menu"),
         has_handoff=True,
         disable_model_invocation=True,
     ),
     "roadmap": SkillMeta(
         domain="meta",
         next_steps_class=3,
-        cites=("reasoning-contract", "next-steps", "handoff-menu", "agency-delivery"),
+        cites=("reasoning-contract", "next-steps", "handoff-menu"),
         has_handoff=True,
         disable_model_invocation=False,
     ),
@@ -231,7 +231,7 @@ SKILLS: dict[str, SkillMeta] = {
     "start": SkillMeta(
         domain="build",
         next_steps_class=1,
-        cites=("next-steps", "handoff-menu", "agency-delivery"),
+        cites=("next-steps", "handoff-menu"),
         has_handoff=True,
         disable_model_invocation=False,
     ),
