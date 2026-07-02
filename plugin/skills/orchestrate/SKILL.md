@@ -82,7 +82,20 @@ state.write_pipeline_state(repo, current_phase="orchestrate", current_plan=<plan
 
 **Changelog / decisions check** — read the last 5 entries in `CHANGELOG.md`, and when `.renmark/memory/decisions.md` is present, also read its decision titles + guard text (titles and guards only — never full bodies; REQ-5). Flag any "Do not change" guard or recorded decision the plan would contradict. A contradiction is **semantic**: the plan would undo or overwrite a guarded decision — and this binds even when there is **no target-file overlap** (a plan can violate a decision without touching the same file). On any such contradiction, surface it and **PAUSE for reconciliation** before dispatching; never silently overwrite a recorded decision.
 
-**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost.
+**Subagent gate (deterministic, pre-dispatch)** — run the enforced justification gate before spending:
+
+```bash
+python -m renmark.subagent_gate <plan>   # exit 0 = clean, 1 = challenged
+```
+
+It challenges the plan per REQ-21's 4 questions (deterministic-eligible tasks,
+inline-able simple tasks, `general-purpose` roles without a `role_reason`). On a
+**challenged** verdict (exit 1), surface the one-line `preview_line` verdict and
+require explicit acknowledgment before dispatch — do NOT auto-proceed on a
+subagent-heavy or deterministic-eligible plan. Prefer converting flagged tasks to
+deterministic checks or assigning a scoped profile (`subagent-profiles.md`).
+
+**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost. The cost preview MUST also carry the subagent-gate line (`renmark.subagent_gate.preview_line`), per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/cost-preview.md`.
 
 **Headless gate (cost approval).** Before the `Proceed? [y/N]` prompt below, consult the headless contract (`plugin/skills/_shared/headless-contract.md`):
 

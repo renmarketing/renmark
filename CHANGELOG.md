@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-02] — enforced subagent-justification gate (REQ-21 strengthening)
+**Request:** Usage report showed subagent-heavy, >150k-context sessions running unchallenged (general-purpose subagents recurring). Turn the advisory deterministic-first / subagent gate into an ENFORCED pre-dispatch check.
+**Built:**
+- `renmark/subagent_gate.py` — pure, zero-LLM gate. `justify_task` answers REQ-21's 4 questions mechanically (deterministic path? scoped role? orchestrator-inline? large/ambiguous enough?); `challenge_plan` rolls a plan up (deterministic-eligible / inline-able / unexplained-general-purpose spawns flagged); `preview_line` for the cost preview; `main()` CLI (`python -m renmark.subagent_gate <plan>` → exit 0 clean / 1 challenged / 2 usage), mirroring `plan_lint`. Composes `cost.is_deterministic_item`/`_get` + `subagent_profiles.resolve_profile`/`profile_tier` — does not re-implement. Never raises.
+- Wiring: orchestrate pre-flight runs the gate before dispatch and requires ack on a challenged plan; `_shared/{deterministic-first,subagent-budget,cost-preview}.md` document the gate as enforced (not advised); CLAUDE.md/AGENTS.md deterministic-first rule names the new helper.
+- `tests/test_subagent_gate.py` — 11 tests: deterministic→no-subagent, simple/tiny→inline-flagged, hard-scoped→clean, general-purpose-without-reason→challenged (+reason clears it), plan-level challenge invariants, never-raises.
+**Files changed:** renmark/subagent_gate.py (new), tests/test_subagent_gate.py (new), orchestrate/SKILL.md, 3 _shared/*.md, CLAUDE.md, AGENTS.md, CHANGELOG.md.
+**Do not change:** the gate is deterministic/zero-LLM and MUST never raise (degrades to "subagent needed" + flag); it composes cost/subagent_profiles, never re-implements; general-purpose without a `role_reason` is challenged (Codex rec #5). Codex recs #2 (context thresholds), #3 (finish lanes), #4 (model routing), #6 (deterministic/model cost split) were already shipped — NOT re-touched.
+
 ## [2026-07-02] — v0.31.0 — Agency Mode full pipeline coverage
 **Release.** Bumps v0.30.0 → v0.31.0. Releases the Agency Mode fast-follow: agency-awareness
 now spans ALL 10 pipeline skills (the v0.30.0 spine start/prd/roadmap/finish/resume PLUS

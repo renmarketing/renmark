@@ -130,3 +130,12 @@ When citing in a SKILL.md, write:
 > *Show a cost preview before expensive work via `renmark/cost.py::estimate_cost`. Format per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/cost-preview.md`: model tiers, token/cost band, subagent count, escalation justification (cite `requires_escalation`), and cheaper alternatives. Do not route to Opus/Fable without justifying and surfacing the cost.*
 
 Do not paste the matrix or examples into the calling SKILL.md — cite this file.
+
+## Subagent-gate line (required)
+
+Every pre-dispatch cost preview MUST include the subagent-gate verdict from
+`renmark.subagent_gate` — call `challenge_plan(tasks)` then `preview_line(...)`
+and show the line (e.g. `⚠ CHALLENGE: 3 of 5 subagent(s) unjustified; 2
+deterministic-eligible; 1 general-purpose`). When the verdict is challenged,
+the dispatch gate requires explicit acknowledgment before proceeding — a
+subagent-heavy or deterministic-eligible plan is never auto-dispatched silently.

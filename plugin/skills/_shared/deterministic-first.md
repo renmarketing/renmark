@@ -109,3 +109,20 @@ When citing this discipline in a SKILL.md or subagent dispatch, write:
 > *Honor deterministic-first discipline in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/deterministic-first.md`: before any task dispatch or model call, answer the 4-question gate (existing state? script? reusable? AI-needed?). Deterministic checks: git/worktree state, artifact existence/metadata, version/release readiness, plan lint, mirror validation, test baseline. Route judgment-heavy tasks (merge risk, release-readiness reasoning, branch strategy) only to model-based agents. See `renmark/worktree.py` for shared checks.*
 
 Do not paste the gate or matrix into the calling SKILL.md — cite this file.
+
+## Enforcement (not just advice)
+
+The subagent side of this gate is now **enforced deterministically** by
+`renmark/subagent_gate.py` (zero-LLM). Before dispatching a plan, run it like
+`plan_lint`:
+
+```bash
+python -m renmark.subagent_gate <plan.md>   # exit 0 = clean, 1 = challenged, 2 = usage
+```
+
+It answers the 4 questions mechanically per task (`justify_task`) and rolls the
+plan up (`challenge_plan`): deterministic-eligible tasks, inline-able simple
+tasks, and unexplained `general-purpose` spawns are flagged BEFORE tokens flow.
+The cost preview surfaces `subagent_gate.preview_line(...)`. This turns REQ-21's
+"prefer deterministic / challenge subagents" from a rule the orchestrator is
+asked to follow into a check it must run.

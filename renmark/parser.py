@@ -45,6 +45,11 @@ class Task:
     est_tokens: int | None = None  # planner estimate (informational)
     est_cost_usd: float | None = None  # planner estimate (informational)
     serves: str | None = None  # optional PRD traceability note, e.g. "REQ-3" or "new"
+    # Subagent routing (v0.31+): optional scoped role profile + a justification
+    # used by the subagent-justification gate. ``role_reason`` is what clears a
+    # ``general-purpose`` challenge for a task the gate would otherwise flag.
+    role: str | None = None
+    role_reason: str = ""
 
 
 _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
@@ -159,7 +164,10 @@ def parse_plan(path: str | Path) -> list[Task]:
                 current["est_cost_usd"] = float(value)
             except ValueError as e:
                 raise PlanError(f"line {line_no}: est_cost_usd must be float, got {value!r}") from e
-        elif key in ("mode", "target", "model", "verifier", "executor", "complexity", "serves"):
+        elif key in (
+            "mode", "target", "model", "verifier", "executor", "complexity",
+            "serves", "role", "role_reason",
+        ):
             current[key] = value
         else:
             raise PlanError(f"line {line_no}: unknown field {key!r}")
@@ -244,6 +252,8 @@ def _build_task(d: dict[str, Any]) -> Task:
         est_cost_usd=d.get("est_cost_usd"),
         executor=executor,
         serves=(d["serves"].strip() if d.get("serves") else None),
+        role=(d["role"].strip() if d.get("role") else None),
+        role_reason=(d["role_reason"].strip() if d.get("role_reason") else ""),
     )
 
 

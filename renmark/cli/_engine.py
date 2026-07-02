@@ -501,6 +501,12 @@ def execute_plan(
         _print(
             "  (codex metered separately; haiku/sonnet/opus/fable bill to your Claude Code quota, ~10k overhead/task)"
         )
+        # Deterministic subagent-justification gate (REQ-21) — enforced here in
+        # the cost-preview code path, not just documented. Flags deterministic-
+        # eligible / inline-able / unexplained-general-purpose spawns before dispatch.
+        from .. import subagent_gate as _sg
+
+        _print("  " + _sg.preview_line(_sg.challenge_plan(tasks)))
         return 0
 
     # Start anchor tag.
