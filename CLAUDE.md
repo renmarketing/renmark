@@ -28,6 +28,11 @@ Renmark runs in one of two modes that shape how the agent behaves. **Conductor**
 **Guardrails:** the mode ask MUST stay ask-once — never a per-entry gate that would break the auto-routing default. Conductor guides via prose/preamble and NEVER programmatically blocks subagent dispatch.
 *Mirrored in `AGENTS.md`.*
 <!-- END:operating-modes-rule -->
+<!-- BEGIN:agency-mode-rule -->
+## Agency Mode (third delivery modality)
+Agency Mode is an OPTIONAL higher-level project-delivery workflow that sits ABOVE Conductor and Orchestrator and does NOT replace them — it drives Orchestrator internally. Explicit opt-in via `/renmark:start` (never auto-detected). It runs the owner-facing delivery loop: discovery → PRD agreement → tech-stack recommendation → roadmap/milestones → build → demo/feedback → verification → signoff → release, pausing at milestone checkpoints for owner signoff. Lightweight resumable state lives in `.renmark/state/agency.json` (`renmark/agency.py`); the agency contract loads on demand from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` (never eager). Reuses — never re-implements — cost-control / finish-lanes / deterministic-first infra.
+*Mirrored in `AGENTS.md`.*
+<!-- END:agency-mode-rule -->
 <!-- BEGIN:parallelism-rule -->
 ## Parallelize large plans
 For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work, **never after**. Long-running probes → background `Bash` with `run_in_background: true`. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.

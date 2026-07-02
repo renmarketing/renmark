@@ -34,7 +34,14 @@ context, and advances wave by wave. It maximizes throughput and protects the
 orchestrator's context window, pausing only at real gates. Best for multi-task
 plans (`/renmark:orchestrate`, `/renmark:loop`).
 
-Both modes enforce the same non-negotiables:
+**Agency Mode.** The third delivery modality — a higher-level project-delivery
+workflow above Conductor and Orchestrator (does not replace them). Explicit
+opt-in via `/renmark:start`. Drives the full discovery → PRD → roadmap →
+milestones → build → demo → feedback → signoff → release loop with owner
+approval gating each milestone checkpoint. Best for managed projects with
+stakeholder sign-off.
+
+All modes enforce the same non-negotiables:
 
 - **Context hygiene** — the primary context is a degrading resource, not durable
   memory. Never read generated file contents, full diffs, or large logs into the

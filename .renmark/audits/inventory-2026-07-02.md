@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-07-02T21:21:59+00:00
-source_sha: 2aa64970b82047117af78ba5655ceeace2ea26ea
+created_at: 2026-07-02T21:24:44+00:00
+source_sha: 1ba9c7aade7de9d684e700a415b1c89a58b12634
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -33,7 +33,7 @@ schema_compliance: true
 | feature | build | pipeline | 2 | 279 | Use for the Feature pipeline (/renmark:feature) when adding to or changing an ex… |
 | finish | build | pipeline | 2 | 502 | Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is d… |
 | guide | meta | aux | 2 | 75 | Use when the user types /renmark:guide or says \"I don't know which command to u… |
-| help | meta | aux | 2 | 177 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
+| help | meta | aux | 2 | 184 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
 | hygiene | meta | aux | 2 | 76 | Use to garbage-collect stale renmark artifacts and prune append-only memory logs… |
 | init | meta | aux | 2 | 227 | Use for the Project Setup pipeline (/renmark:init) to adopt renmark into a repo … |
 | inventory | audit | aux | 2 | 68 | Use to harvest a flat inventory of every renmark command and skill — typed as /r… |
