@@ -563,24 +563,32 @@ def _run_deterministic(case: Case, repo: Path) -> Result:
 
 
 def build_subagent_runner(repo: Path, model: str = "sonnet") -> SubagentRunner:
-    """The eval tier's live runner is HOST-injected — there is no Python factory.
+    """Resolve the eval tier's live runner from config, else raise.
 
-    A pure-Python process cannot issue the Agent/model call the eval tier needs,
-    so there is no honest ``str -> str`` runner to return here. (An earlier
-    version returned the dispatch PROMPT text, which made ``--accept`` record
-    prompts as "goldens" and ``--judge`` feed a prompt into the judge instead of a
-    real transcript — never a real model trajectory.) Callers that need the eval
-    tier must inject a real runner supplied by the HOST (an agent turn with
-    Agent-tool access); absent that, this raises :class:`LiveRunnerUnavailable`.
-    The deterministic tier (:func:`run` with no runner) is the CI-safe default and
-    never reaches here.
+    A pure-Python process cannot itself issue the Agent/model call the eval tier
+    needs, so there is no honest in-process ``str -> str`` runner. Instead the
+    runner is supplied out-of-band: :func:`renmark.providers.eval_runner.resolve_eval_runner`
+    reads config (the ``RENMARK_EVAL_RUNNER_CMD`` env var) and, when set, returns
+    a subprocess-backed ``str -> str`` runner that shells out to a real model
+    command and raises ``EvalRunnerError`` on failure. When UNCONFIGURED it
+    returns ``None`` and this function raises :class:`LiveRunnerUnavailable` — we
+    never fabricate a runner. (An earlier version returned the dispatch PROMPT
+    text, which made ``--accept`` record prompts as "goldens" and ``--judge`` feed
+    a prompt into the judge instead of a real transcript — never a real model
+    trajectory.) The deterministic tier (:func:`run` with no runner) is the
+    CI-safe default and never reaches here.
 
-    ``repo`` / ``model`` are kept for the eventual host-injection signature.
+    ``model`` is passed through to the resolver unchanged (currently unused there).
     """
-    del repo, model  # unused until a host runner is wired; kept for signature
+    from renmark.providers.eval_runner import resolve_eval_runner
+
+    runner = resolve_eval_runner(repo, model)
+    if runner is not None:
+        return runner
     raise LiveRunnerUnavailable(
-        "eval-tier live runner not wired: a host-injected str->str runner is "
-        "required (this Python process cannot issue the model call). The "
+        "eval-tier live runner not wired: a str->str runner command is required "
+        "(this Python process cannot issue the model call). Set "
+        "RENMARK_EVAL_RUNNER_CMD to a str->str command to enable it. The "
         "deterministic tier (--behavior) is the CI-safe default."
     )
 
