@@ -77,10 +77,24 @@ For each selected case, in order:
 
 ### 4. Judge (only when `--judge`)
 
-For each case that has a recorded golden:
+For each selected case, source the judge inputs exactly as
+`behavior._escalate_to_judge` does (same v2 convention), then judge:
 
-1. `judge_prompt = judge.compose_judge_prompt(skill=..., prompt=..., baseline=...,`
-   `golden=..., actual=..., contract=...)`.
+1. Gather the inputs:
+   - `skill = case.skill`
+   - `prompt = case.prompt` (the shared input given to the model)
+   - `contract = case.eval.contract` (what the skill promises to change)
+   - `actual` = the **with-skill transcript captured in Step 3** (the in-session
+     output under test)
+   - `golden` = the **recorded reference** for this case — read the existing
+     snapshot at `snapshots/<case.eval.golden_ref>.json` (the golden from a prior
+     accepted run). On the FIRST run there is no prior golden: Step 3 just
+     established one, so `golden == actual` and the judge effectively scores
+     `actual` against the `contract` alone — state this in the verdict rather than
+     implying a real reference comparison.
+   - `baseline = ""` — v2 keeps no recorded baseline; the judge weighs the
+     contract against `actual` (this matches `_escalate_to_judge`).
+   Then: `judge_prompt = judge.compose_judge_prompt(skill=skill, prompt=prompt, baseline=baseline, golden=golden, actual=actual, contract=contract)`.
 2. **The agent issues a SECOND Agent-tool call** with `judge_prompt` — a second
    in-session model turn — and captures the response.
 3. `verdict = judge.parse_judge_verdict(response)` — a `Verdict`
@@ -94,8 +108,32 @@ For each case that has a recorded golden:
 Transcripts and judge bodies are **high-context**. They go to disk only:
 
 - goldens → `snapshots/<golden_ref>.json` (via `capture_from_transcript`);
-- a run record → `.renmark/reviews/YYYY-MM-DD-<sha>.eval.md` artifact (per case:
-  skill, golden_ref, and — if judged — `outcome`/`confidence`/`validation_status`).
+- a run record → a `.renmark/reviews/YYYY-MM-DD-<sha>.eval.md` artifact.
+
+**Write the run-record artifact explicitly** (do not just imply it) via
+`summary.write_artifact` — this is what gives it G6 provenance metadata:
+
+```python
+from renmark import summary
+summary.write_artifact(
+    artifact_path,                     # .renmark/reviews/<date>-<sha>.eval.md
+    artifact_type="eval",
+    body=full_run_log,                 # per-case: skill, golden_ref, snapshot path,
+                                       # and (if judged) the judge rationale — the
+                                       # heavy detail lives HERE, never in chat
+    summary_lines=verdict_lines,       # the same ≤5-line bounded block shown to chat
+    related_plan=<plan path or "">,
+    source_sha=summary.git_head_sha(repo),
+    generator="eval",
+    completion_state="complete",
+    confidence="high" if all_judged_pass else "medium",
+    validation_status="validated",
+)
+summary.emit_pointer(artifact_path, "eval")
+```
+
+Per case, the artifact body records: `skill`, `golden_ref`, the snapshot path,
+and — if judged — `outcome`/`confidence`/`validation_status`/`rationale`.
 
 Chat sees **ONLY a bounded ≤5-line verdict** (per case: skill + outcome +
 confidence, plus the artifact path). **Never paste transcripts, judge prompts,

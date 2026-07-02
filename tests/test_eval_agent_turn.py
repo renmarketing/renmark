@@ -56,8 +56,13 @@ def test_compose_eval_prompt_contains_enabled_skill_marker_and_case_prompt(
 ) -> None:
     prompt = behavior.compose_eval_prompt(case)
 
-    assert "[skill ENABLED: roadmap]" in prompt
-    assert case.prompt in prompt
+    # Pin the FULL byte-exact prompt contract (this refactor must preserve it),
+    # not just substrings.
+    expected = (
+        f"[skill ENABLED: {case.skill}] Respond to the following with the skill "
+        f"active.\n\n{case.prompt}"
+    )
+    assert prompt == expected
 
 
 def test_capture_from_transcript_writes_snapshot_and_returns_transcript(
