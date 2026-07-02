@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-042 — Finished feature deterministic-first
+
+**Date:** 2026-07-02
+**Status:** Accepted
+
+**Context.** REQ-21 deterministic-first routing; stages init→released
+
+**Decision.** Branch worktree-deterministic-first merged to main, released v0.29.0
+
+---
+
 ## ADR-041 — Finished feature agent-turn-runner
 
 **Date:** 2026-07-02

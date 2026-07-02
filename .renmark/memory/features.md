@@ -4,6 +4,19 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-07-02 — deterministic-first: prefer code/tools before AI/subagents (v0.29.0)
+REQ-21 deterministic-first routing. New `plugin/skills/_shared/deterministic-first.md`
+fragment (4-question gate + task-example catalog) + mirrored CLAUDE.md/AGENTS.md rule
+block. `renmark/worktree.py`: deterministic git-backed lifecycle helpers (current_branch,
+list_worktrees, is_clean_tree, diff_stat, divergence, is_merged, stale_worktrees) — no
+model calls. `finish_lanes.release_readiness()` deterministic release gate (reuses
+release.py) with `tests_present` as an informational (non-gating) check; Worktree column
+added to `lane_table()`. `cost.py` CostPreview tags items deterministic vs model-driven
++ split counts. Gate wiring in model-routing.md/subagent-budget.md; Agency Mode AC6
+cross-ref. 3 codereview findings fixed (informational gate, never-raises contract,
+broken validate.py citation). +41 tests, 1318 pass, ruff/mypy no new errors. Worktree
+isolation preserved (NOT removed). Merged 68ad582, tag v0.29.0.
+
 ### 2026-07-02 — cost-control-finish-lanes: cost/context/routing/finish-lane infra (v0.28.0)
 Finish lanes (`renmark/finish_lanes.py`: quick/release/self-update/full; `recommend_lane`
 picks cheapest-safe, self-update when the repo IS renmark; `resolve_lane` menu-alias aware).
