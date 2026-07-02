@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-041 — Finished feature agent-turn-runner
+
+**Date:** 2026-07-02
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified
+
+**Decision.** Branch feature/agent-turn-runner reached ready-to-release (v0.27.0 pending)
+
+---
+
 ## ADR-040 — Finished feature dynamic-skill-loading
 
 **Date:** 2026-07-01

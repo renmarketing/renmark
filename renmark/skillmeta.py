@@ -116,6 +116,13 @@ SKILLS: dict[str, SkillMeta] = {
         has_handoff=True,
         disable_model_invocation=True,
     ),
+    "eval": SkillMeta(
+        domain="build",
+        next_steps_class=3,
+        cites=("next-steps", "handoff-menu"),
+        has_handoff=True,
+        disable_model_invocation=True,
+    ),
     "feature": SkillMeta(
         domain="build",
         next_steps_class=1,

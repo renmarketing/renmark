@@ -61,6 +61,7 @@ IMPLEMENTED_SKILLS: frozenset[str] = frozenset(
         "codereview",
         "debug",
         "doctor",
+        "eval",
         "feature",
         "finish",
         "guide",
@@ -169,6 +170,7 @@ GATE_SKILLS: frozenset[str] = frozenset(
 AUX_SKILLS: frozenset[str] = frozenset(
     {
         "debug",
+        "eval",
         "doctor",
         "hygiene",
         "roadmap",

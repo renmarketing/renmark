@@ -1,7 +1,7 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-01 @ 7572872 -->
+<!-- Last refreshed: 2026-07-02 @ 7510643 -->
 
-# Dev standards — feature+dynamic-skill-loading
+# Dev standards — feature-agent-turn-runner
 
 What this project enforces about itself, detected from configuration files. Read this before making non-trivial changes so you don't break gates that are silently checking your work.
 

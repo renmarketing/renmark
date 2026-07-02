@@ -593,6 +593,30 @@ def build_subagent_runner(repo: Path, model: str = "sonnet") -> SubagentRunner:
     )
 
 
+def compose_eval_prompt(case: Case) -> str:
+    """Build the skill-enabled golden prompt for one eval case.
+
+    Returns the exact prompt handed to a live runner when recording the
+    with-skill golden: the case prompt prefixed with a directive that activates
+    ``case.skill``. Pure — no I/O, no model call.
+    """
+    return (
+        f"[skill ENABLED: {case.skill}] Respond to the following with the skill "
+        f"active.\n\n{case.prompt}"
+    )
+
+
+def capture_from_transcript(case: Case, transcript: str) -> str:
+    """Persist an already-produced golden transcript for one eval case.
+
+    Writes ``transcript`` under ``snapshots/<golden_ref>.json`` and returns it
+    unchanged. The model-free half of :func:`capture` — the caller supplies the
+    transcript, this only records it.
+    """
+    _write_snapshot(_snapshot_path(case, case.eval.golden_ref), transcript)
+    return transcript
+
+
 def capture(case: Case, subagent_runner: SubagentRunner) -> str:
     """Record the eval golden transcript for one case (the ``--accept`` path).
 
@@ -602,13 +626,7 @@ def capture(case: Case, subagent_runner: SubagentRunner) -> str:
     recorded golden transcript. NEVER called by the default deterministic run —
     only a caller that explicitly supplies a live runner reaches this.
     """
-    golden_prompt = (
-        f"[skill ENABLED: {case.skill}] Respond to the following with the skill "
-        f"active.\n\n{case.prompt}"
-    )
-    golden = subagent_runner(golden_prompt)
-    _write_snapshot(_snapshot_path(case, case.eval.golden_ref), golden)
-    return golden
+    return capture_from_transcript(case, subagent_runner(compose_eval_prompt(case)))
 
 
 def _escalate_to_judge(
@@ -780,6 +798,8 @@ __all__ = [
     "SubagentRunner",
     "build_subagent_runner",
     "capture",
+    "capture_from_transcript",
+    "compose_eval_prompt",
     "load_cases",
     "run",
 ]

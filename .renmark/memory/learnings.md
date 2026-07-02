@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-02, .renmark/reviews/2026-07-02-85b12b34f7d608199efad59895d9826593500f62.verification.md) model `verify`: **verify-agent-turn-runner** — 5/5 behaviors verified; failed: none; regressions: 1257 passed
+
 - (2026-07-02, .renmark/reviews/2026-07-02-7c91bd8dd69c7ebf6d316e0b0995851ff2c408d4.verification.md) model `verify`: **verify-live-eval-runner** — 7/7 behaviors verified; failed: none; regressions: full suite 1242 passed/28 skipped
 
 - (2026-07-01, .renmark/reviews/2026-07-01-889330cac7a287c0e0d44f024c9ea500a2675dc1.verification.md) model `verify`: **verify-dynamic-skill-loading** — 8/8 behaviors verified; failed: none; metadata-not-body proven in prod dispatch path
