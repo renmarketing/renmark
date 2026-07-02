@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from renmark import agency, context, lifecycle, mode
 
 # ── Repo root (the live project, not a tmp dir) ────────────────────────────────

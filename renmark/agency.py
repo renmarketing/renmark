@@ -24,7 +24,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 # ── Budget / error ────────────────────────────────────────────────────────────
