@@ -225,6 +225,12 @@ class SubagentInput:
     metadata references (name + ``${CLAUDE_PLUGIN_ROOT}`` pointer + non-body
     metadata) — never a SKILL.md body. The subagent loads the body itself
     from the pointer; the packet stays metadata-only (dynamic skill loading).
+
+    ``role`` is the resolved subagent role profile name (from
+    ``renmark.subagent_profiles.PROFILES``). It defaults to ``"general-purpose"``
+    so every existing construction remains valid. Specialized roles carry a
+    narrow ``context_scope`` which drives packet shaping and future Agency Mode
+    routing — general-purpose is the fallback only.
     """
 
     task_spec: str
@@ -233,6 +239,7 @@ class SubagentInput:
     dependency_summaries: list[str] = field(default_factory=list)
     verifier_expectations: str = ""
     required_skills: list[str] = field(default_factory=list)
+    role: str = "general-purpose"
 
     def to_dict(self) -> dict[str, Any]:
         # Function-local import mirrors the schemas import below, avoiding any
@@ -259,6 +266,7 @@ class SubagentInput:
             "dependency_summaries": list(self.dependency_summaries),
             "verifier_expectations": self.verifier_expectations,
             "required_skills": skill_refs,
+            "role": self.role,
         }
 
     def to_json(self) -> str:
@@ -384,18 +392,33 @@ def build_subagent_input(
     dependency_summaries: list[str] | None = None,
     upstream_artifact_pointers: list[str] | None = None,
     required_skills: list[str] | None = None,
+    role: str | None = None,
 ) -> SubagentInput:
     """Construct the bounded input for a single task's subagent.
 
     Pulls only the task spec + explicit file paths from the Task dataclass.
     No other Task fields cross the boundary. ``required_skills`` are skill
     NAMES; they are validated as metadata-only at build time (an inlined
-    SKILL.md body is rejected) and rendered as pointers, never bodies."""
+    SKILL.md body is rejected) and rendered as pointers, never bodies.
+
+    ``role`` names a profile from ``renmark.subagent_profiles.PROFILES``. When
+    ``None`` (the common case), the role is resolved automatically from the task
+    via ``subagent_profiles.resolve_profile``. Pass an explicit role only when
+    the caller has already determined the correct profile. The resolved role is
+    stored on the ``SubagentInput`` and does NOT otherwise change what crosses
+    the boundary — the packet stays metadata-only; ``context.assert_metadata_only``
+    is still enforced."""
     # Function-local import mirrors the schemas import in parse_subagent_response,
     # avoiding any context ↔ dispatch import cycle.
     from renmark import context
 
     context.assert_metadata_only(required_skills or [])
+
+    if role is None:
+        from renmark import subagent_profiles
+
+        role = subagent_profiles.resolve_profile(task)
+
     return SubagentInput(
         task_spec=task.spec,
         required_files=[task.target, *list(task.context_files or [])],
@@ -403,6 +426,7 @@ def build_subagent_input(
         dependency_summaries=list(dependency_summaries or []),
         verifier_expectations=task.verifier or "",
         required_skills=list(required_skills or []),
+        role=role,
     )
 
 

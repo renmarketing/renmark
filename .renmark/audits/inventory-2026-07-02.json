@@ -152,7 +152,7 @@
     "domain": "build",
     "skill_class": "pipeline",
     "shim_body_lines": 2,
-    "skill_lines": 393,
+    "skill_lines": 498,
     "has_skill": true
   },
   {
@@ -176,7 +176,7 @@
     "domain": "meta",
     "skill_class": "aux",
     "shim_body_lines": 2,
-    "skill_lines": 175,
+    "skill_lines": 177,
     "has_skill": true
   },
   {

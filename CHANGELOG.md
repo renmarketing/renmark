@@ -1,5 +1,49 @@
 # Changelog
 
+## [2026-07-02] — v0.28.0 — cost-control, finish lanes, model-routing & subagent profiles
+**Release.** Bumps v0.27.0 → v0.28.0. Adds cost-control / context-budget / model-routing /
+finish-lane infrastructure so renmark stays cost-aware in long agentic sessions — and lays
+the reusable groundwork for a future Agency Mode (queued, not built).
+**Request:** Add cost-control, context-budget, model-routing, and finish-lane infrastructure
+(prerequisite for Agency Mode); plus an owner addendum for specialized subagent profiles.
+**Built:**
+- `renmark/finish_lanes.py` — declarative finish lanes (quick / release / self-update / full),
+  each stating merges/releases/packages/updates_wsl/cleans_worktrees/verification/cost;
+  `recommend_lane` (self-update when the repo IS renmark), `resolve_lane` (menu-alias aware),
+  `is_renmark_repo`, `lane_table`, `describe_lane`.
+- `renmark/cost.py` — reusable `estimate_cost` / `cost_band` + `requires_escalation`
+  (Opus/Fable only when justified); `CostPreview.roles` reports subagent role/profile.
+- `renmark/state/skills.py::context_budget_hint` — absolute 100k/120k/150k tiers
+  (additive; existing 60/80% cross-domain logic unchanged).
+- `renmark/subagent_profiles.py` — 8 specialized roles + general-purpose fallback
+  (mission/targets/output/stop/tier/verification/context_scope); `resolve_profile`
+  (fallback-only). `SubagentInput.role` flows into the serialized dispatch packet;
+  `memory.append_routing(role=...)` logs the role.
+- `plugin/skills/finish/SKILL.md` — wired to lane selection + per-lane cost, gated WSL
+  install/verify and worktree cleanup for self-update/full; every existing capability preserved.
+- `_shared/` fragments: model-routing, subagent-budget, finish-lanes, cost-preview,
+  subagent-profiles; mirrored CLAUDE.md/AGENTS.md rule blocks; help + routing.md updates.
+- Agency Mode queued: `.renmark/specs/2026-07-02-agency-mode.request.md`.
+**Files changed:** finish_lanes.py, cost.py, subagent_profiles.py, dispatch.py, memory.py,
+state/skills.py, finish/SKILL.md, help/SKILL.md, 5 `_shared/*.md`, CLAUDE.md, AGENTS.md,
+routing.md, 4 new test modules.
+**Verification:** 1277 passed / 28 skipped; renmark.lint OK; Codex full review (5 findings, all fixed).
+**Do not change:** the self-update finish workflow (merge → release → zip → WSL install →
+verify installed CLI/plugin → clean worktree → document) must stay intact; quick lane must
+never *skip* verification (only the release ceremony); Opus/Fable stay escalation-only.
+
+## [2026-07-02] — profiles tests (Task 10)
+**Request:** Add deterministic coverage for subagent profiles, role propagation, routing persistence, and cost-preview role exposure in `tests/test_subagent_profiles.py`.
+**Built:**
+- New `tests/test_subagent_profiles.py` covering `PROFILES` field completeness plus specialized `model_tier` assertions for the non-fallback roles called out by the spec.
+- Verifies `resolve_profile` maps test targets to `test-writer`, markdown targets to `docs-editor`, core code targets to `code-implementer`, and unmatched targets to `general-purpose`.
+- Verifies `build_subagent_input` populates `role`, `memory.append_routing(..., role=...)` persists the role string, and `estimate_cost` returns sorted unique `roles`.
+**Files changed:**
+- `tests/test_subagent_profiles.py` — new deterministic pytest module
+**Do not change:**
+- Keep this file hermetic and `tmp_path`-scoped; no network, no non-deterministic time dependence.
+- Preserve the fallback contract: unmatched tasks still resolve to `general-purpose`, while cost preview reports distinct roles via `preview.roles`.
+
 ## [2026-07-02] — v0.27.0 — agent-turn eval runner (/renmark:eval in-session path)
 **Release.** Bumps v0.26.0 → v0.27.0. Ships the deferred SECOND eval-tier injection path from
 live-eval-runner: the **in-session, agent-driven** `/renmark:eval` skill. Where v0.26.0's

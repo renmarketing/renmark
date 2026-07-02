@@ -18,6 +18,9 @@ When entries conflict for the same signature, the newest dated entry wins.
 top_tier: fable
 declared_at: 2026-06-12
 
+## Escalation-only reminder
+Opus and Fable are escalation-only executors — never default them for finish, docs, grep, changelog, or small verification tasks. Reserve for: high-risk architecture decisions, major design forks, adversarial review, judgment-heavy synthesis. Use `renmark/cost.py::requires_escalation` to check programmatically. Full discipline in `plugin/skills/_shared/model-routing.md`.
+
 ## Defaults (until experience accumulates)
 
 - (target=`.gitignore`, complexity=simple) → haiku
