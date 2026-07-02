@@ -4,9 +4,9 @@
 
 ---
 
-## Before you spawn — the local-first rule
+## Before you spawn — the local-first rule + deterministic-first gate
 
-Before dispatching a subagent, check FIRST:
+Before dispatching a subagent, **apply the deterministic-first gate first** (see `_shared/deterministic-first.md`): can git / grep / a parser answer this? If not, then check FIRST:
 
 1. **Local grep / Read.** Can I answer this with a quick search in the current repo? (symbol location, simple pattern match, file list).
 2. **Single Explore pass.** If I genuinely need to search, run ONE scoped Explore agent call — breadth "quick" or "medium" — and see if that closes the question. Do not spawn an Explore subagent if a local grep suffices.

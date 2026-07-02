@@ -16,6 +16,7 @@ Design contract:
 
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -218,15 +219,15 @@ def resolve_lane(recommended: Lane, override: str | None) -> Lane:
 def lane_table() -> str:
     """Return a compact Markdown table of all lanes and their capabilities.
 
-    Columns: ``Lane | Merges | Releases | Packages | WSL | Verification | Cost``.
+    Columns: ``Lane | Merges | Releases | Packages | WSL | Worktree | Verification | Cost``.
     Booleans are rendered as ``✓`` / ``✗``.  Pure, never raises.
     """
     try:
         _yes = "✓"
         _no = "✗"
 
-        header = "| Lane | Merges | Releases | Packages | WSL | Verification | Cost |"
-        sep = "|------|--------|----------|----------|-----|--------------|------|"
+        header = "| Lane | Merges | Releases | Packages | WSL | Worktree | Verification | Cost |"
+        sep = "|------|--------|----------|----------|-----|----------|--------------|------|"
         rows = [header, sep]
         for lane_name in (LANE_QUICK, LANE_RELEASE, LANE_SELF_UPDATE, LANE_FULL):
             spec = LANES[lane_name]
@@ -236,6 +237,7 @@ def lane_table() -> str:
                 f"| {_yes if spec.releases else _no} "
                 f"| {_yes if spec.packages else _no} "
                 f"| {_yes if spec.updates_wsl else _no} "
+                f"| {_yes if spec.cleans_worktrees else _no} "
                 f"| {spec.verification} "
                 f"| {spec.cost_level} |"
             )
@@ -260,3 +262,172 @@ def describe_lane(name: str) -> str:
         return f"{spec.name}: {actions}"
     except Exception:
         return f"unknown lane: {name!r}"
+
+
+# ── Deterministic release-readiness gate (REQ-21 AC3) ────────────────────────
+#
+# These functions run CODE only — no model calls, no network, no LLM inference.
+# They are the deterministic tier that finish lanes call before any release/
+# package/install action.  AI reasoning about release readiness is an owner-
+# level explanation layer built on TOP of these pass/fail results; it never
+# replaces them.
+
+
+@dataclass(frozen=True)
+class GateResult:
+    """Result of a single deterministic readiness check.
+
+    ``passed`` is the machine-readable verdict.  ``detail`` is a one-line
+    human-readable explanation — always populated, even on pass (for tracing).
+    """
+
+    name: str
+    passed: bool
+    detail: str
+
+
+@dataclass(frozen=True)
+class ReadinessReport:
+    """Aggregated output of :func:`release_readiness`.
+
+    ``ready`` is ``True`` only when every required gate passes.
+    ``gates`` is the full ordered list of :class:`GateResult` objects so
+    callers can surface per-check details without re-running checks.
+    """
+
+    ready: bool
+    gates: tuple[GateResult, ...]
+
+
+# Gates that are reported but do NOT gate the overall ``ready`` decision.
+_INFORMATIONAL_GATES = frozenset({"tests_present"})
+
+
+def _gate_version_consistent(repo: Path) -> GateResult:
+    """Check that all version files agree (no drift).
+
+    Reuses ``renmark.release.drift_report`` — pure read of version files,
+    no subprocess, no network.  Passes when the drift list is empty.
+    """
+    try:
+        from renmark.release import drift_report
+
+        issues = drift_report(repo)
+        if not issues:
+            return GateResult("version_consistent", True, "all version files agree")
+        detail = "; ".join(issues[:3])
+        if len(issues) > 3:
+            detail += f" (+ {len(issues) - 3} more)"
+        return GateResult("version_consistent", False, detail)
+    except Exception as exc:
+        return GateResult("version_consistent", False, f"check error: {exc}")
+
+
+def _gate_tree_clean(repo: Path) -> GateResult:
+    """Check that the working tree has no uncommitted changes.
+
+    Preferred path: delegate to ``renmark.worktree.is_clean_tree(repo)`` —
+    that module is being built in parallel.  If it is not yet available the
+    import is caught and a minimal ``git status --porcelain`` call is made
+    directly (same semantics, no external dependency beyond git).
+    """
+    # Preferred: use the worktree module when available.
+    try:
+        from renmark import worktree
+
+        clean = worktree.is_clean_tree(repo)
+        if clean:
+            return GateResult("tree_clean", True, "working tree is clean")
+        return GateResult("tree_clean", False, "working tree has uncommitted changes")
+    except ImportError:
+        pass  # module not yet present — fall through to inline git call
+    except Exception as exc:
+        return GateResult("tree_clean", False, f"worktree check error: {exc}")
+
+    # Fallback: inline git status --porcelain.
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            return GateResult("tree_clean", False, "git status failed (not a repo?)")
+        if proc.stdout.strip():
+            return GateResult("tree_clean", False, "working tree has uncommitted changes")
+        return GateResult("tree_clean", True, "working tree is clean")
+    except Exception as exc:
+        return GateResult("tree_clean", False, f"git check error: {exc}")
+
+
+def _gate_package_buildable(repo: Path) -> GateResult:
+    """Check that the package name is derivable (manifest readable or dir name usable).
+
+    Reuses ``renmark.release.package_basename`` — pure read, no subprocess.
+    """
+    try:
+        from renmark.release import package_basename
+
+        name = package_basename(repo)
+        if name:
+            return GateResult("package_buildable", True, f"package name: {name!r}")
+        return GateResult("package_buildable", False, "package name is empty")
+    except Exception as exc:
+        return GateResult("package_buildable", False, f"check error: {exc}")
+
+
+def _gate_tests_present(repo: Path) -> GateResult:
+    """Optional check: verify that a tests/ directory exists."""
+    try:
+        tests_dir = repo / "tests"
+        if tests_dir.is_dir():
+            return GateResult("tests_present", True, f"tests/ directory found at {tests_dir}")
+        return GateResult("tests_present", False, "tests/ directory not found")
+    except Exception as exc:
+        return GateResult("tests_present", False, f"check error: {exc}")
+
+
+def release_readiness(repo: str | Path = ".") -> ReadinessReport:
+    """Aggregate deterministic release-readiness checks for *repo*.
+
+    **Deterministic gate — runs code only, never a model (REQ-21 AC3).**
+    Every check is a pure read of the filesystem or a bounded subprocess call
+    (``git status``).  No network, no LLM, no side effects.
+
+    Checks performed (in order):
+
+    1. ``version_consistent`` — all version files agree; reuses
+       ``renmark.release.drift_report``.
+    2. ``tree_clean`` — working tree has no uncommitted changes; delegates to
+       ``renmark.worktree.is_clean_tree`` when available, falls back to an
+       inline ``git status --porcelain`` call.
+    3. ``package_buildable`` — package name is derivable from the plugin
+       manifest (or the repo dir name); reuses
+       ``renmark.release.package_basename``.
+    4. ``tests_present`` — optional structural check that ``tests/`` exists.
+
+    Returns a :class:`ReadinessReport` whose ``ready`` flag is ``True`` only
+    when all **required** gates pass.  ``tests_present`` is an *informational*
+    gate — it is reported but does NOT gate ``ready`` (many valid repos ship
+    without a ``tests/`` directory, or name it differently).  Never raises —
+    any uncaught error degrades to a not-ready report rather than propagating.
+
+    AI reasoning about *why* a release might not be ready is an owner-level
+    explanation layer built on top of these results; it never replaces them.
+    """
+    try:
+        root = Path(repo)
+        gates: list[GateResult] = [
+            _gate_version_consistent(root),
+            _gate_tree_clean(root),
+            _gate_package_buildable(root),
+            _gate_tests_present(root),
+        ]
+    except Exception as exc:  # honor the "never raises" contract
+        return ReadinessReport(
+            ready=False,
+            gates=(GateResult("release_readiness", False, f"gate setup error: {exc}"),),
+        )
+    # tests_present is informational only — exclude it from the ready decision.
+    ready = all(g.passed for g in gates if g.name not in _INFORMATIONAL_GATES)
+    return ReadinessReport(ready=ready, gates=tuple(gates))

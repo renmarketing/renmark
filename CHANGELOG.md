@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-07-02] — deterministic-first (REQ-21 + worktree cost-control sub-scope)
+**Request:** Deterministic-first execution discipline (REQ-21 AC2) — wire into existing gate docs + establish worktree-backed release readiness checks for Agency Mode (AC6).
+**Built:**
+- `plugin/skills/_shared/deterministic-first.md` — new shared fragment: 4-question gate (git/grep/parser before AI), deterministic task taxonomy (state, artifact integrity, package/release, file sync, execution baseline), cost-saving principle.
+- Gate wiring: `model-routing.md` (ask deterministic-first before model choice) + `subagent-budget.md` (deterministic-first before spawn).
+- `renmark/worktree.py` — git-backed helpers: clean-tree validation, diff-size thresholds, merge-to-main checks, stale-worktree cleanup, test-baseline comparisons.
+- `renmark/finish_lanes.py::release_readiness()` — deterministic lane-readiness gate (no model, git + artifact checks).
+- Agency-Mode cross-ref: `_shared/deterministic-first.md` + worktree.py serve milestone-verification checks (AC6).
+- Worktree cost-control sub-scope: lane_table adds "Worktree" column; cost.py tags checks as deterministic vs. model-driven.
+**Files changed:** deterministic-first.md (new), model-routing.md, subagent-budget.md, renmark/worktree.py, finish_lanes.py, cost.py, 2026-07-02-agency-mode.request.md, CHANGELOG.md.
+**Do not change:** worktree isolation must NOT be removed; worktree/release checks stay deterministic (git + file ops, no model calls); deterministic-first gate must precede all model dispatch.
+
 ## [2026-07-02] — v0.28.0 — cost-control, finish lanes, model-routing & subagent profiles
 **Release.** Bumps v0.27.0 → v0.28.0. Adds cost-control / context-budget / model-routing /
 finish-lane infrastructure so renmark stays cost-aware in long agentic sessions — and lays

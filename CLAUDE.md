@@ -167,6 +167,11 @@ Route each task to the cheapest capable executor. Do NOT default to Opus or Fabl
 - **Opus / Fable** — escalation-only: high-risk architecture decisions, major design forks, adversarial review, judgment-heavy synthesis requiring frontier reasoning. Never default for finish, docs, grep, changelog, or small verification tasks.
 See `plugin/skills/_shared/model-routing.md` + `renmark/cost.py::requires_escalation`.
 <!-- END:model-routing-discipline-rule -->
+<!-- BEGIN:deterministic-first-routing -->
+## Deterministic-first execution
+Before any task dispatch or model call, answer the 4-question gate: (1) Can existing state, files, git, or a parser answer this? (2) Can a deterministic script/check do it reliably? (3) Is this repeated enough to deserve a reusable check? (4) Is AI actually needed for judgment, synthesis, or ambiguous reasoning? Deterministic tasks (git/worktree state, artifact metadata, version/release checks, plan lint, mirror validation, test baseline) route to deterministic checks in `renmark/worktree.py`, `renmark/lint.py`, or shell. Route judgment-heavy tasks (merge conflict risk, release-readiness reasoning, branch strategy) only to model-based agents. Cost preview MUST label tasks as deterministic or model-driven.
+See `plugin/skills/_shared/deterministic-first.md` + `renmark/worktree.py`.
+<!-- END:deterministic-first-routing -->
 <!-- BEGIN:cost-preview-rule -->
 ## Cost preview before expensive work
 Before dispatching any expensive or multi-model operation, show: tier / estimated token+cost band / whether subagents are used / whether expensive models (Opus/Fable) are required / and a cheaper alternative if one exists. Gate on user acknowledgment for escalated-tier work.

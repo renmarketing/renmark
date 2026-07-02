@@ -191,6 +191,17 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     demand**. Subagent dispatch packets carry task-local context + required-skill
     metadata only, never full skill bodies. Infrastructure that operationalizes
     the REQ-5 context-hygiene pillar (extends REQ-5).
+21. `REQ-21` Before any model call or subagent dispatch, renmark checks in order:
+    (1) can existing state, files, git, grep, or deterministic parsers answer
+    this? (2) can a deterministic script or check do it reliably? (3) is this
+    repeated enough to codify as reusable code? (4) is AI judgment, synthesis,
+    ambiguity resolution, or risk interpretation actually needed? Repeated
+    objective checks become reusable code (e.g. worktree lifecycle checks: git
+    status, branch tracking, stale detection, diff size — all deterministic,
+    never model-driven). Finish lanes surface whether worktree cleanup is
+    included. Cost preview labels each task step as deterministic vs
+    model-driven. **Deterministic-first execution**: git / grep / state /
+    parser checks before subagents; deterministic checks before model calls.
 
 ## Success metrics
 

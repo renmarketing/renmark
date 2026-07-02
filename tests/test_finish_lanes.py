@@ -122,3 +122,123 @@ def test_resolve_lane_accepts_menu_aliases() -> None:
     assert resolve_lane(LANE_RELEASE, None) == LANE_RELEASE
     assert resolve_lane(LANE_RELEASE, "9") == LANE_RELEASE
     assert resolve_lane(LANE_RELEASE, "bogus") == LANE_RELEASE
+
+
+# ---------------------------------------------------------------------------
+# REQ-21: release_readiness gates + lane_table Worktree column
+# ---------------------------------------------------------------------------
+
+from renmark.finish_lanes import GateResult, ReadinessReport, release_readiness
+
+
+def test_release_readiness_returns_readiness_report(tmp_path: Path) -> None:
+    # Call on a tmp dir (not a real renmark repo) — gates will mostly fail,
+    # but the function must return a ReadinessReport dataclass, not raise.
+    report = release_readiness(tmp_path)
+    assert isinstance(report, ReadinessReport)
+    assert isinstance(report.ready, bool)
+    assert isinstance(report.gates, tuple)
+    assert len(report.gates) > 0
+
+
+def test_release_readiness_gates_include_required_checks(tmp_path: Path) -> None:
+    report = release_readiness(tmp_path)
+    gate_names = {g.name for g in report.gates}
+    # These three are required by the spec
+    assert "version_consistent" in gate_names
+    assert "tree_clean" in gate_names
+    assert "package_buildable" in gate_names
+
+
+def test_release_readiness_each_gate_has_bool_passed_and_detail(tmp_path: Path) -> None:
+    report = release_readiness(tmp_path)
+    for gate in report.gates:
+        assert isinstance(gate, GateResult)
+        assert isinstance(gate.name, str) and gate.name
+        assert isinstance(gate.passed, bool)
+        assert isinstance(gate.detail, str) and gate.detail
+
+
+def test_release_readiness_is_pure_same_gate_names_twice(tmp_path: Path) -> None:
+    # Pure: calling twice returns the same gate names (no randomness, no model)
+    first = release_readiness(tmp_path)
+    second = release_readiness(tmp_path)
+    assert [g.name for g in first.gates] == [g.name for g in second.gates]
+
+
+def test_release_readiness_no_network_returns_fast() -> None:
+    # Proof that it runs deterministically with no model/network call:
+    # it must complete synchronously and return a dataclass (not a coroutine).
+    import time
+
+    start = time.monotonic()
+    report = release_readiness(".")
+    elapsed = time.monotonic() - start
+    assert isinstance(report, ReadinessReport)
+    # 10 seconds is a very generous upper bound — a model call would be far slower
+    assert elapsed < 10.0
+
+
+def test_lane_table_contains_worktree_column_header() -> None:
+    table = lane_table()
+    assert "Worktree" in table
+
+
+def test_lane_table_self_update_and_full_show_check_mark_in_worktree_column() -> None:
+    table = lane_table()
+    lines = table.splitlines()
+    # Find the column index of "Worktree" in the header row
+    header = next(ln for ln in lines if "Worktree" in ln)
+    col_idx = header.index("Worktree")
+
+    def _worktree_cell(row_line: str) -> str:
+        """Extract the Worktree cell value from a table row string."""
+        # Split by '|' to get cells; strip whitespace from each
+        cells = [c.strip() for c in row_line.split("|")]
+        # Header: | Lane | Merges | Releases | Packages | WSL | Worktree | ...
+        # cell[0] = '', cell[1] = 'Lane', ..., cell[6] = 'Worktree'
+        # Use col_idx to find the right cell position by counting pipes
+        header_cells = [c.strip() for c in header.split("|")]
+        worktree_pos = next(i for i, c in enumerate(header_cells) if "Worktree" in c)
+        return cells[worktree_pos] if worktree_pos < len(cells) else ""
+
+    # Find data rows by lane name
+    self_update_row = next(ln for ln in lines if "self-update" in ln)
+    full_row = next(ln for ln in lines if ln.strip().startswith("| full"))
+    quick_row = next(ln for ln in lines if ln.strip().startswith("| quick"))
+
+    self_update_cell = _worktree_cell(self_update_row)
+    full_cell = _worktree_cell(full_row)
+    quick_cell = _worktree_cell(quick_row)
+
+    # self-update and full have cleans_worktrees=True → ✓
+    assert self_update_cell == "✓", f"self-update Worktree cell was {self_update_cell!r}"
+    assert full_cell == "✓", f"full Worktree cell was {full_cell!r}"
+    # quick has cleans_worktrees=False → ✗
+    assert quick_cell == "✗", f"quick Worktree cell was {quick_cell!r}"
+
+
+# --- codereview fixes: informational gate + never-raises contract ---
+
+
+def test_tests_present_is_informational_and_does_not_gate_ready(tmp_path: Path) -> None:
+    """`tests_present` is reported but must NOT affect the `ready` decision.
+
+    Invariant that holds for ANY repo state: `ready` equals the AND of the
+    *required* gates only (everything except the informational ones).
+    """
+    from renmark.finish_lanes import _INFORMATIONAL_GATES
+
+    assert "tests_present" in _INFORMATIONAL_GATES
+    report = release_readiness(tmp_path)
+    required = [g for g in report.gates if g.name not in _INFORMATIONAL_GATES]
+    assert report.ready == all(g.passed for g in required)
+
+
+def test_release_readiness_never_raises_on_bad_repo() -> None:
+    """Honors the documented 'never raises' contract even for a bad repo arg."""
+    report = release_readiness(None)  # type: ignore[arg-type]
+    assert isinstance(report, ReadinessReport)
+    assert report.ready is False
+    assert len(report.gates) >= 1
+    assert all(isinstance(g, GateResult) for g in report.gates)

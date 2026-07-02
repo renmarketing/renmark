@@ -1,16 +1,16 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-02 @ 7510643 -->
+<!-- Last refreshed: 2026-07-02 @ 5d3f878 -->
 
-# Project map — feature-agent-turn-runner
+# Project map — deterministic-first
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=123
+**Languages:** python=132
 
 ## Directory tree
 
 ```
-feature-agent-turn-runner/
+deterministic-first/
 ├── bin/   executable scripts / wrappers
 ├── plugin/   Claude Code plugin (commands, skills, templates)
 ├── renmark/   Python runtime (CLI, dispatch, verifier, lifecycle)
