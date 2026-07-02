@@ -195,6 +195,44 @@ def _parse_response(response: str) -> Verdict:
     )
 
 
+def compose_judge_prompt(
+    *,
+    skill: str,
+    prompt: str,
+    baseline: str,
+    golden: str,
+    actual: str,
+    contract: str,
+) -> str:
+    """Public wrapper: compose the judge prompt for a host-driven agent turn.
+
+    Delegates to the private :func:`_build_prompt`. Exposed so the
+    ``/renmark:eval`` skill can compose the judge prompt, issue the live model
+    call itself (as an agent turn), and parse the result via
+    :func:`parse_judge_verdict` — without reaching into a private helper.
+    Produces byte-identical output to what :func:`judge_behavior` sends.
+    """
+    return _build_prompt(
+        skill=skill,
+        prompt=prompt,
+        baseline=baseline,
+        golden=golden,
+        actual=actual,
+        contract=contract,
+    )
+
+
+def parse_judge_verdict(response: str) -> Verdict:
+    """Public wrapper: parse a raw judge model response into a :class:`Verdict`.
+
+    Delegates to the private :func:`_parse_response`. Exposed so the
+    ``/renmark:eval`` skill can parse the response from its own agent-turn
+    model call. Parses defensively — on any failure it yields an unvalidated,
+    ``fail`` verdict rather than raising, never a silent ``pass``.
+    """
+    return _parse_response(response)
+
+
 def _extract_json_object(text: str) -> dict[str, object] | None:
     """Best-effort extraction of the first top-level JSON object from text.
 
