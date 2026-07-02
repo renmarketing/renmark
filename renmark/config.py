@@ -21,6 +21,7 @@ from pathlib import Path
 _CONFIG_REL = ".renmark/config.json"
 
 _ENV_HEADLESS = "RENMARK_HEADLESS"
+_ENV_EVAL_RUNNER_CMD = "RENMARK_EVAL_RUNNER_CMD"
 _ENV_TRUE = {"1", "true", "yes", "on"}
 _ENV_FALSE = {"0", "false", "no", "off"}
 
@@ -145,5 +146,69 @@ def headless_source(repo: str | Path) -> str:
     if _env_headless() is not None:
         return "env"
     if isinstance(_read_raw(repo).get("headless"), bool):
+        return "config"
+    return "default"
+
+
+def _env_eval_runner_cmd() -> str | None:
+    """Parse ``RENMARK_EVAL_RUNNER_CMD`` into an optional command string.
+
+    Returns the stripped value when the variable is set and non-blank, or
+    ``None`` when it is unset or holds only whitespace (so the caller falls
+    through to the config file).  Never raises.
+    """
+    raw = os.environ.get(_ENV_EVAL_RUNNER_CMD)
+    if raw is None:
+        return None
+    norm = raw.strip()
+    if norm:
+        return norm
+    return None
+
+
+def eval_runner_cmd(repo: str | Path) -> str | None:
+    """Return the command used to launch the eval-tier runner for *repo*.
+
+    Precedence:
+    1. env ``RENMARK_EVAL_RUNNER_CMD`` if set and non-blank (whitespace is
+       stripped; a blank value is treated as unset and falls through);
+    2. else the ``.renmark/config.json`` key ``"eval_runner_cmd"`` if present
+       **and a real ``str``** (a non-str value is ignored, not coerced);
+    3. else ``None``.
+
+    Never raises — any OS or parse error degrades to ``None``.
+    """
+    env = _env_eval_runner_cmd()
+    if env is not None:
+        return env
+    val = _read_raw(repo).get("eval_runner_cmd")
+    if isinstance(val, str):
+        return val
+    return None
+
+
+def set_eval_runner_cmd(repo: str | Path, value: str) -> None:
+    """Persist the eval-runner command for the project at *repo*.
+
+    Reads the existing config, updates only the ``eval_runner_cmd`` key, and
+    writes it back so unrelated keys are preserved.  Never raises.
+    """
+    data = _read_raw(repo)
+    data["eval_runner_cmd"] = value
+    _write_raw(repo, data)
+
+
+def eval_runner_source(repo: str | Path) -> str:
+    """Return which layer decided :func:`eval_runner_cmd` for *repo*.
+
+    ``"env"`` if ``RENMARK_EVAL_RUNNER_CMD`` resolved the value, ``"config"``
+    if the config file's ``"eval_runner_cmd"`` key did (i.e. it is a real
+    ``str``), else ``"default"``.  Uses the same precedence as
+    :func:`eval_runner_cmd` so the two never disagree — a non-str config value
+    reports ``"default"``.  Never raises.
+    """
+    if _env_eval_runner_cmd() is not None:
+        return "env"
+    if isinstance(_read_raw(repo).get("eval_runner_cmd"), str):
         return "config"
     return "default"
