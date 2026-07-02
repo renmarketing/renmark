@@ -24,6 +24,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -151,7 +152,12 @@ def write_agency(repo: str | Path, state: AgencyState) -> None:
 
     p = agency_state_path(repo)
     p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + f".tmp.{os.getpid()}")
+    # Unique temp file in the SAME dir (so os.replace is atomic) — a bare
+    # pid-derived name would let two same-process writers clobber each other's
+    # temp. mkstemp guarantees a unique path per call.
+    fd, tmp_name = tempfile.mkstemp(dir=p.parent, prefix=p.name + ".tmp.")
+    os.close(fd)
+    tmp = Path(tmp_name)
     try:
         tmp.write_text(payload, encoding="utf-8")
         os.replace(tmp, p)

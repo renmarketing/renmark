@@ -48,6 +48,29 @@ def test_inactive_preamble_has_no_agency_hint(tmp_path: Path) -> None:
         )
 
 
+def test_inactive_agency_note_is_byte_identical_passthrough(tmp_path: Path) -> None:
+    """Invariant #1 at the unit level: when agency is inactive, _with_agency_note
+    returns its input UNCHANGED (identity) — byte-identical, not merely
+    marker-free. Proven for every spine skill against a sentinel that shares no
+    text with the agency hint, so any appended/reordered content would fail."""
+    _init_state_dir(tmp_path)
+    assert not agency.is_active(tmp_path)
+    sentinel = "SENTINEL-preamble-xyz"
+    for skill in sorted(lifecycle._AGENCY_SPINE_SKILLS):
+        assert lifecycle._with_agency_note(tmp_path, skill, sentinel) == sentinel
+        # None must stay None too (no hint fabricated when there was none).
+        assert lifecycle._with_agency_note(tmp_path, skill, None) is None
+
+
+def test_agency_note_noop_for_nonspine_even_when_active(tmp_path: Path) -> None:
+    """Non-spine skills are passed through unchanged even when agency is ACTIVE."""
+    _init_state_dir(tmp_path)
+    agency.activate(tmp_path, current_phase="alpha", current_milestone="M1")
+    sentinel = "SENTINEL-preamble-xyz"
+    assert lifecycle._with_agency_note(tmp_path, "orchestrate", sentinel) == sentinel
+    assert lifecycle._with_agency_note(tmp_path, "debug", None) is None
+
+
 # ── 2. Active spine preamble gains the hint ────────────────────────────────────
 
 

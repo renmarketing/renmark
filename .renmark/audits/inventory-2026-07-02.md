@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-07-02T21:30:35+00:00
-source_sha: d1767c28dbdad6c4bc458f465af1dcf2b59415dc
+created_at: 2026-07-02T21:39:58+00:00
+source_sha: 402dec132b43f6aa2f5f59fb2513bac6849e18fa
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -33,7 +33,7 @@ schema_compliance: true
 | feature | build | pipeline | 2 | 279 | Use for the Feature pipeline (/renmark:feature) when adding to or changing an ex… |
 | finish | build | pipeline | 2 | 502 | Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is d… |
 | guide | meta | aux | 2 | 75 | Use when the user types /renmark:guide or says \"I don't know which command to u… |
-| help | meta | aux | 2 | 184 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
+| help | meta | aux | 2 | 189 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
 | hygiene | meta | aux | 2 | 76 | Use to garbage-collect stale renmark artifacts and prune append-only memory logs… |
 | init | meta | aux | 2 | 227 | Use for the Project Setup pipeline (/renmark:init) to adopt renmark into a repo … |
 | inventory | audit | aux | 2 | 68 | Use to harvest a flat inventory of every renmark command and skill — typed as /r… |
@@ -45,7 +45,7 @@ schema_compliance: true
 | roadmap | meta | aux | 2 | 271 | Use for the Maintenance / Gap pipeline (/renmark:roadmap) to see status and deci… |
 | scan | audit | aux | 2 | 168 | Use to run the read-only QA proposer lane — typed as /renmark:scan (--propose to… |
 | setup | meta | aux | 2 | 59 | Use /renmark:setup to refresh or back-fill renmark's rule blocks in a project th… |
-| start | build | pipeline | 2 | 243 | Use for the New Build pipeline (/renmark:start) when starting something new from… |
+| start | build | pipeline | 2 | 251 | Use for the New Build pipeline (/renmark:start) when starting something new from… |
 | usage | meta | aux | 2 | 86 | Use when the user wants observed local usage status — typed as /renmark:usage or… |
 | verify | build | gate | 6 | 583 | Use after a build or `/renmark:orchestrate` to confirm it works — the post-build… |
 

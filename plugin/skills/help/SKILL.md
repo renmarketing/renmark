@@ -75,6 +75,11 @@ compact summaries). renmark asks once at your first real workflow, remembers it,
 and applies a smart per-skill default after. Override:
   renmark-execute --set-mode conductor|orchestrator
 
+Above both sits Agency Mode — an optional higher-level delivery workflow that
+runs the whole discovery → PRD → roadmap → milestones → build → demo → signoff →
+release loop with owner sign-off at each milestone. It does not replace the two
+modes; opt in explicitly via /renmark:start.
+
 ── Pipelines ───────────────────────────────────────────────────────────────
   /renmark:init      Make a repo renmark-ready.
       repo scan → stack/test detect → CLAUDE/AGENTS → project map →

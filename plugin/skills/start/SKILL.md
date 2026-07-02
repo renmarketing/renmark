@@ -19,7 +19,15 @@ The **New Build pipeline** — the vibe-coder entry point for building something
 
 ## When Agency Mode is active
 
-`/renmark:start` is the **explicit opt-in entry** for Agency Mode — no auto-detect. When chosen, offer an Agency lane that frames the session as a discovery call: owner intent, users, problem, outcome, owner-level questions, and project classification (new app / feature / migration / automation / research-build). On opt-in, initialize agency state via `renmark.agency.activate(...)`. Agency Mode sits **above** Conductor/Orchestrator and does not replace them; existing `/renmark:start` behavior is unchanged when the Agency lane is not chosen. For the full contract, see `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`.
+`/renmark:start` is the **explicit opt-in entry** for Agency Mode — no auto-detect. When chosen, offer an Agency lane that frames the session as a discovery call: owner intent, users, problem, outcome, owner-level questions, and project classification (new app / feature / migration / automation / research-build). Agency Mode sits **above** Conductor/Orchestrator and does not replace them; existing `/renmark:start` behavior is unchanged when the Agency lane is not chosen. For the full contract, see `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`.
+
+**Seed the state on opt-in (required — this is what makes the loop enterable/resumable).** Once the owner opts in and you've established the first phase, activate agency state so `/renmark:resume` and every spine skill's preamble pick it up. Run exactly:
+
+```bash
+python3 -c "from renmark import agency; agency.activate('.', current_phase='discovery', current_milestone='<first milestone>', signoff_status='pending')"
+```
+
+This writes `.renmark/state/agency.json` (verify: `python3 -c "from renmark import agency; print(agency.is_active('.'))"` → `True`). Update `current_phase`/`current_milestone` as the delivery loop advances; call `renmark.agency.deactivate('.')` only at final signoff/release. Do NOT seed agency state unless the owner explicitly chose the Agency lane.
 
 ## Steps
 
