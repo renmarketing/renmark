@@ -248,6 +248,12 @@ Any concrete PRD addition is handed to `/renmark:prd` for the human to approve.
 
 ---
 
+## When Agency Mode is active
+
+When Agency Mode delivery is selected, `/renmark:roadmap` emits **MILESTONES** instead of generic task tables. Each milestone carries: sequenced checkpoints (deterministic gates), demo points (user-observable proof), and SIGNOFF points (formal acceptance). Roadmap annotates each with risk/dependency notes and writes `roadmap_ref` into agency state for orchestration handoff. Contract details: `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` (read by pointer only).
+
+---
+
 ## What's next
 
 *End by calling `renmark.lifecycle.next_steps(repo, "roadmap")` and render per

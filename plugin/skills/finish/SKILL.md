@@ -26,6 +26,10 @@ Finish runs in one of four lanes that control how much it does. The lane is chos
 
 **Self-update lane (renmark project only):** when `is_renmark_repo(repo)` is `True`, the recommended lane is `self-update`. This lane adds — after the standard release steps — a WSL install/verify step and a worktree-cleanup step (see §3.5 and §3.6 below). The separate Windows clone at `C:\Users\roberto.renteria\ai-system` is updated manually via `git fetch` + fast-forward (per project memory); finish does NOT attempt to update it automatically.
 
+## When Agency Mode is active
+
+When finish runs in Agency Mode (third delivery modality), it produces a **MILESTONE DEMO summary** + owner **SIGNOFF gate** before lane selection, then routes through the standard finish lanes via `finish_lanes.recommend_lane()` — reusing existing lane machinery, not re-implementing. On fresh owner feedback, finish updates the roadmap and recommends the next milestone (via `/renmark:roadmap`). Consult the Agency Mode contract at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for the complete flow.
+
 ## When to Use
 
 - After `/renmark:orchestrate` (and optionally `/renmark:verify`) completes cleanly

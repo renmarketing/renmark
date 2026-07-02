@@ -17,6 +17,10 @@ The **New Build pipeline** — the vibe-coder entry point for building something
 
 `start` defaults to **Orchestrator** mode for goal-level build-out — it drives the whole pipeline to a working deliverable, not one edit at a time. The first meaningful workflow is where the mode is chosen: ask once, persist the choice, and don't re-ask. Either mode (Orchestrator or **Conductor**) is overridable at any time via `renmark-execute --set-mode`.
 
+## When Agency Mode is active
+
+`/renmark:start` is the **explicit opt-in entry** for Agency Mode — no auto-detect. When chosen, offer an Agency lane that frames the session as a discovery call: owner intent, users, problem, outcome, owner-level questions, and project classification (new app / feature / migration / automation / research-build). On opt-in, initialize agency state via `renmark.agency.activate(...)`. Agency Mode sits **above** Conductor/Orchestrator and does not replace them; existing `/renmark:start` behavior is unchanged when the Agency lane is not chosen. For the full contract, see `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`.
+
 ## Steps
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'start')`. If it returns a non-None hint, surface as a one-line note (do not block — user decides). Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*

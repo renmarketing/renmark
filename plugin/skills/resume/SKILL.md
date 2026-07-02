@@ -207,6 +207,10 @@ If `read_program` returns `None` or all stages are done, this step prints
 nothing. The existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward)
 is **unchanged** — this is an additive surfacing branch only.
 
+## When Agency Mode is active
+
+In Agency Mode, resume reads `.renmark/state/agency.json` (via `renmark.agency.read_agency`) to locate the last MILESTONE checkpoint. Summarize where the workflow left off — which milestone was last reached, what triggered the checkpoint, any pending decision — and recommend continuing WITHOUT re-discovery of prior work. Still zero LLM calls; pure file IO. For the full Agency Mode contract and delivery mode semantics, see `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`. This recovery path is **additive** — the existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward) remains unchanged for non-Agency workflows.
+
 ### 2. Surface pending approval gates
 
 If `human_review_required` is true and `human_review_completed` is false, the user MUST be told about the pending gate before any other recommendation. The next action is always `/renmark:approve` until the gate is cleared.

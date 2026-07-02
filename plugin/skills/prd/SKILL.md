@@ -24,6 +24,10 @@ description: "Use when the user wants to author or maintain the project's Produc
 - To check whether a change aligns with the PRD from inside another skill — do NOT read the PRD body there. Dispatch the alignment subagent at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md` and consume only its bounded summary.
 - To execute or verify work — use `/renmark:orchestrate` / `/renmark:verify`.
 
+## When Agency Mode is active
+
+In Agency Mode, the PRD is the owner-agreed source-of-truth LOCK. Owner approval gates all PRD changes; change control applies when milestone feedback shifts scope. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for the full contract. The human-gated create/update flow above remains unchanged — this rule is a reinforcement, not a new pathway.
+
 ## Steps
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'prd')`. If it returns a non-None hint, surface it as a one-line note. Do NOT block — the user decides whether to `/compact` or `/clear`.

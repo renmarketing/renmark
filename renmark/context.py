@@ -181,6 +181,7 @@ FRAGMENT_NAMES: tuple[str, ...] = (
     "prd-alignment",
     "reuse-check",
     "context-taxonomy",
+    "agency-delivery",
 )
 
 

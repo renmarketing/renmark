@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-07-02T19:12:52+00:00
-source_sha: cbdab7065071a612167acc7fedb5f5d3d572a0fb
+created_at: 2026-07-02T21:20:55+00:00
+source_sha: abfaed0c86e0fe0c9703a99b8bb2f2e50618d9df
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -31,7 +31,7 @@ schema_compliance: true
 | doctor | meta | aux | 2 | 181 | Use when /renmark:* commands aren't appearing, the plugin seems broken, or the u… |
 | eval | build | aux | 2 | 183 | Use to run the in-session, agent-driven eval path — record golden transcripts or… |
 | feature | build | pipeline | 2 | 279 | Use for the Feature pipeline (/renmark:feature) when adding to or changing an ex… |
-| finish | build | pipeline | 2 | 498 | Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is d… |
+| finish | build | pipeline | 2 | 502 | Use for the Ship / Readiness pipeline (/renmark:finish) when implementation is d… |
 | guide | meta | aux | 2 | 75 | Use when the user types /renmark:guide or says \"I don't know which command to u… |
 | help | meta | aux | 2 | 177 | Use when the user types /renmark:help or asks \"what can renmark do\", \"list re… |
 | hygiene | meta | aux | 2 | 76 | Use to garbage-collect stale renmark artifacts and prune append-only memory logs… |
@@ -40,12 +40,12 @@ schema_compliance: true
 | loop | build | pipeline | 2 | 275 | Use when the user wants a bounded agentic loop toward a verifier — typed as /ren… |
 | orchestrate | build | pipeline | 2 | 345 | Use to execute a renmark plan — `/renmark:orchestrate` or \"execute the plan\", … |
 | plan | build | pipeline | 2 | 266 | Use when the user has a spec and wants it decomposed into an executable task lis… |
-| prd | build | pipeline | 2 | 186 | Use when the user wants to author or maintain the project's Product Requirements… |
-| resume | meta | aux | 2 | 259 | Use after /clear or /compact, or at the start of a fresh session, to discover wh… |
-| roadmap | meta | aux | 2 | 265 | Use for the Maintenance / Gap pipeline (/renmark:roadmap) to see status and deci… |
+| prd | build | pipeline | 2 | 190 | Use when the user wants to author or maintain the project's Product Requirements… |
+| resume | meta | aux | 2 | 263 | Use after /clear or /compact, or at the start of a fresh session, to discover wh… |
+| roadmap | meta | aux | 2 | 271 | Use for the Maintenance / Gap pipeline (/renmark:roadmap) to see status and deci… |
 | scan | audit | aux | 2 | 168 | Use to run the read-only QA proposer lane — typed as /renmark:scan (--propose to… |
 | setup | meta | aux | 2 | 59 | Use /renmark:setup to refresh or back-fill renmark's rule blocks in a project th… |
-| start | build | pipeline | 2 | 239 | Use for the New Build pipeline (/renmark:start) when starting something new from… |
+| start | build | pipeline | 2 | 243 | Use for the New Build pipeline (/renmark:start) when starting something new from… |
 | usage | meta | aux | 2 | 86 | Use when the user wants observed local usage status — typed as /renmark:usage or… |
 | verify | build | gate | 6 | 583 | Use after a build or `/renmark:orchestrate` to confirm it works — the post-build… |
 

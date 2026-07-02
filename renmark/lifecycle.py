@@ -630,7 +630,7 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
         # INVARIANT: record_skill_invocation runs for ALL tiers so that the next
         # skill can detect cross-domain transitions even when this one is minimal.
         _state.record_skill_invocation(repo, skill, domain)
-        return _with_headless_note(repo, None)
+        return _with_agency_note(repo, skill, _with_headless_note(repo, None))
 
     # For standard/full: budget check MUST read last-skill state before
     # record_skill_invocation overwrites it — ordering is load-bearing.
@@ -657,7 +657,7 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
             )
 
     base = " | ".join(fragments) if fragments else None
-    return _with_mode_note(repo, skill, _with_headless_note(repo, base))
+    return _with_agency_note(repo, skill, _with_mode_note(repo, skill, _with_headless_note(repo, base)))
 
 
 # ── Operating-mode directive (Conductor vs Orchestrator) ──────────────────────
@@ -722,6 +722,51 @@ def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | Non
             line = _choose_mode_hint(skill)
         else:
             return hint
+    except Exception:
+        return hint
+    return line if hint is None else f"{hint} | {line}"
+
+
+# Spine skills that receive an Agency Mode hint when agency is active.
+_AGENCY_SPINE_SKILLS: frozenset[str] = frozenset(
+    {"start", "prd", "roadmap", "finish", "resume"}
+)
+
+# Marker string used to identify the agency hint line — load-bearing for
+# behavior tests (T15): assert active preamble contains this prefix and
+# inactive preamble does NOT.
+_AGENCY_HINT_MARKER: str = "Agency Mode active"
+
+
+def _with_agency_note(repo: Path | str, skill: str, hint: str | None) -> str | None:
+    """ADDITIVE: append an Agency Mode hint to ``hint`` when agency is active.
+
+    Only surfaces the hint for SPINE skills (start, prd, roadmap, finish,
+    resume) — all other skills are passed through unchanged regardless of
+    agency state.
+
+    When agency is INACTIVE the return value is byte-identical to ``hint``
+    (the inactive-path guarantee). DEGRADES GRACEFULLY: any exception in
+    agency/context resolution falls back to ``hint`` unchanged, so agency is
+    a pure enhancement and never a hard dependency of the preamble.
+
+    Follows the same additive pattern as :func:`_with_mode_note` and
+    :func:`_with_headless_note`.
+    """
+    if skill not in _AGENCY_SPINE_SKILLS:
+        return hint
+    try:
+        from . import agency as _agency
+        from . import context as _context
+
+        if not _agency.is_active(repo):
+            return hint
+        state = _agency.read_agency(repo)
+        pointer = _context.fragment_pointer("agency-delivery")
+        line = (
+            f"{_AGENCY_HINT_MARKER} — phase {state.current_phase}, "
+            f"milestone {state.current_milestone}. Contract: {pointer}"
+        )
     except Exception:
         return hint
     return line if hint is None else f"{hint} | {line}"
