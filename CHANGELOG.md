@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-07-02] — v0.27.0 — agent-turn eval runner (/renmark:eval in-session path)
+**Release.** Bumps v0.26.0 → v0.27.0. Ships the deferred SECOND eval-tier injection path from
+live-eval-runner: the **in-session, agent-driven** `/renmark:eval` skill. Where v0.26.0's
+subprocess runner shells to an external CLI, `/renmark:eval` runs the eval **inside the current
+agent session** — the agent composes the prompt, issues a real Agent tool call (session model +
+dynamic skill loading + Agent-tool access), and feeds the transcript to the existing capture/judge
+path. Proves whether a skill changes behavior inside the active session. NOT a P8-v2 reopen.
+**Built:**
+- New `/renmark:eval` skill + shim (`disable-model-invocation: true`, opt-in / out-of-CI / no auto-spend).
+- `behavior.compose_eval_prompt` + `behavior.capture_from_transcript` (extracted from `capture()`,
+  byte-identical) and `judge.compose_judge_prompt` + `judge.parse_judge_verdict` public wrappers.
+- Registry wiring (skillmeta build/aux class 3, lifecycle IMPLEMENTED_SKILLS/AUX_SKILLS).
+**Verified:** full suite 1257 passed / 28 skipped; `renmark.audit --quick` clean; ruff+mypy clean.
+Codereview (codex): spec under-built + 2 Major + 1 Minor (skill prose / test completeness; code paths clean), all fixed + regression-tested.
+**Do not change:**
+- Subprocess runner (`eval_runner.py`), the deterministic tier, dynamic skill loading, mode,
+  Codex routing, and the dispatch-packet schema are all UNTOUCHED.
+- `/renmark:eval` stays `disable-model-invocation: true`; the deterministic tier is the CI-safe default.
+
 ## [2026-07-02] — agent-turn eval runner (/renmark:eval, in-session eval path)
 **Request:** Add the deferred in-session eval path (the agent drives the eval turn) as a new /renmark:eval skill.
 **Built:**
