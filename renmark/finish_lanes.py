@@ -299,6 +299,10 @@ class ReadinessReport:
     gates: tuple[GateResult, ...]
 
 
+# Gates that are reported but do NOT gate the overall ``ready`` decision.
+_INFORMATIONAL_GATES = frozenset({"tests_present"})
+
+
 def _gate_version_consistent(repo: Path) -> GateResult:
     """Check that all version files agree (no drift).
 
@@ -403,18 +407,27 @@ def release_readiness(repo: str | Path = ".") -> ReadinessReport:
     4. ``tests_present`` — optional structural check that ``tests/`` exists.
 
     Returns a :class:`ReadinessReport` whose ``ready`` flag is ``True`` only
-    when ALL gates pass.  Never raises — any uncaught error in a gate
-    degrades that gate to ``passed=False`` with an explanatory ``detail``.
+    when all **required** gates pass.  ``tests_present`` is an *informational*
+    gate — it is reported but does NOT gate ``ready`` (many valid repos ship
+    without a ``tests/`` directory, or name it differently).  Never raises —
+    any uncaught error degrades to a not-ready report rather than propagating.
 
     AI reasoning about *why* a release might not be ready is an owner-level
     explanation layer built on top of these results; it never replaces them.
     """
-    root = Path(repo)
-    gates: list[GateResult] = [
-        _gate_version_consistent(root),
-        _gate_tree_clean(root),
-        _gate_package_buildable(root),
-        _gate_tests_present(root),
-    ]
-    ready = all(g.passed for g in gates)
+    try:
+        root = Path(repo)
+        gates: list[GateResult] = [
+            _gate_version_consistent(root),
+            _gate_tree_clean(root),
+            _gate_package_buildable(root),
+            _gate_tests_present(root),
+        ]
+    except Exception as exc:  # honor the "never raises" contract
+        return ReadinessReport(
+            ready=False,
+            gates=(GateResult("release_readiness", False, f"gate setup error: {exc}"),),
+        )
+    # tests_present is informational only — exclude it from the ready decision.
+    ready = all(g.passed for g in gates if g.name not in _INFORMATIONAL_GATES)
     return ReadinessReport(ready=ready, gates=tuple(gates))

@@ -216,3 +216,29 @@ def test_lane_table_self_update_and_full_show_check_mark_in_worktree_column() ->
     assert full_cell == "✓", f"full Worktree cell was {full_cell!r}"
     # quick has cleans_worktrees=False → ✗
     assert quick_cell == "✗", f"quick Worktree cell was {quick_cell!r}"
+
+
+# --- codereview fixes: informational gate + never-raises contract ---
+
+
+def test_tests_present_is_informational_and_does_not_gate_ready(tmp_path: Path) -> None:
+    """`tests_present` is reported but must NOT affect the `ready` decision.
+
+    Invariant that holds for ANY repo state: `ready` equals the AND of the
+    *required* gates only (everything except the informational ones).
+    """
+    from renmark.finish_lanes import _INFORMATIONAL_GATES
+
+    assert "tests_present" in _INFORMATIONAL_GATES
+    report = release_readiness(tmp_path)
+    required = [g for g in report.gates if g.name not in _INFORMATIONAL_GATES]
+    assert report.ready == all(g.passed for g in required)
+
+
+def test_release_readiness_never_raises_on_bad_repo() -> None:
+    """Honors the documented 'never raises' contract even for a bad repo arg."""
+    report = release_readiness(None)  # type: ignore[arg-type]
+    assert isinstance(report, ReadinessReport)
+    assert report.ready is False
+    assert len(report.gates) >= 1
+    assert all(isinstance(g, GateResult) for g in report.gates)

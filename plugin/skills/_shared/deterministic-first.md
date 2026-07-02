@@ -30,7 +30,7 @@ Before dispatching ANY task — deterministic verification, interpretation, or a
    Examples: Validate schema, count tests before/after, check git merge status, compute token estimate, verify artifact metadata, lint a plan. → **Write a deterministic validator; no model call.**
 
 3. **Is this repeated enough to deserve a reusable check?**  
-   If the same validation appears in 2+ skills or tasks, extract it to a shared module (`renmark/worktree.py`, `renmark/lint.py`, `renmark/validate.py`). → **Invest in reusable infrastructure.**
+   If the same validation appears in 2+ skills or tasks, extract it to a shared module (`renmark/worktree.py`, `renmark/lint.py`, `renmark/plan_lint.py`). → **Invest in reusable infrastructure.**
 
 4. **Is AI actually needed for judgment, synthesis, or ambiguous reasoning?**  
    Only if questions 1-3 cannot close the task: the task requires judgment (which branch strategy is safer?), synthesis (is this design coherent across files?), or resolving ambiguity (did the user intend X or Y?). → **Route to model only here.**
@@ -102,7 +102,7 @@ Early drafts of renmark routed many cheap, deterministic tasks to models: "is th
 - One decision framework. The 4-question gate is defined once; every skill uses the same rubric.
 - Fast escalation path. When model-based reasoning is needed, every skill knows the routable task types.
 - Cost transparency. Users see which tasks are deterministic (free or cheap) vs. model-heavy (expensive).
-- Infrastructure investment. Repeated deterministic checks are extracted to `renmark/worktree.py`, `renmark/lint.py`, `renmark/validate.py` — shared, maintainable, auditable.
+- Infrastructure investment. Repeated deterministic checks are extracted to `renmark/worktree.py`, `renmark/lint.py`, `renmark/plan_lint.py` — shared, maintainable, auditable.
 
 When citing this discipline in a SKILL.md or subagent dispatch, write:
 
