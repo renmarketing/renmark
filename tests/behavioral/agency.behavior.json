@@ -1,0 +1,14 @@
+{
+  "skill": "start",
+  "prompt": "Start a new project in Agency Mode.",
+  "deterministic": {
+    "call": "lifecycle.skill_preamble_agency_active",
+    "assertions": [
+      "contains:Agency Mode active"
+    ]
+  },
+  "eval": {
+    "contract": "When Agency Mode is active, the start skill preamble includes an Agency Mode active hint.",
+    "golden_ref": "agency.golden"
+  }
+}

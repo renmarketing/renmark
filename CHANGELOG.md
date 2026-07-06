@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-06 — Agency Mode: behavior tests + CLI flags
+
+**Request**: Close BL-0002 — add AC11 behavior proof, CLI agency state management,
+_with_agency_note unit tests, fix pre-existing mode.behavior.json regression.
+
+**Built**:
+- renmark/behavior.py: `lifecycle.skill_preamble_fresh` and
+  `lifecycle.skill_preamble_agency_active` adapters registered in `_DISPATCH`
+- tests/behavioral/mode.behavior.json: switched to `lifecycle.skill_preamble_fresh` —
+  fixes regression where live repo's mode=orchestrator broke the assertion
+- tests/behavioral/agency.behavior.json: new deterministic case asserting
+  "Agency Mode active" fires in start-skill preamble when agency is active (AC11)
+- tests/test_lifecycle.py: 4 _with_agency_note unit tests (inactive passthrough x2,
+  active-aware-skill marker, non-aware passthrough)
+- renmark/cli/_engine.py: --agency-status, --activate-agency, --deactivate-agency
+
+**Files changed**: renmark/behavior.py, tests/behavioral/mode.behavior.json,
+tests/behavioral/agency.behavior.json (new), tests/test_lifecycle.py,
+renmark/cli/_engine.py, CHANGELOG.md
+
+**Do not change**: renmark/agency.py state API, lifecycle._with_agency_note logic,
+plugin/skills/*/SKILL.md agency sections, tests/test_agency.py, agency-delivery.md
+
 ## [2026-07-06] — Context hygiene gates (selectable AskUserQuestion menus)
 
 **Request:** Add hard-stop context hygiene gates to renmark — a blocking AskUserQuestion menu at cross-domain transitions (clear gate) and at ≥60% context (compact gate) — without claiming to invoke /compact or /clear programmatically.

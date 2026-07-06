@@ -438,6 +438,37 @@ def _render_skill_preamble(repo: Path, case: Case) -> str:
     return hint if hint is not None else ""
 
 
+def _render_skill_preamble_fresh(repo: Path, case: Case) -> str:
+    """Render skill_preamble in an isolated scratch dir (no mode, no agency set)."""
+    import shutil
+    from . import lifecycle
+
+    # Use a repo-owned path so this works in sandboxes without a system /tmp.
+    tmp = repo / ".renmark" / "state" / "_behavior-fresh"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        hint = lifecycle.skill_preamble(tmp, case.skill)
+        return hint if hint is not None else ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _render_skill_preamble_agency_active(repo: Path, case: Case) -> str:
+    """Render skill_preamble in an isolated scratch dir with agency activated."""
+    import shutil
+    from . import lifecycle, agency
+
+    # Use a repo-owned path so this works in sandboxes without a system /tmp.
+    tmp = repo / ".renmark" / "state" / "_behavior-agency"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        agency.activate(tmp)
+        hint = lifecycle.skill_preamble(tmp, case.skill)
+        return hint if hint is not None else ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _render_plan_lint(repo: Path, case: Case) -> str:
     """Render a NARROW, declared-policy read-only check to text (scaffolding tier).
 
@@ -490,6 +521,8 @@ def _render_plan_lint(repo: Path, case: Case) -> str:
 _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "lifecycle.next_steps": _render_next_steps,
     "lifecycle.skill_preamble": _render_skill_preamble,
+    "lifecycle.skill_preamble_fresh": _render_skill_preamble_fresh,
+    "lifecycle.skill_preamble_agency_active": _render_skill_preamble_agency_active,
     "plan_lint": _render_plan_lint,
 }
 

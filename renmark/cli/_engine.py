@@ -1288,6 +1288,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print the current compact-gate token threshold (0 = disabled)",
     )
+    # Agency Mode state management
+    ap.add_argument(
+        "--agency-status",
+        action="store_true",
+        help="print current agency state (active/inactive, phase, milestone)",
+    )
+    ap.add_argument(
+        "--activate-agency",
+        action="store_true",
+        help="activate Agency Mode in the current repo",
+    )
+    ap.add_argument(
+        "--deactivate-agency",
+        action="store_true",
+        help="deactivate Agency Mode in the current repo",
+    )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
         "--task-brief",
@@ -1369,6 +1385,45 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"renmark: operating mode set to {args.set_mode} ({mode_path})")
         return 0
+    if args.agency_status:
+        from renmark import agency as _agency
+        state = _agency.read_agency(repo)
+        status = "active" if state.active else "inactive"
+        print(f"agency: {status}")
+        if state.active:
+            print(f"  phase: {state.current_phase or '(not set)'}")
+            print(f"  milestone: {state.current_milestone or '(not set)'}")
+            print(f"  signoff: {state.signoff_status or '(not set)'}")
+        return 0
+
+    if args.activate_agency:
+        from renmark import agency as _agency
+        agency_path = _agency.agency_state_path(repo)
+        try:
+            _agency.activate(repo)
+        except (OSError, _agency.AgencyBloatError) as exc:
+            print(
+                f"renmark: failed to activate Agency Mode at {agency_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: Agency Mode activated ({agency_path})")
+        return 0
+
+    if args.deactivate_agency:
+        from renmark import agency as _agency
+        agency_path = _agency.agency_state_path(repo)
+        try:
+            _agency.deactivate(repo)
+        except (OSError, _agency.AgencyBloatError) as exc:
+            print(
+                f"renmark: failed to deactivate Agency Mode at {agency_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: Agency Mode deactivated ({agency_path})")
+        return 0
+
     if args.get_mode:
         from .. import mode as _mode
         current = _mode.read_mode(repo)

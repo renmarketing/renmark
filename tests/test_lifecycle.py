@@ -857,3 +857,30 @@ def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
         "out_of_tree",
         "stale_artifact",
     ]
+
+
+def test_agency_hint_inactive_is_passthrough(tmp_path):
+    from renmark import lifecycle
+    result = lifecycle._with_agency_note(tmp_path, "start", "some hint")
+    assert result == "some hint"
+
+
+def test_agency_hint_inactive_none_is_passthrough(tmp_path):
+    from renmark import lifecycle
+    result = lifecycle._with_agency_note(tmp_path, "start", None)
+    assert result is None
+
+
+def test_agency_hint_active_contains_marker(tmp_path):
+    from renmark import lifecycle, agency
+    agency.activate(tmp_path)
+    result = lifecycle._with_agency_note(tmp_path, "start", None)
+    assert result is not None
+    assert lifecycle._AGENCY_HINT_MARKER in result
+
+
+def test_agency_hint_non_aware_skill_is_passthrough(tmp_path):
+    from renmark import lifecycle, agency
+    agency.activate(tmp_path)
+    result = lifecycle._with_agency_note(tmp_path, "help", "original")
+    assert result == "original"
