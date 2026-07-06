@@ -2,7 +2,7 @@
   "skill": "feature",
   "prompt": "Add a small feature to this project.",
   "deterministic": {
-    "call": "lifecycle.skill_preamble",
+    "call": "lifecycle.skill_preamble_fresh",
     "assertions": [
       "contains:Operating mode: not yet set",
       "contains:Conductor vs Orchestrator"

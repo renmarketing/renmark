@@ -438,6 +438,28 @@ def _render_skill_preamble(repo: Path, case: Case) -> str:
     return hint if hint is not None else ""
 
 
+def _render_skill_preamble_fresh(repo: Path, case: Case) -> str:
+    """Render skill_preamble in an isolated tmpdir (no mode, no agency set)."""
+    import tempfile
+    from . import lifecycle
+
+    with tempfile.TemporaryDirectory() as d:
+        hint = lifecycle.skill_preamble(Path(d), case.skill)
+        return hint if hint is not None else ""
+
+
+def _render_skill_preamble_agency_active(repo: Path, case: Case) -> str:
+    """Render skill_preamble in an isolated tmpdir with agency activated."""
+    import tempfile
+    from . import lifecycle, agency
+
+    with tempfile.TemporaryDirectory() as d:
+        tmp = Path(d)
+        agency.activate(tmp)
+        hint = lifecycle.skill_preamble(tmp, case.skill)
+        return hint if hint is not None else ""
+
+
 def _render_plan_lint(repo: Path, case: Case) -> str:
     """Render a NARROW, declared-policy read-only check to text (scaffolding tier).
 
@@ -490,6 +512,8 @@ def _render_plan_lint(repo: Path, case: Case) -> str:
 _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "lifecycle.next_steps": _render_next_steps,
     "lifecycle.skill_preamble": _render_skill_preamble,
+    "lifecycle.skill_preamble_fresh": _render_skill_preamble_fresh,
+    "lifecycle.skill_preamble_agency_active": _render_skill_preamble_agency_active,
     "plan_lint": _render_plan_lint,
 }
 
