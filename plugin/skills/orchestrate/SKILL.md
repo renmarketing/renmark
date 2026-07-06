@@ -173,9 +173,11 @@ renmark-execute <plan>
 
 `renmark-execute` returns one JSON line per task with the `SubagentOutput` shape. The orchestrator passes each through `dispatch.parse_subagent_response()`, which raises `IsolationViolation` on any extra field.
 
-For `executor: haiku | sonnet | opus | fable` tasks:
+**Wave-level dispatch shape.** Before looping over individual tasks, count this wave's non-`codex` (`needs_agent`) tasks. If that count is **> 1**, dispatch the whole wave per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/workflow-fanout.md` instead of issuing one `Agent` call per task: build the args via `dispatch.build_workflow_fanout_args(wave, dependency_summaries=...)` (this pre-resolves each item's native `subagent_type` via `subagent_profiles.has_native_agent_file` in Python, per the fragment), invoke the `Workflow` tool once for the wave, then pass each item of the returned array through `dispatch.parse_subagent_response()` — same `IsolationViolation` → FAIL handling, same per-task `state.log_agent_call` ledgering — exactly as the single-task path below does. Do **not** use the Workflow tool's own budget/token tracking (see the fragment's cost/ledger note); `log_agent_call` remains the single ledger. If the non-codex count is **≤ 1**, skip the fan-out and use the single `Agent` call path below unchanged. Codex tasks are unaffected either way — they always dispatch via `renmark-execute` per the RED FLAG above.
 
-Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `executor: fable`, pass `model: "fable"` on the Agent call. Build the subagent prompt from `dispatch.build_subagent_input(task, dependency_summaries=...)`. The Agent prompt MUST instruct the subagent:
+For `executor: haiku | sonnet | opus | fable` tasks (single-task path):
+
+Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `executor: fable`, pass `model: "fable"` on the Agent call. Build the subagent prompt from `dispatch.build_subagent_input(task, dependency_summaries=...)`, whose `role` field is resolved via `subagent_profiles.resolve_profile`. Before issuing the Agent call, check `subagent_profiles.has_native_agent_file(role)`: if true, pass `subagent_type: <role>` on the Agent call; if false (role is `general-purpose` or the file doesn't exist), omit `subagent_type` (defaults to the harness's general-purpose agent, unchanged from today). `subagent_type` only selects the tool allowlist — it does not change the `model` override rules above; those still apply exactly as written. The Agent prompt MUST instruct the subagent:
 
 > "Your final response MUST be valid JSON matching this shape:
 > ```json
