@@ -213,6 +213,37 @@ def set_eval_runner_cmd(repo: str | Path, value: str) -> None:
     _write_raw(repo, data)
 
 
+def compact_gate_tokens(repo: str | Path) -> int:
+    """Return the configured compact-gate token threshold for *repo*.
+
+    The compact gate fires when the orchestrator's context reaches this many
+    tokens — a proxy for 60% of the 200k window since real % is not detectable
+    from inside a skill. Default: 120_000. A value of 0 means disabled (gate
+    never fires). Never raises.
+    """
+    data = _read_raw(repo)
+    val = data.get("compact_gate_tokens")
+    if not isinstance(val, int) or isinstance(val, bool):
+        return 120_000
+    if val < 0:
+        return 120_000
+    return val
+
+
+def set_compact_gate_tokens(repo: str | Path, value: int) -> None:
+    """Persist the compact-gate token threshold for the project at *repo*.
+
+    Reads the existing config, updates only the ``compact_gate_tokens`` key,
+    and writes it back so unrelated keys are preserved. A value of 0 disables
+    the gate. Negative values are rejected (no-op). Never raises.
+    """
+    if value < 0:
+        return
+    data = _read_raw(repo)
+    data["compact_gate_tokens"] = value
+    _write_raw(repo, data)
+
+
 def eval_runner_source(repo: str | Path) -> str:
     """Return which layer decided :func:`eval_runner_cmd` for *repo*.
 

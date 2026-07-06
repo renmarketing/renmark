@@ -324,10 +324,11 @@ def test_skill_preamble_cross_domain_and_tier_hints_joined(tmp_path: Path, monke
 
     hint = lifecycle.skill_preamble(tmp_path, "brainstorm")
 
+    # Cross-domain gate takes priority — returns CONTEXT_GATE_CLEAR early; tier
+    # hint is not appended when the gate fires (gate short-circuits the join).
     assert hint is not None
-    assert "context: cross-domain transition" in hint
-    assert "declared top tier: fable" in hint
-    assert " | " in hint
+    assert hint.startswith("CONTEXT_GATE_CLEAR:")
+    assert "cross-domain transition" in hint
 
 
 def test_corrupt_lifecycle_returns_none(tmp_path: Path) -> None:

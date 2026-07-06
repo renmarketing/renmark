@@ -1263,6 +1263,26 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="clear the persisted operating mode from .renmark/state/mode.json, then exit",
     )
+    # Context hygiene gates
+    ap.add_argument(
+        "--compact-checkpoint",
+        action="store_true",
+        help=(
+            "persist resume state to .renmark/state/compact_checkpoint.json "
+            "and print the commands to run before /compact. "
+            "Use when context is at 60%%+ to preserve state before compacting."
+        ),
+    )
+    ap.add_argument(
+        "--set-compact-gate-tokens",
+        metavar="TOKENS",
+        type=int,
+        help=(
+            "persist the compact-gate token threshold to .renmark/config.json. "
+            "Default: 120000 (proxy for 60%% of the 200k window). "
+            "0 = disable the compact gate. Negative values are rejected."
+        ),
+    )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
         "--task-brief",
@@ -1361,6 +1381,19 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         print(f"renmark: operating mode cleared ({mode_path})")
+        return 0
+    if args.compact_checkpoint:
+        from renmark import lifecycle as _lifecycle
+        _lifecycle.persist_compact_checkpoint(repo, skill="manual", reason="compact")
+        print("Compact checkpoint written to .renmark/state/compact_checkpoint.json.")
+        print("Run these commands to safely reduce context:")
+        print("  1. /compact")
+        print("  2. /renmark:resume")
+        return 0
+    if args.set_compact_gate_tokens is not None:
+        from renmark import config as _config
+        _config.set_compact_gate_tokens(repo, args.set_compact_gate_tokens)
+        print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
         return 0
     if args.task_brief:
         plan_path, task_index_str = args.task_brief
