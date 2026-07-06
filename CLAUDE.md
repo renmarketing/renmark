@@ -154,7 +154,7 @@ Renmark enforces two context hygiene gates as **blocking AskUserQuestion menus**
 **Cross-domain clear gate (Python-enforced):** When `skill_preamble` returns a string starting with `CONTEXT_GATE_CLEAR:`, use `AskUserQuestion` to present the choices described in that message BEFORE executing any skill steps. Do not proceed with the skill body until the user selects an option. If the user selects "Stop here", print: "State saved. Run: /clear — then run: /renmark:resume". Skills `finish`, `approve`, and `resume` bypass this gate (advisory only — these flows must not be interrupted mid-stream).
 
 **Compact gate (rule-enforced — Python cannot detect % context):**
-- **≥120k tokens** (configurable via `compact_gate_tokens` in `.renmark/config.json`, default 120k — proxy for 60% of the 200k window): MUST present blocking menu via `AskUserQuestion` before starting any new skill:
+- **≥120k tokens by default** (check active threshold: `renmark-execute --get-compact-gate-tokens`; configure: `renmark-execute --set-compact-gate-tokens <value>`; 0 = disabled): MUST present blocking menu via `AskUserQuestion` before starting any new skill:
   - header: "Context hygiene"
   - question: "Context window is at 60%+. Continuing may reduce accuracy."
   - option 1 (Recommended): "Stop here — I will run /compact then /renmark:resume"

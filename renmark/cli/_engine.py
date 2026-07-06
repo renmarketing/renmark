@@ -1283,6 +1283,11 @@ def main(argv: list[str] | None = None) -> int:
             "0 = disable the compact gate. Negative values are rejected."
         ),
     )
+    ap.add_argument(
+        "--get-compact-gate-tokens",
+        action="store_true",
+        help="print the current compact-gate token threshold (0 = disabled)",
+    )
     # P4 file-handoff helpers — print ONLY the written path; diff/spec bytes stay out of orchestrator context
     ap.add_argument(
         "--task-brief",
@@ -1390,10 +1395,29 @@ def main(argv: list[str] | None = None) -> int:
         print("  1. /compact")
         print("  2. /renmark:resume")
         return 0
+    if args.get_compact_gate_tokens:
+        from renmark import config as _config
+        val = _config.compact_gate_tokens(repo)
+        if val == 0:
+            print("compact_gate_tokens: 0 (gate disabled)")
+        else:
+            print(f"compact_gate_tokens: {val}")
+        return 0
     if args.set_compact_gate_tokens is not None:
+        if args.set_compact_gate_tokens < 0:
+            import sys as _sys
+            print(
+                f"error: compact_gate_tokens must be >= 0 "
+                f"(got {args.set_compact_gate_tokens})",
+                file=_sys.stderr,
+            )
+            return 1
         from renmark import config as _config
         _config.set_compact_gate_tokens(repo, args.set_compact_gate_tokens)
-        print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
+        if args.set_compact_gate_tokens == 0:
+            print("compact_gate_tokens set to 0 (gate disabled)")
+        else:
+            print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
         return 0
     if args.task_brief:
         plan_path, task_index_str = args.task_brief
