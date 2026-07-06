@@ -6,17 +6,17 @@
 
 ## The nine dispatch roles
 
-| Role | Mission | Context scope | File targets | Output | Stop condition | Model | Verification |
-|---|---|---|---|---|---|---|---|
-| **docs-editor** | Create/update docs, comments, and docstrings | Narrow (source file + related docs) | `.md`, `.rst`, docstring blocks | Markdown sections or code blocks | File written, lint clean | Haiku | Read back and verify formatting |
-| **code-implementer** | Write/modify feature code (non-test) | Broad (full module + imports, few cross-module) | `.py`, `.ts`, `.tsx`, `.rs` (logic only) | Diff or full file | Code compiles, passes basic lint | Sonnet | Verifier + lint run |
-| **test-writer** | Write unit/integration tests (scaffolding) | Narrow (test framework + SUT signature) | `test_*.py`, `*.test.ts`, spec files | Test file(s) | Test file passes own syntax; verifier runs | Haiku | `pytest`/`npm test` runs green |
-| **reviewer** | Code review for logic bugs, style, and risk | Broad (full diff + context) | N/A (read-only) | JSON findings: `{issues: [...], severity, confidence}` | Review artifact written | Sonnet | Findings JSON parses; PASS/FAIL gate |
-| **release-manager** | Version bumps, CHANGELOG, tag selection, merge readiness | Narrow (config + metadata + CHANGELOG) | `CHANGELOG.md`, `pyproject.toml`, `package.json`, version tags | Markdown + git commands | Version incremented, CHANGELOG appended | Haiku | `git tag -l` confirms version |
-| **researcher** | Web research, data lookup, design patterns | Broad (external sources + repo docs) | N/A (read-only + web) | Markdown summaries with citations | Summary written, sources cited | Haiku | Links verified, claims traceable |
-| **audit-reader** | Read audit/generated-code artifacts for gaps/risks | Narrow (audit file only; no source code) | `.audit.md`, `.review.md`, generated logs | JSON summary: `{gaps: [...], blocking, confidence}` | Artifact read, summary written | Haiku | Summary JSON parses; confidence ≥medium |
-| **finish-lane-specialist** | Determine finish lane (quick/release/self-update/full), cost band, escalation | Broad (plan + cost data + lifecycle) | N/A (read-only state) | Markdown lane recommendation + rationale | Lane selected, cost band shown | Haiku | Lane exists in `renmark.finish_lanes.LANES` |
-| **general-purpose** | Fallback: no specialized role fits | Per task | Per task | Per task | Per task | Sonnet | Per task |
+| Role | Mission | Context scope | File targets | Output | Stop condition | Model | Native agent file | Verification |
+|---|---|---|---|---|---|---|---|---|
+| **docs-editor** | Create/update docs, comments, and docstrings | Narrow (source file + related docs) | `.md`, `.rst`, docstring blocks | Markdown sections or code blocks | File written, lint clean | Haiku | `.claude/agents/docs-editor.md` | Read back and verify formatting |
+| **code-implementer** | Write/modify feature code (non-test) | Broad (full module + imports, few cross-module) | `.py`, `.ts`, `.tsx`, `.rs` (logic only) | Diff or full file | Code compiles, passes basic lint | Sonnet | `.claude/agents/code-implementer.md` | Verifier + lint run |
+| **test-writer** | Write unit/integration tests (scaffolding) | Narrow (test framework + SUT signature) | `test_*.py`, `*.test.ts`, spec files | Test file(s) | Test file passes own syntax; verifier runs | Haiku | `.claude/agents/test-writer.md` | `pytest`/`npm test` runs green |
+| **reviewer** | Code review for logic bugs, style, and risk | Broad (full diff + context) | N/A (read-only) | JSON findings: `{issues: [...], severity, confidence}` | Review artifact written | Sonnet | `.claude/agents/reviewer.md` | Findings JSON parses; PASS/FAIL gate |
+| **release-manager** | Version bumps, CHANGELOG, tag selection, merge readiness | Narrow (config + metadata + CHANGELOG) | `CHANGELOG.md`, `pyproject.toml`, `package.json`, version tags | Markdown + git commands | Version incremented, CHANGELOG appended | Sonnet | `.claude/agents/release-manager.md` | `git tag -l` confirms version |
+| **researcher** | Web research, data lookup, design patterns | Broad (external sources + repo docs) | N/A (read-only + web) | Markdown summaries with citations | Summary written, sources cited | Sonnet | `.claude/agents/researcher.md` | Links verified, claims traceable |
+| **audit-reader** | Read audit/generated-code artifacts for gaps/risks | Narrow (audit file only; no source code) | `.audit.md`, `.review.md`, generated logs | JSON summary: `{gaps: [...], blocking, confidence}` | Artifact read, summary written | Haiku | `.claude/agents/audit-reader.md` | Summary JSON parses; confidence ≥medium |
+| **finish-lane-specialist** | Determine finish lane (quick/release/self-update/full), cost band, escalation | Broad (plan + cost data + lifecycle) | N/A (read-only state) | Markdown lane recommendation + rationale | Lane selected, cost band shown | Sonnet | `.claude/agents/finish-lane-specialist.md` | Lane exists in `renmark.finish_lanes.LANES` |
+| **general-purpose** | Fallback: no specialized role fits | Per task | Per task | Per task | Per task | Sonnet | — (built-in) | Per task |
 
 ---
 
@@ -30,7 +30,7 @@
 
 4. **Narrow context for specialized roles.** Specialized profiles declare a narrow context scope in the table above. The dispatcher MUST respect this boundary — a docs-editor receives file + related docs, not the entire codebase. Broad-scope roles (`code-implementer`, `reviewer`, `finish-lane-specialist`) receive more context; narrow-scope roles (`test-writer`, `release-manager`, `researcher`) receive bounded input.
 
-5. **UI label vs internal tracking.** The Claude Code UI may still display the built-in "general-purpose agent" label. Internally, renmark TRACKS and LOGS the intended specialized `role` (in dispatch packets, routing ledger via `append_routing(role=...)`, and cost summaries via `estimate_cost()` with `roles` field).
+5. **Native agent file dispatch.** When a specialized role has a native agent file at `.claude/agents/<role>.md`, renmark's orchestrate function passes `subagent_type: <role>` to the Agent tool call. This enables Claude Code to enforce the role's tool allowlist and context scope via the native agent file, rather than relying on a label or tracking convention. Roles without native agent files (`general-purpose`) use the built-in dispatch mechanism.
 
 6. **Cost and model tier.** Specialized roles inherit a recommended model tier from the table (Haiku for read-only, Sonnet for code logic). The cost estimator (`renmark/cost.py::estimate_cost`) accumulates roles and reports them per wave to help surface skewed workloads (5+ test-writers vs 1 code-implementer).
 

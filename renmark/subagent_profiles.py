@@ -20,6 +20,7 @@ Design contract:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 # ── Profile dataclass ─────────────────────────────────────────────────────────
@@ -228,6 +229,44 @@ def profile_of(role: str) -> ProfileSpec | None:
         return PROFILES.get(role)
     except Exception:
         return None
+
+
+# ── Native agent-file detection ─────────────────────────────────────────────
+
+
+_NATIVE_AGENT_ROLES: frozenset[str] = frozenset(
+    {
+        "docs-editor",
+        "code-implementer",
+        "test-writer",
+        "reviewer",
+        "release-manager",
+        "researcher",
+        "audit-reader",
+        "finish-lane-specialist",
+    }
+)
+
+
+def has_native_agent_file(role: str, repo: Path | None = None) -> bool:
+    """True when *role* has a native ``.claude/agents/<role>.md`` file.
+
+    ``general-purpose`` and any unrecognized role always return ``False``.
+    When *repo* is given, additionally confirms the file exists on disk under
+    ``repo / ".claude" / "agents" / f"{role}.md"`` — defensive, since a role
+    could land in ``_NATIVE_AGENT_ROLES`` before its file is added. Never
+    raises: any filesystem error falls back to the static-set-only answer.
+    """
+    try:
+        in_static_set = role in _NATIVE_AGENT_ROLES
+        if not in_static_set or repo is None:
+            return in_static_set
+        try:
+            return (repo / ".claude" / "agents" / f"{role}.md").exists()
+        except Exception:
+            return in_static_set
+    except Exception:
+        return False
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

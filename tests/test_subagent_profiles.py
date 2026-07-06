@@ -81,6 +81,35 @@ def test_append_routing_persists_role(tmp_path: Path) -> None:
     assert "role=test-writer" in routing
 
 
+def test_has_native_agent_file_checks_static_roles_without_repo() -> None:
+    specialized_roles = (
+        "docs-editor",
+        "code-implementer",
+        "test-writer",
+        "reviewer",
+        "release-manager",
+        "researcher",
+        "audit-reader",
+        "finish-lane-specialist",
+    )
+
+    for role in specialized_roles:
+        assert subagent_profiles.has_native_agent_file(role) is True
+
+    assert subagent_profiles.has_native_agent_file("general-purpose") is False
+    assert subagent_profiles.has_native_agent_file("garbage-role-name") is False
+
+
+def test_has_native_agent_file_checks_repo_native_agent_files(tmp_path: Path) -> None:
+    role = "reviewer"
+    agent_file = tmp_path / ".claude" / "agents" / f"{role}.md"
+    agent_file.parent.mkdir(parents=True)
+    agent_file.write_text("# reviewer\n", encoding="utf-8")
+
+    assert subagent_profiles.has_native_agent_file(role, repo=tmp_path) is True
+    assert subagent_profiles.has_native_agent_file("release-manager", repo=tmp_path) is False
+
+
 def test_estimate_cost_exposes_sorted_unique_roles() -> None:
     preview = estimate_cost(
         [
