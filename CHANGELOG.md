@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-07-06] — release: bump v0.34.0 -> v0.35.0 (agency-mode BL-0002)
+
+behavior tests + CLI flags for Agency Mode (AC11 proof, mode.behavior.json regression fix,
+_with_agency_note unit tests, --agency-status/--activate-agency/--deactivate-agency CLI).
+
 ## 2026-07-06 — Agency Mode: behavior tests + CLI flags
 
 **Request**: Close BL-0002 — add AC11 behavior proof, CLI agency state management,
