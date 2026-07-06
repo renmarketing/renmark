@@ -430,6 +430,38 @@ def build_subagent_input(
     )
 
 
+def build_workflow_fanout_args(
+    wave: list[Task],
+    *,
+    dependency_summaries: list[str] | None = None,
+    upstream_artifact_pointers: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Shape the `args` payload for a `Workflow` tool fan-out over a wave.
+
+    For each task in ``wave`` whose executor is a Claude-model executor
+    (``claude_agent.is_claude_executor``), builds its bounded
+    ``SubagentInput`` via ``build_subagent_input`` and appends its
+    ``.to_dict()`` to the result, preserving wave order. Codex (and any
+    other non-Claude executor) tasks are skipped — they never go through
+    the Workflow/Agent path.
+
+    This is pure packet-shaping: it does not call the `Workflow` tool
+    itself (Python has no access to it) and does not alter the isolation
+    contract — it only reuses ``build_subagent_input`` per task.
+    """
+    args: list[dict[str, Any]] = []
+    for t in wave:
+        if not claude_agent.is_claude_executor(t.executor):
+            continue
+        inp = build_subagent_input(
+            t,
+            dependency_summaries=dependency_summaries,
+            upstream_artifact_pointers=upstream_artifact_pointers,
+        )
+        args.append(inp.to_dict())
+    return args
+
+
 def dispatch_task_isolated(
     task: Task,
     *,
