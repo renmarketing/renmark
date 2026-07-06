@@ -1,7 +1,7 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-07-02 @ 1a3ac74 -->
+<!-- Last refreshed: 2026-07-06 @ 1a5e8ae -->
 
-# Project map — ai-system
+# Project map — feature+agent-team-migration
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
@@ -10,7 +10,7 @@
 ## Directory tree
 
 ```
-ai-system/
+feature+agent-team-migration/
 ├── bin/   executable scripts / wrappers
 ├── plugin/   Claude Code plugin (commands, skills, templates)
 ├── renmark/   Python runtime (CLI, dispatch, verifier, lifecycle)
