@@ -163,3 +163,37 @@ def test_build_agent_dispatch_returns_structured(tmp_path: Path) -> None:
     assert d.target == "src/foo.py"
     assert "make foo do X" in d.prompt
     assert "Modify exactly one file" in d.prompt
+
+
+def test_build_workflow_fanout_args_returns_claude_wave_in_order() -> None:
+    wave = [
+        _task(1, "src/a.py", executor="sonnet", parallel_group=1),
+        _task(2, "src/b.py", executor="opus", parallel_group=1),
+        _task(3, "src/c.py", executor="fable", parallel_group=1),
+    ]
+
+    assert dispatch.build_workflow_fanout_args(wave) == [
+        dispatch.build_subagent_input(task).to_dict() for task in wave
+    ]
+
+
+def test_build_workflow_fanout_args_excludes_codex_tasks() -> None:
+    wave = [
+        _task(1, "src/a.py", executor="codex", parallel_group=1),
+        _task(2, "src/b.py", executor="sonnet", parallel_group=1),
+        _task(3, "src/c.py", executor="codex", parallel_group=1),
+        _task(4, "src/d.py", executor="opus", parallel_group=1),
+    ]
+
+    assert dispatch.build_workflow_fanout_args(wave) == [
+        dispatch.build_subagent_input(task).to_dict() for task in wave if task.executor != "codex"
+    ]
+
+
+def test_build_workflow_fanout_args_returns_empty_for_all_codex_wave() -> None:
+    wave = [
+        _task(1, "src/a.py", executor="codex", parallel_group=1),
+        _task(2, "src/b.py", executor="codex", parallel_group=1),
+    ]
+
+    assert dispatch.build_workflow_fanout_args(wave) == []
