@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-044 — Finished feature context-hygiene-gates
+
+**Date:** 2026-07-06
+**Status:** Accepted
+
+**Context.** Completed stages: plan-validated, reviewed
+
+**Decision.** Branch feature/context-hygiene-gates reached stage released
+
+---
+
 ## ADR-043 — Finished feature agent-team-migration
 
 **Date:** 2026-07-06
