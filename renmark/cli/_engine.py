@@ -398,6 +398,210 @@ def _format_status_line(
     return f"[{n}/{total}] {title[:46]:<46} {status:<6} {elapsed_s:>5.1f}s  {tokens:>5} tok  {sha_or_note}"
 
 
+def _setup_resume_state(repo: Path, tasks: list[Task]) -> set[int]:
+    """Compute the set of already-committed task indices for --resume.
+
+    Reads pause state and git log, cross-checks the raw done-set against the
+    current live plan, prints warnings for orphaned indices, and returns only
+    the safe-to-skip subset.
+    """
+    pause = read_pause(repo)
+    if pause is None:
+        _print("note: no PAUSED state found; running from start")
+    else:
+        _print(f"resuming run {pause.run_id}; last attempted task: {pause.last_task_index}")
+    raw_done = completed_task_indices(repo)
+    # Cross-check: a git-log scan may include indices from a DIFFERENT plan
+    # (reused task numbers, ``(task N)``-suffix side commits, etc.).
+    # Silently skipping tasks that don't exist in the current plan is the
+    # single most expensive observed failure — the ledger and git log must
+    # be trusted, but ONLY for indices that unambiguously belong to THIS plan.
+    done, ambiguous = _cross_check_skip_list(raw_done, tasks)
+    if ambiguous:
+        _print(
+            f"warning: skip-list cross-check found {len(ambiguous)} orphaned "
+            f"index(es) {sorted(ambiguous)} not in current plan "
+            f"({len(tasks)} tasks).  These will NOT be silently skipped — "
+            f"re-running to avoid false completions.  "
+            f"(Likely cause: reused task numbers or commits from a different plan.)"
+        )
+    if done:
+        _print(f"skipping already-committed tasks: {sorted(done)}")
+    return done
+
+
+def _handle_dry_run(tasks: list[Task], done: set[int], repo: Path) -> int:
+    """Print the dry-run plan preview and return 0.
+
+    Shows wave structure, per-task executor/cost estimates, and the
+    deterministic subagent-justification gate (REQ-21) summary. Makes no
+    model call and writes nothing to disk.
+    """
+    from .. import capabilities as _caps
+    from .. import dispatch as _d
+    from .. import subagent_gate as _sg
+
+    waves = _d.group_tasks_by_wave(tasks)
+    _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
+    # Cost estimates per executor — approximate $/kT (output tokens).
+    cost_per_kt = {"haiku": 0.0001, "codex": 0.05, "sonnet": 0.003, "opus": 0.015, "fable": 0.030}
+    total_tokens = 0
+    total_cost = 0.0
+    for w_idx, w in enumerate(waves, 1):
+        wave_tag = "(parallel)" if len(w) > 1 else ""
+        _print(f"  Wave {w_idx}: {len(w)} task(s) {wave_tag}")
+        for t in w:
+            mark = "DONE" if t.index in done else "TODO"
+            tok = t.est_tokens or _default_tokens_for_complexity(t.complexity)
+            # Resolve declared-tier fallback (fable→opus when undeclared) so
+            # the preview prices and labels what will actually run.
+            ex = _caps.effective_executor(t.executor, repo)
+            ex_display = f"{t.executor}→{ex}" if ex != t.executor else ex
+            # A downgraded executor (e.g. fable→opus) invalidates any prefilled
+            # est_cost_usd — it was estimated at the wrong tier. Reprice from
+            # the effective executor's rate so display matches what's charged.
+            cost = t.est_cost_usd if ex == t.executor else None
+            if cost is None:
+                # Infer from executor.
+                rate = cost_per_kt.get(ex, 0.0)
+                if "/" in ex:  # provider/model — assume openai-compatible mid-tier
+                    rate = cost_per_kt.get("sonnet", 0.003)
+                cost = (tok / 1000.0) * rate
+            cost_str = f"${cost:.3f}" if cost > 0 else "free"
+            _print(
+                f"    [{mark}] task {t.index} {ex_display:<8} {t.complexity:<6} "
+                f"~{tok:>5} tok  {cost_str:>8}  → {t.target}  ({t.title})"
+            )
+            total_tokens += tok
+            total_cost += cost
+    _print(f"\n  TOTAL estimate: ~{total_tokens:,} tokens · ~${total_cost:.3f}")
+    _print(
+        "  (codex metered separately; haiku/sonnet/opus/fable bill to your Claude Code quota, ~10k overhead/task)"
+    )
+    # Deterministic subagent-justification gate (REQ-21) — enforced here in
+    # the cost-preview code path, not just documented. Flags deterministic-
+    # eligible / inline-able / unexplained-general-purpose spawns before dispatch.
+    _print("  " + _sg.preview_line(_sg.challenge_plan(tasks)))
+    return 0
+
+
+def _print_run_summary(
+    passed: list[int],
+    failed_task: "Task | None",
+    budget_kind: "str | None",
+    needs_agent: list[int],
+    tasks: list[Task],
+    tokens_used: int,
+    cfg: Config,
+    repo: Path,
+    skipped: list[int],
+    waves: "list[list[Task]]",
+) -> None:
+    """Print the end-of-run summary table (pass/fail/skip counts, token usage, waves)."""
+    _print("")
+    parts = [
+        f"{len(passed)}/{len(tasks)} passed",
+        f"{1 if (failed_task or budget_kind) else 0} failed",
+        f"{len(skipped)} skipped",
+    ]
+    if needs_agent:
+        parts.append(f"{len(needs_agent)} needs-agent ({sorted(needs_agent)})")
+    _print(", ".join(parts))
+    today = usage_today(repo)
+    # Token-gate honesty: codex usage rolls up to OpenAI's dashboard, recorded
+    # here as 0 tokens — so for a codex-only run tokens_used stays 0 and the
+    # RENMARK_MAX_TOKENS_PER_RUN gate is INERT (the time/task budgets are the
+    # real gates). Printing "0 / 50000 (0.0%)" would falsely imply the token
+    # gate is live. When nothing was metered locally, say so plainly instead.
+    if tokens_used == 0:
+        _print(
+            f"Tokens this run: n/a (codex usage reported upstream) | Today: {today} | Month: {usage_this_month(repo)}"
+        )
+    else:
+        _print(
+            f"Tokens this run: {tokens_used} / {cfg.max_tokens_per_run} "
+            f"({100 * tokens_used / max(cfg.max_tokens_per_run, 1):.1f}%) | "
+            f"Today: {today} | Month: {usage_this_month(repo)}"
+        )
+    waves_count = len(waves)
+    _print(f"Waves: {waves_count} (parallel-grouped from {len(tasks)} tasks)")
+
+
+def _handle_run_exit(
+    failed_task: "Task | None",
+    budget_kind: "str | None",
+    failure_kind: "str | None",
+    needs_agent: list[int],
+    skipped: list[int],
+    run_id: str,
+    plan_path: str,
+    repo: Path,
+) -> int:
+    """Resolve the final exit code and write pause state if needed.
+
+    Returns 0 on success (all tasks passed or needs-agent handoff),
+    10 on pause (budget exhaustion or task failure).
+    """
+    # Budget/deadline exhaustion: NOT a success. Write an honest pause keyed to
+    # the first skipped task and exit non-zero — never the "All tasks completed"
+    # branch. Checked before the success branch so a tripped gate can't fall
+    # through to exit 0.
+    if budget_kind is not None and failed_task is None:
+        first_skipped = min(skipped) if skipped else 0
+        reason = "budget" if budget_kind == "token_budget" else "deadline"
+        write_pause(
+            repo,
+            PauseState(
+                run_id=run_id,
+                plan_path=str(plan_path),
+                last_task_index=first_skipped,
+                reason=reason,
+                ts=now_iso(),
+            ),
+        )
+        _print(
+            f"PAUSED ({reason}): {budget_kind} gate tripped with "
+            f"{len(skipped)} task(s) unrun {sorted(skipped)}.\n"
+            f"Resume with: renmark-execute --resume {plan_path}"
+        )
+        return 10
+
+    if failed_task is None and not needs_agent:
+        _git_tag(repo, f"renmark-run-{run_id}-end")
+        clear_pause(repo)
+        _print("All tasks completed.")
+        return 0
+    if failed_task is None and needs_agent:
+        _print(
+            f"Note: tasks {sorted(needs_agent)} need Claude (opus/sonnet) dispatch "
+            f"via the /renmark:orchestrate skill's Agent-tool path. "
+            f"renmark-execute (CLI) doesn't dispatch Claude executors."
+        )
+        # We did not fail — orchestrate skill is expected to follow up.
+        # Don't tag run-end yet; that's the skill's job after Agent tasks land.
+        return 0
+
+    # Failure path: write pause state and exit non-zero.
+    # Both early-return branches above guarantee failed_task is non-None here.
+    assert failed_task is not None
+    write_pause(
+        repo,
+        PauseState(
+            run_id=run_id,
+            plan_path=str(plan_path),
+            last_task_index=failed_task.index,
+            reason=failure_kind or "unknown",
+            ts=now_iso(),
+        ),
+    )
+    _print(
+        f"PAUSED at task {failed_task.index} ({failure_kind}). "
+        f"Artifacts: .renmark/state/escalations/task-{failed_task.index}/\n"
+        f"Resume with: renmark-execute --resume {plan_path}"
+    )
+    return 10
+
+
 def execute_plan(
     plan_path: str,
     *,
@@ -429,28 +633,7 @@ def execute_plan(
     # Determine which tasks are already done (resume support).
     done: set[int] = set()
     if resume:
-        pause = read_pause(repo)
-        if pause is None:
-            _print("note: no PAUSED state found; running from start")
-        else:
-            _print(f"resuming run {pause.run_id}; last attempted task: {pause.last_task_index}")
-        raw_done = completed_task_indices(repo)
-        # Cross-check: a git-log scan may include indices from a DIFFERENT plan
-        # (reused task numbers, ``(task N)``-suffix side commits, etc.).
-        # Silently skipping tasks that don't exist in the current plan is the
-        # single most expensive observed failure — the ledger and git log must
-        # be trusted, but ONLY for indices that unambiguously belong to THIS plan.
-        done, ambiguous = _cross_check_skip_list(raw_done, tasks)
-        if ambiguous:
-            _print(
-                f"warning: skip-list cross-check found {len(ambiguous)} orphaned "
-                f"index(es) {sorted(ambiguous)} not in current plan "
-                f"({len(tasks)} tasks).  These will NOT be silently skipped — "
-                f"re-running to avoid false completions.  "
-                f"(Likely cause: reused task numbers or commits from a different plan.)"
-            )
-        if done:
-            _print(f"skipping already-committed tasks: {sorted(done)}")
+        done = _setup_resume_state(repo, tasks)
 
     run_id = new_run_id()
     state_dir(repo)  # ensure exists
@@ -461,53 +644,7 @@ def execute_plan(
     )
 
     if dry_run:
-        from .. import capabilities as _caps
-        from .. import dispatch as _d
-
-        waves = _d.group_tasks_by_wave(tasks)
-        _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
-        # Cost estimates per executor — approximate $/kT (output tokens).
-        cost_per_kt = {"haiku": 0.0001, "codex": 0.05, "sonnet": 0.003, "opus": 0.015, "fable": 0.030}
-        total_tokens = 0
-        total_cost = 0.0
-        for w_idx, w in enumerate(waves, 1):
-            wave_tag = "(parallel)" if len(w) > 1 else ""
-            _print(f"  Wave {w_idx}: {len(w)} task(s) {wave_tag}")
-            for t in w:
-                mark = "DONE" if t.index in done else "TODO"
-                tok = t.est_tokens or _default_tokens_for_complexity(t.complexity)
-                # Resolve declared-tier fallback (fable→opus when undeclared) so
-                # the preview prices and labels what will actually run.
-                ex = _caps.effective_executor(t.executor, repo)
-                ex_display = f"{t.executor}→{ex}" if ex != t.executor else ex
-                # A downgraded executor (e.g. fable→opus) invalidates any prefilled
-                # est_cost_usd — it was estimated at the wrong tier. Reprice from
-                # the effective executor's rate so display matches what's charged.
-                cost = t.est_cost_usd if ex == t.executor else None
-                if cost is None:
-                    # Infer from executor.
-                    rate = cost_per_kt.get(ex, 0.0)
-                    if "/" in ex:  # provider/model — assume openai-compatible mid-tier
-                        rate = cost_per_kt.get("sonnet", 0.003)
-                    cost = (tok / 1000.0) * rate
-                cost_str = f"${cost:.3f}" if cost > 0 else "free"
-                _print(
-                    f"    [{mark}] task {t.index} {ex_display:<8} {t.complexity:<6} "
-                    f"~{tok:>5} tok  {cost_str:>8}  → {t.target}  ({t.title})"
-                )
-                total_tokens += tok
-                total_cost += cost
-        _print(f"\n  TOTAL estimate: ~{total_tokens:,} tokens · ~${total_cost:.3f}")
-        _print(
-            "  (codex metered separately; haiku/sonnet/opus/fable bill to your Claude Code quota, ~10k overhead/task)"
-        )
-        # Deterministic subagent-justification gate (REQ-21) — enforced here in
-        # the cost-preview code path, not just documented. Flags deterministic-
-        # eligible / inline-able / unexplained-general-purpose spawns before dispatch.
-        from .. import subagent_gate as _sg
-
-        _print("  " + _sg.preview_line(_sg.challenge_plan(tasks)))
-        return 0
+        return _handle_dry_run(tasks, done, repo)
 
     # Start anchor tag.
     _git_tag(repo, f"renmark-run-{run_id}-start")
@@ -641,119 +778,17 @@ def execute_plan(
             break
 
         # Process results in task-index order so the log reads naturally.
-        for r in sorted(wave_result.tasks, key=lambda x: x.task_index):
-            task_obj = next(t for t in runnable if t.index == r.task_index)
-            if r.status == "passed":
-                passed.append(r.task_index)
-                tokens_used += r.tokens_out
-                _memory_log_outcome(repo, task_obj, "passed", run_id)
-            elif r.status == "needs_agent":
-                needs_agent.append(r.task_index)
-                _print(
-                    _format_status_line(
-                        r.task_index,
-                        len(tasks),
-                        task_obj.title,
-                        "NEEDS-AGENT",
-                        0.0,
-                        0,
-                        f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
-                    )
-                )
-            else:  # failed
-                failed_task = task_obj
-                failure_kind = r.note or "task_failed"
-                tokens_used += r.tokens_out
-                _memory_log_outcome(repo, task_obj, "failed", run_id, note=r.note)
-                break  # stop wave processing; outer loop also breaks via failed_task check
+        tokens_delta, failed_task, failure_kind = _process_wave_results(
+            wave_result, runnable, tasks, repo, run_id, passed, needs_agent
+        )
+        tokens_used += tokens_delta
 
     # End-of-run summary.
-    _print("")
-    parts = [
-        f"{len(passed)}/{len(tasks)} passed",
-        f"{1 if (failed_task or budget_kind) else 0} failed",
-        f"{len(skipped)} skipped",
-    ]
-    if needs_agent:
-        parts.append(f"{len(needs_agent)} needs-agent ({sorted(needs_agent)})")
-    _print(", ".join(parts))
-    today = usage_today(repo)
-    # Token-gate honesty: codex usage rolls up to OpenAI's dashboard, recorded
-    # here as 0 tokens — so for a codex-only run tokens_used stays 0 and the
-    # RENMARK_MAX_TOKENS_PER_RUN gate is INERT (the time/task budgets are the
-    # real gates). Printing "0 / 50000 (0.0%)" would falsely imply the token
-    # gate is live. When nothing was metered locally, say so plainly instead.
-    if tokens_used == 0:
-        _print(
-            f"Tokens this run: n/a (codex usage reported upstream) | Today: {today} | Month: {usage_this_month(repo)}"
-        )
-    else:
-        _print(
-            f"Tokens this run: {tokens_used} / {cfg.max_tokens_per_run} "
-            f"({100 * tokens_used / max(cfg.max_tokens_per_run, 1):.1f}%) | "
-            f"Today: {today} | Month: {usage_this_month(repo)}"
-        )
-    waves_count = len(waves)
-    _print(f"Waves: {waves_count} (parallel-grouped from {len(tasks)} tasks)")
+    _print_run_summary(passed, failed_task, budget_kind, needs_agent, tasks, tokens_used, cfg, repo, skipped, waves)
 
-    # Budget/deadline exhaustion: NOT a success. Write an honest pause keyed to
-    # the first skipped task and exit non-zero — never the "All tasks completed"
-    # branch. Checked before the success branch so a tripped gate can't fall
-    # through to exit 0.
-    if budget_kind is not None and failed_task is None:
-        first_skipped = min(skipped) if skipped else 0
-        reason = "budget" if budget_kind == "token_budget" else "deadline"
-        write_pause(
-            repo,
-            PauseState(
-                run_id=run_id,
-                plan_path=str(plan_path),
-                last_task_index=first_skipped,
-                reason=reason,
-                ts=now_iso(),
-            ),
-        )
-        _print(
-            f"PAUSED ({reason}): {budget_kind} gate tripped with "
-            f"{len(skipped)} task(s) unrun {sorted(skipped)}.\n"
-            f"Resume with: renmark-execute --resume {plan_path}"
-        )
-        return 10
-
-    if failed_task is None and not needs_agent:
-        _git_tag(repo, f"renmark-run-{run_id}-end")
-        clear_pause(repo)
-        _print("All tasks completed.")
-        return 0
-    if failed_task is None and needs_agent:
-        _print(
-            f"Note: tasks {sorted(needs_agent)} need Claude (opus/sonnet) dispatch "
-            f"via the /renmark:orchestrate skill's Agent-tool path. "
-            f"renmark-execute (CLI) doesn't dispatch Claude executors."
-        )
-        # We did not fail — orchestrate skill is expected to follow up.
-        # Don't tag run-end yet; that's the skill's job after Agent tasks land.
-        return 0
-
-    # Failure path: write pause state and exit non-zero.
-    # Both early-return branches above guarantee failed_task is non-None here.
-    assert failed_task is not None
-    write_pause(
-        repo,
-        PauseState(
-            run_id=run_id,
-            plan_path=str(plan_path),
-            last_task_index=failed_task.index,
-            reason=failure_kind or "unknown",
-            ts=now_iso(),
-        ),
+    return _handle_run_exit(
+        failed_task, budget_kind, failure_kind, needs_agent, skipped, run_id, plan_path, repo
     )
-    _print(
-        f"PAUSED at task {failed_task.index} ({failure_kind}). "
-        f"Artifacts: .renmark/state/escalations/task-{failed_task.index}/\n"
-        f"Resume with: renmark-execute --resume {plan_path}"
-    )
-    return 10
 
 
 def _execute_task(
@@ -770,6 +805,88 @@ def _execute_task(
     # nim executor removed in v0.2.0; only codex reaches this function now.
     return _execute_task_codex(
         task=task, repo=repo, run_id=run_id, cfg=cfg, total=total, sibling_targets=sibling_targets
+    )
+
+
+def _codex_fail_after_retries(
+    task: Task,
+    total: int,
+    repo: Path,
+    run_id: str,
+    cfg: Config,
+    retries_left: int,
+    start: float,
+    status_note: str,
+    verifier_log: str,
+    fail_code: str,
+) -> tuple[bool, str, int, str]:
+    """Print FAIL status and record escalation for a terminal codex failure.
+
+    Called when retries are exhausted for exit-code failures, out-of-lane
+    violations, or verifier failures. Returns the standard failure tuple.
+    """
+    _print(_format_status_line(task.index, total, task.title, "FAIL", time.monotonic() - start, 0, status_note))
+    _record_escalation(
+        repo, task, run_id, "codex",
+        base_prompt="(see codex_output.log)",
+        response="",
+        verifier_log=verifier_log,
+        retry_count=cfg.max_task_retries - retries_left,
+        prompt_tokens=0,
+        completion_tokens=0,
+    )
+    return False, fail_code, 0, ""
+
+
+def _codex_verify_and_commit(
+    vres,
+    task: Task,
+    total: int,
+    repo: Path,
+    run_id: str,
+    cfg: Config,
+    retries_left: int,
+    start: float,
+    last_output_tail: str,
+) -> tuple[bool | None, str, int, str]:
+    """Handle the verifier result for a single codex attempt.
+
+    If the verifier passes: commit, print PASS, return ``(True, "", 0, sha)``.
+
+    If the verifier fails: roll back the target (mode-aware — deletes untracked
+    targets, checks out tracked ones under one _GIT_LOCK), then:
+    - Return ``(None, "", 0, "")`` sentinel when retries remain; caller
+      decrements ``retries_left`` and continues the loop.
+    - Return the failure tuple when retries are exhausted.
+    """
+    if vres.ok:
+        sha = _git_commit(
+            repo,
+            task.target,
+            message=f"[renmark] task {task.index}: {task.title}",
+            trailer="Co-Authored-By: Codex-CLI <noreply@openai.com>",
+        )
+        _print(
+            _format_status_line(
+                task.index, total, task.title, "PASS", time.monotonic() - start, 0,
+                f"→ {sha or '(no-commit)'} (codex)",
+            )
+        )
+        return True, "", 0, sha
+
+    # Verifier failed. Roll back before deciding to retry or fail.
+    # _classify_and_rollback deletes untracked targets and checks out tracked
+    # ones — classification + rollback under ONE lock (no TOCTOU gap).
+    last_verifier_tail = vres.tail
+    _classify_and_rollback(repo, [task.target])
+    if retries_left > 0:
+        return None, "", 0, ""  # sentinel: retry
+
+    return _codex_fail_after_retries(
+        task, total, repo, run_id, cfg, retries_left, start,
+        f"codex verifier exit {vres.exit_code} after retries",
+        f"verifier:\n{last_verifier_tail}\n\ncodex tail:\n{last_output_tail}",
+        "codex_verifier_failed",
     )
 
 
@@ -794,22 +911,9 @@ def _execute_task_codex(
     """
     start = time.monotonic()
     if not codex_available():
-        _print(
-            _format_status_line(
-                task.index,
-                total,
-                task.title,
-                "FAIL",
-                0.0,
-                0,
-                "codex CLI not on PATH",
-            )
-        )
+        _print(_format_status_line(task.index, total, task.title, "FAIL", 0.0, 0, "codex CLI not on PATH"))
         _record_escalation(
-            repo,
-            task,
-            run_id,
-            "codex",
+            repo, task, run_id, "codex",
             base_prompt="(codex not available)",
             response="",
             verifier_log="codex CLI is not installed (npm i -g @openai/codex)",
@@ -827,21 +931,10 @@ def _execute_task_codex(
             result = run_codex_task(task, repo, timeout_s=cfg.default_verifier_timeout_s * 10)
         except CodexError as e:
             _print(
-                _format_status_line(
-                    task.index,
-                    total,
-                    task.title,
-                    "FAIL",
-                    time.monotonic() - start,
-                    0,
-                    f"codex: {e}",
-                )
+                _format_status_line(task.index, total, task.title, "FAIL", time.monotonic() - start, 0, f"codex: {e}")
             )
             _record_escalation(
-                repo,
-                task,
-                run_id,
-                "codex",
+                repo, task, run_id, "codex",
                 base_prompt="(codex error)",
                 response="",
                 verifier_log=str(e),
@@ -857,46 +950,23 @@ def _execute_task_codex(
         append_usage(
             repo,
             UsageRecord(
-                ts=now_iso(),
-                run_id=run_id,
-                task_id=task.index,
-                model="codex",
-                prompt_tokens=0,
-                completion_tokens=0,
+                ts=now_iso(), run_id=run_id, task_id=task.index, model="codex",
+                prompt_tokens=0, completion_tokens=0,
                 attempt=cfg.max_task_retries - retries_left,
             ),
         )
-
         last_output_tail = result.output_tail
 
         if result.exit_code != 0:
             if retries_left > 0:
                 retries_left -= 1
                 continue
-            _print(
-                _format_status_line(
-                    task.index,
-                    total,
-                    task.title,
-                    "FAIL",
-                    time.monotonic() - start,
-                    0,
-                    f"codex exit {result.exit_code} after retries",
-                )
+            return _codex_fail_after_retries(
+                task, total, repo, run_id, cfg, retries_left, start,
+                f"codex exit {result.exit_code} after retries",
+                result.output_tail,
+                "codex_failed",
             )
-            _record_escalation(
-                repo,
-                task,
-                run_id,
-                "codex",
-                base_prompt="(see codex_output.log)",
-                response="",
-                verifier_log=result.output_tail,
-                retry_count=cfg.max_task_retries - retries_left,
-                prompt_tokens=0,
-                completion_tokens=0,
-            )
-            return False, "codex_failed", 0, ""
 
         # Constrain codex: must have modified only the target file (sibling
         # wave-targets are excluded — they're another task's lane, not ours).
@@ -916,89 +986,22 @@ def _execute_task_codex(
             if retries_left > 0:
                 retries_left -= 1
                 continue
-            _print(
-                _format_status_line(
-                    task.index,
-                    total,
-                    task.title,
-                    "FAIL",
-                    time.monotonic() - start,
-                    0,
-                    f"codex out of lane: {reason[:40]}",
-                )
+            return _codex_fail_after_retries(
+                task, total, repo, run_id, cfg, retries_left, start,
+                f"codex out of lane: {reason[:40]}",
+                f"{reason}\n\n{result.output_tail}",
+                "codex_out_of_lane",
             )
-            _record_escalation(
-                repo,
-                task,
-                run_id,
-                "codex",
-                base_prompt="(see codex_output.log)",
-                response="",
-                verifier_log=f"{reason}\n\n{result.output_tail}",
-                retry_count=cfg.max_task_retries - retries_left,
-                prompt_tokens=0,
-                completion_tokens=0,
-            )
-            return False, "codex_out_of_lane", 0, ""
 
         # Run verifier.
         vres = run_verifier(task.verifier, cwd=repo, timeout_s=task.verifier_timeout_s)
-        if vres.ok:
-            sha = _git_commit(
-                repo,
-                task.target,
-                message=f"[renmark] task {task.index}: {task.title}",
-                trailer="Co-Authored-By: Codex-CLI <noreply@openai.com>",
-            )
-            _print(
-                _format_status_line(
-                    task.index,
-                    total,
-                    task.title,
-                    "PASS",
-                    time.monotonic() - start,
-                    0,
-                    f"→ {sha or '(no-commit)'} (codex)",
-                )
-            )
-            return True, "", 0, sha
-
-        # Verifier failed. Roll back the target and retry. Mode-aware: a mode-A
-        # task that just CREATED the target leaves it untracked, so a plain
-        # `git checkout` is a no-op (returncode ignored) and the rejected
-        # artifact would persist and poison the NEXT task's change detection.
-        # _classify_and_rollback deletes untracked targets and checks out tracked
-        # ones — classification + rollback under ONE lock (no TOCTOU gap).
-        last_verifier_tail = vres.tail
-        _classify_and_rollback(repo, [task.target])
-        if retries_left > 0:
+        outcome = _codex_verify_and_commit(
+            vres, task, total, repo, run_id, cfg, retries_left, start, last_output_tail
+        )
+        if outcome[0] is None:
             retries_left -= 1
             continue
-
-        _print(
-            _format_status_line(
-                task.index,
-                total,
-                task.title,
-                "FAIL",
-                time.monotonic() - start,
-                0,
-                f"codex verifier exit {vres.exit_code} after retries",
-            )
-        )
-        _record_escalation(
-            repo,
-            task,
-            run_id,
-            "codex",
-            base_prompt="(see codex_output.log)",
-            response="",
-            verifier_log=f"verifier:\n{last_verifier_tail}\n\ncodex tail:\n{last_output_tail}",
-            retry_count=cfg.max_task_retries - retries_left,
-            prompt_tokens=0,
-            completion_tokens=0,
-        )
-        return False, "codex_verifier_failed", 0, ""
+        return outcome
 
 
 def _record_escalation(
@@ -1165,6 +1168,255 @@ def _judge_est_cost() -> float:
     from ..judge import JUDGE_EST_COST_USD
 
     return JUDGE_EST_COST_USD
+
+
+# ---------------------------------------------------------------------------
+# Sub-command dispatch helpers — group the main() dispatch chain into logical
+# clusters. Each returns int (the exit code) when it handled the flag, or
+# None when the flag is not set (pass through to the next group).
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_query_flags(
+    args: argparse.Namespace, ap: argparse.ArgumentParser, repo: Path
+) -> int | None:
+    """Handle --usage/--analytics/--roadmap/--logs/--scan/--behavior/--task."""
+    if args.usage:
+        return cmd_usage(repo)
+    if args.analytics:
+        return cmd_analytics(repo)
+    if args.roadmap:
+        return cmd_roadmap(repo)
+    if args.logs:
+        return cmd_logs(repo, n=args.logs_n)
+    if args.scan:
+        return cmd_scan(repo, propose=args.propose, emit_cron=args.emit_cron)
+    if args.behavior:
+        return _cmd_behavior(repo, accept=args.accept, judge=args.judge)
+    if args.task:
+        if not args.output:
+            ap.error("--task requires --output ARTIFACT_PATH")
+        return cmd_task(args.task, args.output, repo=repo)
+    return None
+
+
+def _dispatch_proactive_mode_flags(
+    args: argparse.Namespace, ap: argparse.ArgumentParser, repo: Path
+) -> int | None:
+    """Handle --set-proactive/--set-headless/--set-mode."""
+    if args.set_proactive is not None:
+        raw = args.set_proactive.strip().lower()
+        if raw not in ("true", "false"):
+            ap.error("--set-proactive expects 'true' or 'false'")
+        from .. import config as _config
+
+        value = raw == "true"
+        _config.set_proactive(repo, value)
+        state_str = "on" if value else "off"
+        print(f"renmark: proactive auto-routing {state_str} ({repo}/.renmark/config.json)")
+        return 0
+    if args.set_headless is not None:
+        raw = args.set_headless.strip().lower()
+        if raw not in ("true", "false"):
+            ap.error("--set-headless expects 'true' or 'false'")
+        from .. import config as _config
+
+        value = raw == "true"
+        _config.set_headless(repo, value)
+        state_str = "on" if value else "off"
+        print(f"renmark: headless mode {state_str} ({repo}/.renmark/config.json)")
+        return 0
+    if args.set_mode is not None:
+        from .. import mode as _mode
+
+        mode_path = _mode.mode_state_path(repo)
+        try:
+            _mode.set_mode(repo, args.set_mode)
+        except ValueError as exc:
+            ap.error(str(exc))
+        except OSError as exc:
+            print(
+                f"renmark: failed to persist operating mode to {mode_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: operating mode set to {args.set_mode} ({mode_path})")
+        return 0
+    return None
+
+
+def _dispatch_agency_flags(args: argparse.Namespace, repo: Path) -> int | None:
+    """Handle --agency-status/--activate-agency/--deactivate-agency."""
+    if args.agency_status:
+        from renmark import agency as _agency
+
+        state = _agency.read_agency(repo)
+        status = "active" if state.active else "inactive"
+        print(f"agency: {status}")
+        if state.active:
+            print(f"  phase: {state.current_phase or '(not set)'}")
+            print(f"  milestone: {state.current_milestone or '(not set)'}")
+            print(f"  signoff: {state.signoff_status or '(not set)'}")
+        return 0
+    if args.activate_agency:
+        from renmark import agency as _agency
+
+        agency_path = _agency.agency_state_path(repo)
+        try:
+            _agency.activate(repo)
+        except (OSError, _agency.AgencyBloatError) as exc:
+            print(
+                f"renmark: failed to activate Agency Mode at {agency_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: Agency Mode activated ({agency_path})")
+        return 0
+    if args.deactivate_agency:
+        from renmark import agency as _agency
+
+        agency_path = _agency.agency_state_path(repo)
+        try:
+            _agency.deactivate(repo)
+        except (OSError, _agency.AgencyBloatError) as exc:
+            print(
+                f"renmark: failed to deactivate Agency Mode at {agency_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: Agency Mode deactivated ({agency_path})")
+        return 0
+    return None
+
+
+def _dispatch_mode_read_flags(
+    args: argparse.Namespace, ap: argparse.ArgumentParser, repo: Path
+) -> int | None:
+    """Handle --get-mode/--clear-mode."""
+    if args.get_mode:
+        from .. import mode as _mode
+
+        current = _mode.read_mode(repo)
+        print(current if current is not None else "unset")
+        return 0
+    if args.clear_mode:
+        from .. import mode as _mode
+
+        mode_path = _mode.mode_state_path(repo)
+        try:
+            _mode.clear_mode(repo)
+        except OSError as exc:
+            print(
+                f"renmark: failed to clear operating mode at {mode_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: operating mode cleared ({mode_path})")
+        return 0
+    return None
+
+
+def _dispatch_compact_flags(args: argparse.Namespace, repo: Path) -> int | None:
+    """Handle --compact-checkpoint/--get-compact-gate-tokens/--set-compact-gate-tokens."""
+    if args.compact_checkpoint:
+        from renmark import lifecycle as _lifecycle
+
+        _lifecycle.persist_compact_checkpoint(repo, skill="manual", reason="compact")
+        print("Compact checkpoint written to .renmark/state/compact_checkpoint.json.")
+        print("Run these commands to safely reduce context:")
+        print("  1. /compact")
+        print("  2. /renmark:resume")
+        return 0
+    if args.get_compact_gate_tokens:
+        from renmark import config as _config
+
+        val = _config.compact_gate_tokens(repo)
+        if val == 0:
+            print("compact_gate_tokens: 0 (gate disabled)")
+        else:
+            print(f"compact_gate_tokens: {val}")
+        return 0
+    if args.set_compact_gate_tokens is not None:
+        if args.set_compact_gate_tokens < 0:
+            print(
+                f"error: compact_gate_tokens must be >= 0 "
+                f"(got {args.set_compact_gate_tokens})",
+                file=sys.stderr,
+            )
+            return 1
+        from renmark import config as _config
+
+        _config.set_compact_gate_tokens(repo, args.set_compact_gate_tokens)
+        if args.set_compact_gate_tokens == 0:
+            print("compact_gate_tokens set to 0 (gate disabled)")
+        else:
+            print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
+        return 0
+    return None
+
+
+def _dispatch_handoff_flags(
+    args: argparse.Namespace, ap: argparse.ArgumentParser, repo: Path
+) -> int | None:
+    """Handle --task-brief/--review-package."""
+    if args.task_brief:
+        plan_path, task_index_str = args.task_brief
+        try:
+            task_index = int(task_index_str)
+        except ValueError:
+            ap.error(f"--task-brief TASK_INDEX must be an integer, got {task_index_str!r}")
+        return cmd_task_brief(plan_path, task_index, repo=repo)
+    if args.review_package:
+        base_ref, head_ref = args.review_package
+        return cmd_review_package(base_ref, head_ref, repo=repo)
+    return None
+
+
+def _process_wave_results(
+    wave_result,  # _dispatch.WaveResult — imported lazily inside execute_plan
+    runnable: list[Task],
+    tasks: list[Task],
+    repo: Path,
+    run_id: str,
+    passed: list[int],
+    needs_agent: list[int],
+) -> tuple[int, Task | None, str | None]:
+    """Process task results from a dispatched wave.
+
+    Mutates ``passed`` and ``needs_agent`` in-place.
+    Returns ``(tokens_delta, failed_task, failure_kind)``.
+    """
+    tokens_delta = 0
+    failed_task: Task | None = None
+    failure_kind: str | None = None
+
+    for r in sorted(wave_result.tasks, key=lambda x: x.task_index):
+        task_obj = next(t for t in runnable if t.index == r.task_index)
+        if r.status == "passed":
+            passed.append(r.task_index)
+            tokens_delta += r.tokens_out
+            _memory_log_outcome(repo, task_obj, "passed", run_id)
+        elif r.status == "needs_agent":
+            needs_agent.append(r.task_index)
+            _print(
+                _format_status_line(
+                    r.task_index,
+                    len(tasks),
+                    task_obj.title,
+                    "NEEDS-AGENT",
+                    0.0,
+                    0,
+                    f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
+                )
+            )
+        else:  # failed
+            failed_task = task_obj
+            failure_kind = r.note or "task_failed"
+            tokens_delta += r.tokens_out
+            _memory_log_outcome(repo, task_obj, "failed", run_id, note=r.note)
+            break  # stop wave processing; outer loop also breaks via failed_task check
+
+    return tokens_delta, failed_task, failure_kind
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1334,156 +1586,17 @@ def main(argv: list[str] | None = None) -> int:
 
     repo = Path(args.repo).resolve()
 
-    if args.usage:
-        return cmd_usage(repo)
-    if args.analytics:
-        return cmd_analytics(repo)
-    if args.roadmap:
-        return cmd_roadmap(repo)
-    if args.logs:
-        return cmd_logs(repo, n=args.logs_n)
-    if args.scan:
-        return cmd_scan(repo, propose=args.propose, emit_cron=args.emit_cron)
-    if args.behavior:
-        return _cmd_behavior(repo, accept=args.accept, judge=args.judge)
-    if args.task:
-        if not args.output:
-            ap.error("--task requires --output ARTIFACT_PATH")
-        return cmd_task(args.task, args.output, repo=repo)
-    if args.set_proactive is not None:
-        raw = args.set_proactive.strip().lower()
-        if raw not in ("true", "false"):
-            ap.error("--set-proactive expects 'true' or 'false'")
-        from .. import config as _config
-        value = raw == "true"
-        _config.set_proactive(repo, value)
-        state_str = "on" if value else "off"
-        print(f"renmark: proactive auto-routing {state_str} ({repo}/.renmark/config.json)")
-        return 0
-    if args.set_headless is not None:
-        raw = args.set_headless.strip().lower()
-        if raw not in ("true", "false"):
-            ap.error("--set-headless expects 'true' or 'false'")
-        from .. import config as _config
-        value = raw == "true"
-        _config.set_headless(repo, value)
-        state_str = "on" if value else "off"
-        print(f"renmark: headless mode {state_str} ({repo}/.renmark/config.json)")
-        return 0
-    if args.set_mode is not None:
-        from .. import mode as _mode
-        mode_path = _mode.mode_state_path(repo)
-        try:
-            _mode.set_mode(repo, args.set_mode)
-        except ValueError as exc:
-            ap.error(str(exc))
-        except OSError as exc:
-            print(
-                f"renmark: failed to persist operating mode to {mode_path}: {exc}",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"renmark: operating mode set to {args.set_mode} ({mode_path})")
-        return 0
-    if args.agency_status:
-        from renmark import agency as _agency
-        state = _agency.read_agency(repo)
-        status = "active" if state.active else "inactive"
-        print(f"agency: {status}")
-        if state.active:
-            print(f"  phase: {state.current_phase or '(not set)'}")
-            print(f"  milestone: {state.current_milestone or '(not set)'}")
-            print(f"  signoff: {state.signoff_status or '(not set)'}")
-        return 0
-
-    if args.activate_agency:
-        from renmark import agency as _agency
-        agency_path = _agency.agency_state_path(repo)
-        try:
-            _agency.activate(repo)
-        except (OSError, _agency.AgencyBloatError) as exc:
-            print(
-                f"renmark: failed to activate Agency Mode at {agency_path}: {exc}",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"renmark: Agency Mode activated ({agency_path})")
-        return 0
-
-    if args.deactivate_agency:
-        from renmark import agency as _agency
-        agency_path = _agency.agency_state_path(repo)
-        try:
-            _agency.deactivate(repo)
-        except (OSError, _agency.AgencyBloatError) as exc:
-            print(
-                f"renmark: failed to deactivate Agency Mode at {agency_path}: {exc}",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"renmark: Agency Mode deactivated ({agency_path})")
-        return 0
-
-    if args.get_mode:
-        from .. import mode as _mode
-        current = _mode.read_mode(repo)
-        print(current if current is not None else "unset")
-        return 0
-    if args.clear_mode:
-        from .. import mode as _mode
-        mode_path = _mode.mode_state_path(repo)
-        try:
-            _mode.clear_mode(repo)
-        except OSError as exc:
-            print(
-                f"renmark: failed to clear operating mode at {mode_path}: {exc}",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"renmark: operating mode cleared ({mode_path})")
-        return 0
-    if args.compact_checkpoint:
-        from renmark import lifecycle as _lifecycle
-        _lifecycle.persist_compact_checkpoint(repo, skill="manual", reason="compact")
-        print("Compact checkpoint written to .renmark/state/compact_checkpoint.json.")
-        print("Run these commands to safely reduce context:")
-        print("  1. /compact")
-        print("  2. /renmark:resume")
-        return 0
-    if args.get_compact_gate_tokens:
-        from renmark import config as _config
-        val = _config.compact_gate_tokens(repo)
-        if val == 0:
-            print("compact_gate_tokens: 0 (gate disabled)")
-        else:
-            print(f"compact_gate_tokens: {val}")
-        return 0
-    if args.set_compact_gate_tokens is not None:
-        if args.set_compact_gate_tokens < 0:
-            import sys as _sys
-            print(
-                f"error: compact_gate_tokens must be >= 0 "
-                f"(got {args.set_compact_gate_tokens})",
-                file=_sys.stderr,
-            )
-            return 1
-        from renmark import config as _config
-        _config.set_compact_gate_tokens(repo, args.set_compact_gate_tokens)
-        if args.set_compact_gate_tokens == 0:
-            print("compact_gate_tokens set to 0 (gate disabled)")
-        else:
-            print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
-        return 0
-    if args.task_brief:
-        plan_path, task_index_str = args.task_brief
-        try:
-            task_index = int(task_index_str)
-        except ValueError:
-            ap.error(f"--task-brief TASK_INDEX must be an integer, got {task_index_str!r}")
-        return cmd_task_brief(plan_path, task_index, repo=repo)
-    if args.review_package:
-        base_ref, head_ref = args.review_package
-        return cmd_review_package(base_ref, head_ref, repo=repo)
+    for _handler in (
+        lambda: _dispatch_query_flags(args, ap, repo),
+        lambda: _dispatch_proactive_mode_flags(args, ap, repo),
+        lambda: _dispatch_agency_flags(args, repo),
+        lambda: _dispatch_mode_read_flags(args, ap, repo),
+        lambda: _dispatch_compact_flags(args, repo),
+        lambda: _dispatch_handoff_flags(args, ap, repo),
+    ):
+        _result = _handler()
+        if _result is not None:
+            return _result
 
     if not args.plan:
         ap.error(

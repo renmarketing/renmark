@@ -415,6 +415,42 @@ def _parse_h3_entries(text: str, schema: str) -> list[_MemoryEntry]:
     return entries
 
 
+def _find_bullet_end(lines: list[str], start: int, n: int) -> int:
+    """Return the index of the first line AFTER the bullet that begins at *start*.
+
+    Scans forward from ``start + 1``, consuming indented continuation lines and
+    provisional blank lines.  Stops (without consuming) at:
+    - the next top-level ``- `` bullet,
+    - the next ``## Section`` header, or
+    - a non-indented paragraph line that follows a blank line.
+
+    Trailing blank lines are NOT trimmed here; callers handle that separately.
+    """
+    j = start + 1
+    saw_blank = False
+    while j < n:
+        ln = lines[j]
+        ln_no_nl = ln.rstrip("\n")
+        if ln_no_nl.startswith("- "):
+            break
+        if _H2_SECTION_RE.match(ln_no_nl):
+            break
+        # Blank line is provisional — extend through it; but if we
+        # then see a non-indented, non-bullet, non-section line,
+        # that's a paragraph break (e.g. template placeholders),
+        # so end the bullet at the blank line.
+        if ln_no_nl.strip() == "":
+            saw_blank = True
+            j += 1
+            continue
+        if saw_blank and not (ln_no_nl.startswith(" ") or ln_no_nl.startswith("\t")):
+            # Non-indented paragraph after a blank — bullet ended at the blank.
+            break
+        saw_blank = False
+        j += 1
+    return j
+
+
 def _parse_learning_entries(text: str) -> list[_MemoryEntry]:
     """Parse learnings.md — top-level `- ` bullets under `## Section`.
 
@@ -445,28 +481,7 @@ def _parse_learning_entries(text: str) -> list[_MemoryEntry]:
             continue
         if current_section in allowed_sections and stripped_nl.startswith("- "):
             start_line = i
-            j = i + 1
-            saw_blank = False
-            while j < n:
-                ln = lines[j]
-                ln_no_nl = ln.rstrip("\n")
-                if ln_no_nl.startswith("- "):
-                    break
-                if _H2_SECTION_RE.match(ln_no_nl):
-                    break
-                # Blank line is provisional — extend through it; but if we
-                # then see a non-indented, non-bullet, non-section line,
-                # that's a paragraph break (e.g. template placeholders),
-                # so end the bullet at the blank line.
-                if ln_no_nl.strip() == "":
-                    saw_blank = True
-                    j += 1
-                    continue
-                if saw_blank and not (ln_no_nl.startswith(" ") or ln_no_nl.startswith("\t")):
-                    # Non-indented paragraph after a blank — bullet ended at the blank.
-                    break
-                saw_blank = False
-                j += 1
+            j = _find_bullet_end(lines, start_line, n)
             # Trim trailing blank-only lines so the bullet's raw doesn't
             # absorb separator whitespace into its signature.
             while j > start_line + 1 and lines[j - 1].strip() == "":

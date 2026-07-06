@@ -245,6 +245,59 @@ def registry_sync(repo: Path | str) -> list[str]:
     return sorted(set(issues))
 
 
+def _collect_candidate_files(plugin: Path) -> list[Path]:
+    """Return all ``SKILL.md`` and command ``*.md`` files under *plugin* to scan."""
+    candidate_files: list[Path] = []
+    skills_dir = plugin / "skills"
+    if skills_dir.is_dir():
+        for skill_dir in sorted(skills_dir.iterdir()):
+            if skill_dir.is_dir() and not skill_dir.name.startswith("_"):
+                skill_md = skill_dir / "SKILL.md"
+                if skill_md.exists():
+                    candidate_files.append(skill_md)
+    commands_dir = plugin / "commands"
+    if commands_dir.is_dir():
+        candidate_files.extend(sorted(commands_dir.glob("*.md")))
+    return candidate_files
+
+
+def _scan_file_for_raw_jsonl(
+    fpath: Path,
+    shell_re: "re.Pattern[str]",
+    prohibit_re: "re.Pattern[str]",
+    repo: Path,
+) -> list[str]:
+    """Scan *fpath* for raw-JSONL shell-read violations and return issue strings.
+
+    Skips lines inside python-fenced code blocks.  Returns an empty list when
+    the file is unreadable or clean.
+    """
+    try:
+        text = fpath.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    file_issues: list[str] = []
+    in_python_fence = False
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        # Track python fenced code blocks.
+        if stripped.startswith("```"):
+            lang = stripped[3:].strip().lower()
+            if in_python_fence:
+                in_python_fence = False  # closing fence
+            elif lang == "python":
+                in_python_fence = True
+            # Non-python opening fences: don't toggle in_python_fence
+            continue
+        if in_python_fence:
+            continue  # inside a python block — skip
+        if shell_re.search(line) and not prohibit_re.search(line):
+            rel = str(fpath.relative_to(repo)).replace("\\", "/")
+            file_issues.append(f"no-raw-jsonl: {rel}:{lineno}: {stripped[:120]}")
+    return file_issues
+
+
 def no_raw_jsonl(repo: Path | str) -> list[str]:
     """Flag lines in plugin skills/commands that instruct shell-reading a JSONL ledger.
 
@@ -275,48 +328,16 @@ def no_raw_jsonl(repo: Path | str) -> list[str]:
     """
     repo = Path(repo)
     plugin = _plugin_dir(repo)
-    issues: list[str] = []
 
     # Optional flag tokens (and their bare-number values) between the command
     # and the path: `head -5 f.jsonl`, `tail -n 20 f.jsonl`, `cat -- f.jsonl`
     # must all be caught (v0.9.1 review).
-    _SHELL_JSONL_RE = re.compile(r"\b(cat|head|tail|less|more)\b(\s+(-+\S*|\d+))*\s+\S*\.jsonl")
-    _PROHIBIT_RE = re.compile(r"\b(never|do\s+not|don'?t)\b", re.IGNORECASE)
+    shell_re = re.compile(r"\b(cat|head|tail|less|more)\b(\s+(-+\S*|\d+))*\s+\S*\.jsonl")
+    prohibit_re = re.compile(r"\b(never|do\s+not|don'?t)\b", re.IGNORECASE)
 
-    candidate_files: list[Path] = []
-    skills_dir = plugin / "skills"
-    if skills_dir.is_dir():
-        for skill_dir in sorted(skills_dir.iterdir()):
-            if skill_dir.is_dir() and not skill_dir.name.startswith("_"):
-                skill_md = skill_dir / "SKILL.md"
-                if skill_md.exists():
-                    candidate_files.append(skill_md)
-    commands_dir = plugin / "commands"
-    if commands_dir.is_dir():
-        candidate_files.extend(sorted(commands_dir.glob("*.md")))
-
-    for fpath in candidate_files:
-        try:
-            text = fpath.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        in_python_fence = False
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            stripped = line.strip()
-            # Track python fenced code blocks.
-            if stripped.startswith("```"):
-                lang = stripped[3:].strip().lower()
-                if in_python_fence:
-                    in_python_fence = False  # closing fence
-                elif lang == "python":
-                    in_python_fence = True
-                # Non-python opening fences: don't toggle in_python_fence
-                continue
-            if in_python_fence:
-                continue  # inside a python block — skip
-            if _SHELL_JSONL_RE.search(line) and not _PROHIBIT_RE.search(line):
-                rel = str(fpath.relative_to(repo)).replace("\\", "/")
-                issues.append(f"no-raw-jsonl: {rel}:{lineno}: {stripped[:120]}")
+    issues: list[str] = []
+    for fpath in _collect_candidate_files(plugin):
+        issues.extend(_scan_file_for_raw_jsonl(fpath, shell_re, prohibit_re, repo))
 
     return sorted(set(issues))
 

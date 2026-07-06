@@ -228,6 +228,25 @@ def read_summary_lines(path: Path | str, *, n_lines: int = MAX_SUMMARY_LINES) ->
     return bullets
 
 
+def _coerce_yaml_value(value: str) -> Any:
+    """Convert a raw YAML scalar string to the appropriate Python type.
+
+    Handles the subset of YAML scalars written by ``ArtifactMetadata.to_yaml``:
+    null → None, [] → [], true/false → bool, digit strings → int, else str.
+    """
+    if value == "null":
+        return None
+    if value == "[]":
+        return []
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    if value.isdigit():
+        return int(value)
+    return value
+
+
 def read_metadata(path: Path | str) -> dict[str, Any]:
     """Parse the YAML frontmatter block at the top of an artifact.
 
@@ -267,19 +286,7 @@ def read_metadata(path: Path | str) -> dict[str, Any]:
             continue
         key, _, value = line.partition(": ")
         key = key.strip()
-        value = value.strip()
-        if value == "null":
-            result[key] = None
-        elif value == "[]":
-            result[key] = []
-        elif value.lower() == "true":
-            result[key] = True
-        elif value.lower() == "false":
-            result[key] = False
-        elif value.isdigit():
-            result[key] = int(value)
-        else:
-            result[key] = value
+        result[key] = _coerce_yaml_value(value.strip())
     return result
 
 

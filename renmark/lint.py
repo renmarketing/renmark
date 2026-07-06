@@ -350,6 +350,31 @@ _FM_DQ_BALANCED_RE = re.compile(r'"(?:[^"\\]|\\.)*"\s*$')
 _FM_SQ_BALANCED_RE = re.compile(r"'(?:[^']|'')*'\s*$")
 
 
+def _check_frontmatter_line(line: str, rel: str) -> str | None:
+    """Check a single (already rstripped) frontmatter line for value issues.
+
+    Returns an issue string if the line has a bad value, or ``None`` when clean.
+    Blank lines and comment lines are silently ignored (return ``None``).
+    """
+    if not line or line.startswith("#"):
+        return None
+    kv = _FM_KEY_VALUE_RE.match(line)
+    if not kv:
+        return None
+    value = kv.group(2)
+    if value.startswith('"'):
+        if not _FM_DQ_BALANCED_RE.match(value):
+            return f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
+    elif value.startswith("'"):
+        if not _FM_SQ_BALANCED_RE.match(value):
+            return f"{rel}: frontmatter value has unbalanced quotes: {line!r}"
+    elif _FM_UNQUOTED_COLON_RE.match(line):
+        return (
+            f"{rel}: frontmatter value contains unquoted ': ' — quote the value to fix strict-YAML: {line!r}"
+        )
+    return None
+
+
 def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
     """Detect frontmatter lines with invalid strict-YAML scalar values.
 
@@ -384,23 +409,9 @@ def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
         except ValueError:
             rel = md_path.name  # type: ignore[assignment]
         for raw_line in m.group(1).splitlines():
-            line = raw_line.rstrip()
-            if not line or line.startswith("#"):
-                continue
-            kv = _FM_KEY_VALUE_RE.match(line)
-            if not kv:
-                continue
-            value = kv.group(2)
-            if value.startswith('"'):
-                if not _FM_DQ_BALANCED_RE.match(value):
-                    issues.append(f"{rel}: frontmatter value has unbalanced quotes: {line!r}")
-            elif value.startswith("'"):
-                if not _FM_SQ_BALANCED_RE.match(value):
-                    issues.append(f"{rel}: frontmatter value has unbalanced quotes: {line!r}")
-            elif _FM_UNQUOTED_COLON_RE.match(line):
-                issues.append(
-                    f"{rel}: frontmatter value contains unquoted ': ' — quote the value to fix strict-YAML: {line!r}"
-                )
+            issue = _check_frontmatter_line(raw_line.rstrip(), str(rel))
+            if issue:
+                issues.append(issue)
     return issues
 
 

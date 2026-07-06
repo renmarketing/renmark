@@ -65,6 +65,29 @@ def current_branch(repo: Path) -> str | None:
     return branch if branch else None
 
 
+def _apply_worktree_line(current: dict[str, object], line: str) -> None:
+    """Mutate *current* by applying one non-blank porcelain line.
+
+    Handles the field-setting tokens emitted by
+    ``git worktree list --porcelain``: ``worktree``, ``HEAD``, ``branch``,
+    ``bare``, and ``detached``.  Unrecognised tokens are silently ignored.
+    """
+    if line.startswith("worktree "):
+        current["path"] = line[len("worktree "):]
+        current.setdefault("head", "")
+        current.setdefault("branch", None)
+        current.setdefault("is_bare", False)
+        current.setdefault("is_detached", False)
+    elif line.startswith("HEAD "):
+        current["head"] = line[len("HEAD "):]
+    elif line.startswith("branch "):
+        current["branch"] = line[len("branch "):]
+    elif line == "bare":
+        current["is_bare"] = True
+    elif line == "detached":
+        current["is_detached"] = True
+
+
 def list_worktrees(repo: Path) -> list[dict[str, object]]:
     """Return a list of dicts describing every git worktree for *repo*.
 
@@ -92,20 +115,8 @@ def list_worktrees(repo: Path) -> list[dict[str, object]]:
             if current:
                 worktrees.append(current)
             current = {}
-        elif line.startswith("worktree "):
-            current["path"] = line[len("worktree "):]
-            current.setdefault("head", "")
-            current.setdefault("branch", None)
-            current.setdefault("is_bare", False)
-            current.setdefault("is_detached", False)
-        elif line.startswith("HEAD "):
-            current["head"] = line[len("HEAD "):]
-        elif line.startswith("branch "):
-            current["branch"] = line[len("branch "):]
-        elif line == "bare":
-            current["is_bare"] = True
-        elif line == "detached":
-            current["is_detached"] = True
+        else:
+            _apply_worktree_line(current, line)
 
     if current:
         worktrees.append(current)

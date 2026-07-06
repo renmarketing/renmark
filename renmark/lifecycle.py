@@ -961,6 +961,99 @@ def halt_for_human_review(
 # ── Artifact reference validation ─────────────────────────────────────────────
 
 
+def _validate_one_artifact(
+    key: str,
+    path_str: str,
+    repo_path: Path,
+) -> list[dict[str, str]]:
+    """Perform all checks for a single artifact reference.
+
+    Returns a list of issue dicts (each with ``severity``, ``kind``,
+    ``artifact``, ``path``, ``detail`` set). Returns an empty list when the
+    artifact passes all checks. Callers route BLOCK vs WARN issues to the
+    appropriate accumulator — this helper never mutates external state.
+    """
+    # ── inside-repo check ─────────────────────────────────────────────────
+    raw = Path(path_str)
+    try:
+        resolved = raw.resolve() if raw.is_absolute() else (repo_path / raw).resolve()
+        resolved.relative_to(repo_path.resolve())  # raises ValueError if outside
+        inside_repo = True
+    except (ValueError, OSError):
+        inside_repo = False
+
+    if not inside_repo:
+        return [
+            {
+                "severity": "WARN",
+                "kind": "out_of_tree",
+                "artifact": key,
+                "path": path_str,
+                "detail": f"artifact {key!r} resolves outside project subtree"[:120],
+            }
+        ]
+
+    # ── exists check ──────────────────────────────────────────────────────
+    if not resolved.exists():
+        severity = "BLOCK" if key in {"plan", "spec"} else "WARN"
+        return [
+            {
+                "severity": severity,
+                "kind": "missing_path",
+                "artifact": key,
+                "path": path_str,
+                "detail": f"artifact {key!r} missing at {path_str}"[:120],
+            }
+        ]
+
+    # ── provenance and freshness checks ───────────────────────────────────
+    issues: list[dict[str, str]] = []
+
+    try:
+        meta = read_metadata(resolved)
+    except Exception:
+        meta = {}
+
+    source_sha = meta.get("source_sha")
+    if isinstance(source_sha, str) and source_sha and source_sha != "null":
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "cat-file", "-e", source_sha],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+            if result.returncode != 0:
+                issues.append(
+                    {
+                        "severity": "WARN",
+                        "kind": "unreachable_sha",
+                        "artifact": key,
+                        "path": path_str,
+                        "detail": f"source_sha {source_sha[:12]} for {key!r} not reachable in git"[:120],
+                    }
+                )
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    try:
+        stale = is_stale(resolved)
+    except Exception:
+        stale = False
+    if stale:
+        issues.append(
+            {
+                "severity": "WARN",
+                "kind": "stale_artifact",
+                "artifact": key,
+                "path": path_str,
+                "detail": f"artifact {key!r} past its stale_after timestamp"[:120],
+            }
+        )
+
+    return issues
+
+
 def validate_artifact_refs(
     repo: Path | str,
     state: LifecycleState | None = None,
@@ -996,83 +1089,11 @@ def validate_artifact_refs(
     for key, path_str in artifacts.items():
         if not isinstance(path_str, str):
             continue
-        raw = Path(path_str)
-        try:
-            resolved = raw.resolve() if raw.is_absolute() else (repo_path / raw).resolve()
-            resolved.relative_to(repo_path.resolve())  # raises ValueError if outside
-            inside_repo = True
-        except (ValueError, OSError):
-            inside_repo = False
-
-        if not inside_repo:
-            warn_issues.append(
-                {
-                    "severity": "WARN",
-                    "kind": "out_of_tree",
-                    "artifact": key,
-                    "path": path_str,
-                    "detail": f"artifact {key!r} resolves outside project subtree"[:120],
-                }
-            )
-            continue
-
-        if not resolved.exists():
-            severity = "BLOCK" if key in {"plan", "spec"} else "WARN"
-            issue: dict[str, str] = {
-                "severity": severity,
-                "kind": "missing_path",
-                "artifact": key,
-                "path": path_str,
-                "detail": f"artifact {key!r} missing at {path_str}"[:120],
-            }
-            if severity == "BLOCK":
+        for issue in _validate_one_artifact(key, path_str, repo_path):
+            if issue["severity"] == "BLOCK":
                 block_issues.append(issue)
             else:
                 warn_issues.append(issue)
-            continue
-
-        # File exists — check provenance and freshness.
-        try:
-            meta = read_metadata(resolved)
-        except Exception:
-            meta = {}
-
-        source_sha = meta.get("source_sha")
-        if isinstance(source_sha, str) and source_sha and source_sha != "null":
-            try:
-                result = subprocess.run(
-                    ["git", "-C", str(repo_path), "cat-file", "-e", source_sha],
-                    capture_output=True,
-                    timeout=5,
-                    check=False,
-                )
-                if result.returncode != 0:
-                    warn_issues.append(
-                        {
-                            "severity": "WARN",
-                            "kind": "unreachable_sha",
-                            "artifact": key,
-                            "path": path_str,
-                            "detail": f"source_sha {source_sha[:12]} for {key!r} not reachable in git"[:120],
-                        }
-                    )
-            except (subprocess.TimeoutExpired, OSError):
-                pass
-
-        try:
-            stale = is_stale(resolved)
-        except Exception:
-            stale = False
-        if stale:
-            warn_issues.append(
-                {
-                    "severity": "WARN",
-                    "kind": "stale_artifact",
-                    "artifact": key,
-                    "path": path_str,
-                    "detail": f"artifact {key!r} past its stale_after timestamp"[:120],
-                }
-            )
 
     warn_issues.sort(key=lambda i: i["artifact"])
     return block_issues + warn_issues

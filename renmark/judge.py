@@ -233,6 +233,61 @@ def parse_judge_verdict(response: str) -> Verdict:
     return _parse_response(response)
 
 
+def _strip_code_fence(text: str) -> str:
+    """Return the JSON content inside a ```json … ``` fence, or *text* unchanged.
+
+    Iterates over the segments produced by splitting on ``` and returns the
+    first segment whose non-whitespace content starts with ``{`` (after
+    stripping an optional ``json`` language tag).  If no fenced block is
+    found the original string is returned as-is.
+    """
+    if "```" not in text:
+        return text
+    for part in text.split("```"):
+        candidate = part
+        if candidate.lstrip().lower().startswith("json"):
+            candidate = candidate.lstrip()[len("json"):]
+        candidate = candidate.strip()
+        if candidate.startswith("{"):
+            return candidate
+    return text
+
+
+def _find_balanced_brace(text: str) -> str | None:
+    """Return the first balanced ``{…}`` substring in *text*, or ``None``.
+
+    Uses a character-by-character state machine that tracks string literals
+    (including escape sequences) so that braces inside strings are ignored.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if escaped:
+                escaped = False
+                continue
+            if ch == "\\":
+                escaped = True
+                continue
+            if ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def _extract_json_object(text: str) -> dict[str, object] | None:
     """Best-effort extraction of the first top-level JSON object from text.
 
@@ -247,50 +302,15 @@ def _extract_json_object(text: str) -> dict[str, object] | None:
     except (json.JSONDecodeError, ValueError):
         pass
 
-    # Strip a leading ```json / ``` fence if present.
-    fenced = text
-    if "```" in fenced:
-        parts = fenced.split("```")
-        for part in parts:
-            candidate = part
-            if candidate.lstrip().lower().startswith("json"):
-                candidate = candidate.lstrip()[len("json"):]
-            candidate = candidate.strip()
-            if candidate.startswith("{"):
-                fenced = candidate
-                break
-
-    # Scan for the first balanced {...} span.
-    start = fenced.find("{")
-    if start == -1:
+    stripped = _strip_code_fence(text)
+    candidate = _find_balanced_brace(stripped)
+    if candidate is None:
         return None
-    depth = 0
-    in_str = False
-    escaped = False
-    for i in range(start, len(fenced)):
-        ch = fenced[i]
-        if in_str:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_str = False
-            continue
-        if ch == '"':
-            in_str = True
-        elif ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                span = fenced[start : i + 1]
-                try:
-                    obj = json.loads(span)
-                except (json.JSONDecodeError, ValueError):
-                    return None
-                return obj if isinstance(obj, dict) else None
-    return None
+    try:
+        obj = json.loads(candidate)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return obj if isinstance(obj, dict) else None
 
 
 def judge_behavior(
