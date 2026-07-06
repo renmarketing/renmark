@@ -1,0 +1,21 @@
+{
+  "feature": "context-hygiene-gates",
+  "branch": "feature/context-hygiene-gates",
+  "sha": "e5782df1661d4ea9861e3fe6cf9c4c7c3e701bc1",
+  "version_path": ".renmark/version/v0.9.1/",
+  "release_link": ".renmark/version/v0.9.1/",
+  "verification": "1363 passed, 28 skipped",
+  "codereview": ".renmark/reviews/2026-07-06-725d77e.review.md",
+  "files_changed": 12,
+  "token_cost": {},
+  "loop_iterations": 0,
+  "stop_reason": "",
+  "branch_disposition": "open",
+  "shipped": [],
+  "deferred": [],
+  "next_backlog": [],
+  "task_id": "",
+  "backlog_item_id": "",
+  "loop_id": "",
+  "created_at": "2026-07-06T18:16:47+00:00"
+}

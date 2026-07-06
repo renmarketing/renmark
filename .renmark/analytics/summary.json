@@ -1,33 +1,53 @@
 {
-  "generated_at": "2026-07-01T14:37:49+00:00",
+  "generated_at": "2026-07-06T19:07:34+00:00",
   "source": "local-observed",
   "features": {
-    "started": 0,
-    "completed": 0,
+    "started": 12,
+    "completed": 12,
     "blocked": 0,
-    "by_status": {},
-    "branch_dispositions": {},
-    "shipped_names": [],
+    "by_status": {
+      "completed": 12
+    },
+    "branch_dispositions": {
+      "merged-deleted": 12
+    },
+    "shipped_names": [
+      "fable-integration",
+      "fable-routing",
+      "agent-routing-policy",
+      "cowork-alignment",
+      "claude-doc-slimming",
+      "doc-slimming-fixes",
+      "playwright-browser-control",
+      "roadmap-staged-planner",
+      "req14-scan-proposer",
+      "finish-branch-disposition"
+    ],
     "blocked_names": []
   },
   "tasks": {
-    "total": 4,
-    "passed": 4,
+    "total": 107,
+    "passed": 106,
     "failed": 0,
-    "skipped": 0,
-    "verification_pass": 4,
+    "skipped": 1,
+    "verification_pass": 107,
     "verification_fail": 0,
     "common_failure_reasons": [],
     "tokens_by_executor": {
-      "opus": 4700,
-      "haiku": 340
+      "codex": 182951,
+      "sonnet": 173910,
+      "opus": 56800,
+      "haiku": 33465
     },
     "tokens_by_model": {
-      "opus": 4700,
-      "haiku": 340
+      "codex": 182951,
+      "sonnet": 173910,
+      "opus": 56800,
+      "haiku": 33465
     },
     "tokens_by_provider": {
-      "unknown": 5040
+      "unknown": 264175,
+      "openai": 182951
     }
   },
   "loops": {
@@ -44,31 +64,41 @@
     "rejected": 0
   },
   "verification": {
-    "pass": 4,
+    "pass": 107,
     "fail": 0
   },
-  "releases_created": 0,
-  "branch_dispositions": {},
+  "releases_created": 23,
+  "branch_dispositions": {
+    "merged-deleted": 12
+  },
   "common_failure_reasons": [],
-  "events": {},
+  "events": {
+    "release": 23,
+    "resume": 2,
+    "quota": 1
+  },
   "quota_rate_limit": {
     "rate_limit": 0,
-    "quota": 0,
+    "quota": 1,
     "pause": 0,
-    "resume": 0
+    "resume": 2
   },
   "tokens": {
-    "total": 45040,
+    "total": 2003706,
     "by_provider": {
-      "unknown": 45040
+      "unknown": 2003706
     },
     "by_model": {
-      "opus": 24700,
-      "haiku": 20340
+      "sonnet": 1101761,
+      "haiku": 595775,
+      "opus": 306170,
+      "codex": 0
     },
     "by_executor": {
-      "opus": 4700,
-      "haiku": 340
+      "codex": 182951,
+      "sonnet": 173910,
+      "opus": 56800,
+      "haiku": 33465
     },
     "by_feature": {},
     "requests": 0,
