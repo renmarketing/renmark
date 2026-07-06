@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-07-06] — Context hygiene gates (selectable AskUserQuestion menus)
+
+**Request:** Add hard-stop context hygiene gates to renmark — a blocking AskUserQuestion menu at cross-domain transitions (clear gate) and at ≥60% context (compact gate) — without claiming to invoke /compact or /clear programmatically.
+
+**Built:**
+- `renmark/config.py`: `compact_gate_tokens(repo) -> int` + `set_compact_gate_tokens(repo, value)` — configurable threshold (default 120k, 0=disabled)
+- `renmark/lifecycle.py`: `persist_compact_checkpoint(repo, skill, reason)` — writes `.renmark/state/compact_checkpoint.json`; `_CONTEXT_BYPASS_SKILLS = {"finish", "approve", "resume"}`; `skill_preamble` clear-verdict upgraded from advisory "consider /clear" to `CONTEXT_GATE_CLEAR:` prefixed hard-stop with full AskUserQuestion menu spec (bypass skills stay advisory)
+- `renmark/cli/_engine.py`: `--compact-checkpoint` flag (calls persist_compact_checkpoint + prints /compact+/renmark:resume instructions); `--set-compact-gate-tokens TOKENS` (configures threshold)
+- `CLAUDE.md` + `AGENTS.md`: Context budget rule block replaced with selectable hygiene gates spec (AskUserQuestion menus, CONTEXT_GATE_CLEAR: sentinel, compact-checkpoint CLI, bypass skill list, configurable threshold note)
+- `plugin/skills/_shared/context-taxonomy.md`: Added "Context hygiene gates" section documenting both gate types
+- Tests: 9 new tests (5 config + 4 lifecycle); 1359 total, all pass
+
+**Files changed:** renmark/config.py, renmark/lifecycle.py, renmark/cli/_engine.py, CLAUDE.md, AGENTS.md, plugin/skills/_shared/context-taxonomy.md, tests/test_config.py, tests/test_lifecycle.py
+
+**Do not change:**
+- `_CONTEXT_BYPASS_SKILLS` must include finish/approve/resume — these flows must never be blocked mid-stream
+- `compact_gate_tokens` must return 0 when 0 is stored (0 = disabled, not default)
+- `CONTEXT_GATE_CLEAR:` prefix is load-bearing — CLAUDE.md rule pattern-matches it to trigger AskUserQuestion
+- `persist_compact_checkpoint` is exported (no underscore) — tests and CLI import it directly
+
 ## [2026-07-06] — Claude-native subagent definitions + wave-level Workflow fan-out
 **Request:** Upgrade renmark to use Claude Code's native `.claude/agents/*.md` subagent-type
 files for the 8 specialized dispatch roles and add an optional wave-level `Workflow`-tool

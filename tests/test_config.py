@@ -219,3 +219,44 @@ def test_set_headless_preserves_other_keys(
     assert data["headless"] is True
     assert cfg.is_proactive(tmp_path) is False
     assert cfg.is_headless(tmp_path) is True
+
+
+# ── compact_gate_tokens ───────────────────────────────────────────────────────
+
+
+def test_compact_gate_tokens_default(tmp_path: Path) -> None:
+    from renmark.config import compact_gate_tokens
+    assert compact_gate_tokens(tmp_path) == 120_000
+
+
+def test_compact_gate_tokens_set_and_get(tmp_path: Path) -> None:
+    from renmark.config import compact_gate_tokens, set_compact_gate_tokens
+    set_compact_gate_tokens(tmp_path, 80_000)
+    assert compact_gate_tokens(tmp_path) == 80_000
+
+
+def test_compact_gate_tokens_zero_is_valid(tmp_path: Path) -> None:
+    """0 means disabled — it must be stored and returned as 0, not fall back to default."""
+    from renmark.config import compact_gate_tokens, set_compact_gate_tokens
+    set_compact_gate_tokens(tmp_path, 0)
+    assert compact_gate_tokens(tmp_path) == 0
+
+
+def test_compact_gate_tokens_negative_value_returns_default(tmp_path: Path) -> None:
+    """Negative value stored in config.json returns default 120_000."""
+    import json
+    cfg_file = tmp_path / ".renmark" / "config.json"
+    cfg_file.parent.mkdir(parents=True, exist_ok=True)
+    cfg_file.write_text(json.dumps({"compact_gate_tokens": -5}))
+    from renmark.config import compact_gate_tokens
+    assert compact_gate_tokens(tmp_path) == 120_000
+
+
+def test_compact_gate_tokens_non_int_returns_default(tmp_path: Path) -> None:
+    """Non-int config value returns default 120_000."""
+    import json
+    cfg_file = tmp_path / ".renmark" / "config.json"
+    cfg_file.parent.mkdir(parents=True, exist_ok=True)
+    cfg_file.write_text(json.dumps({"compact_gate_tokens": "not-an-int"}))
+    from renmark.config import compact_gate_tokens
+    assert compact_gate_tokens(tmp_path) == 120_000

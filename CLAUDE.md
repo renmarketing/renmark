@@ -148,18 +148,29 @@ Each task (or parallel group) runs in an isolated subagent/executor context (G11
 - **Orchestrator aggregates ONLY:** PASS/FAIL/SKIP; artifact path; token count; dependency status; next-wave readiness. Never merged back: subagent transcript, generated code, diff, long reasoning — the orchestrator advances on summary fields alone.
 <!-- END:task-isolation-rule -->
 <!-- BEGIN:context-budget-rule -->
-## Context budget — `/compact` at 60%, `/clear` on subject change
-Orchestrator runs on Sonnet 200k; the window degrades before it fills, so act early:
-- **~60% (≈120k tokens):** surface a one-line note suggesting `/compact` before the next skill. Do NOT auto-run `/compact`.
-- **~80% (≈160k tokens):** refuse to start a new long skill (`orchestrate`,
-  `loop`, `audit`) until `/compact` or `/clear`; short skills still run.
-- **Cross-domain transition:** recommend `/clear` (memory survives). The %-side is enforced by orchestrator self-monitoring; the cross-domain side is automated via `renmark.lifecycle.skill_preamble(repo, skill)` (resolves domain from `DOMAIN_BY_SKILL`, runs `context_budget_check`, returns the hint).
+## Context budget — selectable hygiene gates at 60% and on domain change
+Renmark enforces two context hygiene gates as **blocking AskUserQuestion menus**, not silent hints. Neither gate claims to invoke `/compact` or `/clear` — those are host-level commands the user runs manually. Selecting "Stop here" means Python persists resume state and the skill stops cleanly.
+
+**Cross-domain clear gate (Python-enforced):** When `skill_preamble` returns a string starting with `CONTEXT_GATE_CLEAR:`, use `AskUserQuestion` to present the choices described in that message BEFORE executing any skill steps. Do not proceed with the skill body until the user selects an option. If the user selects "Stop here", print: "State saved. Run: /clear — then run: /renmark:resume". Skills `finish`, `approve`, and `resume` bypass this gate (advisory only — these flows must not be interrupted mid-stream).
+
+**Compact gate (rule-enforced — Python cannot detect % context):**
+- **≥120k tokens by default** (check active threshold: `renmark-execute --get-compact-gate-tokens`; configure: `renmark-execute --set-compact-gate-tokens <value>`; 0 = disabled): MUST present blocking menu via `AskUserQuestion` before starting any new skill:
+  - header: "Context hygiene"
+  - question: "Context window is at 60%+. Continuing may reduce accuracy."
+  - option 1 (Recommended): "Stop here — I will run /compact then /renmark:resume"
+  - option 2: "Continue this step only (once)"
+  - option 3: "Raise threshold: renmark-execute --set-compact-gate-tokens <value>"
+  - option 4: "Disable for this branch: renmark-execute --set-compact-gate-tokens 0"
+  If user selects option 1: run `renmark-execute --compact-checkpoint` to persist state, then print: "Run: /compact — then run: /renmark:resume"
+- **≥160k tokens:** Refuse to start any new long skill (`orchestrate`, `loop`, `audit`) until the user runs `/compact` or `/clear`.
+
+Cross-domain transition always triggers the clear gate regardless of token count.
 <!-- END:context-budget-rule -->
 <!-- BEGIN:context-thresholds-rule -->
 ## Context thresholds (absolute token counts)
 Complement the %-based budget above with absolute hard stops (see `renmark.state.skills.context_budget_hint`):
 - **100k tokens:** summarize in-flight reasoning; prefer artifact pointers over inline output.
-- **120k tokens:** surface `/compact` suggestion — do NOT auto-run.
+- **120k tokens** (configurable via `compact_gate_tokens` in `.renmark/config.json`): surface `/compact` suggestion — do NOT auto-run.
 - **150k tokens:** checkpoint to `.renmark/state/`; refuse new long skills until `/compact` or `/clear`.
 Cross-domain transition always recommends `/clear` regardless of count.
 <!-- END:context-thresholds-rule -->

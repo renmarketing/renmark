@@ -81,3 +81,15 @@ When citing this taxonomy in a SKILL.md or rule block, write:
 > full body.*
 
 Do not paste the taxonomy table into the calling SKILL.md — cite this file.
+
+---
+
+## Context hygiene gates
+
+Renmark enforces two hygiene gates as blocking AskUserQuestion menus:
+
+**Clear gate (Python-enforced):** `skill_preamble` → `context_budget_check` returns `"clear"` on cross-domain transition → `persist_compact_checkpoint(repo, skill, reason="clear")` called → returns `CONTEXT_GATE_CLEAR:`-prefixed string → CLAUDE.md rule triggers `AskUserQuestion` menu. Bypass skills (advisory only): `finish`, `approve`, `resume`.
+
+**Compact gate (rule-enforced):** Threshold in `config.json["compact_gate_tokens"]` (default 120k, 0 = disabled). CLI helper: `renmark-execute --compact-checkpoint`. Enforced by CLAUDE.md rule at ≥120k tokens; Python provides persist + CLI helper only. Python cannot detect real % context utilization — absolute token count is the proxy.
+
+**`persist_compact_checkpoint(repo, skill, reason)`:** writes `.renmark/state/compact_checkpoint.json` with `{skill, reason, resume_cmd: "/renmark:resume", timestamp}`. Consumed by `/renmark:resume` for state recovery. Never raises.

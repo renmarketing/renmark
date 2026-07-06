@@ -599,6 +599,36 @@ def preamble_tier(skill: str) -> str:
     return PREAMBLE_TIER_BY_SKILL.get(skill, "full")
 
 
+def persist_compact_checkpoint(
+    repo: "Path | str", skill: str, reason: str
+) -> None:
+    """Write a compact checkpoint to .renmark/state/compact_checkpoint.json.
+
+    Called by skill_preamble before emitting a context gate message so the
+    user can resume after running /compact or /clear.  Never raises.
+    """
+    from . import state as _state  # lazy — avoid circular import at module load
+    import json as _json
+
+    try:
+        state_path = _state.state_dir(repo) / "compact_checkpoint.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            _json.dumps(
+                {
+                    "skill": skill,
+                    "reason": reason,
+                    "resume_cmd": "/renmark:resume",
+                    "timestamp": _state.now_iso(),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
 def skill_preamble(repo: Path | str, skill: str) -> str | None:
     """Single-call Step-0 boilerplate for every SKILL.md.
 
@@ -634,11 +664,55 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
 
     # For standard/full: budget check MUST read last-skill state before
     # record_skill_invocation overwrites it — ordering is load-bearing.
+    # Read last-skill state once here so prev_domain is available for the gate message.
+    last = _state.last_skill_invocation(repo)
     verdict = _state.context_budget_check(repo, skill, domain)
-    _state.record_skill_invocation(repo, skill, domain)
 
     fragments: list[str] = []
+    if verdict == "clear" and skill not in _CONTEXT_BYPASS_SKILLS:
+        prev_domain = last.get("domain", "?") if last else "?"
+        persist_compact_checkpoint(repo, skill, reason="clear")
+        # Headless: skip the interactive gate so non-interactive runs are not blocked.
+        from . import config as _config
+        if _config.is_headless(repo):
+            # Record now — headless runs proceed automatically past the gate.
+            _state.record_skill_invocation(repo, skill, domain)
+            return _with_agency_note(
+                repo, skill,
+                _with_mode_note(
+                    repo, skill,
+                    _with_headless_note(
+                        repo,
+                        f"context: cross-domain transition into `{domain}` "
+                        f"(prev: `{prev_domain}`) "
+                        "\u2014 headless mode: skipping interactive gate, proceeding automatically",
+                    ),
+                ),
+            )
+        # Interactive: return the gate prefix WITHOUT recording the invocation.
+        # Not recording keeps the gate live on re-entry — the user must choose
+        # explicitly before the skill proceeds.
+        return (
+            f"CONTEXT_GATE_CLEAR: cross-domain transition detected "
+            f"(prev: `{prev_domain}` \u2192 `{domain}`).\n"
+            "State persisted to .renmark/state/compact_checkpoint.json.\n"
+            "Present the user with AskUserQuestion before proceeding with this skill:\n"
+            '  header: "Context hygiene"\n'
+            '  question: "Domain change detected. Run /clear to start fresh '
+            '(memory survives), or continue with accumulated context?"\n'
+            "  options:\n"
+            "    1. Stop here \u2014 I will run /clear then /renmark:resume (Recommended)\n"
+            "    2. Continue in same context (this step only)\n"
+            "    3. Queue this as next task after current work finishes\n"
+            "    4. Cancel"
+        )
+
+    # Record the invocation here — after the gate, so a gated-then-stopped skill
+    # does not corrupt the domain state for subsequent cross-domain detection.
+    _state.record_skill_invocation(repo, skill, domain)
+
     if verdict == "clear":
+        # Must be a bypass skill (finish/approve/resume) — advisory only.
         fragments.append(
             f"context: cross-domain transition into `{domain}` — consider `/clear` "
             "before continuing (`.renmark/memory/` survives clears)"
@@ -680,6 +754,10 @@ _MODE_DIRECTIVE: dict[str, str] = {
 _MODE_ENTRY_SKILLS: frozenset[str] = frozenset(
     {"start", "feature", "debug", "roadmap", "finish", "orchestrate"}
 )
+
+# Skills whose flows must not be blocked mid-stream by context gates.
+# finish/approve/resume: urgent paths that must not be interrupted halfway.
+_CONTEXT_BYPASS_SKILLS: frozenset[str] = frozenset({"finish", "approve", "resume"})
 
 
 def _choose_mode_hint(skill: str) -> str:

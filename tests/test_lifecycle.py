@@ -324,10 +324,53 @@ def test_skill_preamble_cross_domain_and_tier_hints_joined(tmp_path: Path, monke
 
     hint = lifecycle.skill_preamble(tmp_path, "brainstorm")
 
+    # Cross-domain gate takes priority — returns CONTEXT_GATE_CLEAR early; tier
+    # hint is not appended when the gate fires (gate short-circuits the join).
     assert hint is not None
-    assert "context: cross-domain transition" in hint
-    assert "declared top tier: fable" in hint
-    assert " | " in hint
+    assert hint.startswith("CONTEXT_GATE_CLEAR:")
+    assert "cross-domain transition" in hint
+
+
+def test_skill_preamble_bypass_skill_no_gate_prefix(tmp_path: Path) -> None:
+    """finish/approve/resume must never return the CONTEXT_GATE_CLEAR prefix."""
+    # Set up a debug-domain last invocation
+    lifecycle.skill_preamble(tmp_path, "debug")
+    # finish is in _CONTEXT_BYPASS_SKILLS — gate must not fire
+    hint = lifecycle.skill_preamble(tmp_path, "finish")
+    assert hint is None or not (isinstance(hint, str) and hint.startswith("CONTEXT_GATE_CLEAR:"))
+
+
+def test_persist_compact_checkpoint_writes_file(tmp_path: Path) -> None:
+    """persist_compact_checkpoint writes the expected JSON fields."""
+    import json
+
+    lifecycle.persist_compact_checkpoint(tmp_path, "start", "clear")
+    cp = tmp_path / ".renmark" / "state" / "compact_checkpoint.json"
+    assert cp.exists(), "compact_checkpoint.json must be created"
+    data = json.loads(cp.read_text(encoding="utf-8"))
+    assert data["skill"] == "start"
+    assert data["reason"] == "clear"
+    assert data["resume_cmd"] == "/renmark:resume"
+    assert "timestamp" in data
+
+
+def test_persist_compact_checkpoint_never_raises() -> None:
+    """persist_compact_checkpoint must not raise even with an invalid path."""
+    # /nonexistent/... will fail at mkdir — must be silently swallowed.
+    lifecycle.persist_compact_checkpoint("/nonexistent/path/xyz", "debug", "compact")
+
+
+def test_cross_domain_checkpoint_written(tmp_path: Path) -> None:
+    """skill_preamble writes compact_checkpoint.json before returning CONTEXT_GATE_CLEAR."""
+    import json
+
+    lifecycle.skill_preamble(tmp_path, "debug")
+    hint = lifecycle.skill_preamble(tmp_path, "start")
+    assert hint is not None and hint.startswith("CONTEXT_GATE_CLEAR:")
+    cp = tmp_path / ".renmark" / "state" / "compact_checkpoint.json"
+    assert cp.exists(), "checkpoint must be written when the clear gate fires"
+    data = json.loads(cp.read_text(encoding="utf-8"))
+    assert data["reason"] == "clear"
 
 
 def test_corrupt_lifecycle_returns_none(tmp_path: Path) -> None:
