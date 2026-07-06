@@ -439,25 +439,34 @@ def _render_skill_preamble(repo: Path, case: Case) -> str:
 
 
 def _render_skill_preamble_fresh(repo: Path, case: Case) -> str:
-    """Render skill_preamble in an isolated tmpdir (no mode, no agency set)."""
-    import tempfile
+    """Render skill_preamble in an isolated scratch dir (no mode, no agency set)."""
+    import shutil
     from . import lifecycle
 
-    with tempfile.TemporaryDirectory() as d:
-        hint = lifecycle.skill_preamble(Path(d), case.skill)
+    # Use a repo-owned path so this works in sandboxes without a system /tmp.
+    tmp = repo / ".renmark" / "state" / "_behavior-fresh"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        hint = lifecycle.skill_preamble(tmp, case.skill)
         return hint if hint is not None else ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _render_skill_preamble_agency_active(repo: Path, case: Case) -> str:
-    """Render skill_preamble in an isolated tmpdir with agency activated."""
-    import tempfile
+    """Render skill_preamble in an isolated scratch dir with agency activated."""
+    import shutil
     from . import lifecycle, agency
 
-    with tempfile.TemporaryDirectory() as d:
-        tmp = Path(d)
+    # Use a repo-owned path so this works in sandboxes without a system /tmp.
+    tmp = repo / ".renmark" / "state" / "_behavior-agency"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
         agency.activate(tmp)
         hint = lifecycle.skill_preamble(tmp, case.skill)
         return hint if hint is not None else ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _render_plan_lint(repo: Path, case: Case) -> str:

@@ -1398,14 +1398,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.activate_agency:
         from renmark import agency as _agency
-        _agency.activate(repo)
-        print(f"renmark: Agency Mode activated ({repo}/.renmark/state/agency.json)")
+        agency_path = _agency.agency_state_path(repo)
+        try:
+            _agency.activate(repo)
+        except (OSError, _agency.AgencyBloatError) as exc:
+            print(
+                f"renmark: failed to activate Agency Mode at {agency_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: Agency Mode activated ({agency_path})")
         return 0
 
     if args.deactivate_agency:
         from renmark import agency as _agency
-        _agency.deactivate(repo)
-        print(f"renmark: Agency Mode deactivated ({repo}/.renmark/state/agency.json)")
+        agency_path = _agency.agency_state_path(repo)
+        try:
+            _agency.deactivate(repo)
+        except (OSError, _agency.AgencyBloatError) as exc:
+            print(
+                f"renmark: failed to deactivate Agency Mode at {agency_path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"renmark: Agency Mode deactivated ({agency_path})")
         return 0
 
     if args.get_mode:
