@@ -130,7 +130,7 @@ def is_playwright_available() -> bool:
     Never raises — all exceptions are caught and mapped to False.
     """
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright  # type: ignore[import-not-found]
 
         with sync_playwright() as pw:
             _ = pw.chromium.executable_path  # raises if binary missing

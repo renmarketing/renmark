@@ -202,7 +202,7 @@ def resolve_lane(recommended: Lane, override: str | None) -> Lane:
         if not token:
             return recommended
         if token in LANES:
-            return token  # type: ignore[return-value]
+            return token
         if token.isdigit():
             idx = int(token) - 1
             if 0 <= idx < len(LANE_ORDER):
@@ -255,7 +255,7 @@ def describe_lane(name: str) -> str:
     name.  Never raises.
     """
     try:
-        spec = LANES.get(name)  # type: ignore[arg-type]
+        spec = LANES.get(name)  # type: ignore[call-overload]
         if spec is None:
             return f"unknown lane: {name!r}"
         actions = ", ".join(spec.actions)
