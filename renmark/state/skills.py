@@ -36,9 +36,7 @@ def context_budget_hint(tokens: int) -> str | None:
       CTX_CHECKPOINT(150k) — strongly recommend /compact or a checkpoint.
     """
     # Guard: booleans are ints in Python; treat them as invalid.
-    if isinstance(tokens, bool):
-        return None
-    if not isinstance(tokens, int):
+    if not isinstance(tokens, int) or isinstance(tokens, bool):
         return None
     if tokens < 0:
         return None

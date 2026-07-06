@@ -158,7 +158,7 @@ def cmd_login(args: argparse.Namespace, repo_root: Path) -> int:
         _print_playwright_remediation()
         return 1
 
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import sync_playwright  # type: ignore[import-not-found]
 
     with sync_playwright() as playwright:
         try:
@@ -206,7 +206,7 @@ def cmd_list(_: argparse.Namespace, repo_root: Path) -> int:
         return 0
 
     for name in names:
-        saved_at, _, stale = _status_fields(name, repo_root)
+        saved_at, _mode, stale = _status_fields(name, repo_root)
         stale_label = "stale" if stale else "fresh"
         print(f"{name}\tsaved_at={saved_at}\t{stale_label}")
     return 0

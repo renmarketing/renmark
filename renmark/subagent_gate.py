@@ -102,7 +102,7 @@ def justify_task(task: Any) -> SubagentVerdict:
         est_known = (
             isinstance(raw_tokens, int) and not isinstance(raw_tokens, bool) and raw_tokens > 0
         )
-        est_tokens = raw_tokens if est_known else 0
+        est_tokens: int = raw_tokens if est_known else 0  # type: ignore[assignment]
         tok_str = f"~{est_tokens} tok" if est_known else "no estimate"
 
         # Q3 — a trivial/simple task the orchestrator can do inline. A "simple"

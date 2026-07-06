@@ -31,6 +31,7 @@ Design contract:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 # ── Pricing (USD per 1 000 tokens) ──────────────────────────────────────────
 
@@ -134,7 +135,7 @@ def cost_band(usd: float) -> str:
     return "high"
 
 
-def estimate_cost(items: list) -> CostPreview:
+def estimate_cost(items: list[Any]) -> CostPreview:
     """Estimate the cost of a set of planned tasks.
 
     Each item in ``items`` may be a :class:`dict` or any object exposing:
