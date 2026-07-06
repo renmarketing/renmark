@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-06] — release: bump v0.35.0 -> v0.36.0 (reduce-complexity)
+
+**Request:** Reduce all 32 modularity danger items (cyclomatic/cognitive complexity, oversized modules, long functions).
+**Built:** Extracted helpers across 15 files; split renmark/init.py -> health.py and cli/_engine.py -> _codex_runner.py. Fixed spec-parsing bug introduced during refactor. Final danger count: 5 (all marginal engine.py metrics).
+**Files changed:** renmark/audit.py, bootstrap.py, cli/_engine.py, cli/_codex_runner.py (new), cli/commands.py, health.py (new), init.py, judge.py, lifecycle.py, lint.py, memory.py, parser.py, release.py, shadow.py, subagent_gate.py, summary.py, worktree.py
+**Do not change:** spec_lines-is-not-None guard in parser.py (bare 'or []' creates new list on empty, causing silent data loss in spec blocks).
+
 ## [2026-07-06] — release: bump v0.34.0 -> v0.35.0 (agency-mode BL-0002)
 
 behavior tests + CLI flags for Agency Mode (AC11 proof, mode.behavior.json regression fix,
