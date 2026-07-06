@@ -9,6 +9,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -839,7 +840,7 @@ def _codex_fail_after_retries(
 
 
 def _codex_verify_and_commit(
-    vres,
+    vres: Any,
     task: Task,
     total: int,
     repo: Path,
@@ -1001,7 +1002,7 @@ def _execute_task_codex(
         if outcome[0] is None:
             retries_left -= 1
             continue
-        return outcome
+        return outcome  # type: ignore[return-value]
 
 
 def _record_escalation(
@@ -1373,7 +1374,7 @@ def _dispatch_handoff_flags(
 
 
 def _process_wave_results(
-    wave_result,  # _dispatch.WaveResult — imported lazily inside execute_plan
+    wave_result: Any,  # _dispatch.WaveResult — imported lazily inside execute_plan
     runnable: list[Task],
     tasks: list[Task],
     repo: Path,
@@ -1594,7 +1595,7 @@ def main(argv: list[str] | None = None) -> int:
         lambda: _dispatch_compact_flags(args, repo),
         lambda: _dispatch_handoff_flags(args, ap, repo),
     ):
-        _result = _handler()
+        _result = _handler()  # type: ignore[no-untyped-call]
         if _result is not None:
             return _result
 
