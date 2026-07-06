@@ -1,4 +1,4 @@
-# renmark v0.32.0
+# renmark v0.33.0
 
 A Claude Code plugin that turns Claude into a **pipeline-first** build assistant. Instead of memorizing commands, pick the pipeline that matches your situation and renmark runs the whole sequence — continuing on its own and pausing only at real decisions (unclear intent, PRD approval, scope change, risky action, cost, a blocker, or merge/release).
 
