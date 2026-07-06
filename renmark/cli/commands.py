@@ -7,6 +7,7 @@ orchestrator's shared git globals, so they live apart from the execution engine.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from ..state import handoffs_dir, now_iso, read_usage
@@ -101,6 +102,23 @@ def cmd_scan(repo: Path, *, propose: bool = False, emit_cron: bool = False) -> i
     return 2 if failed_checks else 0
 
 
+def _fail_response(out_path: "Path | str", summary_lines: list[str]) -> str:
+    """Return the standard FAIL JSON string for cmd_task early exits."""
+    return json.dumps(
+        {
+            "status": "FAIL",
+            "artifact_path": str(out_path),
+            "summary_lines": summary_lines,
+            "completion_state": "failed",
+            "confidence": "high",
+            "retry_count": 0,
+            "validation_status": "failed",
+            "parser_success": False,
+            "schema_compliance": False,
+        }
+    )
+
+
 def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     """Ad-hoc Codex task mode (v0.3.0+).
 
@@ -109,28 +127,12 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     SubagentOutput-shaped JSON dict[str, Any] to stdout for the orchestrator to consume.
     Honors G5 (executor isolation) and G11 (task isolation).
     """
-    import json as _json
-
     from ..summary import emit_pointer, git_head_sha
 
     spec_path = Path(task_spec_path)
     out_path = Path(output_path)
     if not spec_path.exists():
-        print(
-            _json.dumps(
-                {
-                    "status": "FAIL",
-                    "artifact_path": str(out_path),
-                    "summary_lines": [f"task spec not found at {spec_path}"],
-                    "completion_state": "failed",
-                    "confidence": "high",
-                    "retry_count": 0,
-                    "validation_status": "failed",
-                    "parser_success": False,
-                    "schema_compliance": False,
-                }
-            )
-        )
+        print(_fail_response(out_path, [f"task spec not found at {spec_path}"]))
         return 2
 
     task_prompt = spec_path.read_text(encoding="utf-8")
@@ -141,24 +143,10 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
     import shutil
 
     if shutil.which("codex") is None:
-        print(
-            _json.dumps(
-                {
-                    "status": "FAIL",
-                    "artifact_path": str(out_path),
-                    "summary_lines": [
-                        "codex CLI not found on PATH",
-                        "Install codex (https://github.com/openai/codex) or call this task via Agent.",
-                    ],
-                    "completion_state": "failed",
-                    "confidence": "high",
-                    "retry_count": 0,
-                    "validation_status": "failed",
-                    "parser_success": False,
-                    "schema_compliance": False,
-                }
-            )
-        )
+        print(_fail_response(out_path, [
+            "codex CLI not found on PATH",
+            "Install codex (https://github.com/openai/codex) or call this task via Agent.",
+        ]))
         return 127
 
     # Run codex with the task spec as input. We tell it to write the artifact
@@ -189,44 +177,15 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
             cwd=str(repo),
         )
     except subprocess.TimeoutExpired:
-        print(
-            _json.dumps(
-                {
-                    "status": "FAIL",
-                    "artifact_path": str(out_path),
-                    "summary_lines": ["codex timed out after 600s"],
-                    "completion_state": "failed",
-                    "confidence": "high",
-                    "retry_count": 0,
-                    "validation_status": "failed",
-                    "parser_success": False,
-                    "schema_compliance": False,
-                }
-            )
-        )
+        print(_fail_response(out_path, ["codex timed out after 600s"]))
         return 124
 
     if proc.returncode != 0 or not out_path.exists():
         # codex either errored or didn't write the artifact. Surface a bounded summary.
         stderr_tail = (proc.stderr or "").splitlines()[-3:]
-        print(
-            _json.dumps(
-                {
-                    "status": "FAIL",
-                    "artifact_path": str(out_path),
-                    "summary_lines": [
-                        f"codex exit {proc.returncode}",
-                        *[line[:200] for line in stderr_tail],
-                    ][:5],
-                    "completion_state": "failed",
-                    "confidence": "high",
-                    "retry_count": 0,
-                    "validation_status": "failed",
-                    "parser_success": False,
-                    "schema_compliance": False,
-                }
-            )
-        )
+        print(_fail_response(out_path, (
+            [f"codex exit {proc.returncode}", *[line[:200] for line in stderr_tail]][:5]
+        )))
         return proc.returncode or 1
 
     # Artifact exists, but existence != correctness (G9). Validate it before
@@ -259,7 +218,7 @@ def cmd_task(task_spec_path: str, output_path: str, *, repo: Path) -> int:
         "parser_success": True,  # we parsed the artifact without raising
         "schema_compliance": validated,  # frontmatter + ## Summary both present
     }
-    print(_json.dumps(output))
+    print(json.dumps(output))
     return 0
 
 

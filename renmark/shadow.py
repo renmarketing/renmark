@@ -283,12 +283,12 @@ def _print_diffs(diffs: list[ShadowDiff], verbose: bool) -> int:
     return drift_count + missing_count + error_count
 
 
-def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
-    if not argv:
-        sys.stderr.write("usage: python -m renmark.shadow {run|accept|list} [--subsystem X] [-m MSG] [--verbose]\n")
-        return 2
+def _parse_shadow_args(argv: list[str]) -> tuple[str, str | None, str | None, bool]:
+    """Parse argv (starting after the program name) into (cmd, subsystem, message, verbose).
 
+    Raises ValueError on an unrecognised flag so the caller can surface the
+    error and return exit-code 2 without mixing I/O into this function.
+    """
     cmd = argv[0]
     subsystem: str | None = None
     message: str | None = None
@@ -305,47 +305,70 @@ def main(argv: list[str] | None = None) -> int:
             verbose = True
             i += 1
         else:
-            sys.stderr.write(f"unknown arg: {argv[i]}\n")
-            return 2
+            raise ValueError(f"unknown arg: {argv[i]}")
+    return cmd, subsystem, message, verbose
+
+
+def _cmd_list() -> int:
+    for sub in registered_subsystems():
+        n = len(list_cases(sub))
+        sys.stdout.write(f"  {sub:12s}  {n} case{'s' if n != 1 else ''}\n")
+    return 0
+
+
+def _cmd_run(subsystem: str | None, verbose: bool) -> int:
+    targets = [subsystem] if subsystem else registered_subsystems()
+    total_issues = 0
+    for sub in targets:
+        sys.stdout.write(f"\n→ shadow run: {sub}\n")
+        try:
+            diffs = run_subsystem(sub)
+        except KeyError as exc:
+            sys.stderr.write(f"  ERR {exc}\n")
+            total_issues += 1
+            continue
+        total_issues += _print_diffs(diffs, verbose=verbose)
+    if total_issues:
+        sys.stderr.write(f"\nFAIL ({total_issues} drift/missing/error)\n")
+        return 1
+    sys.stdout.write("\nOK  all subsystems clean\n")
+    return 0
+
+
+def _cmd_accept(subsystem: str | None, message: str | None) -> int:
+    if not subsystem:
+        sys.stderr.write("accept requires --subsystem\n")
+        return 2
+    if not message:
+        sys.stderr.write("accept requires -m MESSAGE explaining the change\n")
+        return 2
+    try:
+        count = accept_subsystem(subsystem, message)
+    except (KeyError, ValueError) as exc:
+        sys.stderr.write(f"  ERR {exc}\n")
+        return 1
+    sys.stdout.write(f"OK  accepted {count} baseline{'s' if count != 1 else ''} for {subsystem}\n")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if not argv:
+        sys.stderr.write("usage: python -m renmark.shadow {run|accept|list} [--subsystem X] [-m MSG] [--verbose]\n")
+        return 2
+
+    try:
+        cmd, subsystem, message, verbose = _parse_shadow_args(argv)
+    except ValueError as exc:
+        sys.stderr.write(f"{exc}\n")
+        return 2
 
     if cmd == "list":
-        for sub in registered_subsystems():
-            n = len(list_cases(sub))
-            sys.stdout.write(f"  {sub:12s}  {n} case{'s' if n != 1 else ''}\n")
-        return 0
-
+        return _cmd_list()
     if cmd == "run":
-        targets = [subsystem] if subsystem else registered_subsystems()
-        total_issues = 0
-        for sub in targets:
-            sys.stdout.write(f"\n→ shadow run: {sub}\n")
-            try:
-                diffs = run_subsystem(sub)
-            except KeyError as exc:
-                sys.stderr.write(f"  ERR {exc}\n")
-                total_issues += 1
-                continue
-            total_issues += _print_diffs(diffs, verbose=verbose)
-        if total_issues:
-            sys.stderr.write(f"\nFAIL ({total_issues} drift/missing/error)\n")
-            return 1
-        sys.stdout.write("\nOK  all subsystems clean\n")
-        return 0
-
+        return _cmd_run(subsystem, verbose)
     if cmd == "accept":
-        if not subsystem:
-            sys.stderr.write("accept requires --subsystem\n")
-            return 2
-        if not message:
-            sys.stderr.write("accept requires -m MESSAGE explaining the change\n")
-            return 2
-        try:
-            count = accept_subsystem(subsystem, message)
-        except (KeyError, ValueError) as exc:
-            sys.stderr.write(f"  ERR {exc}\n")
-            return 1
-        sys.stdout.write(f"OK  accepted {count} baseline{'s' if count != 1 else ''} for {subsystem}\n")
-        return 0
+        return _cmd_accept(subsystem, message)
 
     sys.stderr.write(f"unknown command: {cmd}\n")
     return 2

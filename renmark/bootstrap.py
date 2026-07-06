@@ -36,27 +36,13 @@ def _substitute(text: str, project_name: str, date: str) -> str:
     return text.replace("{{PROJECT_NAME}}", project_name).replace("{{DATE}}", date)
 
 
-def bootstrap(
-    repo: str | Path,
-    *,
-    project_name: str | None = None,
-    init_git: bool = True,
-) -> BootstrapResult:
-    """Scaffold CLAUDE.md, AGENTS.md, .renmark/, and .gitignore from templates.
-
-    Idempotent: existing files are left alone.
-    """
-    repo_p = Path(repo).resolve()
-    repo_p.mkdir(parents=True, exist_ok=True)
-    if project_name is None:
-        project_name = repo_p.name
-    today = dt.date.today().isoformat()
-
-    tdir = memory.template_dir()
-    if tdir is None:
-        raise RuntimeError("renmark templates directory not found; install.sh symlink missing?")
-    plugin_tdir = tdir.parent  # plugin/templates/
-
+def _scaffold_files(
+    repo_p: Path,
+    plugin_tdir: Path,
+    project_name: str,
+    today: str,
+) -> list[str]:
+    """Create scaffold files and directories; return list of created paths."""
     created: list[str] = []
 
     # CLAUDE.md
@@ -118,65 +104,92 @@ def bootstrap(
             gk.touch()
             created.append(str(gk))
 
-    git_initialized = False
-    if init_git and not (repo_p / ".git").is_dir():
-        try:
+    return created
+
+
+def _init_git_repo(repo_p: Path, created: list[str]) -> bool:
+    """Run git init + scaffold commit; return True if git was initialized."""
+    if (repo_p / ".git").is_dir():
+        return False
+    try:
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main"],
+            cwd=str(repo_p),
+            check=True,
+            capture_output=True,
+        )
+        # Identity defaults if not configured.
+        res = subprocess.run(
+            ["git", "-C", str(repo_p), "config", "user.email"],
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode != 0 or not res.stdout.strip():
             subprocess.run(
-                ["git", "init", "-q", "-b", "main"],
-                cwd=str(repo_p),
+                ["git", "-C", str(repo_p), "config", "user.email", "renmark@local"],
                 check=True,
                 capture_output=True,
             )
-            # Identity defaults if not configured.
-            res = subprocess.run(
-                ["git", "-C", str(repo_p), "config", "user.email"],
-                capture_output=True,
-                text=True,
-            )
-            if res.returncode != 0 or not res.stdout.strip():
-                subprocess.run(
-                    ["git", "-C", str(repo_p), "config", "user.email", "renmark@local"],
-                    check=True,
-                    capture_output=True,
-                )
-            res = subprocess.run(
-                ["git", "-C", str(repo_p), "config", "user.name"],
-                capture_output=True,
-                text=True,
-            )
-            if res.returncode != 0 or not res.stdout.strip():
-                subprocess.run(
-                    ["git", "-C", str(repo_p), "config", "user.name", "renmark"],
-                    check=True,
-                    capture_output=True,
-                )
-            # Safety: only stage the files bootstrap itself created.
-            # If the project is not empty (pre-existing user files present),
-            # `git add -A` would silently commit every pre-existing file —
-            # restrict the add to only the scaffolded paths instead.
-            if not created:
-                # Nothing to stage — shouldn't happen, but guard defensively.
-                pass
-            else:
-                # Stage only the files bootstrap created, not -A (traversal
-                # guard: a non-empty project's pre-existing files must NOT be
-                # committed as part of the scaffold commit).
-                for path_str in created:
-                    # Strip the " (appended)" annotation we sometimes add
-                    clean = path_str.removesuffix(" (appended)")
-                    with contextlib.suppress(subprocess.CalledProcessError):
-                        subprocess.run(
-                            ["git", "-C", str(repo_p), "add", "--", clean],
-                            check=True,
-                            capture_output=True,
-                        )
+        res = subprocess.run(
+            ["git", "-C", str(repo_p), "config", "user.name"],
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode != 0 or not res.stdout.strip():
             subprocess.run(
-                ["git", "-C", str(repo_p), "commit", "-q", "-m", "chore: renmark scaffold"],
+                ["git", "-C", str(repo_p), "config", "user.name", "renmark"],
                 check=True,
                 capture_output=True,
             )
-            git_initialized = True
-        except subprocess.CalledProcessError:
-            pass
+        # Safety: only stage the files bootstrap itself created.
+        # If the project is not empty (pre-existing user files present),
+        # `git add -A` would silently commit every pre-existing file —
+        # restrict the add to only the scaffolded paths instead.
+        if created:
+            # Stage only the files bootstrap created, not -A (traversal
+            # guard: a non-empty project's pre-existing files must NOT be
+            # committed as part of the scaffold commit).
+            for path_str in created:
+                # Strip the " (appended)" annotation we sometimes add
+                clean = path_str.removesuffix(" (appended)")
+                with contextlib.suppress(subprocess.CalledProcessError):
+                    subprocess.run(
+                        ["git", "-C", str(repo_p), "add", "--", clean],
+                        check=True,
+                        capture_output=True,
+                    )
+        subprocess.run(
+            ["git", "-C", str(repo_p), "commit", "-q", "-m", "chore: renmark scaffold"],
+            check=True,
+            capture_output=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def bootstrap(
+    repo: str | Path,
+    *,
+    project_name: str | None = None,
+    init_git: bool = True,
+) -> BootstrapResult:
+    """Scaffold CLAUDE.md, AGENTS.md, .renmark/, and .gitignore from templates.
+
+    Idempotent: existing files are left alone.
+    """
+    repo_p = Path(repo).resolve()
+    repo_p.mkdir(parents=True, exist_ok=True)
+    if project_name is None:
+        project_name = repo_p.name
+    today = dt.date.today().isoformat()
+
+    tdir = memory.template_dir()
+    if tdir is None:
+        raise RuntimeError("renmark templates directory not found; install.sh symlink missing?")
+    plugin_tdir = tdir.parent  # plugin/templates/
+
+    created = _scaffold_files(repo_p, plugin_tdir, project_name, today)
+    git_initialized = _init_git_repo(repo_p, created) if init_git else False
 
     return BootstrapResult(created=created, git_initialized=git_initialized)

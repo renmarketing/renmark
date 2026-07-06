@@ -120,16 +120,8 @@ def parse_plan(path: str | Path) -> list[Task]:
             continue
 
         if reading_spec:
-            stripped = raw.strip()
-            if stripped.startswith("### Task ") or (raw.startswith("## ") and not raw.startswith("### ")):
+            if not _handle_spec_line(raw, line_no, current, spec_lines if spec_lines is not None else [], reading_spec):
                 _close_current(line_no - 1)
-                continue
-            if spec_lines is None:
-                spec_lines = []
-            if raw.startswith("  "):
-                spec_lines.append(raw[2:])
-            else:
-                spec_lines.append(raw)
             continue
 
         field_m = _FIELD_RE.match(raw)
@@ -142,35 +134,8 @@ def parse_plan(path: str | Path) -> list[Task]:
         if key == "spec":
             reading_spec = True
             spec_lines = [value] if value else []
-        elif key == "context_files":
-            current["context_files"] = _parse_list(value)
-        elif key == "verifier_timeout_s":
-            try:
-                current["verifier_timeout_s"] = int(value)
-            except ValueError as e:
-                raise PlanError(f"line {line_no}: verifier_timeout_s must be int, got {value!r}") from e
-        elif key == "parallel_group":
-            try:
-                current["parallel_group"] = int(value)
-            except ValueError as e:
-                raise PlanError(f"line {line_no}: parallel_group must be int, got {value!r}") from e
-        elif key == "est_tokens":
-            try:
-                current["est_tokens"] = int(value)
-            except ValueError as e:
-                raise PlanError(f"line {line_no}: est_tokens must be int, got {value!r}") from e
-        elif key == "est_cost_usd":
-            try:
-                current["est_cost_usd"] = float(value)
-            except ValueError as e:
-                raise PlanError(f"line {line_no}: est_cost_usd must be float, got {value!r}") from e
-        elif key in (
-            "mode", "target", "model", "verifier", "executor", "complexity",
-            "serves", "role", "role_reason",
-        ):
-            current[key] = value
         else:
-            raise PlanError(f"line {line_no}: unknown field {key!r}")
+            _dispatch_field(key, value, line_no, current)
 
     _close_current(line_no)
 
@@ -179,6 +144,68 @@ def parse_plan(path: str | Path) -> list[Task]:
 
     _validate_indices(tasks)
     return tasks
+
+
+_PLAN_INT_FIELDS: frozenset[str] = frozenset({"verifier_timeout_s", "parallel_group", "est_tokens"})
+_PLAN_FLOAT_FIELDS: frozenset[str] = frozenset({"est_cost_usd"})
+_PLAN_STR_FIELDS: frozenset[str] = frozenset({
+    "mode", "target", "model", "verifier", "executor", "complexity",
+    "serves", "role", "role_reason",
+})
+
+
+def _dispatch_field(key: str, value: str, line_no: int, current: dict[str, Any]) -> None:
+    """Populate *current* task dict from a parsed field key/value pair.
+
+    Raises PlanError on unknown or malformed fields.  The ``spec`` key is
+    handled by the caller (it also manages ``reading_spec`` / ``spec_lines``
+    state that lives outside this helper).
+    """
+    if key == "context_files":
+        current["context_files"] = _parse_list(value)
+        return
+    if key in _PLAN_INT_FIELDS:
+        try:
+            current[key] = int(value)
+        except ValueError as e:
+            raise PlanError(f"line {line_no}: {key} must be int, got {value!r}") from e
+        return
+    if key in _PLAN_FLOAT_FIELDS:
+        try:
+            current[key] = float(value)
+        except ValueError as e:
+            raise PlanError(f"line {line_no}: {key} must be float, got {value!r}") from e
+        return
+    if key in _PLAN_STR_FIELDS:
+        current[key] = value
+        return
+    raise PlanError(f"line {line_no}: unknown field {key!r}")
+
+
+def _handle_spec_line(
+    raw: str,
+    line_no: int,
+    current: dict[str, Any],
+    spec_lines: list[str],
+    reading_spec: bool,
+) -> bool:
+    """Process one line while in spec-reading mode.
+
+    Appends *raw* to *spec_lines* (stripping a 2-space indent when present).
+    Returns ``False`` when a new section or task heading is detected — the
+    caller must then invoke ``_close_current``; returns ``True`` otherwise
+    (spec reading should continue).
+    """
+    stripped = raw.strip()
+    if stripped.startswith("### Task ") or (
+        raw.startswith("## ") and not raw.startswith("### ")
+    ):
+        return False
+    if raw.startswith("  "):
+        spec_lines.append(raw[2:])
+    else:
+        spec_lines.append(raw)
+    return True
 
 
 def _parse_list(raw: str) -> list[str]:

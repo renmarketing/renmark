@@ -577,7 +577,117 @@ def drift_report(repo: Path | str = ".") -> list[str]:
     return issues
 
 
+# ── CLI sub-command handlers ──────────────────────────────────────────────────
+
+
+def _cmd_current(argv: list[str]) -> int:
+    sys.stdout.write(current_version() + "\n")
+    return 0
+
+
+def _cmd_package(argv: list[str]) -> int:
+    rest = argv[1:]
+    dest = None
+    name = None
+    positional: list[str] = []
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--dest" and i + 1 < len(rest):
+            dest = rest[i + 1]
+            i += 2
+        elif rest[i] == "--name" and i + 1 < len(rest):
+            name = rest[i + 1]
+            i += 2
+        else:
+            positional.append(rest[i])
+            i += 1
+    repo = Path(positional[0]) if positional else Path(".")
+    if name is not None:
+        try:
+            name = _safe_archive_stem(name)
+        except ValueError as e:
+            sys.stderr.write(f"error: {e}\n")
+            return 2
+    issues = drift_report(repo)
+    if issues:
+        sys.stderr.write("refusing to package — version drift:\n")
+        for issue in issues:
+            sys.stderr.write(f"  - {issue}\n")
+        return 1
+    out = build_package(repo, dest_dir=dest, archive_stem=name)
+    sys.stdout.write(f"OK  built {out}  (v{current_version(repo)})\n")
+    return 0
+
+
+def _cmd_snapshot(argv: list[str]) -> int:
+    rest = argv[1:]
+    snap_dest = None
+    snap_name = None
+    snap_positional: list[str] = []
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--dest" and i + 1 < len(rest):
+            snap_dest = rest[i + 1]
+            i += 2
+        elif rest[i] == "--name" and i + 1 < len(rest):
+            snap_name = rest[i + 1]
+            i += 2
+        else:
+            snap_positional.append(rest[i])
+            i += 1
+    repo = Path(snap_positional[0]) if snap_positional else Path(".")
+    if snap_name is not None:
+        try:
+            snap_name = _safe_archive_stem(snap_name)
+        except ValueError as e:
+            sys.stderr.write(f"error: {e}\n")
+            return 2
+    issues = drift_report(repo)
+    if issues:
+        sys.stderr.write("refusing to snapshot — version drift:\n")
+        for issue in issues:
+            sys.stderr.write(f"  - {issue}\n")
+        return 1
+    result = build_version_snapshot(repo, dest_dir=snap_dest, archive_stem=snap_name)
+    sys.stdout.write(f"OK  snapshot v{result['version']} → {result['snapshot_dir']}\n")
+    sys.stdout.write(f"    zip: {result['zip']}\n")
+    return 0
+
+
+def _cmd_check(argv: list[str]) -> int:
+    repo = Path(argv[1]) if len(argv) > 1 else Path(".")
+    canonical = current_version(repo)
+    issues = drift_report(repo)
+    if issues:
+        sys.stderr.write(f"Canonical version (VERSION): {canonical}\n")
+        for issue in issues:
+            sys.stderr.write(f"  - {issue}\n")
+        sys.stderr.write(f"FAIL ({len(issues)} drift{'s' if len(issues) != 1 else ''})\n")
+        return 1
+    sys.stdout.write(f"OK  all {len(VERSION_FILES)} version locations at v{canonical}\n")
+    return 0
+
+
+def _cmd_scan(argv: list[str]) -> int:
+    if len(argv) < 2:
+        sys.stderr.write("usage: python -m renmark.release scan <repo-path>\n")
+        return 2
+    repo = Path(argv[1])
+    found = check_drift(repo)
+    for label, version in found.items():
+        sys.stdout.write(f"  {version or '<missing>':>10}  {label}\n")
+    return 0
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
+
+_COMMANDS: dict[str, "Callable[[list[str]], int]"] = {
+    "current": _cmd_current,
+    "package": _cmd_package,
+    "snapshot": _cmd_snapshot,
+    "check": _cmd_check,
+    "scan": _cmd_scan,
+}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -587,103 +697,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     cmd = argv[0]
-
-    if cmd == "current":
-        sys.stdout.write(current_version() + "\n")
-        return 0
-
-    if cmd == "package":
-        rest = argv[1:]
-        dest = None
-        name = None
-        positional: list[str] = []
-        i = 0
-        while i < len(rest):
-            if rest[i] == "--dest" and i + 1 < len(rest):
-                dest = rest[i + 1]
-                i += 2
-            elif rest[i] == "--name" and i + 1 < len(rest):
-                name = rest[i + 1]
-                i += 2
-            else:
-                positional.append(rest[i])
-                i += 1
-        repo = Path(positional[0]) if positional else Path(".")
-        if name is not None:
-            try:
-                name = _safe_archive_stem(name)
-            except ValueError as e:
-                sys.stderr.write(f"error: {e}\n")
-                return 2
-        issues = drift_report(repo)
-        if issues:
-            sys.stderr.write("refusing to package — version drift:\n")
-            for issue in issues:
-                sys.stderr.write(f"  - {issue}\n")
-            return 1
-        out = build_package(repo, dest_dir=dest, archive_stem=name)
-        sys.stdout.write(f"OK  built {out}  (v{current_version(repo)})\n")
-        return 0
-
-    if cmd == "snapshot":
-        rest = argv[1:]
-        snap_dest = None
-        snap_name = None
-        snap_positional: list[str] = []
-        i = 0
-        while i < len(rest):
-            if rest[i] == "--dest" and i + 1 < len(rest):
-                snap_dest = rest[i + 1]
-                i += 2
-            elif rest[i] == "--name" and i + 1 < len(rest):
-                snap_name = rest[i + 1]
-                i += 2
-            else:
-                snap_positional.append(rest[i])
-                i += 1
-        repo = Path(snap_positional[0]) if snap_positional else Path(".")
-        if snap_name is not None:
-            try:
-                snap_name = _safe_archive_stem(snap_name)
-            except ValueError as e:
-                sys.stderr.write(f"error: {e}\n")
-                return 2
-        issues = drift_report(repo)
-        if issues:
-            sys.stderr.write("refusing to snapshot — version drift:\n")
-            for issue in issues:
-                sys.stderr.write(f"  - {issue}\n")
-            return 1
-        result = build_version_snapshot(repo, dest_dir=snap_dest, archive_stem=snap_name)
-        sys.stdout.write(f"OK  snapshot v{result['version']} → {result['snapshot_dir']}\n")
-        sys.stdout.write(f"    zip: {result['zip']}\n")
-        return 0
-
-    if cmd == "check":
-        repo = Path(argv[1]) if len(argv) > 1 else Path(".")
-        canonical = current_version(repo)
-        issues = drift_report(repo)
-        if issues:
-            sys.stderr.write(f"Canonical version (VERSION): {canonical}\n")
-            for issue in issues:
-                sys.stderr.write(f"  - {issue}\n")
-            sys.stderr.write(f"FAIL ({len(issues)} drift{'s' if len(issues) != 1 else ''})\n")
-            return 1
-        sys.stdout.write(f"OK  all {len(VERSION_FILES)} version locations at v{canonical}\n")
-        return 0
-
-    if cmd == "scan":
-        if len(argv) < 2:
-            sys.stderr.write("usage: python -m renmark.release scan <repo-path>\n")
-            return 2
-        repo = Path(argv[1])
-        found = check_drift(repo)
-        for label, version in found.items():
-            sys.stdout.write(f"  {version or '<missing>':>10}  {label}\n")
-        return 0
-
-    sys.stderr.write(f"unknown command: {cmd}\n")
-    return 2
+    handler = _COMMANDS.get(cmd)
+    if handler is None:
+        sys.stderr.write(f"unknown command: {cmd}\n")
+        return 2
+    return handler(argv)
 
 
 if __name__ == "__main__":

@@ -75,6 +75,25 @@ class PlanChallenge:
     message: str = ""
 
 
+def _q3_inlineable(complexity: str, est_known: bool, est_tokens: int) -> bool:
+    """Return True when the task is simple/tiny enough to execute inline.
+
+    A *simple* complexity is inline-able unless a known estimate exceeds the
+    ceiling.  An unspecified complexity only inlines when a known-tiny estimate
+    is present (total unknowns are not auto-inlined).
+    """
+    return (complexity == "simple" and (not est_known or est_tokens <= _DIRECT_TOKEN_CEILING)) or (
+        complexity == "" and est_known and est_tokens <= _DIRECT_TOKEN_CEILING
+    )
+
+
+def _q4_justified(complexity: str, est_known: bool, est_tokens: int) -> bool:
+    """Return True when a subagent is positively warranted by complexity or size."""
+    return complexity in _SUBAGENT_JUSTIFYING_COMPLEXITY or (
+        est_known and est_tokens > _DIRECT_TOKEN_CEILING
+    )
+
+
 def justify_task(task: Any) -> SubagentVerdict:
     """Return the justification :class:`SubagentVerdict` for one planned task.
 
@@ -110,9 +129,7 @@ def justify_task(task: Any) -> SubagentVerdict:
         # (a missing estimate must NOT force a subagent — that was a false
         # positive). An unspecified-complexity task only inlines on a known-tiny
         # estimate (we don't inline total unknowns).
-        inlineable = (complexity == "simple" and (not est_known or est_tokens <= _DIRECT_TOKEN_CEILING)) or (
-            complexity == "" and est_known and est_tokens <= _DIRECT_TOKEN_CEILING
-        )
+        inlineable = _q3_inlineable(complexity, est_known, est_tokens)
         if inlineable:
             return SubagentVerdict(
                 needs_subagent=False,
@@ -125,10 +142,7 @@ def justify_task(task: Any) -> SubagentVerdict:
             )
 
         # Q4 — large/ambiguous enough → a subagent is justified.
-        justified = (
-            complexity in _SUBAGENT_JUSTIFYING_COMPLEXITY
-            or (est_known and est_tokens > _DIRECT_TOKEN_CEILING)
-        )
+        justified = _q4_justified(complexity, est_known, est_tokens)
 
         challenge: str | None = None
         challenge_code = ""

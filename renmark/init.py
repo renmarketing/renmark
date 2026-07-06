@@ -423,6 +423,64 @@ def _extract_symbols(text: str, lang: str, include_private: bool) -> list[str]:
     return uniq[:SYMBOLS_PER_FILE_CAP]
 
 
+def _first_sentence(joined: str) -> str:
+    """Return the first sentence from a joined docstring body (≤80 chars), or ''."""
+    for k, ch in enumerate(joined):
+        if ch in "!?":
+            return joined[: k + 1].strip()[:80]
+        if ch == "." and (k + 1 >= len(joined) or joined[k + 1] in (" ", "\t")):
+            return joined[: k + 1].strip()[:80]
+    return ""
+
+
+def _collect_docstring_body(lines: list[str], i: int, quote: str, first_part: str) -> str:
+    """Collect a multi-line docstring body and return its first sentence (≤80 chars)."""
+    body_lines: list[str] = []
+    if first_part:
+        body_lines.append(first_part)
+    for j in range(i + 1, min(i + 20, len(lines))):
+        inner = lines[j].strip()
+        if inner.startswith(quote):
+            break
+        body_lines.append(inner)
+    if not body_lines:
+        return ""
+    result = _first_sentence(" ".join(body_lines))
+    if result:
+        return result
+    for segment in body_lines:
+        if segment:
+            return segment[:80]
+    return ""
+
+
+def _extract_python_docstring(lines: list[str]) -> str:
+    """Return the first sentence of a Python module docstring, or ''."""
+    for i, ln in enumerate(lines[:30]):
+        s = ln.strip()
+        if not (s.startswith('"""') or s.startswith("'''")):
+            continue
+        quote = s[:3]
+        if s.endswith(quote) and len(s) > 6:
+            return s[3:-3].strip()[:80]
+        result = _collect_docstring_body(lines, i, quote, s[3:].strip())
+        if result:
+            return result
+    return ""
+
+
+def _extract_generic_comment(lines: list[str]) -> str:
+    """Return the first non-shebang comment line across common comment styles."""
+    for ln in lines[:15]:
+        s = ln.strip()
+        if not s or s.startswith("#!"):
+            continue
+        for prefix in ("# ", "// ", "/* ", "* "):
+            if s.startswith(prefix):
+                return s[len(prefix) :].rstrip(" */").strip()[:80]
+    return ""
+
+
 def _file_purpose(text: str, lang: str) -> str:
     """One-line purpose from the first docstring or comment of a file.
 
@@ -433,50 +491,10 @@ def _file_purpose(text: str, lang: str) -> str:
     """
     lines = text.splitlines()
     if lang == "python":
-        # Look for module docstring
-        for i, ln in enumerate(lines[:30]):
-            s = ln.strip()
-            if s.startswith('"""') or s.startswith("'''"):
-                quote = s[:3]
-                # Same-line docstring
-                if s.endswith(quote) and len(s) > 6:
-                    return s[3:-3].strip()[:80]
-                # Multi-line — collect body lines, join, extract first sentence.
-                body_lines: list[str] = []
-                # Text after the opening triple-quote on the same line (may be empty)
-                after_open = s[3:].strip()
-                if after_open:
-                    body_lines.append(after_open)
-                for j in range(i + 1, min(i + 20, len(lines))):
-                    inner = lines[j].strip()
-                    if inner.startswith(quote):
-                        break  # closing quotes
-                    body_lines.append(inner)
-                if not body_lines:
-                    continue
-                joined = " ".join(body_lines)
-                # Find first sentence end: a period, ! or ? that is followed by
-                # a space, end-of-string, or closing punctuation.  This avoids
-                # stopping inside backtick paths (`path/to/file.py`), URL dots,
-                # or mid-word abbreviations.
-                for k, ch in enumerate(joined):
-                    if ch in "!?":
-                        return joined[: k + 1].strip()[:80]
-                    if ch == "." and (k + 1 >= len(joined) or joined[k + 1] in (" ", "\t")):
-                        return joined[: k + 1].strip()[:80]
-                # No sentence-end found — return the first non-empty line
-                for segment in body_lines:
-                    if segment:
-                        return segment[:80]
-    # Generic: first non-shebang comment line
-    for ln in lines[:15]:
-        s = ln.strip()
-        if not s or s.startswith("#!"):
-            continue
-        for prefix in ("# ", "// ", "/* ", "* "):
-            if s.startswith(prefix):
-                return s[len(prefix) :].rstrip(" */").strip()[:80]
-    return ""
+        result = _extract_python_docstring(lines)
+        if result:
+            return result
+    return _extract_generic_comment(lines)
 
 
 # ── Main scan ────────────────────────────────────────────────────────────────
@@ -1107,30 +1125,25 @@ def _count_test_files(repo: Path, files: list[FileInfo]) -> int:
     return count
 
 
-def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo], deep: bool) -> list[Gap]:
-    """Run the gap detectors and return a list of Gap objects, severity-sorted."""
-    by_name = {s.name: s for s in standards}
-    gaps: list[Gap] = []
-    n_source_files = len(files)
-    pkg = _package_json(repo)
-
-    # 🚨 danger: .env committed
-    env_committed = (repo / ".env").exists()
-    if env_committed:
-        # Check if .env is gitignored
-        gi = repo / ".gitignore"
-        gitignored = gi.exists() and ".env" in _read_text_safe(gi).splitlines()
-        if not gitignored:
-            gaps.append(
-                Gap(
-                    "danger",
-                    "Secrets risk: `.env` is committed (not gitignored)",
-                    "`.env` exists in the repo and is not in `.gitignore`. Real credentials may be checked in.",
-                    "Add `.env` to `.gitignore`, run `git rm --cached .env`, and rotate any leaked credentials.",
-                )
+def _check_secrets_risk(repo: Path, gaps: list[Gap]) -> None:
+    """Append a Gap if .env is committed and not gitignored."""
+    if not (repo / ".env").exists():
+        return
+    gi = repo / ".gitignore"
+    gitignored = gi.exists() and ".env" in _read_text_safe(gi).splitlines()
+    if not gitignored:
+        gaps.append(
+            Gap(
+                "danger",
+                "Secrets risk: `.env` is committed (not gitignored)",
+                "`.env` exists in the repo and is not in `.gitignore`. Real credentials may be checked in.",
+                "Add `.env` to `.gitignore`, run `git rm --cached .env`, and rotate any leaked credentials.",
             )
+        )
 
-    # 🚨 danger: multiple package managers
+
+def _check_package_managers(repo: Path, gaps: list[Gap]) -> None:
+    """Append a Gap if multiple JS package manager lockfiles coexist."""
     lockfiles_present = [lf for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml") if (repo / lf).exists()]
     if len(lockfiles_present) > 1:
         gaps.append(
@@ -1142,21 +1155,10 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
             )
         )
 
-    # ⚠ warn: no linter at all
-    if "lint" not in by_name:
-        gaps.append(
-            Gap(
-                "warn",
-                "No linter configured",
-                "No ruff/flake8/eslint/rubocop/clippy/go-vet detected. Style and obvious bugs go uncaught.",
-                "Add a linter — for Python: `pip install ruff && echo '[tool.ruff]' >> pyproject.toml`; "
-                "for JS/TS: `npm i -D eslint && npx eslint --init`.",
-            )
-        )
 
-    # ⚠ warn: no type checker
+def _check_type_checking(by_name: dict[str, Standard], files: list[FileInfo], gaps: list[Gap]) -> None:
+    """Append Gaps for missing or non-strict type checking."""
     if "typecheck" not in by_name:
-        # Only flag for typed-ish languages
         has_typed_lang = any(f.lang in ("python", "typescript") for f in files)
         if has_typed_lang:
             gaps.append(
@@ -1181,8 +1183,9 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
                 )
             )
 
-    # ⚠ warn: no tests in a multi-file project
-    n_tests = _count_test_files(repo, files)
+
+def _check_test_coverage(by_name: dict[str, Standard], n_source_files: int, n_tests: int, gaps: list[Gap]) -> None:
+    """Append Gaps for zero tests or a configured-but-empty test suite."""
     if n_source_files >= 10 and n_tests == 0:
         gaps.append(
             Gap(
@@ -1192,8 +1195,6 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
                 "Add the first test before the next feature. Even one smoke test changes the trajectory.",
             )
         )
-
-    # ⚠ warn: test framework in deps but zero test files
     if "test" in by_name and n_tests == 0 and n_source_files >= 3:
         gaps.append(
             Gap(
@@ -1204,7 +1205,9 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
             )
         )
 
-    # ⚠ warn: linter exists but not wired to pre-commit or CI
+
+def _check_quality_enforcement(by_name: dict[str, Standard], n_source_files: int, gaps: list[Gap]) -> None:
+    """Append Gaps for lint/CI/pre-commit enforcement gaps."""
     if "lint" in by_name and "precommit" not in by_name and "ci" not in by_name:
         gaps.append(
             Gap(
@@ -1214,8 +1217,6 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
                 "Add a pre-commit hook (`.pre-commit-config.yaml`) or a CI workflow that runs it.",
             )
         )
-
-    # ⚠ warn: multi-file project with no CI
     if n_source_files >= 10 and "ci" not in by_name:
         gaps.append(
             Gap(
@@ -1225,8 +1226,6 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
                 "Add a minimal CI workflow that runs tests + lint on every PR.",
             )
         )
-
-    # ⚠ warn: no pre-commit AND no CI
     if "precommit" not in by_name and "ci" not in by_name and n_source_files >= 5:
         gaps.append(
             Gap(
@@ -1237,7 +1236,9 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
             )
         )
 
-    # ⚠ warn: no lockfile when package.json exists
+
+def _check_project_basics(repo: Path, pkg: object, n_source_files: int, gaps: list[Gap]) -> None:
+    """Append Gaps for missing lockfile, .gitignore, or README."""
     if pkg is not None and not any((repo / lf).exists() for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml")):
         gaps.append(
             Gap(
@@ -1247,8 +1248,6 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
                 "Run `npm install` (or yarn/pnpm) and commit the resulting lockfile.",
             )
         )
-
-    # ℹ info: no .gitignore
     if not (repo / ".gitignore").exists() and n_source_files >= 3:
         gaps.append(
             Gap(
@@ -1258,8 +1257,6 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
                 "Add a stack-appropriate `.gitignore` (renmark's `/renmark:setup` will create one).",
             )
         )
-
-    # ℹ info: no README
     if not (repo / "README.md").exists() and not (repo / "README").exists() and n_source_files >= 5:
         gaps.append(
             Gap(
@@ -1270,39 +1267,67 @@ def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo]
             )
         )
 
-    # Deep-only: commit-message style sample
-    if deep:
-        try:
-            out = subprocess.run(
-                ["git", "-C", str(repo), "log", "-20", "--pretty=%s"],
-                capture_output=True,
-                text=True,
-                timeout=5,
+
+def _check_commit_style(repo: Path, deep: bool, gaps: list[Gap]) -> None:
+    """Append a Gap for inconsistent commit message style (deep mode only)."""
+    if not deep:
+        return
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(repo), "log", "-20", "--pretty=%s"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if out.returncode == 0:
+            subjects = [s for s in out.stdout.splitlines() if s]
+            conv = sum(
+                1
+                for s in subjects
+                if re.match(
+                    r"^(feat|fix|chore|docs|refactor|test|build|ci|perf|style|revert)(\(\w+\))?!?:",
+                    s,
+                )
             )
-            if out.returncode == 0:
-                subjects = [s for s in out.stdout.splitlines() if s]
-                # Conventional commits detection
-                conv = sum(
-                    1
-                    for s in subjects
-                    if re.match(
-                        r"^(feat|fix|chore|docs|refactor|test|build|ci|perf|style|revert)(\(\w+\))?!?:",
-                        s,
+            if subjects and conv / max(len(subjects), 1) < 0.3 and conv > 0:
+                gaps.append(
+                    Gap(
+                        "info",
+                        "Inconsistent commit message style",
+                        f"Of the last {len(subjects)} commits, only {conv} follow conventional-commits format.",
+                        "Pick a convention (conventional-commits or freeform) and enforce via commitlint or PR review.",
                     )
                 )
-                if subjects and conv / max(len(subjects), 1) < 0.3 and conv > 0:
-                    gaps.append(
-                        Gap(
-                            "info",
-                            "Inconsistent commit message style",
-                            f"Of the last {len(subjects)} commits, only {conv} follow conventional-commits format.",
-                            "Pick a convention (conventional-commits or freeform) and enforce via commitlint or PR review.",
-                        )
-                    )
-        except (FileNotFoundError, subprocess.SubprocessError):
-            pass
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
 
-    # Severity sort: danger > warn > info
+
+def evaluate_health(repo: Path, standards: list[Standard], files: list[FileInfo], deep: bool) -> list[Gap]:
+    """Run the gap detectors and return a list of Gap objects, severity-sorted."""
+    by_name = {s.name: s for s in standards}
+    gaps: list[Gap] = []
+    n_source_files = len(files)
+    pkg = _package_json(repo)
+    n_tests = _count_test_files(repo, files)
+
+    _check_secrets_risk(repo, gaps)
+    _check_package_managers(repo, gaps)
+    if "lint" not in by_name:
+        gaps.append(
+            Gap(
+                "warn",
+                "No linter configured",
+                "No ruff/flake8/eslint/rubocop/clippy/go-vet detected. Style and obvious bugs go uncaught.",
+                "Add a linter — for Python: `pip install ruff && echo '[tool.ruff]' >> pyproject.toml`; "
+                "for JS/TS: `npm i -D eslint && npx eslint --init`.",
+            )
+        )
+    _check_type_checking(by_name, files, gaps)
+    _check_test_coverage(by_name, n_source_files, n_tests, gaps)
+    _check_quality_enforcement(by_name, n_source_files, gaps)
+    _check_project_basics(repo, pkg, n_source_files, gaps)
+    _check_commit_style(repo, deep, gaps)
+
     order = {"danger": 0, "warn": 1, "info": 2}
     gaps.sort(key=lambda g: order.get(g.severity, 99))
     return gaps
