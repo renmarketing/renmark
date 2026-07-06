@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-043 — Finished feature agent-team-migration
+
+**Date:** 2026-07-06
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted,plan-validated,created,verified,reviewed
+
+**Decision.** Branch feature/agent-team-migration reached stage ready-to-release
+
+---
+
 ## ADR-042 — Finished feature deterministic-first
 
 **Date:** 2026-07-02
