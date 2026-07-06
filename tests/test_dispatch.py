@@ -165,6 +165,19 @@ def test_build_agent_dispatch_returns_structured(tmp_path: Path) -> None:
     assert "Modify exactly one file" in d.prompt
 
 
+def _fanout_expected(tasks: list) -> list:
+    """Build expected fanout payloads: SubagentInput.to_dict() + agent_type field."""
+    from renmark import subagent_profiles
+
+    result = []
+    for task in tasks:
+        inp = dispatch.build_subagent_input(task)
+        payload = inp.to_dict()
+        payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
+        result.append(payload)
+    return result
+
+
 def test_build_workflow_fanout_args_returns_claude_wave_in_order() -> None:
     wave = [
         _task(1, "src/a.py", executor="sonnet", parallel_group=1),
@@ -172,9 +185,7 @@ def test_build_workflow_fanout_args_returns_claude_wave_in_order() -> None:
         _task(3, "src/c.py", executor="fable", parallel_group=1),
     ]
 
-    assert dispatch.build_workflow_fanout_args(wave) == [
-        dispatch.build_subagent_input(task).to_dict() for task in wave
-    ]
+    assert dispatch.build_workflow_fanout_args(wave) == _fanout_expected(wave)
 
 
 def test_build_workflow_fanout_args_excludes_codex_tasks() -> None:
@@ -184,10 +195,9 @@ def test_build_workflow_fanout_args_excludes_codex_tasks() -> None:
         _task(3, "src/c.py", executor="codex", parallel_group=1),
         _task(4, "src/d.py", executor="opus", parallel_group=1),
     ]
+    claude_tasks = [t for t in wave if t.executor != "codex"]
 
-    assert dispatch.build_workflow_fanout_args(wave) == [
-        dispatch.build_subagent_input(task).to_dict() for task in wave if task.executor != "codex"
-    ]
+    assert dispatch.build_workflow_fanout_args(wave) == _fanout_expected(claude_tasks)
 
 
 def test_build_workflow_fanout_args_returns_empty_for_all_codex_wave() -> None:
@@ -197,3 +207,23 @@ def test_build_workflow_fanout_args_returns_empty_for_all_codex_wave() -> None:
     ]
 
     assert dispatch.build_workflow_fanout_args(wave) == []
+
+
+def test_build_workflow_fanout_args_includes_agent_type_for_native_roles() -> None:
+    """agent_type is pre-resolved: native roles get the role name, others get None."""
+    from renmark import subagent_profiles
+
+    # docs-editor target resolves to docs-editor (has native file) → agent_type != None
+    wave_doc = [_task(1, "plugin/skills/foo.md", executor="haiku", parallel_group=1)]
+    result = dispatch.build_workflow_fanout_args(wave_doc)
+    assert len(result) == 1
+    role = result[0]["role"]
+    if subagent_profiles.has_native_agent_file(role):
+        assert result[0]["agent_type"] == role
+    else:
+        assert result[0]["agent_type"] is None
+
+    # src/a.py resolves to general-purpose → agent_type is None
+    wave_gp = [_task(2, "src/a.py", executor="sonnet", parallel_group=1)]
+    result_gp = dispatch.build_workflow_fanout_args(wave_gp)
+    assert result_gp[0]["agent_type"] is None

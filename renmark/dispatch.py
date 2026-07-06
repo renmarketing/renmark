@@ -449,6 +449,8 @@ def build_workflow_fanout_args(
     itself (Python has no access to it) and does not alter the isolation
     contract — it only reuses ``build_subagent_input`` per task.
     """
+    from renmark import subagent_profiles
+
     args: list[dict[str, Any]] = []
     for t in wave:
         if not claude_agent.is_claude_executor(t.executor):
@@ -458,7 +460,11 @@ def build_workflow_fanout_args(
             dependency_summaries=dependency_summaries,
             upstream_artifact_pointers=upstream_artifact_pointers,
         )
-        args.append(inp.to_dict())
+        payload = inp.to_dict()
+        # Pre-resolve agent_type so the Workflow script never needs to call back
+        # into Python — it reads this field directly to pass agentType on agent().
+        payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
+        args.append(payload)
     return args
 
 

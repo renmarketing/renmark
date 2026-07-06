@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Web research, data lookup, design-pattern lookups — broad scope over external sources + repo docs.
-tools: Read, WebSearch, WebFetch, Grep, Glob
+tools: Read, Write, WebSearch, WebFetch, Grep, Glob
 model: sonnet
 ---
 

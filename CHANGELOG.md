@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-07-06] — Claude-native subagent definitions + wave-level Workflow fan-out
+**Request:** Upgrade renmark to use Claude Code's native `.claude/agents/*.md` subagent-type
+files for the 8 specialized dispatch roles and add an optional wave-level `Workflow`-tool
+fan-out path to `/renmark:orchestrate` — without migrating to Agent Teams or touching the
+deterministic Python policy layer.
+**Built:**
+- `.claude/agents/{docs-editor,code-implementer,test-writer,reviewer,release-manager,researcher,audit-reader,finish-lane-specialist}.md` — 8 native Claude Code subagent-type files with enforced tool allowlists and model tiers.
+- `renmark/subagent_profiles.py::has_native_agent_file` — pure helper (static frozenset + optional on-disk check, never raises) used by orchestrate to pass `subagent_type: <role>` on Agent calls.
+- `renmark/dispatch.py::build_workflow_fanout_args` — packet-shaping helper that builds Workflow `args` payloads (pre-resolves `agent_type` per task via `has_native_agent_file`), skipping codex tasks.
+- `plugin/skills/_shared/workflow-fanout.md` — contract doc for wave-level fan-out (when to use, what stays Python, G11 validation ownership, cost/ledger note).
+- `plugin/skills/orchestrate/SKILL.md` Step 3b — updated with `subagent_type` dispatch and Workflow fan-out branch for waves with >1 needs_agent task.
+- `plugin/skills/_shared/subagent-profiles.md` — added "Native agent file" column; fixed pre-existing model-tier drift (release-manager/researcher/finish-lane-specialist were stale Haiku).
+- 3 codex-review fixes: `agent_type` field in fanout payloads, `docs-editor.md` stop condition, `researcher.md` `Write` tool.
+**Files changed:** `.claude/agents/*.md` (8 new), `renmark/subagent_profiles.py`, `renmark/dispatch.py`, `plugin/skills/_shared/subagent-profiles.md`, `plugin/skills/_shared/workflow-fanout.md`, `plugin/skills/orchestrate/SKILL.md`, `tests/test_dispatch.py`, `tests/test_subagent_profiles.py`.
+**Do not change:** Python policy layer stays the backbone — `dispatch.py` wave grouping/validation, `subagent_gate.py`, `cost.py`, G11 `SubagentInput`/`SubagentOutput`/`parse_subagent_response`. Do not broaden Workflow use to whole-plan execution (breaks G12 cross-`/clear` resumability).
+
 ## [2026-07-02] — v0.32.0 — enforced subagent-justification gate
 **Release.** Bumps v0.31.0 → v0.32.0. Ships the enforced subagent gate (strengthens
 REQ-21) in response to a usage report (subagent-heavy, >150k-context sessions running
