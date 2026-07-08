@@ -1,17 +1,19 @@
 # Model Routing Discipline — Reference (single source of truth)
 
-**Shared by `/renmark:orchestrate`, `/renmark:finish`, `/renmark:feature`, and any skill that dispatches subagents.** This is the one place strict model-routing discipline lives: clear rules for when to use Haiku, Sonnet, Opus, and Fable, and explicit gates to prevent escalation creep. Operationalizes cost discipline and REQ-19 (cost control).
+**Shared by `/renmark:orchestrate`, `/renmark:finish`, `/renmark:feature`, and any skill that dispatches subagents.** This is the one place strict model-routing discipline lives: provider-neutral task tiers, Claude mappings, Codex mappings, and explicit gates to prevent escalation creep. Operationalizes cost discipline and REQ-19 (cost control).
 
 ---
 
 ## The routing matrix
 
-| Task signature | Model | Rationale |
-|---|---|---|
-| Docs, grep, changelog, small summaries, simple audits | **Haiku** | Pattern-matching, text shuffling, no reasoning or architecture. Haiku is cost-optimal and sufficient. |
-| Planning, normal implementation, review summaries, refactor decisions | **Sonnet** | Light reasoning, multi-file scope, moderate context. Sonnet + subagent isolation is the cost/quality sweet spot. |
-| Bounded code tasks, single-file fixes, test scaffolding | **Codex** (when `renmark-execute` is available) | Bulk code emit, deterministic, no model fallacy risk. Always prefer Codex for code bulk. If Codex unavailable, route to Sonnet. |
-| **Escalation ONLY:** architecture decisions, major design forks, adversarial review, judgment-heavy tradeoffs | **Opus / Fable** | Deep reasoning, cross-domain synthesis. **Reserved.** Do NOT use by default for docs, finish, small verification, or changelog. |
+| Task signature | Claude tier | Codex tier | Rationale |
+|---|---|---|---|
+| Docs, grep, changelog, small summaries, simple audits | **Haiku** | **gpt-5.4-mini / low effort** (`renmark-mini`) | Pattern-matching, text shuffling, no architecture. Use the cheaper fast lane. |
+| Planning, normal implementation, review summaries, refactor decisions | **Sonnet** | **gpt-5.5 / medium effort** (`renmark-standard`) | Light-to-moderate reasoning, multi-file scope, normal implementation quality. |
+| Bounded code tasks, single-file fixes, test scaffolding | **Codex** when `renmark-execute` is available | **gpt-5.4-mini / low effort** for simple scaffolds, **gpt-5.5 / medium effort** for normal code | Bulk code emit with scoped verification. If Codex unavailable under Claude, route to Sonnet. |
+| **Escalation ONLY:** architecture decisions, major design forks, adversarial review, judgment-heavy tradeoffs | **Opus / Fable** | **gpt-5.5 / high effort** (`renmark-deep`) | Deep reasoning and tradeoff synthesis. **Reserved.** Do not use by default for docs, finish, small verification, or changelog. |
+
+Codex-specific selection is implemented in `renmark/codex_routing.py`: simple/easy/low-complexity roles route to `gpt-5.4-mini` with low effort; medium/default work routes to `gpt-5.5` with medium effort; hard/architecture/adversarial/design-fork work routes to `gpt-5.5` with high effort. Claude and Codex mappings may coexist because the plan tier is provider-neutral and each host maps it to its own model vocabulary.
 
 ---
 
@@ -67,6 +69,6 @@ Early drafts scattered model-choice rationale across skill prompts. One skill es
 
 When citing this discipline in a SKILL.md or subagent dispatch, write:
 
-> *Honor model routing discipline in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/model-routing.md`: Haiku for docs/grep/summaries/small audits; Sonnet for planning/implementation/reviews; Codex for bounded code tasks; Opus/Fable escalation-only when `renmark.cost.requires_escalation` returns True (architecture/judgment/prior-failure). Consult `.renmark/memory/routing.md` ledger before choosing non-default tier.*
+> *Honor model routing discipline in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/model-routing.md`: simple work uses Haiku on Claude or `gpt-5.4-mini`/low effort on Codex; normal work uses Sonnet on Claude or `gpt-5.5`/medium effort on Codex; escalation-only work uses Opus/Fable on Claude or `gpt-5.5`/high effort on Codex when `renmark.cost.requires_escalation` returns True (architecture/judgment/prior-failure). Consult `.renmark/memory/routing.md` ledger before choosing non-default tier.*
 
 Do not paste the matrix or escalation gate into the calling SKILL.md — cite this file.
