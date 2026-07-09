@@ -8,19 +8,18 @@ disable-model-invocation: true
 
 ## Overview
 
-`/renmark:heartbeat` is the **usage-limit recovery monitor**. When a
-`/renmark:feature`, `/renmark:loop`, or other long-running workflow pauses
-because of a local usage limit, heartbeat watches for the limit to clear and
-notifies you when it's safe to resume. Zero LLM calls; operates entirely in
-Python on local state.
+`/renmark:heartbeat` is the **proactive workflow scheduler**. It monitors for
+stalls and blockers across 5 categories: usage-limit pauses, stuck feature
+lifecycle stages (>4h), stalled pipeline waves (>2h), blocked backlog items
+(>48h), and loops awaiting approval. Zero LLM calls; operates entirely in Python
+on local state.
 
 ## When to Use
 
-- After a run pauses due to a usage limit (heartbeat detects this via
-  `.renmark/state/PAUSED`)
-- As a periodic scheduled check (via `--emit-cron`), to auto-notify when the
-  limit window closes
-- To manually poll recovery status without entering Claude Code
+- After a run pauses due to a usage limit
+- Periodically (via `--emit-cron`), to catch stuck workflows before they block
+  progress
+- To check backlog/pipeline health without entering Claude Code
 
 ## Steps
 
@@ -30,14 +29,10 @@ Python on local state.
 renmark-execute --heartbeat
 ```
 
-Reads `.renmark/state/PAUSED`. If no usage-limit pause is active, outputs:
-`HEARTBEAT_OK`. If a pause IS active, outputs:
-
-```
-⏸  Paused: <feature> (limit clears at <resume_after>)
-   Iteration: <N>/<max>  |  Time until resume: <human-readable duration>
-   Ready to resume: /renmark:loop --resume  (or re-invoke the paused command)
-```
+Reads all `.renmark/state/` sources. If everything is moving normally, outputs:
+`HEARTBEAT_OK`. If anything is stuck or needs attention, outputs a summary with
+the suggested next command for each item (e.g., resume paused feature, advance
+stuck lifecycle stage, unblock backlog item, approve awaiting loop).
 
 Exit 0 always (this is a status check, not a failure condition).
 

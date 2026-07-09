@@ -44,8 +44,6 @@ class TestCheck:
         result = heartbeat.check(tmp_path, now="2026-07-09T12:00:00Z")
         assert result.should_notify is False
         assert result.message == heartbeat.HEARTBEAT_OK
-        assert result.pause_state is not None
-        assert result.pause_state.pause_kind == "manual"
 
     def test_usage_limit_resume_after_in_future_silent(self, tmp_path: Path) -> None:
         """usage_limit pause, resume_after in future (now < resume_after) → should_notify=False."""
@@ -74,8 +72,6 @@ class TestCheck:
         result = heartbeat.check(tmp_path, now="2026-07-10T08:00:00Z")
         assert result.should_notify is False
         assert result.message == heartbeat.HEARTBEAT_OK
-        assert result.pause_state is not None
-        assert result.pause_state.pause_kind == "usage_limit"
 
     def test_usage_limit_resume_after_in_past_notifies(self, tmp_path: Path) -> None:
         """usage_limit pause, resume_after in past (now > resume_after) → should_notify=True."""
@@ -106,7 +102,6 @@ class TestCheck:
         assert "renmark-execute --resume" in result.message
         assert "important-feature" in result.message
         assert "loop-2" in result.message
-        assert result.pause_state is not None
 
     def test_usage_limit_resume_after_empty_notifies(self, tmp_path: Path) -> None:
         """usage_limit pause, resume_after empty → should_notify=True.

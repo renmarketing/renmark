@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-09] — feat(heartbeat): expand to general proactive scheduler — 5 check types
+
+**Request:** Heartbeat should also nudge stuck backlog items and stalled pipelines, not just monitor usage limits.
+**Built:** `renmark/heartbeat_checks.py` with check_usage_limit_pause, check_stalled_feature, check_stalled_pipeline, check_blocked_backlog, check_awaiting_loop; heartbeat.check() now fans out to all 5.
+**Files changed:** renmark/heartbeat_checks.py (new), renmark/heartbeat.py (updated check()), plugin/skills/heartbeat/SKILL.md, tests/test_heartbeat_checks.py.
+**Do not change:** Individual check function thresholds (stall_hours) are module-level defaults — don't tune without data.
+
 ## [2026-07-09] — feat: heartbeat proactive usage-limit recovery monitor
 
 **Request:** Add a scheduled heartbeat check that monitors for usage-limit pauses and notifies when the limit clears, inspired by OpenClaw's heartbeat pattern.

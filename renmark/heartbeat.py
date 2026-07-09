@@ -50,70 +50,27 @@ class HeartbeatResult:
 
 
 def check(repo: Path | str, *, now: str) -> HeartbeatResult:
-    """Read pause state; compare ``resume_after`` to *now* (caller injects time).
+    """Run all registered proactive checks and aggregate results.
 
-    Parameters
-    ----------
-    repo:
-        Path to the repository root (``state_dir`` is resolved relative to it).
-    now:
-        Current time as an ISO8601 string supplied by the caller — never read
-        from the clock internally, so tests can inject any timestamp.
-
-    Returns
-    -------
-    HeartbeatResult
-        ``should_notify=False`` (silent) when:
-
-        * No PAUSED file exists.
-        * ``pause_kind != "usage_limit"``.
-        * ``resume_after`` is set **and** ``now < resume_after`` (still waiting).
-
-        ``should_notify=True`` when ``resume_after`` is empty **or**
-        ``now >= resume_after`` — the usage window may have cleared.
+    Fans out to heartbeat_checks.run_all_checks() — each individual check
+    handles its own exceptions and returns a CheckResult. Never raises.
     """
-    ps = read_pause(repo)
+    from renmark.heartbeat_checks import run_all_checks
 
-    if ps is None or ps.pause_kind != "usage_limit":
+    results = run_all_checks(repo, now=now)
+
+    if not results:
         return HeartbeatResult(
             should_notify=False,
             message=HEARTBEAT_OK,
-            pause_state=ps,
+            pause_state=None,
             check_ts=now,
         )
 
-    # If resume_after is set and we haven't reached it yet → stay silent.
-    if ps.resume_after:
-        try:
-            if _parse_iso(now) < _parse_iso(ps.resume_after):
-                return HeartbeatResult(
-                    should_notify=False,
-                    message=HEARTBEAT_OK,
-                    pause_state=ps,
-                    check_ts=now,
-                )
-        except (ValueError, TypeError):
-            pass  # Unparseable timestamps → assume limit cleared
-
-    # Limit may have cleared — build the human-readable nudge (≤3 lines).
-    lines: list[str] = ["Usage limit may have cleared."]
-
-    # Build the context line only from non-empty fields.
-    context_parts: list[str] = []
-    if ps.feature:
-        context_parts.append(f"Feature: {ps.feature}")
-    if ps.loop_id:
-        iter_str = f"iter {ps.iteration}/{ps.max_iterations}" if ps.max_iterations else f"iter {ps.iteration}"
-        context_parts.append(f"Loop: {ps.loop_id} {iter_str}")
-    if context_parts:
-        lines.append("  ".join(context_parts))
-
-    lines.append("Run: renmark-execute --resume  (or /renmark:resume)")
-
     return HeartbeatResult(
         should_notify=True,
-        message="\n".join(lines),
-        pause_state=ps,
+        message="\n---\n".join(r.message for r in results),
+        pause_state=None,
         check_ts=now,
     )
 
