@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-09] — feat: heartbeat proactive usage-limit recovery monitor
+
+**Request:** Add a scheduled heartbeat check that monitors for usage-limit pauses and notifies when the limit clears, inspired by OpenClaw's heartbeat pattern.
+**Built:** `renmark/heartbeat.py` (check, auto_resume, emit_cron), `--heartbeat` CLI flag (--emit-cron, --auto-resume), `/renmark:heartbeat` skill.
+**Files changed:** renmark/heartbeat.py, renmark/cli/commands.py, renmark/cli/_engine.py, plugin/skills/heartbeat/SKILL.md, plugin/commands/heartbeat.md, tests/test_heartbeat.py.
+**Do not change:** PauseState schema in renmark/state/pause.py — heartbeat reads it but never writes it.
+
 ## [2026-07-06] — release: bump v0.35.0 -> v0.36.0 (reduce-complexity)
 
 **Request:** Reduce all 32 modularity danger items (cyclomatic/cognitive complexity, oversized modules, long functions).

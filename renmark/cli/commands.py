@@ -102,6 +102,31 @@ def cmd_scan(repo: Path, *, propose: bool = False, emit_cron: bool = False) -> i
     return 2 if failed_checks else 0
 
 
+def cmd_heartbeat(repo: Path, *, emit_cron: bool = False, auto_resume: bool = False, interval_minutes: int = 30) -> int:
+    from .. import heartbeat as _heartbeat
+    import datetime
+
+    if emit_cron:
+        print(_heartbeat.emit_cron(repo, interval_minutes=interval_minutes))
+        return 0
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    result = _heartbeat.check(repo, now=now)
+
+    if auto_resume and result.should_notify:
+        print(result.message)
+        return _heartbeat.auto_resume(repo)
+
+    if result.should_notify:
+        print(result.message)
+    else:
+        # Silent — HEARTBEAT_OK, suppress if output would be under ~300 chars
+        # (matches OpenClaw gateway suppression behavior)
+        pass
+
+    return 0
+
+
 def _fail_response(out_path: "Path | str", summary_lines: list[str]) -> str:
     """Return the standard FAIL JSON string for cmd_task early exits."""
     return json.dumps(

@@ -158,6 +158,13 @@ SKILLS: dict[str, SkillMeta] = {
         has_handoff=True,
         disable_model_invocation=True,
     ),
+    "heartbeat": SkillMeta(
+        domain="meta",
+        next_steps_class=3,
+        cites=(),
+        has_handoff=False,
+        disable_model_invocation=True,
+    ),
     "init": SkillMeta(
         domain="meta",
         next_steps_class=3,

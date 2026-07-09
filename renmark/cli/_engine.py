@@ -39,6 +39,7 @@ from ..state import (
 from ..verifier import run_verifier
 from .commands import (
     cmd_analytics,
+    cmd_heartbeat,
     cmd_logs,
     cmd_review_package,
     cmd_roadmap,
@@ -815,6 +816,13 @@ def _dispatch_query_flags(
         return cmd_logs(repo, n=args.logs_n)
     if args.scan:
         return cmd_scan(repo, propose=args.propose, emit_cron=args.emit_cron)
+    if args.heartbeat:
+        return cmd_heartbeat(
+            repo,
+            emit_cron=args.heartbeat_emit_cron,
+            auto_resume=args.heartbeat_auto_resume,
+            interval_minutes=args.heartbeat_interval,
+        )
     if args.behavior:
         return _cmd_behavior(repo, accept=args.accept, judge=args.judge)
     if args.task:
@@ -1061,6 +1069,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scan", action="store_true", help="scan repo and print cron/schedule proposals; exit 0")
     ap.add_argument("--propose", action="store_true", help="(with --scan) include proposed cron entries")
     ap.add_argument("--emit-cron", action="store_true", help="(with --scan) emit cron block to stdout (read-only)")
+    ap.add_argument("--heartbeat", action="store_true", help="check pipeline heartbeat and emit any overdue notification; exit 0")
+    ap.add_argument("--heartbeat-emit-cron", action="store_true", help="(with --heartbeat) emit cron install block to stdout")
+    ap.add_argument("--heartbeat-auto-resume", action="store_true", help="(with --heartbeat) auto-resume the pipeline if overdue")
+    ap.add_argument("--heartbeat-interval", type=int, default=30, metavar="MINUTES", help="(with --heartbeat) cron interval in minutes (default: 30)")
     ap.add_argument(
         "--behavior",
         action="store_true",
@@ -1204,6 +1216,9 @@ def main(argv: list[str] | None = None) -> int:
     if (args.propose or args.emit_cron) and not args.scan:
         print("--propose/--emit-cron require --scan", file=sys.stderr)
         return 2
+    if (args.heartbeat_emit_cron or args.heartbeat_auto_resume) and not args.heartbeat:
+        print("--heartbeat-emit-cron/--heartbeat-auto-resume require --heartbeat", file=sys.stderr)
+        return 2
     if (args.accept or args.judge) and not args.behavior:
         print("--accept/--judge require --behavior", file=sys.stderr)
         return 2
@@ -1225,7 +1240,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.plan:
         ap.error(
             "plan path is required unless --usage / --analytics / --roadmap / --logs / "
-            "--scan / --behavior / --task / --task-brief / --review-package / "
+            "--scan / --heartbeat / --behavior / --task / --task-brief / --review-package / "
             "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode"
         )
     return execute_plan(
