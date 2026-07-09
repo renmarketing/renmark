@@ -123,6 +123,14 @@ def cmd_heartbeat(repo: Path, *, emit_cron: bool = False, auto_resume: bool = Fa
     return 0
 
 
+def cmd_heartbeat_check_cron() -> int:
+    """Print 'installed' or 'not-installed' based on cron entry presence. Exit 0 always."""
+    from .. import heartbeat as _heartbeat
+    status = "installed" if _heartbeat.is_cron_installed() else "not-installed"
+    print(status)
+    return 0
+
+
 def _fail_response(out_path: "Path | str", summary_lines: list[str]) -> str:
     """Return the standard FAIL JSON string for cmd_task early exits."""
     return json.dumps(

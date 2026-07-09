@@ -173,4 +173,22 @@ def emit_cron(repo: Path | str, *, interval_minutes: int = 30) -> str:
     )
 
 
-__all__ = ["HEARTBEAT_OK", "HeartbeatResult", "check", "auto_resume", "emit_cron"]
+def is_cron_installed() -> bool:
+    """Return True if a renmark-heartbeat cron entry is installed.
+
+    Checks crontab -l for 'renmark-heartbeat'. Non-raising: returns False
+    on Windows, missing crontab binary, or any error.
+    """
+    try:
+        result = subprocess.run(
+            ["crontab", "-l"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return "renmark-heartbeat" in result.stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+__all__ = ["HEARTBEAT_OK", "HeartbeatResult", "check", "auto_resume", "emit_cron", "is_cron_installed"]

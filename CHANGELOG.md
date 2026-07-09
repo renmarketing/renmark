@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-09] — feat(heartbeat): add cron setup hint to init/start/feature handoff menus
+
+**Request:** Surface heartbeat cron install command in /renmark:init, /renmark:start, and /renmark:feature handoffs when cron is not yet set up.
+**Built:** is_cron_installed() in renmark/heartbeat.py, --heartbeat-check-cron CLI flag, cron hint added to plugin/skills/init/SKILL.md, plugin/skills/start/SKILL.md, plugin/skills/feature/SKILL.md.
+**Files changed:** renmark/heartbeat.py, renmark/cli/commands.py, renmark/cli/_engine.py, plugin/skills/init/SKILL.md, plugin/skills/start/SKILL.md, plugin/skills/feature/SKILL.md, tests/test_heartbeat.py.
+**Do not change:** is_cron_installed() checks only crontab (Unix); Windows Task Scheduler detection not implemented.
+
 ## [2026-07-09] — feat(heartbeat): expand to general proactive scheduler — 5 check types
 
 **Request:** Heartbeat should also nudge stuck backlog items and stalled pipelines, not just monitor usage limits.

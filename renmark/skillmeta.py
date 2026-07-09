@@ -161,7 +161,7 @@ SKILLS: dict[str, SkillMeta] = {
     "heartbeat": SkillMeta(
         domain="meta",
         next_steps_class=3,
-        cites=(),
+        cites=("next-steps",),
         has_handoff=False,
         disable_model_invocation=True,
     ),

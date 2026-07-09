@@ -65,6 +65,7 @@ IMPLEMENTED_SKILLS: frozenset[str] = frozenset(
         "feature",
         "finish",
         "guide",
+        "heartbeat",
         "help",
         "hygiene",
         "init",
@@ -184,6 +185,7 @@ AUX_SKILLS: frozenset[str] = frozenset(
         "analytics",
         "approve",
         "audit",
+        "heartbeat",
         "inventory",
         "scan",
     }

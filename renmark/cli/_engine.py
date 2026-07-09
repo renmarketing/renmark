@@ -40,6 +40,7 @@ from ..verifier import run_verifier
 from .commands import (
     cmd_analytics,
     cmd_heartbeat,
+    cmd_heartbeat_check_cron,
     cmd_logs,
     cmd_review_package,
     cmd_roadmap,
@@ -823,6 +824,8 @@ def _dispatch_query_flags(
             auto_resume=args.heartbeat_auto_resume,
             interval_minutes=args.heartbeat_interval,
         )
+    if args.heartbeat_check_cron:
+        return cmd_heartbeat_check_cron()
     if args.behavior:
         return _cmd_behavior(repo, accept=args.accept, judge=args.judge)
     if args.task:
@@ -1073,6 +1076,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--heartbeat-emit-cron", action="store_true", help="(with --heartbeat) emit cron install block to stdout")
     ap.add_argument("--heartbeat-auto-resume", action="store_true", help="(with --heartbeat) auto-resume the pipeline if overdue")
     ap.add_argument("--heartbeat-interval", type=int, default=30, metavar="MINUTES", help="(with --heartbeat) cron interval in minutes (default: 30)")
+    ap.add_argument("--heartbeat-check-cron", action="store_true", help="check if renmark-heartbeat cron entry is installed; prints 'installed' or 'not-installed'; exit 0")
     ap.add_argument(
         "--behavior",
         action="store_true",
@@ -1240,7 +1244,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.plan:
         ap.error(
             "plan path is required unless --usage / --analytics / --roadmap / --logs / "
-            "--scan / --heartbeat / --behavior / --task / --task-brief / --review-package / "
+            "--scan / --heartbeat / --heartbeat-check-cron / --behavior / --task / --task-brief / --review-package / "
             "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode"
         )
     return execute_plan(

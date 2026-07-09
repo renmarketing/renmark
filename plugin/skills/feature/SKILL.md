@@ -281,3 +281,19 @@ smoke tests — ALWAYS, all tiers; there is no menu choice for this since v0.3.3
 > Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
 > 6–9); the state-derived next command is the `(Recommended)` option. Require an
 > explicit choice — never auto-proceed.*
+
+### Heartbeat cron hint (optional, non-blocking)
+
+Before presenting the handoff menu, run:
+
+```bash
+renmark-execute --heartbeat-check-cron
+```
+
+If output is `not-installed`, add one optional menu item to the `AskUserQuestion` handoff:
+
+> **Set up heartbeat monitor** (optional) — run every 30 min to auto-resume if a usage limit is hit:
+> `(crontab -l 2>/dev/null; echo "*/30 * * * * cd <repo> && renmark-execute --heartbeat --auto-resume") | crontab -`
+> Replace `<repo>` with the actual repo path from `lifecycle.json`.
+
+This is purely informational. The user can skip it. It never gates the handoff or blocks the recommended action.

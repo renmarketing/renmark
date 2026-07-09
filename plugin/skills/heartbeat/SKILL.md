@@ -79,3 +79,12 @@ Heartbeat is **read-only and non-destructive**. It reads `.renmark/state/` only,
 never modifies workflow state, never commits, never advances stages. When
 `--auto-resume` is used, it delegates back to the paused command's own recovery
 logic (the actual re-invocation is external to heartbeat).
+
+## Next Steps
+
+> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline)
+
+After running heartbeat, typical next actions:
+- If `HEARTBEAT_OK`: no action needed.
+- If notified: run the suggested command (e.g., `renmark-execute --resume`).
+- To set up automated polling: run `renmark-execute --heartbeat --emit-cron` and follow the output.

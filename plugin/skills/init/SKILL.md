@@ -192,6 +192,22 @@ gaps and next moves (nudge `/renmark:prd` first if no PRD exists). Surface the
 in-flight feature's resume step (or `/renmark:start` if none) as an alternate,
 plus `Nothing`. Init never auto-proceeds — it hands off through an explicit choice.
 
+### Heartbeat cron hint (optional, non-blocking)
+
+Before presenting the handoff menu, run:
+
+```bash
+renmark-execute --heartbeat-check-cron
+```
+
+If output is `not-installed`, add one optional menu item to the `AskUserQuestion` handoff:
+
+> **Set up heartbeat monitor** (optional) — run every 30 min to auto-resume if a usage limit is hit:
+> `(crontab -l 2>/dev/null; echo "*/30 * * * * cd <repo> && renmark-execute --heartbeat --auto-resume") | crontab -`
+> Replace `<repo>` with the actual repo path from `lifecycle.json`.
+
+This is purely informational. The user can skip it. It never gates the handoff or blocks the recommended action.
+
 ## `/renmark:setup` is now a thin alias of init
 
 Per PRD REQ-8, `/renmark:setup` is no longer a separate bootstrapper — it is a

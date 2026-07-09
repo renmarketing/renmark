@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -272,3 +272,34 @@ class TestAutoResume:
             # cwd should be a Path object
             assert isinstance(call_args[1]["cwd"], Path)
             assert call_args[1]["cwd"] == tmp_path
+
+
+class TestIsCronInstalled:
+    """Tests for heartbeat.is_cron_installed()."""
+
+    def test_cron_installed_when_entry_present(self) -> None:
+        """is_cron_installed returns True when 'renmark-heartbeat' in crontab output."""
+        with patch("renmark.heartbeat.subprocess.run") as mock_run:
+            mock_run.return_value.stdout = "# Some other cron\n*/30 * * * * cd /home/user && renmark-heartbeat --check\n"
+
+            result = heartbeat.is_cron_installed()
+
+            assert result is True
+
+    def test_cron_not_installed_when_entry_absent(self) -> None:
+        """is_cron_installed returns False when 'renmark-heartbeat' not in crontab output."""
+        with patch("renmark.heartbeat.subprocess.run") as mock_run:
+            mock_run.return_value.stdout = "# Some other cron\n*/30 * * * * some-other-command\n"
+
+            result = heartbeat.is_cron_installed()
+
+            assert result is False
+
+    def test_cron_returns_false_on_oserror(self) -> None:
+        """is_cron_installed returns False when subprocess raises OSError (non-raising)."""
+        with patch("renmark.heartbeat.subprocess.run") as mock_run:
+            mock_run.side_effect = OSError("crontab not found")
+
+            result = heartbeat.is_cron_installed()
+
+            assert result is False
