@@ -17,7 +17,7 @@ Python on local state.
 ## When to Use
 
 - After a run pauses due to a usage limit (heartbeat detects this via
-  `.renmark/state/pause.json`)
+  `.renmark/state/PAUSED`)
 - As a periodic scheduled check (via `--emit-cron`), to auto-notify when the
   limit window closes
 - To manually poll recovery status without entering Claude Code
@@ -30,7 +30,7 @@ Python on local state.
 renmark-execute --heartbeat
 ```
 
-Reads `.renmark/state/pause.json`. If no usage-limit pause is active, outputs:
+Reads `.renmark/state/PAUSED`. If no usage-limit pause is active, outputs:
 `HEARTBEAT_OK`. If a pause IS active, outputs:
 
 ```

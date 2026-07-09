@@ -1216,8 +1216,8 @@ def main(argv: list[str] | None = None) -> int:
     if (args.propose or args.emit_cron) and not args.scan:
         print("--propose/--emit-cron require --scan", file=sys.stderr)
         return 2
-    if (args.heartbeat_emit_cron or args.heartbeat_auto_resume) and not args.heartbeat:
-        print("--heartbeat-emit-cron/--heartbeat-auto-resume require --heartbeat", file=sys.stderr)
+    if (args.heartbeat_emit_cron or args.heartbeat_auto_resume or args.heartbeat_interval != 30) and not args.heartbeat:
+        print("--heartbeat-emit-cron/--heartbeat-auto-resume/--heartbeat-interval require --heartbeat", file=sys.stderr)
         return 2
     if (args.accept or args.judge) and not args.behavior:
         print("--accept/--judge require --behavior", file=sys.stderr)

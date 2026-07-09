@@ -16,6 +16,7 @@ Design contract:
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,12 @@ from pathlib import Path
 from renmark.state.pause import PauseState, read_pause
 
 HEARTBEAT_OK = "HEARTBEAT_OK"
+
+
+def _parse_iso(ts: str) -> "datetime.datetime":
+    """Parse an ISO8601 timestamp string, normalising the trailing ``Z``."""
+    import datetime
+    return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
 
 @dataclass
@@ -76,13 +83,17 @@ def check(repo: Path | str, *, now: str) -> HeartbeatResult:
         )
 
     # If resume_after is set and we haven't reached it yet → stay silent.
-    if ps.resume_after and now < ps.resume_after:
-        return HeartbeatResult(
-            should_notify=False,
-            message=HEARTBEAT_OK,
-            pause_state=ps,
-            check_ts=now,
-        )
+    if ps.resume_after:
+        try:
+            if _parse_iso(now) < _parse_iso(ps.resume_after):
+                return HeartbeatResult(
+                    should_notify=False,
+                    message=HEARTBEAT_OK,
+                    pause_state=ps,
+                    check_ts=now,
+                )
+        except (ValueError, TypeError):
+            pass  # Unparseable timestamps → assume limit cleared
 
     # Limit may have cleared — build the human-readable nudge (≤3 lines).
     lines: list[str] = ["Usage limit may have cleared."]
@@ -124,11 +135,17 @@ def auto_resume(repo: Path | str) -> int:
     int
         Exit code from ``renmark-execute --resume``.
     """
-    result = subprocess.run(
-        ["renmark-execute", "--resume"],
-        cwd=Path(repo),
-    )
-    return result.returncode
+    try:
+        result = subprocess.run(
+            ["renmark-execute", "--resume"],
+            cwd=Path(repo),
+            timeout=300,
+        )
+        return result.returncode
+    except subprocess.TimeoutExpired:
+        return 1
+    except OSError:
+        return 1
 
 
 def emit_cron(repo: Path | str, *, interval_minutes: int = 30) -> str:
@@ -153,10 +170,12 @@ def emit_cron(repo: Path | str, *, interval_minutes: int = 30) -> str:
         A comment block suitable for pasting into crontab or a scheduler config.
         Pure string — never writes, never raises.
     """
+    if interval_minutes <= 0:
+        raise ValueError(f"interval_minutes must be positive, got {interval_minutes}")
     repo = Path(repo)
     cron_freq = f"*/{interval_minutes}" if interval_minutes > 1 else "*"
-    crontab_line = f"{cron_freq} * * * * cd {repo} && renmark-execute --heartbeat"
-    crontab_auto = f"{cron_freq} * * * * cd {repo} && renmark-execute --heartbeat --auto-resume"
+    crontab_line = f"{cron_freq} * * * * cd {shlex.quote(str(repo))} && renmark-execute --heartbeat"
+    crontab_auto = f"{cron_freq} * * * * cd {shlex.quote(str(repo))} && renmark-execute --heartbeat --auto-resume"
 
     return (
         f"# renmark:heartbeat — proactive usage-limit cleared notifier\n"

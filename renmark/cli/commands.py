@@ -119,10 +119,6 @@ def cmd_heartbeat(repo: Path, *, emit_cron: bool = False, auto_resume: bool = Fa
 
     if result.should_notify:
         print(result.message)
-    else:
-        # Silent — HEARTBEAT_OK, suppress if output would be under ~300 chars
-        # (matches OpenClaw gateway suppression behavior)
-        pass
 
     return 0
 
