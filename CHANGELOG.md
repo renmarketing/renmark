@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-15] — PRD updated: Claude Code / Codex host parity
+
+**Request:** Make Renmark a first-class Codex host with the same selector, natural-language routing, pipeline, loop, and resume outcomes as Claude Code.
+**Built:** Reconciled Vision, Non-goals, Requirements, Success metrics, and Scope boundaries; added REQ-23 with product-level parity acceptance criteria; bumped `last_reviewed` to 2026-07-15.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Both hosts share one product workflow and artifact/state semantics; every choice has exactly one `(Recommended)` option at index 0; selector unavailability alone never means an interactive Codex session is headless; PRD changes remain human-approved.
+
 ## [2026-07-15] — audit: Codex / Claude Code parity
 
 **Request:** Deep-audit renmark's Codex parity with Claude Code, especially native selectors, recommended-first ordering, natural-language pipeline triggers, orchestration, loops, and resume behavior.
