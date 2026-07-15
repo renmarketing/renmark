@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-15] — audit: Codex / Claude Code parity
+
+**Request:** Deep-audit renmark's Codex parity with Claude Code, especially native selectors, recommended-first ordering, natural-language pipeline triggers, orchestration, loops, and resume behavior.
+**Built:** Wrote a provenance-bearing parity audit with a P0/P1 gap map, host-neutral interaction and dispatch architecture, trigger matrix, implementation sequence, and acceptance criteria. Ran the full deterministic audit, skill consistency lint, behavior fixtures, a 211-test focused parity slice, and the full suite (1,423 passed, 28 skipped); no runtime/source behavior was changed.
+**Files changed:** `.renmark/audits/2026-07-15-codex-claude-parity.audit.md`, `.renmark/audits/audit-report-2026-07-15.{md,json}`, `.renmark/audits/inventory-2026-07-15.{md,json}`, `CHANGELOG.md`.
+**Do not change:** Keep recommended action at option index 0 on both hosts; never equate an unavailable Claude picker with Codex headless mode; do not claim host parity without installed-package identity plus live Claude and Codex trajectory proof.
+
 ## [2026-07-09] — feat(heartbeat): add cron setup hint to init/start/feature handoff menus
 
 **Request:** Surface heartbeat cron install command in /renmark:init, /renmark:start, and /renmark:feature handoffs when cron is not yet set up.
