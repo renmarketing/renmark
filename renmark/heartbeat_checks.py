@@ -9,13 +9,11 @@ Each function is:
 
 from __future__ import annotations
 
-import datetime
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from renmark.heartbeat import _parse_iso  # shared ISO parser
-
 
 TERMINAL_LIFECYCLE_STAGES = {"init", "released"}
 STUCK_BACKLOG_STATUSES = {"in progress", "needs approval", "blocked"}
@@ -198,7 +196,7 @@ def check_blocked_backlog(
 
         # Sort by oldest first.
         stuck.sort(key=lambda x: x[0], reverse=True)
-        oldest_elapsed, oldest_id, oldest_title = stuck[0]
+        _oldest_elapsed, oldest_id, oldest_title = stuck[0]
         count = len(stuck)
         msg = (
             f"{count} backlog item(s) have not moved in >{stall_hours:.0f}h"
@@ -266,10 +264,10 @@ def run_all_checks(repo: Path | str, *, now: str) -> list[CheckResult]:
 
 __all__ = [
     "CheckResult",
-    "run_all_checks",
-    "check_usage_limit_pause",
+    "check_awaiting_loop",
+    "check_blocked_backlog",
     "check_stalled_feature",
     "check_stalled_pipeline",
-    "check_blocked_backlog",
-    "check_awaiting_loop",
+    "check_usage_limit_pause",
+    "run_all_checks",
 ]

@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-16 — Repository-wide Ruff and mypy baseline was red
+
+**Severity:** medium
+**Symptom:** Ruff reported 60+ violations and mypy reported an undefined datetime annotation while pytest was green.
+**Root cause:** The heartbeat and reduce-complexity changes landed with tests green but without a green repo-wide Ruff/mypy gate, leaving lazy annotation imports, stale extracted imports, and mechanical formatting debt in the committed baseline.
+**Fix:** Applied safe Ruff fixes, repaired remaining annotations and formatting, preserved legacy engine aliases, then passed Ruff, mypy, focused tests, and the full 1,423-test suite.
+**Lesson:** A green pytest run is not a substitute for running every repository quality gate after cross-file extraction work.
+
+---
+
 ### 2026-07-01 — harness-modes: mode mutators silently swallowed write failures + wrong CLI path
 
 **Severity:** medium (was Major in codereview)

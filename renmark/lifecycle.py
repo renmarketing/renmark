@@ -602,15 +602,16 @@ def preamble_tier(skill: str) -> str:
 
 
 def persist_compact_checkpoint(
-    repo: "Path | str", skill: str, reason: str
+    repo: Path | str, skill: str, reason: str
 ) -> None:
     """Write a compact checkpoint to .renmark/state/compact_checkpoint.json.
 
     Called by skill_preamble before emitting a context gate message so the
     user can resume after running /compact or /clear.  Never raises.
     """
-    from . import state as _state  # lazy — avoid circular import at module load
     import json as _json
+
+    from . import state as _state  # lazy — avoid circular import at module load
 
     try:
         state_path = _state.state_dir(repo) / "compact_checkpoint.json"

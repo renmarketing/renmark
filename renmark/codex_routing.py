@@ -72,10 +72,7 @@ def route_for_task(task: Any) -> CodexRoute:
 
 
 def _field(obj: Any, name: str, default: str) -> str:
-    if isinstance(obj, dict):
-        value = obj.get(name, default)
-    else:
-        value = getattr(obj, name, default)
+    value = obj.get(name, default) if isinstance(obj, dict) else getattr(obj, name, default)
     return value if isinstance(value, str) else default
 
 

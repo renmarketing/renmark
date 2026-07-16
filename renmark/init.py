@@ -112,14 +112,29 @@ class FileInfo:
 # Re-exports for backward compatibility — symbols moved to renmark.health
 from .health import (
     Gap as Gap,
+)
+from .health import (
     Standard as Standard,
+)
+from .health import (
     StandardsScan as StandardsScan,
-    _render_modularity_section,
+)
+from .health import (
     _strip_header_lines,
+)
+from .health import (
     evaluate_health as evaluate_health,
+)
+from .health import (
     render_dev_gates_line as render_dev_gates_line,
+)
+from .health import (
     render_standards_md as render_standards_md,
+)
+from .health import (
     scan_standards as scan_standards,
+)
+from .health import (
     write_standards_md as write_standards_md,
 )
 

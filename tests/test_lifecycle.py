@@ -872,7 +872,7 @@ def test_agency_hint_inactive_none_is_passthrough(tmp_path):
 
 
 def test_agency_hint_active_contains_marker(tmp_path):
-    from renmark import lifecycle, agency
+    from renmark import agency, lifecycle
     agency.activate(tmp_path)
     result = lifecycle._with_agency_note(tmp_path, "start", None)
     assert result is not None
@@ -880,7 +880,7 @@ def test_agency_hint_active_contains_marker(tmp_path):
 
 
 def test_agency_hint_non_aware_skill_is_passthrough(tmp_path):
-    from renmark import lifecycle, agency
+    from renmark import agency, lifecycle
     agency.activate(tmp_path)
     result = lifecycle._with_agency_note(tmp_path, "help", "original")
     assert result == "original"

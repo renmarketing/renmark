@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-16] — fix: restore repository quality gates
+
+**Request:** Repair the pre-existing lint and type-check debt before implementing Claude Code / Codex parity.
+**Built:** Applied safe Ruff cleanup, restored compatibility aliases removed by the mechanical pass, fixed the heartbeat datetime annotation, and wrapped remaining long lines. Verified Ruff, mypy, focused regression tests, and the full suite (1,423 passed, 28 skipped).
+**Files changed:** `renmark/`, `tests/`, `.renmark/memory/bugs.md`, `CHANGELOG.md`.
+**Do not change:** Keep the `_engine` compatibility aliases until their direct test/API consumers migrate; repository-wide Ruff, mypy, and pytest must all remain green.
+
 ## [2026-07-15] — PRD updated: Claude Code / Codex host parity
 
 **Request:** Make Renmark a first-class Codex host with the same selector, natural-language routing, pipeline, loop, and resume outcomes as Claude Code.

@@ -441,6 +441,7 @@ def _render_skill_preamble(repo: Path, case: Case) -> str:
 def _render_skill_preamble_fresh(repo: Path, case: Case) -> str:
     """Render skill_preamble in an isolated scratch dir (no mode, no agency set)."""
     import shutil
+
     from . import lifecycle
 
     # Use a repo-owned path so this works in sandboxes without a system /tmp.
@@ -456,7 +457,8 @@ def _render_skill_preamble_fresh(repo: Path, case: Case) -> str:
 def _render_skill_preamble_agency_active(repo: Path, case: Case) -> str:
     """Render skill_preamble in an isolated scratch dir with agency activated."""
     import shutil
-    from . import lifecycle, agency
+
+    from . import agency, lifecycle
 
     # Use a repo-owned path so this works in sandboxes without a system /tmp.
     tmp = repo / ".renmark" / "state" / "_behavior-agency"

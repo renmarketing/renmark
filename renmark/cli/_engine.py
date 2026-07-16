@@ -13,21 +13,12 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from .. import memory as _memory
 from ..parser import PlanError, Task, parse_plan
-from ..providers.codex import (
-    CodexError,
-    check_only_target_modified,
-    codex_available,
-    run_codex_task,
-)
+from ..providers.codex import codex_available as codex_available
 from ..state import (
     PauseState,
-    UsageRecord,
-    append_usage,
     clear_pause,
     completed_task_indices,
-    escalation_dir,
     new_run_id,
     now_iso,
     read_pause,
@@ -36,7 +27,22 @@ from ..state import (
     usage_today,
     write_pause,
 )
-from ..verifier import run_verifier
+from ._codex_runner import (
+    _classify_and_rollback as _classify_and_rollback,
+)
+from ._codex_runner import (
+    _execute_task_codex,
+    _record_escalation,
+)
+from ._codex_runner import (
+    _judge_lane_and_rollback as _judge_lane_and_rollback,
+)
+from ._codex_runner import (
+    _rollback_paths as _rollback_paths,
+)
+from ._codex_runner import (
+    _untracked_paths as _untracked_paths,
+)
 from .commands import (
     cmd_analytics,
     cmd_heartbeat,
@@ -48,19 +54,6 @@ from .commands import (
     cmd_task,
     cmd_task_brief,
     cmd_usage,
-)
-from ._codex_runner import (
-    _classify_and_rollback,
-    _codex_fail_after_retries,
-    _codex_verify_and_commit,
-    _execute_task_codex,
-    _git_restore_target,
-    _judge_lane_and_rollback,
-    _record_escalation,
-    _rollback_paths,
-    _rollback_paths_locked,
-    _untracked_paths,
-    _untracked_paths_locked,
 )
 
 
@@ -359,15 +352,15 @@ def _handle_dry_run(tasks: list[Task], done: set[int], repo: Path) -> int:
 
 def _print_run_summary(
     passed: list[int],
-    failed_task: "Task | None",
-    budget_kind: "str | None",
+    failed_task: Task | None,
+    budget_kind: str | None,
     needs_agent: list[int],
     tasks: list[Task],
     tokens_used: int,
     cfg: Config,
     repo: Path,
     skipped: list[int],
-    waves: "list[list[Task]]",
+    waves: list[list[Task]],
 ) -> None:
     """Print the end-of-run summary table (pass/fail/skip counts, token usage, waves)."""
     _print("")
@@ -400,9 +393,9 @@ def _print_run_summary(
 
 
 def _handle_run_exit(
-    failed_task: "Task | None",
-    budget_kind: "str | None",
-    failure_kind: "str | None",
+    failed_task: Task | None,
+    budget_kind: str | None,
+    failure_kind: str | None,
     needs_agent: list[int],
     skipped: list[int],
     run_id: str,
@@ -1072,11 +1065,36 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scan", action="store_true", help="scan repo and print cron/schedule proposals; exit 0")
     ap.add_argument("--propose", action="store_true", help="(with --scan) include proposed cron entries")
     ap.add_argument("--emit-cron", action="store_true", help="(with --scan) emit cron block to stdout (read-only)")
-    ap.add_argument("--heartbeat", action="store_true", help="check pipeline heartbeat and emit any overdue notification; exit 0")
-    ap.add_argument("--heartbeat-emit-cron", action="store_true", help="(with --heartbeat) emit cron install block to stdout")
-    ap.add_argument("--heartbeat-auto-resume", action="store_true", help="(with --heartbeat) auto-resume the pipeline if overdue")
-    ap.add_argument("--heartbeat-interval", type=int, default=30, metavar="MINUTES", help="(with --heartbeat) cron interval in minutes (default: 30)")
-    ap.add_argument("--heartbeat-check-cron", action="store_true", help="check if renmark-heartbeat cron entry is installed; prints 'installed' or 'not-installed'; exit 0")
+    ap.add_argument(
+        "--heartbeat",
+        action="store_true",
+        help="check pipeline heartbeat and emit any overdue notification; exit 0",
+    )
+    ap.add_argument(
+        "--heartbeat-emit-cron",
+        action="store_true",
+        help="(with --heartbeat) emit cron install block to stdout",
+    )
+    ap.add_argument(
+        "--heartbeat-auto-resume",
+        action="store_true",
+        help="(with --heartbeat) auto-resume the pipeline if overdue",
+    )
+    ap.add_argument(
+        "--heartbeat-interval",
+        type=int,
+        default=30,
+        metavar="MINUTES",
+        help="(with --heartbeat) cron interval in minutes (default: 30)",
+    )
+    ap.add_argument(
+        "--heartbeat-check-cron",
+        action="store_true",
+        help=(
+            "check if the renmark-heartbeat cron entry is installed; "
+            "prints 'installed' or 'not-installed'; exit 0"
+        ),
+    )
     ap.add_argument(
         "--behavior",
         action="store_true",

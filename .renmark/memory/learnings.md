@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-16, bug) **Repository-wide Ruff and mypy baseline was red** — A green pytest run is not a substitute for running every repository quality gate after cross-file extraction work.
+
 - (2026-07-06, .renmark/reviews/2026-07-06-c89a3320872dc49cbe62209cdf740f2a4c7dcd69.verification.md) model `verify`: **verify-agent-team-migration** — 7/7 behaviors verified; failed: none; regressions: 0
 
 - (2026-07-02, .renmark/reviews/2026-07-02-85b12b34f7d608199efad59895d9826593500f62.verification.md) model `verify`: **verify-agent-turn-runner** — 5/5 behaviors verified; failed: none; regressions: 1257 passed

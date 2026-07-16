@@ -681,7 +681,7 @@ def _cmd_scan(argv: list[str]) -> int:
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
-_COMMANDS: dict[str, "Callable[[list[str]], int]"] = {
+_COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "current": _cmd_current,
     "package": _cmd_package,
     "snapshot": _cmd_snapshot,

@@ -6,10 +6,7 @@ import datetime
 import json
 from pathlib import Path
 
-import pytest
-
 from renmark.heartbeat_checks import (
-    CheckResult,
     check_awaiting_loop,
     check_blocked_backlog,
     check_stalled_feature,

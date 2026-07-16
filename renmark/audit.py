@@ -263,8 +263,8 @@ def _collect_candidate_files(plugin: Path) -> list[Path]:
 
 def _scan_file_for_raw_jsonl(
     fpath: Path,
-    shell_re: "re.Pattern[str]",
-    prohibit_re: "re.Pattern[str]",
+    shell_re: re.Pattern[str],
+    prohibit_re: re.Pattern[str],
     repo: Path,
 ) -> list[str]:
     """Scan *fpath* for raw-JSONL shell-read violations and return issue strings.
