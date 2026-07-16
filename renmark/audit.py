@@ -220,8 +220,13 @@ def registry_sync(repo: Path | str) -> list[str]:
     if not skills_dir.is_dir():
         return issues
 
-    # All non-underscore subdirectories, regardless of SKILL.md presence.
-    all_dirs = {d.name for d in skills_dir.iterdir() if d.is_dir() and not d.name.startswith("_")}
+    # All user-facing subdirectories, regardless of SKILL.md presence.
+    # Hidden/underscore-prefixed directories contain internal support files.
+    all_dirs = {
+        d.name
+        for d in skills_dir.iterdir()
+        if d.is_dir() and not d.name.startswith(("_", "."))
+    }
     # Only dirs that actually have a SKILL.md — these are "known to the registry."
     dirs = {name for name in all_dirs if (skills_dir / name / "SKILL.md").exists()}
 
@@ -251,7 +256,7 @@ def _collect_candidate_files(plugin: Path) -> list[Path]:
     skills_dir = plugin / "skills"
     if skills_dir.is_dir():
         for skill_dir in sorted(skills_dir.iterdir()):
-            if skill_dir.is_dir() and not skill_dir.name.startswith("_"):
+            if skill_dir.is_dir() and not skill_dir.name.startswith(("_", ".")):
                 skill_md = skill_dir / "SKILL.md"
                 if skill_md.exists():
                     candidate_files.append(skill_md)

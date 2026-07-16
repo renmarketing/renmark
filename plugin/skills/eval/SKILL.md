@@ -1,7 +1,7 @@
 ---
 name: eval
 description: "Use to run the in-session, agent-driven eval path — record golden transcripts or run the LLM-judge live inside the current agent session — typed as /renmark:eval (--judge or <skill>)."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # eval
@@ -143,14 +143,14 @@ optimizations (G3).
 ### 6. Hand off
 
 eval is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It reports; it never
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`). It reports; it never
 advances the pipeline.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "eval")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`.
 > Render via `AskUserQuestion`
-> (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules 6–9); require an
+> (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules 6–9); require an
 > explicit choice. Do not paste the rendering rules or the gate menu — cite the
 > files.*
 

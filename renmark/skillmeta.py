@@ -2,7 +2,7 @@
 
 Each ``plugin/skills/<name>/SKILL.md`` has a small set of structural facts that
 several P7 consumers (template scaffolding, lint, doc generation) need to agree
-on: which domain it belongs to, which ``_shared`` contract fragments it cites,
+on: which domain it belongs to, which ``.shared`` contract fragments it cites,
 whether it renders a hand-off menu, whether it is hidden from model invocation,
 and which next-steps class drives its menu rendering.
 
@@ -11,7 +11,7 @@ site (slow, and prone to drift between consumers), they are captured once here
 as a frozen registry. The values were harvested by inspecting each SKILL.md:
 
 - ``domain`` seeds from ``lifecycle.DOMAIN_BY_SKILL`` (default ``"build"``).
-- ``cites`` is the subset of the three ``_shared`` contract files the SKILL.md
+- ``cites`` is the subset of the three ``.shared`` contract files the SKILL.md
   text references: ``"reasoning-contract"``, ``"next-steps"``, ``"handoff-menu"``.
 - ``has_handoff`` is True when the skill cites ``handoff-menu`` or otherwise
   drives a hand-off / next-steps menu.
@@ -19,7 +19,7 @@ as a frozen registry. The values were harvested by inspecting each SKILL.md:
 - ``next_steps_class`` is the class declared in the SKILL.md next-steps
   citation: 1 = pipeline (Tier-0 stage routing), 2 = quality gate (defers to
   the gate sub-menu), 3 = aux / terminal (resume-pipeline). See
-  ``plugin/skills/_shared/next-steps.md`` for the canonical definition.
+  ``plugin/skills/.shared/next-steps.md`` for the canonical definition.
 
 Design constraints (matching ``renmark/config.py`` / ``renmark/lifecycle.py``):
 - stdlib-only, frozen dataclass, ``from __future__ import annotations``.
@@ -51,21 +51,21 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "approve": SkillMeta(
         domain="meta",
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "audit": SkillMeta(
         domain="audit",
         next_steps_class=3,
         cites=("reasoning-contract", "next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "backlog": SkillMeta(
         domain="build",
@@ -93,7 +93,7 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=1,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "codereview": SkillMeta(
         domain="debug",
@@ -114,14 +114,14 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "eval": SkillMeta(
         domain="build",
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "feature": SkillMeta(
         domain="build",
@@ -149,21 +149,21 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps",),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "hygiene": SkillMeta(
         domain="meta",
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "heartbeat": SkillMeta(
         domain="meta",
         next_steps_class=3,
         cites=("next-steps",),
         has_handoff=False,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "init": SkillMeta(
         domain="meta",
@@ -177,7 +177,7 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "loop": SkillMeta(
         domain="build",
@@ -212,7 +212,7 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "roadmap": SkillMeta(
         domain="meta",
@@ -226,7 +226,7 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "setup": SkillMeta(
         domain="meta",
@@ -247,7 +247,7 @@ SKILLS: dict[str, SkillMeta] = {
         next_steps_class=3,
         cites=("next-steps", "handoff-menu"),
         has_handoff=True,
-        disable_model_invocation=True,
+        disable_model_invocation=False,
     ),
     "verify": SkillMeta(
         domain="build",

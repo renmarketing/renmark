@@ -22,7 +22,9 @@ This is distinct from `/renmark:help` (which is a static reference listing all c
 
 ### 1. Ask the one routing question
 
-Using `AskUserQuestion`, ask exactly this — no preamble, no renmark jargon:
+Build this choice set with `renmark.interaction.build_selector` and ask exactly
+this — no preamble, no renmark jargon. Compute the state-matching recommendation
+first, so it is option 1 in the host selector and the full numbered fallback:
 
 > **What are you trying to do right now?**
 >
@@ -32,10 +34,13 @@ Using `AskUserQuestion`, ask exactly this — no preamble, no renmark jargon:
 > 4. See what's been built / find gaps / decide what's next
 > 5. We're done — I want to verify, review, and ship
 > 6. Adopt renmark into an existing repo that doesn't use it yet
-> 7. I was mid-something and lost my place after a `/clear`
+> 7. Continue an interrupted workflow
 > 8. I'm not sure — show me the options
 
-Label option 1 `(Recommended start)` if no lifecycle state exists; otherwise label the option that matches the current lifecycle stage `(Recommended)`.
+Recommend Start if no lifecycle state exists; otherwise recommend the option
+matching the current lifecycle stage. Exactly one option is `(Recommended)` and
+it is always first. On Codex, selector overflow is printed as the full fallback;
+do not mistake an unavailable selector for headless mode.
 
 ### 2. Route based on answer
 
@@ -47,7 +52,7 @@ Label option 1 `(Recommended start)` if no lifecycle state exists; otherwise lab
 | 4 — what's next | `/renmark:roadmap` | — |
 | 5 — ship it | `/renmark:finish` | Mention `/renmark:verify` if there is doubt whether the last build passed |
 | 6 — adopt renmark | `/renmark:init` | — |
-| 7 — lost place | `/renmark:resume` | — |
+| 7 — interrupted | Claude Code: `/renmark:resume`; Codex: continue directly from `.renmark/state/` | Never ask a Codex user to run `/clear` or `/resume` when the host does not expose those commands |
 | 8 — not sure | Print the quick "Which one?" map (copied from `/renmark:help`) and re-ask |
 
 ### 3. Confirm and hand off
@@ -70,6 +75,6 @@ Then invoke the chosen command (dispatch via the skill's own invocation path —
 ## What's next
 
 `guide` is a class-3 aux/terminal skill under
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`. After it routes the user
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`. After it routes the user
 into a pipeline, `guide` itself is done — the target pipeline owns all subsequent
 hand-offs. No `AskUserQuestion` picker needed after the dispatch.

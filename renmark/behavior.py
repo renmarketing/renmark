@@ -517,6 +517,34 @@ def _render_plan_lint(repo: Path, case: Case) -> str:
     return "\n".join(lines)
 
 
+def _render_selector(repo: Path, case: Case, host: str) -> str:
+    """Render one live host selector contract as bounded JSON text."""
+    import json
+
+    from .interaction import Choice, build_selector
+
+    _ = repo
+    result = build_selector(
+        case.prompt,
+        (
+            Choice("r", "Review", "read the plan"),
+            Choice("d", "Dispatch", "execute the plan", recommended=True),
+            Choice("e", "Edit", "change the plan"),
+            Choice("n", "No", "stop here"),
+        ),
+        host=host,
+    )
+    return json.dumps(result, sort_keys=True)
+
+
+def _render_selector_claude(repo: Path, case: Case) -> str:
+    return _render_selector(repo, case, "claude")
+
+
+def _render_selector_codex(repo: Path, case: Case) -> str:
+    return _render_selector(repo, case, "codex")
+
+
 # call key -> adapter(repo, case) -> rendered current output text.
 # EXPLICIT allow-list: an unresolved key is a FAIL (see _run_deterministic),
 # never an import-time surprise or a silent pass.
@@ -525,6 +553,8 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "lifecycle.skill_preamble": _render_skill_preamble,
     "lifecycle.skill_preamble_fresh": _render_skill_preamble_fresh,
     "lifecycle.skill_preamble_agency_active": _render_skill_preamble_agency_active,
+    "interaction.selector_claude": _render_selector_claude,
+    "interaction.selector_codex": _render_selector_codex,
     "plan_lint": _render_plan_lint,
 }
 

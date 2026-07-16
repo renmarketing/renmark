@@ -46,8 +46,8 @@ plus any local/aux actions to surface.
 **Render the returned set** by reusing `_shared/handoff-menu.md` **rendering
 rules 6–9 verbatim, BY REFERENCE** — do not restate them here:
 
-- **Rule 6** — present survivors as an interactive `AskUserQuestion` choice
-  (PRIMARY), real `options[]` entries, 4-option cap.
+- **Rule 6** — present survivors through the active host selector (PRIMARY),
+  real `options[]` entries, host option cap.
 - **Rule 7** — printed numbered fallback when the picker is unavailable/declined.
 - **Rule 8** — a choice is always required; never auto-proceed.
 - **Rule 9** — visible choices XOR printed fallback, never a bare question; its
@@ -128,7 +128,7 @@ deliberately. Never jump to an expensive tier silently.
 **Pipeline skill** (class 1):
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")` and render the
-> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
 > Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
 > 6–9); the state-derived next command is the `(Recommended)` option. Require an
 > explicit choice — never auto-proceed.*
@@ -136,14 +136,14 @@ deliberately. Never jump to an expensive tier silently.
 **Quality gate** (class 2):
 
 > *End by rendering the gate hand-off menu from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` (the next-step contract's
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` (the next-step contract's
 > class 2 defers to it). Filter (rules 1–5), then present via `AskUserQuestion`
 > (rules 6–9). Require an explicit choice.*
 
 **Aux / terminal skill** (class 3):
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
 > rules 6–9); require an explicit choice.*
@@ -155,9 +155,9 @@ cite the file.
 
 ## Headless mode
 
-When the run is headless (per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/headless-contract.md`
+When the run is headless (per `skills/.shared/headless-contract.md` in the active plugin root
 detection), the state-derived next-step set computed above is **not** presented
-via `AskUserQuestion`. Instead the `(Recommended)` next command — always a safe,
+via a host selector. Instead the `(Recommended)` next command — always a safe,
 state-derived route — is auto-selected and the skill emits the contract's
 JSON + prose return rather than rendering rules 6–9. The one exception: if the
 recommended next step is itself a **dangerous** action (e.g. a `merge` / `release`
@@ -172,7 +172,7 @@ only swaps how the resolved recommendation is surfaced.
 
 One edit point: change the next-step policy here and every skill picks it up next
 run, instead of restating it in 20+ SKILL.md files that drift within a release
-(the same failure that motivated `handoff-menu.md`). `plugin/skills/_shared/` is
+(the same failure that motivated `handoff-menu.md`). `plugin/skills/.shared/` is
 skipped by `renmark.lint` (it's a reference dir, not a skill), so this file never
 trips the "missing command pair" check. Symmetric with
 `_shared/handoff-menu.md` and `_shared/scope-contract.md` — same pattern, same

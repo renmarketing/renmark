@@ -40,6 +40,16 @@ def _make_repo(tmp_path: Path, version: str = "0.3.1", *, mismatch: dict[str, st
             }
         )
     )
+    (tmp_path / "plugin" / ".codex-plugin").mkdir(parents=True)
+    (tmp_path / "plugin" / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps(
+            {
+                "name": "renmark",
+                "version": v("plugin/.codex-plugin/plugin.json"),
+                "description": "test",
+            }
+        )
+    )
     (tmp_path / ".claude-plugin").mkdir()
     (tmp_path / ".claude-plugin" / "marketplace.json").write_text(
         json.dumps(
@@ -104,6 +114,18 @@ def test_current_version(tmp_path: Path):
 def test_check_drift_all_in_sync(tmp_path: Path):
     repo = _make_repo(tmp_path, version="0.3.1")
     assert release.drift_report(repo) == []
+
+
+def test_check_drift_catches_cross_host_manifest_name_mismatch(tmp_path: Path):
+    repo = _make_repo(tmp_path, version="0.3.1")
+    codex_manifest = repo / "plugin" / ".codex-plugin" / "plugin.json"
+    data = json.loads(codex_manifest.read_text())
+    data["name"] = "different-name"
+    codex_manifest.write_text(json.dumps(data))
+
+    issues = release.drift_report(repo)
+
+    assert any("Codex plugin manifest name" in issue for issue in issues)
 
 
 def test_check_drift_catches_pyproject(tmp_path: Path):

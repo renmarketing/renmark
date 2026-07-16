@@ -1,6 +1,6 @@
 ---
 name: plan
-description: "Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases like \"write a plan\", \"decompose this\", \"create the plan for X\". Splits the spec into atomic tasks and emits a cost preview."
+description: "Use when the user has a spec and wants it decomposed into an executable task list — typed as /renmark:plan or phrases like \"plan this\", \"write a plan\", \"decompose this\", \"create the plan for X\". Splits the spec into atomic tasks and emits a cost preview."
 ---
 
 # plan
@@ -33,7 +33,7 @@ The plan is consumed by `/renmark:orchestrate`.
 
 ## When Agency Mode is active
 
-In Agency Mode, `plan` decomposes the assigned **milestone** (not the full PRD) into atomic tasks, attaches the milestone's **acceptance criteria** as the verifier success target (what "done + demo-ready" means for the owner), and **always displays a cost preview before dispatch**. Reference the full agency delivery contract by pointer only — `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`. This behavior is additive; existing plan behavior is unchanged when agency is off.
+In Agency Mode, `plan` decomposes the assigned **milestone** (not the full PRD) into atomic tasks, attaches the milestone's **acceptance criteria** as the verifier success target (what "done + demo-ready" means for the owner), and **always displays a cost preview before dispatch**. Reference the full agency delivery contract by pointer only — `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`. This behavior is additive; existing plan behavior is unchanged when agency is off.
 
 ## Steps
 
@@ -61,7 +61,7 @@ Before decomposing a directly provided feature description, establish a lightwei
 
 ---
 
-**Discovery flow** — ask at most 3 questions, one at a time. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md` (the single source of truth shared with `/renmark:brainstorm`) for the full Q1–Q3 question text, stack inference rules, and option menus. Do not decompose until discovery is complete.
+**Discovery flow** — ask at most 3 questions, one at a time. See `${CLAUDE_PLUGIN_ROOT}/skills/.shared/scope-contract.md` (the single source of truth shared with `/renmark:brainstorm`) for the full Q1–Q3 question text, stack inference rules, and option menus. Do not decompose until discovery is complete.
 
 ---
 
@@ -75,7 +75,7 @@ Proceed only after the user explicitly confirms the summarized scope contract, s
 
 ---
 
-**Record decisions.** See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/scope-contract.md` for the CHANGELOG scope entry format and `stack.md` template. Write both before decomposing (skip if brainstorm already wrote them — they're the shared contract). The generated task plan must respect all locked decisions — do not introduce new major stack choices during decomposition unless the user asks.
+**Record decisions.** See `${CLAUDE_PLUGIN_ROOT}/skills/.shared/scope-contract.md` for the CHANGELOG scope entry format and `stack.md` template. Write both before decomposing (skip if brainstorm already wrote them — they're the shared contract). The generated task plan must respect all locked decisions — do not introduce new major stack choices during decomposition unless the user asks.
 
 ---
 
@@ -91,7 +91,7 @@ If `CHANGELOG.md` exists at the project root, read the last 5 entries. Use the "
 
 Resolve the conflict (honor the guard, or get an explicit override) before proceeding to decomposition. Do not treat silence or an ambiguous reply as an override.
 
-**Reuse check — before decomposition (don't re-decompose an existing build).** Before splitting the spec into a custom task list, dispatch the reuse-check subagent from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`: Agent tool call (`model: haiku`; `sonnet` for a large search surface), passing ONLY `request_description`. The subagent searches loaded skills/commands, session MCP tools, `.renmark/specs/` + `.renmark/plans/`, and `.renmark/memory/features.md` in its own context, and returns ONLY the ≤5-line `reuse: found | none` verdict (+ a one-line pointer when found). On `reuse: found`, surface the `pointer` and **default to reuse** — recommend the existing skill / MCP tool / spec / feature instead of re-decomposing a custom build, unless there is a clear, stated reason it doesn't fit. Do NOT read the searched bodies in the orchestrator context (REQ-5).
+**Reuse check — before decomposition (don't re-decompose an existing build).** Before splitting the spec into a custom task list, dispatch the reuse-check subagent from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reuse-check.md`: Agent tool call (`model: haiku`; `sonnet` for a large search surface), passing ONLY `request_description`. The subagent searches loaded skills/commands, session MCP tools, `.renmark/specs/` + `.renmark/plans/`, and `.renmark/memory/features.md` in its own context, and returns ONLY the ≤5-line `reuse: found | none` verdict (+ a one-line pointer when found). On `reuse: found`, surface the `pointer` and **default to reuse** — recommend the existing skill / MCP tool / spec / feature instead of re-decomposing a custom build, unless there is a clear, stated reason it doesn't fit. Do NOT read the searched bodies in the orchestrator context (REQ-5).
 
 ### 2. Decompose into atomic tasks
 
@@ -209,24 +209,30 @@ Show a clear summary:
 > *Executors: haiku×a, codex×b, sonnet×c, opus×d*
 >
 > *What's next?*
-> *  1. [r] Review — open the plan file so you can read every task before approving*
-> *  2. [d] Dispatch — spin up AI subagents to implement the plan, then auto-verify on completion*
+> *  1. [d] Dispatch (Recommended) — spin up AI subagents to implement the plan, then auto-verify on completion*
+> *  2. [r] Review — open the plan file so you can read every task before approving*
 > *  3. [e] Edit — tell me what to change; I'll rewrite the plan and re-validate it*
 > *  4. [n] No — stop here; the validated plan stays on disk to dispatch later"*
 
-**Present this as an interactive `AskUserQuestion` choice when available** (PRIMARY): one arrow-selectable choice per option — `label` = the action with its code (`Review [r]`, `Dispatch [d]`, `Edit [e]`, `No [n]`), `description` = the gloss above. All 4 fit the picker's option cap. **Fallback** (tool unavailable / non-interactive / headless, OR the picker is declined, errors, returns no valid selection, or would show no visible options): print the numbered list above and accept a number or bracket letter — pass options as real `AskUserQuestion` choices (never embedded in the question text), and never end on the question with no visible choices. A choice is required either way — `AskUserQuestion` blocks by construction; never auto-proceed on an empty answer.
+**Present this through `renmark.interaction.build_selector`** (PRIMARY): mark
+`Dispatch [d]` as the sole recommendation so it is option 1 on both hosts.
+Claude Code uses `AskUserQuestion` (all 4 options); Codex uses
+`request_user_input` (recommended + highest-priority alternatives, with the full
+numbered fallback printed for overflow). If the selector is unavailable,
+declined, empty, or invalid, print the same recommended-first numbered fallback;
+selector absence alone is not headless. A choice is required either way.
 
-On **1 / r** → cat/open the plan file in the conversation, then re-ask the same prompt.
-On **2 / d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.
+On **1 / d** → immediately invoke `/renmark:orchestrate <plan-path>`. Don't make the user retype.
+On **2 / r** → cat/open the plan file in the conversation, then re-ask the same prompt.
 On **3 / e** → ask what to change, rewrite the plan, re-run 8a (re-validate), then re-show the summary.
 On **4 / n** → stop. Plan stays on disk for later (already validated at `plan-validated`).
 
 **Next-step contract (shared, by reference — class 1 / Pipeline).** This hand-off
 follows the single-source next-step contract. Per
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`:
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`:
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "plan")` and render the
-> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
 > Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
 > 6–9); the state-derived next command is the `(Recommended)` option. Require an
 > explicit choice — never auto-proceed.*

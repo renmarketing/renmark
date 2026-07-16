@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-16] — release: Claude Code / Codex parity (v0.38.0)
+
+**Request:** Give Renmark first-class Claude Code and Codex parity across distribution, recommended-first selectors, natural-language routing, isolated dispatch, pipelines, loops, recovery, and installed-machine behavior; Codex must never ask the user to run unsupported `/clear`, `/compact`, or `/renmark:resume` commands.
+**Built:** Unified both hosts under the canonical `plugin/` bundle with synchronized manifests and a Codex personal-marketplace installer; added host capability resolution, exactly-one/recommended-first selector adapters with numbered fallback, exact natural triggers such as “plan this” and “dispatch this,” native Codex subagent dispatch semantics, host-aware lifecycle/context gates, and deterministic cross-host pipeline/loop E2E proof. Hidden shared contracts now live under `plugin/skills/.shared/` so Codex discovers only callable skills, all skill frontmatter permits implicit routing, and the Windows installer is ASCII-safe for Windows PowerShell. Verified Codex plugin validation, release drift, Ruff, mypy, strict plugin lint, six behavioral fixtures, installer smoke tests, and the full suite (1,461 passed, 29 skipped).
+**Files changed:** `plugin/`, `renmark/`, `tests/`, `install.sh`, `install.ps1`, host manifests/templates, `README.md`, `VERSION`, `pyproject.toml`, `CLAUDE.md`, `AGENTS.md`, `.renmark/memory/features.md`, `CHANGELOG.md`.
+**Do not change:** Keep one product identity and artifact/state model across hosts; every choice has exactly one `(Recommended)` option at index 0; selector unavailability alone is not headless mode; pass the active host explicitly at Windows/WSL boundaries; Codex must continue from persisted state without clear/compact/resume instructions; keep internal shared contracts hidden from Codex skill discovery.
+
 ## [2026-07-16] — fix: restore repository quality gates
 
 **Request:** Repair the pre-existing lint and type-check debt before implementing Claude Code / Codex parity.

@@ -70,7 +70,7 @@ calls back into Python. For each item the script then:
    this shape..."` block — read the exact text from
    `plugin/skills/orchestrate/SKILL.md` Step 3b rather than re-deriving it) and
    the canonical reasoning-contract blockquote from
-   `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`.
+   `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md`.
 3. Calls `agent(prompt, { schema: SUBAGENT_OUTPUT_SCHEMA, agentType })` for
    that item, inside a `parallel()` so all of the wave's items run
    concurrently.
@@ -148,7 +148,7 @@ returned, successfully-parsed result exactly as Step 3b does today, per task.
 When citing this contract in a SKILL.md, write:
 
 > *When a wave has more than one `needs_agent` task, fan out via the Workflow
-> tool per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/workflow-fanout.md`: build
+> tool per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/workflow-fanout.md`: build
 > each task's input with `dispatch.build_subagent_input`, pass the wave as
 > `dispatch.build_workflow_fanout_args(tasks)` (which pre-resolves each item's
 > `agent_type` via `subagent_profiles.has_native_agent_file(role)` in Python)
@@ -172,7 +172,7 @@ Centralizing here means:
 
 - One edit point for the fan-out shape; `renmark/dispatch.py` stays the single
   place that defines what a subagent may receive and return.
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint` (it's
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint` (it's
   a reference dir, not a skill).
 - Symmetric with `_shared/prd-alignment.md` and `_shared/reuse-check.md` —
   same pattern (isolated work, bounded interface, orchestrator reads only the

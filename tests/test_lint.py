@@ -70,7 +70,7 @@ def _valid_skill_md(name: str) -> str:
     # A fully-compliant skill cites the shared hand-off contract (lint_next_steps_citation).
     return (
         f"---\nname: {name}\ndescription: a skill for {name}\n---\n\n# {name}\n\n"
-        f"## What's next\nSee `${{CLAUDE_PLUGIN_ROOT}}/skills/_shared/next-steps.md`.\n"
+        f"## What's next\nSee `${{CLAUDE_PLUGIN_ROOT}}/skills/.shared/next-steps.md`.\n"
     )
 
 
@@ -139,13 +139,13 @@ def test_lint_command_shims_catches_skill_without_command(tmp_path: Path):
     assert any("unreachable" in i for i in issues)
 
 
-def test_lint_ignores_underscore_shared_dirs(tmp_path: Path):
-    """`_shared/` holds cross-skill reference files — not a skill, not orphaned.
+def test_lint_ignores_hidden_shared_dirs(tmp_path: Path):
+    """`.shared/` holds cross-skill reference files — not a skill, not orphaned.
     It must not trip 'missing SKILL.md' or 'unreachable' checks."""
     plugin = _make_plugin(
         tmp_path, skills={"start": _valid_skill_md("start")}, commands={"start": _valid_command_md("start")}
     )
-    shared = plugin / "skills" / "_shared"
+    shared = plugin / "skills" / ".shared"
     shared.mkdir()
     (shared / "scope-contract.md").write_text("# shared reference\n")
     assert lint.lint_skill_files(plugin) == []

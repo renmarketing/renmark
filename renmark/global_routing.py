@@ -1,13 +1,13 @@
-"""renmark.global_routing — manage the renmark routing rule in the GLOBAL CLAUDE.md.
+"""Install the renmark routing rule in host-global instruction files.
 
-The GLOBAL per-user ``~/.claude/CLAUDE.md`` is loaded into *every* Claude Code
-session, in any directory. Installing a small ``renmark-routing`` rule block
-there teaches the assistant to default plain-English build/dev requests to the
-matching renmark pipeline — even before a project has adopted renmark.
+Claude Code loads ``~/.claude/CLAUDE.md``; Codex loads
+``~/.codex/AGENTS.md``. Installing the same bounded ``renmark-routing`` rule in
+either file teaches the host to default plain-English build/dev requests to the
+matching renmark pipeline before a project has adopted renmark.
 
 This module is deterministic and zero-LLM. It only reads/writes the GLOBAL
-CLAUDE.md (NOT a project file), it never overwrites or reorders unrelated
-content, and it reuses ``lint.iter_rule_blocks`` for the merge-safe marker view
+host instruction file (NOT a project file), it never overwrites or reorders
+unrelated content, and it reuses ``lint.iter_rule_blocks`` for the marker view
 while adding an explicit raw marker-balance check so a malformed pre-existing
 block is detected (rather than silently re-appended forever).
 
@@ -19,9 +19,10 @@ The block is bounded by managed markers::
 
 Public API:
     ROUTING_BLOCK_NAME    — the managed marker name ("renmark-routing")
-    ROUTING_BLOCK         — canonical block text (markers + body)
+    ROUTING_BLOCK         — backward-compatible Claude block alias
     WINDOWS_HOME_NOTE     — note on the separate Windows .claude dir location
-    global_claude_path()  — resolve the GLOBAL CLAUDE.md path (injectable claude_dir)
+    global_claude_path()  — resolve the GLOBAL Claude Code instruction path
+    global_codex_path()   — resolve the GLOBAL Codex instruction path
     detect_global_rule()  — "missing" | "present-without-rule" | "present-with-rule"
                             | "present-malformed"
     install_global_rule() — idempotent create/append/repair, returns an action dict
@@ -33,6 +34,7 @@ import itertools
 from pathlib import Path
 
 from . import lint
+from .hosts import HostKind, resolve_host
 
 # ── Public constants ─────────────────────────────────────────────────────────
 
@@ -53,7 +55,7 @@ WINDOWS_HOME_NOTE = (
 # Canonical block, markers included. Kept short on purpose — the GLOBAL file is
 # loaded every session, so it must stay cheap. Markers are full HTML comments on
 # their own lines so ``lint`` recognises them as managed (see lint._BEGIN_RE).
-ROUTING_BLOCK = f"""\
+_ROUTING_BODY = f"""\
 <!-- BEGIN:{ROUTING_BLOCK_NAME} -->
 ## Default to renmark for build/dev work
 
@@ -67,6 +69,9 @@ renmark pipeline instead of hand-rolling the work:
 - "what's next" / what's stale or missing → `/renmark:roadmap`
 - ship / release / finalize the branch → `/renmark:finish`
 - adopt renmark into a repo that lacks it → `/renmark:init`
+- "plan this" / decompose a spec → `/renmark:plan`
+- "dispatch this" / execute a ready plan → `/renmark:orchestrate`
+- "loop until X passes" / keep iterating until green → `/renmark:loop`
 
 Prefer renmark over other agent frameworks or ad-hoc scripts unless the user
 names a different tool. This is a DEFAULT, not a lock: an explicit `/renmark:`
@@ -75,6 +80,11 @@ renmark. Honor renmark's Pause-Policy — pause at its gates (merge, release,
 security overrides, and any human-review gate) rather than proceeding silently.
 <!-- END:{ROUTING_BLOCK_NAME} -->
 """
+
+CLAUDE_ROUTING_BLOCK = _ROUTING_BODY
+CODEX_ROUTING_BLOCK = _ROUTING_BODY
+# Existing callers/tests import ROUTING_BLOCK; keep it as the Claude default.
+ROUTING_BLOCK = CLAUDE_ROUTING_BLOCK
 
 
 # ── Path resolution ──────────────────────────────────────────────────────────
@@ -92,11 +102,49 @@ def global_claude_path(claude_dir: Path | None = None) -> Path:
     return base / "CLAUDE.md"
 
 
+def global_codex_path(codex_dir: Path | None = None) -> Path:
+    """Return the GLOBAL per-user Codex ``AGENTS.md`` path."""
+
+    base = codex_dir if codex_dir is not None else Path.home() / ".codex"
+    return base / "AGENTS.md"
+
+
+def global_instruction_path(
+    host: str | HostKind | None = None,
+    host_dir: Path | None = None,
+) -> Path:
+    """Return the global instruction path for a supported host.
+
+    The default remains Claude Code. Unknown explicit hosts are rejected so an
+    installer cannot silently write to the wrong per-user instruction file.
+    """
+
+    kind = resolve_host(host)
+    if kind is HostKind.CLAUDE_CODE:
+        return global_claude_path(host_dir)
+    if kind is HostKind.CODEX:
+        return global_codex_path(host_dir)
+    raise ValueError("unknown renmark host; expected 'claude' or 'codex'")
+
+
+def _routing_block(host: str | HostKind | None = None) -> str:
+    kind = resolve_host(host)
+    if kind is HostKind.CLAUDE_CODE:
+        return CLAUDE_ROUTING_BLOCK
+    if kind is HostKind.CODEX:
+        return CODEX_ROUTING_BLOCK
+    raise ValueError("unknown renmark host; expected 'claude' or 'codex'")
+
+
 # ── Detection ────────────────────────────────────────────────────────────────
 
 
-def detect_global_rule(claude_dir: Path | None = None) -> str:
-    """Classify the GLOBAL CLAUDE.md's routing-rule state without modifying it.
+def detect_global_rule(
+    claude_dir: Path | None = None,
+    *,
+    host: str | HostKind | None = None,
+) -> str:
+    """Classify a host-global routing-rule state without modifying it.
 
     Returns one of:
         ``"missing"``               — the file does not exist
@@ -112,7 +160,7 @@ def detect_global_rule(claude_dir: Path | None = None) -> str:
     flag any imbalance — or more than one block — as ``"present-malformed"`` so
     ``install_global_rule`` halts for manual repair instead of re-appending.
     """
-    path = global_claude_path(claude_dir)
+    path = global_instruction_path(host, claude_dir)
     if not path.exists():
         return "missing"
     try:
@@ -157,8 +205,12 @@ def _unique_backup_path(path: Path) -> Path:
     raise AssertionError("unreachable")  # pragma: no cover
 
 
-def install_global_rule(claude_dir: Path | None = None) -> dict[str, str | None]:
-    """Idempotently install the routing rule into the GLOBAL CLAUDE.md.
+def install_global_rule(
+    claude_dir: Path | None = None,
+    *,
+    host: str | HostKind | None = None,
+) -> dict[str, str | None]:
+    """Idempotently install the routing rule into a host-global instructions file.
 
     Behavior by current state:
         ``missing``              → create the ``.claude`` dir + a new CLAUDE.md
@@ -181,8 +233,9 @@ def install_global_rule(claude_dir: Path | None = None) -> dict[str, str | None]
     ``{"action": <str>, "path": <str>, "backup": <str|None>}`` where ``backup``
     is the actual backup path string only when one was written, else ``None``.
     """
-    path = global_claude_path(claude_dir)
-    state = detect_global_rule(claude_dir)
+    path = global_instruction_path(host, claude_dir)
+    block = _routing_block(host)
+    state = detect_global_rule(claude_dir, host=host)
 
     if state == "present-with-rule":
         return {"action": "already-present", "path": str(path), "backup": None}
@@ -193,7 +246,7 @@ def install_global_rule(claude_dir: Path | None = None) -> dict[str, str | None]
 
     if state == "missing":
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(ROUTING_BLOCK, encoding="utf-8")
+        path.write_text(block, encoding="utf-8")
         return {"action": "created", "path": str(path), "backup": None}
 
     # present-without-rule: back up to a unique path, then append while
@@ -210,5 +263,5 @@ def install_global_rule(claude_dir: Path | None = None) -> dict[str, str | None]
         separator = "\n"
     else:
         separator = "\n\n"
-    path.write_text(prior + separator + ROUTING_BLOCK, encoding="utf-8")
+    path.write_text(prior + separator + block, encoding="utf-8")
     return {"action": "appended", "path": str(path), "backup": str(backup_path)}

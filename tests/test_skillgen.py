@@ -10,7 +10,7 @@ Violation categories under test:
   - description not trigger-shaped (must open with "Use")
   - description names no trigger (no `/renmark:` and no quoted phrase)
   - `disable-model-invocation` mismatch vs skillmeta (both directions)
-  - re-inlines a `_shared/<name>.md` canonical blockquote verbatim (doc-slimming)
+  - re-inlines a `.shared/<name>.md` canonical blockquote verbatim (doc-slimming)
 """
 
 from __future__ import annotations
@@ -60,11 +60,11 @@ def test_clean_skill_has_no_violations() -> None:
 
 
 def test_clean_skill_citing_pointer_only_is_clean() -> None:
-    # Citing the _shared file BY POINTER (path mention) is the desired form and
+    # Citing the .shared file BY POINTER (path mention) is the desired form and
     # must NOT be flagged as a re-inlined blockquote.
     body = (
         "Follow the reasoning contract → see "
-        "${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md\n"
+        "${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md\n"
     )
     text = _skill_md(body=body)
     assert skillgen.lint_skill("example", text, _meta()) == []
@@ -153,30 +153,31 @@ def test_disable_mismatch_declared_false_meta_true() -> None:
     assert any("disable-model-invocation=False but skillmeta expects True" in i for i in issues)
 
 
-def test_disable_match_both_true_is_clean() -> None:
+def test_disable_match_both_true_is_rejected_for_codex_routing() -> None:
     text = _skill_md(disable_model_invocation=True)
-    assert skillgen.lint_skill("example", text, _meta(disable_model_invocation=True)) == []
+    issues = skillgen.lint_skill("example", text, _meta(disable_model_invocation=True))
+    assert any("must be false for Codex implicit routing" in issue for issue in issues)
 
 
-# ── 6. doc-slimming guard — re-inlined _shared blockquote ─────────────────────
+# ── 6. doc-slimming guard — re-inlined .shared blockquote ─────────────────────
 
 
 def test_reinlined_shared_blockquote_flagged() -> None:
-    # Pull the live signature so the test stays in sync with the _shared source.
+    # Pull the live signature so the test stays in sync with the .shared source.
     sig = skillgen._shared_signature("reasoning-contract")
-    assert sig, "reasoning-contract signature should resolve against the live _shared file"
+    assert sig, "reasoning-contract signature should resolve against the live .shared file"
     # Re-inline it verbatim (as a blockquote, to also exercise quote-stripping).
     body = f"> {sig}\n"
     text = _skill_md(body=body)
     issues = skillgen.lint_skill("example", text, _meta())
     assert any(
-        "re-inlines _shared/reasoning-contract.md blockquote verbatim" in i for i in issues
+        "re-inlines .shared/reasoning-contract.md blockquote verbatim" in i for i in issues
     )
 
 
 def test_pointer_citation_is_not_a_reinline() -> None:
     # Citing only the pointer path must not trip the doc-slimming guard.
-    body = "See ${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md for the stance.\n"
+    body = "See ${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md for the stance.\n"
     text = _skill_md(body=body)
     issues = skillgen.lint_skill("example", text, _meta())
     assert not any("re-inlines" in i for i in issues)

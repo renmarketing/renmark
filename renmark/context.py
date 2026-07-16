@@ -12,7 +12,7 @@ The four context kinds:
 - ``STATIC`` — always-present rule surfaces (``CLAUDE.md`` / ``AGENTS.md``).
   These are in the agent's context by default; nothing loads them.
 - ``DYNAMIC`` — skill bodies (``plugin/skills/<name>/SKILL.md``) and the shared
-  contract fragments (``plugin/skills/_shared/*.md``).  Their *metadata* is known
+  contract fragments (``plugin/skills/.shared/*.md``).  Their *metadata* is known
   upfront (via :mod:`renmark.skillmeta`); their *bodies* are pulled on demand and
   are NEVER pre-loaded.  This on-demand property is the whole point of dynamic
   skill loading — it is what keeps orchestrator/subagent context lean.
@@ -139,12 +139,12 @@ TAXONOMY: dict[ContextKind, ContextSource] = {
         label="Dynamic skill bodies + shared fragments",
         persistence="on-demand",
         load_policy=(
-            "Metadata known upfront; SKILL.md / _shared/*.md bodies fetched only "
+            "Metadata known upfront; SKILL.md / .shared/*.md bodies fetched only "
             "on demand — bodies are never pre-loaded."
         ),
         examples=(
             "plugin/skills/<name>/SKILL.md",
-            "plugin/skills/_shared/<fragment>.md",
+            "plugin/skills/.shared/<fragment>.md",
         ),
     ),
     ContextKind.MEMORY: ContextSource(
@@ -170,8 +170,8 @@ TAXONOMY: dict[ContextKind, ContextSource] = {
 }
 
 
-# The ``_shared`` contract fragment stems (basename without the ``.md``), the
-# single source of truth for what lives under ``plugin/skills/_shared/``.
+# The ``.shared`` contract fragment stems (basename without the ``.md``), the
+# single source of truth for what lives under ``plugin/skills/.shared/``.
 FRAGMENT_NAMES: tuple[str, ...] = (
     "reasoning-contract",
     "next-steps",
@@ -191,7 +191,7 @@ def classify_path(path: str | os.PathLike[str]) -> ContextKind:
     Rules (first match wins):
     - basename ``CLAUDE.md`` / ``AGENTS.md`` → ``STATIC``
     - under ``plugin/skills/`` ending in ``SKILL.md`` → ``DYNAMIC``
-    - under ``plugin/skills/_shared/`` ending in ``.md`` → ``DYNAMIC``
+    - under ``plugin/skills/.shared/`` ending in ``.md`` → ``DYNAMIC``
     - path containing ``.renmark/memory/`` → ``MEMORY``
     - everything else (including ``""``) → ``TASK_LOCAL``
 
@@ -210,7 +210,7 @@ def classify_path(path: str | os.PathLike[str]) -> ContextKind:
 
     if base in ("CLAUDE.md", "AGENTS.md"):
         return ContextKind.STATIC
-    if _has_contiguous(parts, ("plugin", "skills", "_shared")) and base.endswith(
+    if _has_contiguous(parts, ("plugin", "skills", ".shared")) and base.endswith(
         ".md"
     ):
         return ContextKind.DYNAMIC
@@ -263,7 +263,7 @@ def all_skill_metadata() -> dict[str, dict[str, object]]:
 
 
 def fragment_names() -> tuple[str, ...]:
-    """Return the ``_shared`` fragment stems (from :data:`FRAGMENT_NAMES`)."""
+    """Return the ``.shared`` fragment stems (from :data:`FRAGMENT_NAMES`)."""
     return FRAGMENT_NAMES
 
 
@@ -277,8 +277,8 @@ def skill_pointer(name: str) -> str:
 
 
 def fragment_pointer(name: str) -> str:
-    """Return the on-demand *pointer* to a ``_shared`` fragment (NOT the body)."""
-    return f"${{CLAUDE_PLUGIN_ROOT}}/skills/_shared/{name}.md"
+    """Return the on-demand *pointer* to a ``.shared`` fragment (NOT the body)."""
+    return f"${{CLAUDE_PLUGIN_ROOT}}/skills/.shared/{name}.md"
 
 
 def load_skill_body(plugin_root: str | os.PathLike[str], name: str) -> str:
@@ -295,13 +295,13 @@ def load_skill_body(plugin_root: str | os.PathLike[str], name: str) -> str:
 
 
 def load_fragment(plugin_root: str | os.PathLike[str], name: str) -> str:
-    """Read and return ``<plugin_root>/skills/_shared/<name>.md``.
+    """Read and return ``<plugin_root>/skills/.shared/<name>.md``.
 
     On-demand load; raises :class:`ValueError` for an unsafe (traversal) *name*
     and :class:`FileNotFoundError` if the fragment is absent.
     """
     _reject_unsafe_name(name)
-    return (Path(plugin_root) / "skills" / "_shared" / f"{name}.md").read_text(
+    return (Path(plugin_root) / "skills" / ".shared" / f"{name}.md").read_text(
         encoding="utf-8"
     )
 

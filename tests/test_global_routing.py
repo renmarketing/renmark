@@ -16,9 +16,11 @@ dependency_refs:
 from pathlib import Path
 
 from renmark.global_routing import (
+    CODEX_ROUTING_BLOCK,
     ROUTING_BLOCK_NAME,
     detect_global_rule,
     global_claude_path,
+    global_codex_path,
     install_global_rule,
 )
 from renmark.lint import iter_rule_blocks
@@ -43,6 +45,27 @@ def test_create_when_missing(tmp_path: Path) -> None:
     text = (claude_dir / "CLAUDE.md").read_text()
     assert _routing_block_count(text) == 1
     assert detect_global_rule(claude_dir=claude_dir) == "present-with-rule"
+
+
+def test_create_codex_global_agents_file(tmp_path: Path) -> None:
+    codex_dir = tmp_path / ".codex"
+
+    assert global_codex_path(codex_dir) == codex_dir / "AGENTS.md"
+    result = install_global_rule(codex_dir, host="codex")
+
+    assert result == {
+        "action": "created",
+        "path": str(codex_dir / "AGENTS.md"),
+        "backup": None,
+    }
+    assert (codex_dir / "AGENTS.md").read_text() == CODEX_ROUTING_BLOCK
+    assert detect_global_rule(codex_dir, host="codex") == "present-with-rule"
+
+
+def test_routing_block_contains_exact_plan_dispatch_and_loop_phrases() -> None:
+    assert '"plan this"' in CODEX_ROUTING_BLOCK
+    assert '"dispatch this"' in CODEX_ROUTING_BLOCK
+    assert '"loop until X passes"' in CODEX_ROUTING_BLOCK
 
 
 def test_append_when_present_without_rule(tmp_path: Path) -> None:

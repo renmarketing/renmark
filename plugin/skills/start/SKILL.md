@@ -9,7 +9,7 @@ description: "Use for the New Build pipeline (/renmark:start) when starting some
 
 The **New Build pipeline** — the vibe-coder entry point for building something new. Ask what you want to build, and renmark handles the rest — stack selection, scope, best practices, PRD, and routing — without requiring any knowledge of specs, plans, or executors.
 
-**Pipeline:** intent → (brainstorm if fuzzy) → PRD → roadmap → first feature → plan → build → verify → review. renmark continues automatically and pauses only at the real gates in the Pause Policy (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`) — chiefly unclear intent, PRD approval, and cost.
+**Pipeline:** intent → (brainstorm if fuzzy) → PRD → roadmap → first feature → plan → build → verify → review. renmark continues automatically and pauses only at the real gates in the Pause Policy (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`) — chiefly unclear intent, PRD approval, and cost.
 
 **Adaptive routing (Step 7) stays intact:** a clear single-purpose build → straight to `/renmark:plan`; a fuzzy or multi-part idea → `/renmark:brainstorm` first; a whole greenfield product → the staged program. A `PRD.md` is established before the first feature is built (Step 5a); a blueprint is offered only when the architecture is non-trivial (Step 5b).
 
@@ -19,7 +19,7 @@ The **New Build pipeline** — the vibe-coder entry point for building something
 
 ## When Agency Mode is active
 
-`/renmark:start` is the **explicit opt-in entry** for Agency Mode — no auto-detect. When chosen, offer an Agency lane that frames the session as a discovery call: owner intent, users, problem, outcome, owner-level questions, and project classification (new app / feature / migration / automation / research-build). Agency Mode sits **above** Conductor/Orchestrator and does not replace them; existing `/renmark:start` behavior is unchanged when the Agency lane is not chosen. For the full contract, see `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`.
+`/renmark:start` is the **explicit opt-in entry** for Agency Mode — no auto-detect. When chosen, offer an Agency lane that frames the session as a discovery call: owner intent, users, problem, outcome, owner-level questions, and project classification (new app / feature / migration / automation / research-build). Agency Mode sits **above** Conductor/Orchestrator and does not replace them; existing `/renmark:start` behavior is unchanged when the Agency lane is not chosen. For the full contract, see `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`.
 
 **Seed the state on opt-in (required — this is what makes the loop enterable/resumable).** Once the owner opts in and you've established the first phase, activate agency state so `/renmark:resume` and every spine skill's preamble pick it up. Run exactly:
 
@@ -47,7 +47,7 @@ Do not mention specs, plans, executors, or any renmark terminology. Do not ask a
 
 ### 2. Assess the response
 
-> *The canonical scope questions (Q1–Q3) and their menus live in `_shared/scope-contract.md`; the tables in Steps 2–4 below are their rendering for vibe coders — do not improvise alternatives.*
+> *The canonical scope questions (Q1–Q3) and their menus live in `.shared/scope-contract.md`; the tables in Steps 2–4 below are their rendering for vibe coders — do not improvise alternatives.*
 
 From the description, determine silently:
 
@@ -70,7 +70,11 @@ From the description, determine silently:
 
 ### 3. Adaptive follow-up (at most 2 questions, only when needed)
 
-Ask only when the answer would meaningfully change what gets built AND cannot be reasonably inferred. Ask one at a time. **Ask each via the `AskUserQuestion` tool (arrow-selectable choices) when available**; the numbered lists below are the text fallback for non-interactive sessions (accept a number or bracket letter).
+Ask only when the answer would meaningfully change what gets built AND cannot be
+reasonably inferred. Ask one at a time through
+`renmark.interaction.build_selector`. Infer the safest likely answer and mark it
+as the sole recommendation at index 0; when no answer can be inferred, put `Not
+sure yet (Recommended)` first. The numbered lists below are the full fallback.
 
 **Q1 — Reach** (ask if deployment signal is ambiguous):
 > "Is this just for you, or will other people use it?"
@@ -233,7 +237,7 @@ The routing above IS the next step — defer its presentation to the shared
 next-step contract (class 1 — Tier-0 stage routing):
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "start")` and render the
-> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
 > Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
 > 6–9); the state-derived next command is the `(Recommended)` option. Require an
 > explicit choice — never auto-proceed.*

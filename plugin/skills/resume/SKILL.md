@@ -1,7 +1,7 @@
 ---
 name: resume
 description: "Use after /clear or /compact, or at the start of a fresh session, to discover where the in-flight renmark feature stopped — typed as /renmark:resume or \"where was I\", \"pick up where I left off\"."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # resume
@@ -209,7 +209,7 @@ is **unchanged** — this is an additive surfacing branch only.
 
 ## When Agency Mode is active
 
-In Agency Mode, resume reads `.renmark/state/agency.json` (via `renmark.agency.read_agency`) to locate the last MILESTONE checkpoint. Summarize where the workflow left off — which milestone was last reached, what triggered the checkpoint, any pending decision — and recommend continuing WITHOUT re-discovery of prior work. Still zero LLM calls; pure file IO. For the full Agency Mode contract and delivery mode semantics, see `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`. This recovery path is **additive** — the existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward) remains unchanged for non-Agency workflows.
+In Agency Mode, resume reads `.renmark/state/agency.json` (via `renmark.agency.read_agency`) to locate the last MILESTONE checkpoint. Summarize where the workflow left off — which milestone was last reached, what triggered the checkpoint, any pending decision — and recommend continuing WITHOUT re-discovery of prior work. Still zero LLM calls; pure file IO. For the full Agency Mode contract and delivery mode semantics, see `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`. This recovery path is **additive** — the existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward) remains unchanged for non-Agency workflows.
 
 ### 2. Surface pending approval gates
 
@@ -254,7 +254,7 @@ Resume is a reporting skill — there is no automatic handoff. The user reads th
 
 Resume is a **class 3 (aux / terminal) skill** in the next-step contract. It already derives and prints the recommended next command from `lifecycle.json` (Steps 1–3) — that recommendation IS the contract's class-3 **resume-pipeline** option. For the canonical hand-off format and class definition, see — by static reference, never pasted, and **without changing resume's zero-LLM / pure-file-IO cold-start logic**:
 
-> *Render the printed recommendation per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline + 1–2 local actions). The in-flight feature's next command is `(Recommended)`. Resume is zero-LLM, so it uses the printed numbered form (handoff-menu.md rule 7), not the interactive `AskUserQuestion` picker — and never auto-proceeds.*
+> *Render the printed recommendation per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline + 1–2 local actions). The in-flight feature's next command is `(Recommended)`. Resume is zero-LLM, so it uses the printed numbered form (handoff-menu.md rule 7), not the interactive `AskUserQuestion` picker — and never auto-proceeds.*
 
 ## Governance compliance
 

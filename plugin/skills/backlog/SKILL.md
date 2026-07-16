@@ -67,9 +67,10 @@ from renmark import backlog
 items = backlog.list_items(repo)
 ```
 
-Present the items as a selectable list via `AskUserQuestion` (handoff-menu.md rules 6–9),
+Present the items through `renmark.interaction.build_selector` (handoff-menu.md rules 6–9),
 one option per item, each showing `title · status · source · risk · pending decision`.
-Cap at 4 options per picker; if more items exist, surface the 4 highest-priority (lowest
+Mark the highest-priority item as the sole recommendation so it is index 0. Use
+the active host's option cap; if more items exist, surface the highest-priority (lowest
 status in the machine first: `needs review` / `needs approval` outrank `blocked` /
 `completed`) and print the full numbered fallback beneath so the rest stay reachable.
 Always include a `Back / Nothing` exit. On selection, open the **Detail view** (Step 2).
@@ -89,7 +90,9 @@ Always include a `Back / Nothing` exit. On selection, open the **Detail view** (
   Pending decision:    <pending_decision>
 ```
 
-Then offer the action set via `AskUserQuestion` (rules 6–9), require an explicit choice:
+Then offer the action set through `build_selector` (rules 6–9). Recommend the
+item's `recommended_action` when it maps to an option; otherwise recommend
+`Back`. Require an explicit choice:
 
 | Option | Effect |
 |---|---|
@@ -161,7 +164,8 @@ skill returns. Route on the loop's terminal verify result:
   ```python
   analytics.record_event(repo, ts=rstate.now_iso(), kind="backlog_blocked", item_id=item.id)
   ```
-- OFFER keep-or-delete via `AskUserQuestion`:
+- OFFER keep-or-delete through `build_selector`, with **Keep the branch
+  (Recommended)** first:
   | Choice | Disposition | Branch |
   |---|---|---|
   | **Keep the branch** (resume / inspect later) | `kept` | left in place |
@@ -202,7 +206,7 @@ skill; `/renmark:backlog` only triages items that already exist in the ledger.
 ## Next step
 
 *End by calling `renmark.lifecycle.next_steps(repo, "backlog")` and render the
-result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 —
+result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 —
 resume-pipeline + 1–2 local actions). The generic aux router for `backlog`
 produces `/renmark:backlog (refresh the list)` and `/renmark:finish` — those
 are the non-blocked fallbacks. The skill drives its own hand-off menu directly

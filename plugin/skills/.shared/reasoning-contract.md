@@ -72,7 +72,7 @@ unvalidated`, not as a pass.
 When citing this contract in a SKILL.md dispatch section, write:
 
 > *Include the reasoning/output-discipline contract from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` in every
 > dispatched subagent prompt: multi-perspective decomposition → explicit
 > assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
 > recommendations; evidence preserved; missing context stated, never guessed;
@@ -91,7 +91,7 @@ one release. Centralizing here means:
 
 - One edit point. Any future dispatching skill (or fable lane) reads the same
   contract.
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint` (it's
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint` (it's
   a reference dir, not a skill).
 - Symmetric with `_shared/prd-alignment.md`, `_shared/scope-contract.md`, and
   `_shared/handoff-menu.md` — same pattern, same precedent.

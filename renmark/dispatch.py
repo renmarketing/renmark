@@ -3,9 +3,11 @@
 Groups tasks by parallel_group, validates that tasks sharing a group write
 to disjoint targets, and dispatches each task to its executor backend.
 
-Claude-model tasks (opus/sonnet) cannot run from this Python process —
-they need an Agent tool call from the host. The dispatcher returns a
-`needs_agent` marker for those so the skill can issue Agent calls itself.
+Host-agent tasks cannot run from this Python process. The dispatcher returns a
+``needs_agent`` compatibility marker; :func:`build_host_dispatch_plan` then
+maps the same bounded packet to Claude's Agent/Workflow tools or Codex's
+spawn_agent/wait_agent/followup_task tools. This module shapes contracts only
+and never claims to execute either host tool.
 
 Permission-economy: by accepting a list of tasks per wave call, the user
 sees one Bash prompt per wave instead of one per task.
@@ -175,7 +177,7 @@ def estimate_wave_cost(wave: list[Task]) -> tuple[int, float]:
 # dispatch_task_isolated enforces the contract: violations raise IsolationViolation.
 
 import json as _json
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 
 class IsolationViolation(RuntimeError):
@@ -466,6 +468,229 @@ def build_workflow_fanout_args(
         payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
         args.append(payload)
     return args
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Host-native dispatch transport (Claude Code / Codex)
+# ─────────────────────────────────────────────────────────────────────────────
+
+HostName = Literal["claude", "codex"]
+HostDispatchStrategy = Literal["none", "single", "fanout"]
+
+# A task packet larger than this is not a bounded subagent prompt. Refuse it
+# instead of truncating task intent or silently leaking more context.
+MAX_HOST_DISPATCH_PROMPT_CHARS = 32_000
+
+
+@dataclass(frozen=True)
+class HostDispatchCall:
+    """One host-tool invocation shaped from one or more G11 task packets."""
+
+    task_indices: tuple[int, ...]
+    tool: str
+    arguments: dict[str, Any]
+    model_route: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class HostDispatchPlan:
+    """Pure transport plan; no host tool has been invoked.
+
+    ``task_packets`` is host-independent and therefore is the semantic parity
+    surface.  ``calls`` adapts those packets to the selected host. Ledgering,
+    wave-summary persistence, response parsing, and verifier execution remain
+    downstream and identical for both hosts.
+    """
+
+    host: HostName
+    strategy: HostDispatchStrategy
+    task_packets: tuple[dict[str, Any], ...]
+    calls: tuple[HostDispatchCall, ...]
+    wait_tool: str | None = None
+    followup_tool: str | None = None
+
+
+def render_bounded_subagent_prompt(
+    inp: SubagentInput,
+    *,
+    reasoning_instruction: str = "",
+) -> str:
+    """Render the canonical task packet + output contract for either host.
+
+    Only :class:`SubagentInput` fields cross the boundary. The response schema
+    is the same :class:`SubagentOutput` schema consumed by
+    :func:`parse_subagent_response`; code, diffs, transcripts, and reasoning
+    remain forbidden.
+    """
+
+    packet = inp.to_dict()
+    prompt = (
+        "Complete one isolated renmark task using only the bounded packet below.\n"
+        "Do not use or request orchestrator conversation history. Do not commit.\n\n"
+        "SUBAGENT_INPUT_JSON\n"
+        f"{_json.dumps(packet, indent=2, sort_keys=True)}\n"
+        "END_SUBAGENT_INPUT_JSON\n\n"
+        "Return ONLY valid JSON matching SubagentOutput: status (PASS|FAIL|SKIP), "
+        "artifact_path, touched_files, sha, summary_lines (at most 5), "
+        "dependency_notes, token_count, completion_state "
+        "(complete|partial|failed), confidence (low|medium|high), retry_count, "
+        "validation_status (validated|unvalidated|failed), parser_success, and "
+        "schema_compliance. Generated code belongs in the target/artifact, never "
+        "in the response. Never return transcript, diff, generated_code, or reasoning."
+    )
+    if reasoning_instruction.strip():
+        prompt += f"\n\nCANONICAL_REASONING_INSTRUCTION\n{reasoning_instruction.strip()}"
+    if len(prompt) > MAX_HOST_DISPATCH_PROMPT_CHARS:
+        raise IsolationViolation(
+            f"host dispatch prompt is {len(prompt)} chars; max "
+            f"{MAX_HOST_DISPATCH_PROMPT_CHARS} (bounded-input contract)"
+        )
+    return prompt
+
+
+def build_host_dispatch_plan(
+    wave: list[Task],
+    *,
+    host: HostName | str,
+    dependency_summaries: list[str] | None = None,
+    upstream_artifact_pointers: list[str] | None = None,
+    reasoning_instruction: str = "",
+) -> HostDispatchPlan:
+    """Map host-agent tasks in ``wave`` to a host-native transport contract.
+
+    Claude uses one ``Agent`` call for a single task and one ``Workflow`` call
+    for a fan-out. Codex uses one ``spawn_agent`` call per independent task,
+    followed by ``wait_agent``; a bounded correction may use
+    ``followup_task``. Codex spawns always use ``fork_turns='none'``.
+
+    ``executor: codex`` tasks are intentionally excluded: they remain on the
+    deterministic ``renmark-execute`` subprocess path on both hosts. This
+    function performs no dispatch and no ledger/state writes.
+    """
+
+    normalized = str(host).strip().lower()
+    if normalized not in {"claude", "codex"}:
+        raise ValueError(f"unsupported host {host!r}; expected 'claude' or 'codex'")
+    host_name = cast(HostName, normalized)
+
+    host_tasks = [task for task in wave if claude_agent.is_claude_executor(task.executor)]
+    inputs = [
+        build_subagent_input(
+            task,
+            dependency_summaries=dependency_summaries,
+            upstream_artifact_pointers=upstream_artifact_pointers,
+        )
+        for task in host_tasks
+    ]
+    packets = tuple(inp.to_dict() for inp in inputs)
+    if not host_tasks:
+        return HostDispatchPlan(host=host_name, strategy="none", task_packets=packets, calls=())
+
+    strategy: HostDispatchStrategy = "single" if len(host_tasks) == 1 else "fanout"
+    if host_name == "claude":
+        calls = _build_claude_host_calls(
+            host_tasks,
+            inputs,
+            reasoning_instruction=reasoning_instruction,
+        )
+        return HostDispatchPlan(
+            host=host_name,
+            strategy=strategy,
+            task_packets=packets,
+            calls=calls,
+        )
+
+    calls = _build_codex_host_calls(
+        host_tasks,
+        inputs,
+        reasoning_instruction=reasoning_instruction,
+    )
+    return HostDispatchPlan(
+        host=host_name,
+        strategy=strategy,
+        task_packets=packets,
+        calls=calls,
+        wait_tool="wait_agent",
+        followup_tool="followup_task",
+    )
+
+
+def _build_claude_host_calls(
+    tasks: list[Task],
+    inputs: list[SubagentInput],
+    *,
+    reasoning_instruction: str,
+) -> tuple[HostDispatchCall, ...]:
+    from renmark import subagent_profiles
+
+    if len(tasks) > 1:
+        args: list[dict[str, Any]] = []
+        for inp in inputs:
+            payload = inp.to_dict()
+            payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
+            args.append(payload)
+        return (
+            HostDispatchCall(
+                task_indices=tuple(task.index for task in tasks),
+                tool="Workflow",
+                arguments={"args": args},
+            ),
+        )
+
+    task = tasks[0]
+    inp = inputs[0]
+    arguments: dict[str, Any] = {
+        "description": f"renmark task {task.index}: {task.title[:60]}",
+        "prompt": render_bounded_subagent_prompt(
+            inp,
+            reasoning_instruction=reasoning_instruction,
+        ),
+    }
+    if subagent_profiles.has_native_agent_file(inp.role):
+        arguments["subagent_type"] = inp.role
+    if task.executor == "fable":
+        arguments["model"] = "fable"
+    return (
+        HostDispatchCall(
+            task_indices=(task.index,),
+            tool="Agent",
+            arguments=arguments,
+        ),
+    )
+
+
+def _build_codex_host_calls(
+    tasks: list[Task],
+    inputs: list[SubagentInput],
+    *,
+    reasoning_instruction: str,
+) -> tuple[HostDispatchCall, ...]:
+    from renmark import codex_routing
+
+    calls: list[HostDispatchCall] = []
+    for task, inp in zip(tasks, inputs, strict=True):
+        native = codex_routing.build_native_dispatch(
+            task,
+            role=inp.role,
+            prompt=render_bounded_subagent_prompt(
+                inp,
+                reasoning_instruction=reasoning_instruction,
+            ),
+        )
+        calls.append(
+            HostDispatchCall(
+                task_indices=(task.index,),
+                tool=native.spawn_tool,
+                arguments=dict(native.spawn_args),
+                model_route={
+                    "model": native.route.model,
+                    "reasoning_effort": native.route.reasoning_effort,
+                    "tier": native.route.tier,
+                    "reason": native.route.reason,
+                },
+            )
+        )
+    return tuple(calls)
 
 
 def dispatch_task_isolated(

@@ -1,0 +1,18 @@
+{
+  "skill": "plan",
+  "prompt": "Plan validated. What is next?",
+  "deterministic": {
+    "call": "interaction.selector_codex",
+    "assertions": [
+      "contains:request_user_input",
+      "contains:Dispatch (Recommended)",
+      "contains:\"overflow\": true",
+      "contains:1. [d] Dispatch (Recommended)",
+      "not_contains:AskUserQuestion"
+    ]
+  },
+  "eval": {
+    "contract": "Codex renders request_user_input with the recommendation first and preserves every overflow option in the fallback.",
+    "golden_ref": "selector-codex.golden"
+  }
+}

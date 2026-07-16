@@ -1,8 +1,8 @@
 """Enforced subagent-justification gate — the deterministic-first check that runs
 BEFORE any subagent is dispatched (strengthens REQ-21 from advice into a gate).
 
-Renmark already ships the *advice* (``_shared/deterministic-first.md`` 4-question
-gate, ``_shared/subagent-budget.md``) and the cost machinery that *tags*
+Renmark already ships the *advice* (``.shared/deterministic-first.md`` 4-question
+gate, ``.shared/subagent-budget.md``) and the cost machinery that *tags*
 deterministic vs model-driven work (``renmark.cost``). What was missing is a pure,
 zero-LLM function the dispatch path can actually CALL to challenge a spawn — so a
 subagent-heavy, deterministic-eligible plan gets flagged before tokens flow.

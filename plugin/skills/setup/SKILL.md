@@ -45,11 +45,11 @@ that the file was skipped for corruption.
 ## What's next
 
 setup is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It sits off the main
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`). It sits off the main
 pipeline line.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "setup")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
 > rules 6–9); require an explicit choice.*

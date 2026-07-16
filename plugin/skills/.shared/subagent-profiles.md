@@ -42,7 +42,7 @@
 
 When dispatching a subagent in a SKILL.md, write:
 
-> *Dispatch specialized subagent role (prefer over generic `general-purpose`): `docs-editor` (docs/comments), `code-implementer` (feature code), `test-writer` (tests), `reviewer` (code review), `release-manager` (version/release), `researcher` (web research), `audit-reader` (audit artifacts), `finish-lane-specialist` (lane selection). Full registry: `${CLAUDE_PLUGIN_ROOT}/skills/_shared/subagent-profiles.md`. Fallback to `general-purpose` only when no role fits; in that case, set `role: general-purpose` and relax context scope.*
+> *Dispatch specialized subagent role (prefer over generic `general-purpose`): `docs-editor` (docs/comments), `code-implementer` (feature code), `test-writer` (tests), `reviewer` (code review), `release-manager` (version/release), `researcher` (web research), `audit-reader` (audit artifacts), `finish-lane-specialist` (lane selection). Full registry: `${CLAUDE_PLUGIN_ROOT}/skills/.shared/subagent-profiles.md`. Fallback to `general-purpose` only when no role fits; in that case, set `role: general-purpose` and relax context scope.*
 
 ---
 
@@ -52,7 +52,7 @@ Early drafts had subagents dispatch with only task-local context and no declared
 
 - One edit point. Every future dispatcher references the same 9 roles and respects the same context boundaries.
 - Cost discipline. The cost summary (`estimate_cost()`) aggregates roles and surfaces imbalance (many cheap-scoped tasks vs few expensive ones).
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint`.
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint`.
 - Symmetric with `_shared/subagent-budget.md`, `_shared/context-taxonomy.md`, `_shared/reasoning-contract.md` — same pattern.
 
 Update this registry when adding a new specialized role; do not let roles drift in individual skill dispatch prompts.

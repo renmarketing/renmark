@@ -1,7 +1,7 @@
 ---
 name: usage
 description: "Use when the user wants observed local usage status — typed as /renmark:usage or \"show usage\", \"rolling 5h\", \"weekly limits\", \"paused runs\"."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # usage
@@ -73,7 +73,7 @@ where orchestration left off.
 ## What's next
 
 *End by calling `renmark.lifecycle.next_steps(repo, "usage")` and render per
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 add the skill's local follow-ups (e.g. re-run `/renmark:usage` to refresh the
 view, or run `/renmark:resume` if paused runs were reported). Render via

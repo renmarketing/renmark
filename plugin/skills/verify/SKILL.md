@@ -48,13 +48,13 @@ Reads the plan's intent paragraph via `parser.parse_plan()`, extracts stated use
 
 ### Fable QA review (optional, declared projects)
 
-In projects where `capabilities.top_tier == "fable"` (per `renmark.capabilities.top_tier(repo)`), the hand-off offers a **fable QA-review subagent** via the verify-lane **extension code `[fr] Fable review`** — the same pattern codereview uses for its `[o]`/`[fix]` extension codes. Extension codes are NOT in `handoff-menu.md`'s canonical master list; `[fr]` appears only in the combined menu this skill builds for its own hand-off, and only in declared projects. Choosing `[fr]` dispatches an implementation review against the plan goal + acceptance criteria, plus regression-risk and edge-case review. Dispatch it per the reasoning/output-discipline contract — *include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every dispatched subagent prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed.* The subagent returns a bounded ≤5-line verdict with each issue marked **blocking vs deferrable**; full evidence goes to a `.renmark/reviews/` artifact, never into chat.
+In projects where `capabilities.top_tier == "fable"` (per `renmark.capabilities.top_tier(repo)`), the hand-off offers a **fable QA-review subagent** via the verify-lane **extension code `[fr] Fable review`** — the same pattern codereview uses for its `[o]`/`[fix]` extension codes. Extension codes are NOT in `handoff-menu.md`'s canonical master list; `[fr]` appears only in the combined menu this skill builds for its own hand-off, and only in declared projects. Choosing `[fr]` dispatches an implementation review against the plan goal + acceptance criteria, plus regression-risk and edge-case review. Dispatch it per the reasoning/output-discipline contract — *include the reasoning/output-discipline contract from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` in every dispatched subagent prompt: multi-perspective decomposition → explicit assumptions/edge cases → synthesis; blocking vs deferrable; findings vs recommendations; evidence preserved; missing context stated, never guessed.* The subagent returns a bounded ≤5-line verdict with each issue marked **blocking vs deferrable**; full evidence goes to a `.renmark/reviews/` artifact, never into chat.
 
 State it plainly: **deterministic smoke remains the always-run default** — the fable pass is additive and never replaces verifiers (REQ-7).
 
 ## When Agency Mode is active
 
-In Agency Mode, verify escalates from feature-level smoke to milestone-readiness assessment. Runs smoke tests plus browser QA (`--qa`) / edge-case checks (`--deep-qa`) when the milestone surfaces user-visible behavior. Reports DEMO-readiness against the milestone acceptance criteria (what passed, what remains unverified, confidence level) and feeds the owner's signoff checkpoint. See contract pointer: `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`. Additive — existing verify behavior unchanged when agency is off.
+In Agency Mode, verify escalates from feature-level smoke to milestone-readiness assessment. Runs smoke tests plus browser QA (`--qa`) / edge-case checks (`--deep-qa`) when the milestone surfaces user-visible behavior. Reports DEMO-readiness against the milestone acceptance criteria (what passed, what remains unverified, confidence level) and feeds the owner's signoff checkpoint. See contract pointer: `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`. Additive — existing verify behavior unchanged when agency is off.
 
 ## When to Use
 
@@ -199,7 +199,7 @@ Sets the stage to `verified` so `/renmark:resume` knows the next step is `/renma
 
 ### 7. Hand off (wizard step)
 
-Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`, applying the rendering rules:
+Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`, applying the rendering rules:
 
 - **Omit `[s] Smoke test`** — we just ran smoke.
 - **Show `[qa] QA`** unconditionally (always reachable as a different lens).
@@ -211,7 +211,10 @@ Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu
 
 Prefix the menu with `N/M requirements verified. Artifact: PATH.` and end with `What's next?`.
 
-Dispatch on the chosen option (arrow-selected via `AskUserQuestion`, or a typed number/bracket letter in the text fallback): invoke the matching `/renmark:` skill (passing the failed-symptom into `/renmark:debug` if `[d]`), or stop on `[n]`. Require an explicit choice — don't proceed without one.
+Dispatch on the chosen option (selected through `renmark.interaction.build_selector`
+or a typed number/bracket letter in its fallback). Recommend `[d] Debug` first on
+failure and `[f] Finish` first on a green run. Invoke the matching `/renmark:`
+skill (passing the failed symptom into debug), or stop on `[n]`. Require a choice.
 
 ---
 
@@ -341,7 +344,9 @@ When `--bootstrap` modifies `--qa`, the goal is **not** to verify one feature �
 
 1. **Read project memory + history:** `.renmark/memory/stack.md`, `.renmark/memory/project-map.md`, the plans under `.renmark/plans/`, `.renmark/memory/bugs.md`, and `CHANGELOG.md`.
 2. **Detect the main browser surfaces/routes** — the entry routes, primary pages, forms, and controllers serving browser pages — from stack/project-map + the running app.
-3. **Ask or infer the top 3–5 critical user flows.** Prefer the interactive `AskUserQuestion` hand-off to confirm the candidate flows; infer from the surfaces above if the user defers.
+3. **Ask or infer the top 3–5 critical user flows.** Prefer the host selector
+   from `renmark.interaction.build_selector` to confirm candidates, with the
+   highest-risk flow recommended first; infer from the surfaces if the user defers.
 4. **Create `.renmark/memory/qa-flows.md`** (the QA-flow memory file) seeded with those flows.
 5. **When browser QA actually runs**, drive each candidate flow with the active channel (same steps/criteria as a normal `--qa` flow) and save **baseline notes + screenshot/artifact paths** into each flow entry (paths only — evidence stays on disk).
 6. **If browser QA cannot run** (no channel connected / degrade-to-shell), still create the documented candidate flows in `qa-flows.md`, each marked **UNVERIFIED** (no baseline screenshots yet) so a later `--qa` can verify and upgrade them.
@@ -350,7 +355,7 @@ Bootstrap honors the same context-hygiene contract: chat sees only a bounded sum
 
 ### Subagent browser-access instruction (applies to `--qa` and `--deep-qa`)
 
-When subagents participate in QA in any capacity (e.g. a fable QA-review pass), their dispatch prompt MUST explicitly tell them they have **browser automation access via the active browser channel** (Chrome DevTools MCP or native Claude-in-Chrome, per the channel-selection rules above), and that **UI-bearing acceptance criteria MUST NOT be validated by static code inspection alone** — a PASS on a UI criterion never exercised in a live browser is a G9 violation (`validation_status: unvalidated`). See the browser-validation clause in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`. This does not change the singleton-browser design: flows still run serially in the main agent; subagents that need rendered evidence coordinate through the same single browser session, never parallel pages.
+When subagents participate in QA in any capacity (e.g. a fable QA-review pass), their dispatch prompt MUST explicitly tell them they have **browser automation access via the active browser channel** (Chrome DevTools MCP or native Claude-in-Chrome, per the channel-selection rules above), and that **UI-bearing acceptance criteria MUST NOT be validated by static code inspection alone** — a PASS on a UI criterion never exercised in a live browser is a G9 violation (`validation_status: unvalidated`). See the browser-validation clause in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md`. This does not change the singleton-browser design: flows still run serially in the main agent; subagents that need rendered evidence coordinate through the same single browser session, never parallel pages.
 
 ### Context-hygiene contract (non-negotiable)
 
@@ -433,7 +438,7 @@ Run the **selected flow** (from *BEFORE QA — flow selection from memory*) usin
 
 ### QA hand-off
 
-Render the menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`:
+Render the menu from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`:
 
 - **Omit `[qa] QA`** — we just ran QA.
 - **Show `[s] Smoke`** (re-test from the other lens).
@@ -571,7 +576,7 @@ At 1 (`--qa`) + 3 (`--deep-qa`) flows that each dump evidence to disk and return
 
 ### Deep QA hand-off
 
-Render the menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`:
+Render the menu from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`:
 
 - **Omit `[dq] Deep QA`** — we just ran it.
 - **Show `[s] Smoke`** and `[qa] QA` (re-test from other lenses if a fix lands).

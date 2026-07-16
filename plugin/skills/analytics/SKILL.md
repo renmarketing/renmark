@@ -1,7 +1,7 @@
 ---
 name: analytics
 description: "Use when the user wants a project build-health summary — typed as /renmark:analytics or \"build health\", \"feature metrics\", \"loop success rate\", \"token cost by feature\"."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # analytics
@@ -62,7 +62,7 @@ so it can be committed alongside the rest of the project memory.
 ## What's next
 
 *End by calling `renmark.lifecycle.next_steps(repo, "analytics")` and render per
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 add the skill's local follow-ups (e.g. re-run analytics after the next orchestrate,
 or open `.renmark/memory/analytics.md` to review the snapshot). Render via

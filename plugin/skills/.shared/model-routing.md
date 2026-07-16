@@ -69,6 +69,6 @@ Early drafts scattered model-choice rationale across skill prompts. One skill es
 
 When citing this discipline in a SKILL.md or subagent dispatch, write:
 
-> *Honor model routing discipline in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/model-routing.md`: simple work uses Haiku on Claude or `gpt-5.4-mini`/low effort on Codex; normal work uses Sonnet on Claude or `gpt-5.5`/medium effort on Codex; escalation-only work uses Opus/Fable on Claude or `gpt-5.5`/high effort on Codex when `renmark.cost.requires_escalation` returns True (architecture/judgment/prior-failure). Consult `.renmark/memory/routing.md` ledger before choosing non-default tier.*
+> *Honor model routing discipline in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/model-routing.md`: simple work uses Haiku on Claude or `gpt-5.4-mini`/low effort on Codex; normal work uses Sonnet on Claude or `gpt-5.5`/medium effort on Codex; escalation-only work uses Opus/Fable on Claude or `gpt-5.5`/high effort on Codex when `renmark.cost.requires_escalation` returns True (architecture/judgment/prior-failure). Consult `.renmark/memory/routing.md` ledger before choosing non-default tier.*
 
 Do not paste the matrix or escalation gate into the calling SKILL.md — cite this file.

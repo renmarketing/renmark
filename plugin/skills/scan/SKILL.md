@@ -1,7 +1,7 @@
 ---
 name: scan
 description: "Use to run the read-only QA proposer lane — typed as /renmark:scan (--propose to land backlog items, --emit-cron for the schedule command). Never edits code, commits, or merges."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # scan
@@ -149,15 +149,15 @@ skill surfaces the `needs review` queue and lets you approve, reject, or defer
 each item before any execution occurs.
 
 scan is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It reports and proposes;
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`). It reports and proposes;
 it never advances the pipeline.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "scan")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups (e.g. `/renmark:backlog` to triage proposed
 > items). Render via `AskUserQuestion`
-> (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules 6–9); require an
+> (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules 6–9); require an
 > explicit choice.*
 
 ## Maintainer Note

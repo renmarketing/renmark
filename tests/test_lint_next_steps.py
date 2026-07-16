@@ -27,7 +27,7 @@ def _make_plugin(tmp_path: Path, skills: dict[str, str] | None = None) -> Path:
 
 def _skill_body(name: str, *, citation: str = "") -> str:
     """SKILL.md body that optionally cites a hand-off contract file."""
-    tail = f"\nSee _shared/{citation} for what to do next.\n" if citation else "\n"
+    tail = f"\nSee .shared/{citation} for what to do next.\n" if citation else "\n"
     return f"---\nname: {name}\ndescription: a skill for {name}\n---\n\n# {name}\n{tail}"
 
 
@@ -64,11 +64,11 @@ def test_cites_neither_one_issue_naming_skill(tmp_path: Path):
     assert "deadend" in issues[0]
 
 
-def test_skips_underscore_shared_dir(tmp_path: Path):
-    """`_shared/` holds reference files, not skills — an uncited *.md there must
+def test_skips_hidden_shared_dir(tmp_path: Path):
+    """`.shared/` holds reference files, not skills — an uncited *.md there must
     not produce an issue."""
     plugin = _make_plugin(tmp_path, skills={"plan": _skill_body("plan", citation="next-steps.md")})
-    shared = plugin / "skills" / "_shared"
+    shared = plugin / "skills" / ".shared"
     shared.mkdir()
     (shared / "scope-contract.md").write_text("# shared reference, no citation\n", encoding="utf-8")
     assert lint.lint_next_steps_citation(plugin) == []

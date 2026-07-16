@@ -79,7 +79,7 @@ It searches, IN ITS OWN CONTEXT, the four reuse sources:
 
 The subagent's own prompt MUST carry the reasoning-contract citation — consider
 interpretations, list assumptions, then act — per
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`.
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md`.
 
 The subagent does NOT modify any file. It reads and reasons only.
 
@@ -140,7 +140,7 @@ Report the finding first; propose custom work second.
 When citing this contract in a SKILL.md, write:
 
 > *Before proposing any custom build, dispatch the reuse-check subagent from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`: Agent tool call
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reuse-check.md`: Agent tool call
 > (`model: haiku`; `sonnet` for a large search surface), passing ONLY
 > `request_description`. The subagent searches loaded skills/commands, session
 > MCP tools, `.renmark/specs/` + `.renmark/plans/`, and
@@ -163,7 +163,7 @@ brainstorm and plan need the identical contract. Centralizing here means:
 
 - One edit point. Both consumers (and any future skill that proposes builds)
   read the same contract.
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint` (it's
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint` (it's
   a reference dir, not a skill).
 - Symmetric with `_shared/prd-alignment.md`, `_shared/scope-contract.md`, and
   `_shared/handoff-menu.md` — same pattern, same precedent.

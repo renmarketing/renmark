@@ -4,6 +4,15 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-07-16 — Claude Code / Codex host parity (v0.38.0)
+
+**Files:** `plugin/`, `renmark/hosts.py`, `renmark/interaction.py`, `renmark/dispatch.py`, `renmark/codex_routing.py`, installers, host rule templates, and parity tests
+**PRD:** `PRD.md` REQ-23
+
+One canonical distribution now installs on Claude Code and Codex. Both hosts share pipeline, loop, artifact, lifecycle, routing, and verification semantics; host adapters provide recommended-first selectors and native isolated dispatch. Natural requests such as “plan this” and “dispatch this” route without slash commands. Codex skips unsupported clear/compact/resume gates and continues from persisted state. Deterministic cross-host E2E, Codex package validation, installer smoke proof, Ruff, mypy, strict plugin lint, behavior fixtures, and 1,461 tests are green.
+
+---
+
 ### 2026-07-02 — Agency Mode (walking-skeleton MVP)
 
 **Files:** `renmark/agency.py`, `plugin/skills/_shared/agency-delivery.md`, `renmark/context.py`, `renmark/lifecycle.py`, `tests/test_agency.py`, `tests/test_agency_behavior.py`

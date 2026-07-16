@@ -44,7 +44,7 @@ def _make_plugin(
 def _skill_md(name: str, desc: str = "a skill") -> str:
     return (
         f"---\nname: {name}\ndescription: {desc} for {name}\n---\n\n# {name}\n\n"
-        f"See `${{CLAUDE_PLUGIN_ROOT}}/skills/_shared/next-steps.md`.\n"
+        f"See `${{CLAUDE_PLUGIN_ROOT}}/skills/.shared/next-steps.md`.\n"
     )
 
 
@@ -177,6 +177,17 @@ def test_registry_sync_detects_dir_without_skill_md(tmp_path: Path) -> None:
     (repo / "plugin" / "skills" / "orphaned_dir").mkdir(parents=True)
     issues = audit.registry_sync(repo)
     assert any("skill dir without SKILL.md" in i and "orphaned_dir" in i for i in issues), issues
+
+
+def test_registry_sync_ignores_hidden_support_dir(tmp_path: Path) -> None:
+    repo = _make_plugin(tmp_path, skills={}, commands={})
+    shared = repo / "plugin" / "skills" / ".shared"
+    shared.mkdir(parents=True)
+    (shared / "contract.md").write_text("# internal contract\n", encoding="utf-8")
+
+    issues = audit.registry_sync(repo)
+
+    assert not any(".shared" in issue for issue in issues)
 
 
 def test_registry_sync_skill_dir_with_skill_md_not_flagged(tmp_path: Path) -> None:

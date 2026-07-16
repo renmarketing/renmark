@@ -75,7 +75,7 @@ tier-override flag:
 - **`standard` / `full` tier, OR `--full` on any tier** → run the full codex pass
   below.
 
-**When Agency Mode is active:** codereview runs a full review before each milestone signoff, reports both merge-readiness and risk findings, and gates the owner signoff on review verdict. The review blocks premature "done" declarations until findings are addressed. See the Agency Mode contract at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for gating rules and escalation conditions. When Agency Mode is off, existing codereview behavior is unchanged.
+**When Agency Mode is active:** codereview runs a full review before each milestone signoff, reports both merge-readiness and risk findings, and gates the owner signoff on review verdict. The review blocks premature "done" declarations until findings are addressed. See the Agency Mode contract at `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` for gating rules and escalation conditions. When Agency Mode is off, existing codereview behavior is unchanged.
 
 **Adversarial escalation (REQ-2 — highest-stakes diffs only).** For release-gating,
 security-sensitive, or engine/state code, adversarial verification subagents MAY be
@@ -87,7 +87,7 @@ the codex read-only sandbox pass and the bounded severity-summary contract (Opus
 only the summary, never the diff body) are unchanged.
 
 > *Include the reasoning/output-discipline contract from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` in every
 > dispatched subagent prompt: multi-perspective decomposition → explicit
 > assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
 > recommendations; evidence preserved; missing context stated, never guessed.*
@@ -327,7 +327,7 @@ as final without it.
 
 Omit the `(focus: <mode>)` parenthetical entirely when mode is default — preserves the existing terse output for the common case.
 
-Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`, applying the rendering rules:
+Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`, applying the rendering rules:
 
 - **Omit `[c] Code review`** — we just ran it.
 - **Show `[s] Smoke`** and `[qa] QA` (a finding worth re-verifying live often lives in the just-reviewed diff).
@@ -336,15 +336,16 @@ Then append the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff
 - **Show `[f] Finish`** unconditionally and `[n] Nothing` always.
 
 Treat the `[o]`/`[fix]` actions plus the filtered gate options as ONE combined
-menu. **Present it as an interactive `AskUserQuestion` choice when available**
-(PRIMARY) — one selectable choice per option (`label` = action + code, e.g.
+menu. **Present it through `renmark.interaction.build_selector` when available**
+(PRIMARY). Recommend `[fix]` on critical findings, otherwise `[f] Finish`, and
+place that sole recommendation first. Use one selectable choice per option (`label` = action + code, e.g.
 `Fix [fix]`, `Open [o]`, `Code review`… ). This combined menu usually exceeds
-the picker's 4-option cap, so apply handoff-menu.md rule 6's overflow path:
-surface the **4 highest-priority** as selectable choices (priority: `[fix]` on
+the host's option cap, so apply handoff-menu.md rule 6's overflow path:
+surface the highest-priority choices (priority after the recommendation: `[fix]` on
 critical findings → `[qa]` → `[f]` → `[o]`/`[s]`, always keep `[n] Nothing`) AND
 print the **full combined numbered list** beneath as reference, so the overflow
 options stay reachable by typed number/letter. **Fall back** to the numbered list
-entirely when `AskUserQuestion` is unavailable / non-interactive / errors. Require
+entirely when the host selector is unavailable / non-interactive / errors. Require
 an explicit choice before doing anything.
 
 Don't auto-fix. The human reads and decides.

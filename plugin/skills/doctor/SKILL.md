@@ -1,7 +1,7 @@
 ---
 name: doctor
 description: "Use when /renmark:* commands aren't appearing, the plugin seems broken, or the user wants a sanity check on the install — typed as /renmark:doctor (--fix to apply safe auto-fixes)."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # doctor
@@ -160,11 +160,11 @@ Settings changes don't take effect until Claude Code reloads its plugin registry
 ## What's next
 
 doctor is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). After diagnosis (and any
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`). After diagnosis (and any
 `--fix`), don't dead-end — return the user to the pipeline.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "doctor")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
 > rules 6–9); require an explicit choice.*
