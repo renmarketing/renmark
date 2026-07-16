@@ -13,6 +13,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from .. import __version__
 from ..parser import PlanError, Task, parse_plan
 from ..providers.codex import codex_available as codex_available
 from ..state import (
@@ -1050,6 +1051,7 @@ def _process_wave_results(
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     ap = argparse.ArgumentParser(prog="renmark-execute")
+    ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     ap.add_argument("plan", nargs="?", help="path to plan file")
     ap.add_argument("--resume", action="store_true", help="resume a paused run")
     ap.add_argument("--dry-run", action="store_true", help="parse plan, list tasks, exit")

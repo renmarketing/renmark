@@ -35,6 +35,13 @@ $ConvenienceLink  = Join-Path $PluginsDir "renmark"
 $CacheDir         = Join-Path $PluginsDir "cache\renmark-local\renmark\$Version"
 $CodexPluginDir   = Join-Path $env:USERPROFILE "plugins\renmark"
 $CodexMarketplaceJson = Join-Path $env:USERPROFILE ".agents\plugins\marketplace.json"
+$CodexRuntimeDeps = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies"
+$CodexPython      = Join-Path $CodexRuntimeDeps "python\python.exe"
+$CodexPythonScripts = Join-Path $CodexRuntimeDeps "python\Scripts"
+$CodexFallbackBin = Join-Path $CodexRuntimeDeps "bin\fallback"
+$CodexGeneratedCli = Join-Path $CodexPythonScripts "renmark-execute.exe"
+$CodexCliExecutable = Join-Path $CodexFallbackBin "renmark-execute.exe"
+$CodexLegacyWrapper = Join-Path $CodexFallbackBin "renmark-execute.cmd"
 
 # Vibe-coder note: PowerShell prints with Write-Host; we do plain ASCII to
 # avoid encoding glitches in older Windows Terminal versions.
@@ -71,6 +78,14 @@ if ($Uninstall) {
     Write-Host "  removed $CodexPluginDir"
     if (Get-Command codex -ErrorAction SilentlyContinue) {
         & codex plugin remove "renmark@personal" 2>$null | Out-Null
+    }
+    if (Test-Path $CodexCliExecutable) {
+        Remove-Item $CodexCliExecutable -Force
+        Write-Host "  removed $CodexCliExecutable"
+    }
+    if (Test-Path $CodexLegacyWrapper) {
+        Remove-Item $CodexLegacyWrapper -Force
+        Write-Host "  removed $CodexLegacyWrapper"
     }
 
     # Wipe the entire renmark cache (all versions)
@@ -157,22 +172,35 @@ if (-not $IsLive) {
 # 2. Python package (editable). Required for renmark.doctor + renmark.init.
 Write-Host ""
 Write-Host "Python package:"
-if (Get-Command python -ErrorAction SilentlyContinue) {
+$pyExe = $null
+$pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+$python3Command = Get-Command python3 -ErrorAction SilentlyContinue
+if ($pythonCommand) {
+    $pyExe = $pythonCommand.Source
+} elseif ($python3Command) {
+    $pyExe = $python3Command.Source
+} elseif (Test-Path $CodexPython) {
+    $pyExe = $CodexPython
+}
+
+if ($pyExe -ne $null) {
     try {
-        & python -m pip install -q -e $InstallDir 2>&1 | Select-Object -Last 3
+        & $pyExe -m pip install -q -e $InstallDir 2>&1 | Select-Object -Last 3
         Write-Host "  renmark editable install OK"
     } catch {
         Write-Host "  pip install skipped (see above)"
     }
-} elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
-    try {
-        & python3 -m pip install -q -e $InstallDir 2>&1 | Select-Object -Last 3
-        Write-Host "  renmark editable install OK"
-    } catch {
-        Write-Host "  pip install skipped (see above)"
+
+    if ((Test-Path $CodexFallbackBin) -and (Test-Path $CodexGeneratedCli)) {
+        Copy-Item -LiteralPath $CodexGeneratedCli -Destination $CodexCliExecutable -Force
+        if (Test-Path $CodexLegacyWrapper) {
+            Remove-Item $CodexLegacyWrapper -Force
+        }
+        Write-Host "  renmark-execute installed at $CodexCliExecutable"
     }
 } else {
-    Write-Host "  python not found. Install Python 3.10+ from https://python.org"
+    Write-Host "  python not found (including the Codex bundled runtime)."
+    Write-Host "  Install Python 3.10+ from https://python.org"
     Write-Host "  then re-run this installer."
 }
 
@@ -215,10 +243,6 @@ if (-not $NoCodex) {
 # 4. Claude Code and Codex marketplace registration (must run after pip)
 Write-Host ""
 Write-Host "Registering with Claude Code and Codex:"
-
-$pyExe = $null
-if (Get-Command python -ErrorAction SilentlyContinue) { $pyExe = "python" }
-elseif (Get-Command python3 -ErrorAction SilentlyContinue) { $pyExe = "python3" }
 
 if ($pyExe -ne $null) {
     $canImport = $false

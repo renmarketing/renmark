@@ -9,7 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from renmark import cli
+from renmark import __version__, cli
+
+
+def test_version_flag_reports_package_version(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--version"])
+
+    assert exc_info.value.code == 0
+    assert capsys.readouterr().out.strip() == f"renmark-execute {__version__}"
 
 
 def test_task_mode_missing_output_arg_errors() -> None:
