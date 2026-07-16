@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-16] — package: deployable Renmark v0.38.0 archive
+
+**Request:** Create a deployable Renmark zip in the shared `/home/renmark/projects/releases/` folder.
+**Built:** Prepared the sanitized offline distribution `ai-system-renmark-v0.38.0-2026-07-16.zip` using Renmark's version-drift-aware packager; the archive excludes repository state, virtual environments, caches, generated `.renmark/` data, and secret-bearing file patterns.
+**Files changed:** `CHANGELOG.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.0-2026-07-16.zip`.
+**Do not change:** Keep deployable archives version-anchored, rooted under one extraction directory, free of `.git`/`.venv`/`.renmark` and secret-bearing files, and validate archive integrity before distribution.
+
 ## [2026-07-16] — release: Claude Code / Codex parity (v0.38.0)
 
 **Request:** Give Renmark first-class Claude Code and Codex parity across distribution, recommended-first selectors, natural-language routing, isolated dispatch, pipelines, loops, recovery, and installed-machine behavior; Codex must never ask the user to run unsupported `/clear`, `/compact`, or `/renmark:resume` commands.
