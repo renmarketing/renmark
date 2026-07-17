@@ -6,19 +6,20 @@ enough to derive a fingerprint and bounded decision summary, then discarded.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import datetime, timezone
+import importlib
 import json
 import os
-from pathlib import Path
 import tempfile
 import time
-from typing import Any, Iterator, Literal, Mapping, Sequence
 import warnings
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Literal
 
 from renmark.scan import content_fingerprint, finding_key_from_parts
-
 
 RemediationClass = Literal["patch", "durable_guard"]
 AcknowledgementAction = Literal["patch", "durable_guard", "retry_once"]
@@ -355,11 +356,26 @@ def _structured_summary(
     permitted_once: bool = False,
 ) -> tuple[str, ...]:
     count = _positive_int(entry.get("occurrence_count"), 1)
-    status = "resolved" if entry.get("resolved") else "acknowledged" if entry.get("acknowledged") else "open"
+    status = (
+        "resolved"
+        if entry.get("resolved")
+        else "acknowledged"
+        if entry.get("acknowledged")
+        else "open"
+    )
     lines = (
-        f"{_bounded_text(entry.get('source'), _MAX_SOURCE_CHARS)}: {_bounded_text(entry.get('target'), MAX_SUMMARY_LINE_CHARS)}",
+        (
+            f"{_bounded_text(entry.get('source'), _MAX_SOURCE_CHARS)}: "
+            f"{_bounded_text(entry.get('target'), MAX_SUMMARY_LINE_CHARS)}"
+        ),
         f"occurrences={count}; remediation={_remediation_for(count)}; status={status}",
-        "one-time retry permitted" if permitted_once else "next attempt blocked" if _is_blocked(entry) else "next attempt permitted",
+        (
+            "one-time retry permitted"
+            if permitted_once
+            else "next attempt blocked"
+            if _is_blocked(entry)
+            else "next attempt permitted"
+        ),
     )
     return tuple(_bounded_text(line, MAX_SUMMARY_LINE_CHARS) for line in lines if line)
 
@@ -378,8 +394,10 @@ def _bounded_text(value: object, limit: int) -> str:
 def _positive_int(value: object, default: int) -> int:
     if isinstance(value, bool):
         return default
+    if not isinstance(value, (int, str)):
+        return default
     try:
-        parsed = int(value)  # type: ignore[arg-type]
+        parsed = int(value)
     except (TypeError, ValueError):
         return default
     return parsed if parsed > 0 else default
@@ -521,10 +539,8 @@ def _write_state(path: Path, state: Mapping[str, Any]) -> None:
         raise RecurrenceStateError(f"unable to persist recurrence state: {exc}") from exc
     finally:
         if temporary is not None:
-            try:
+            with suppress(FileNotFoundError):
                 os.unlink(temporary)
-            except FileNotFoundError:
-                pass
 
 
 def _best_effort_sync_directory(directory: Path) -> None:
@@ -555,22 +571,28 @@ def _advisory_lock(path: Path) -> Iterator[bool]:
     acquired = False
     try:
         try:
-            import fcntl  # type: ignore[import-not-found]
+            fcntl: Any = importlib.import_module("fcntl")
 
             deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
             while True:
                 try:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     acquired = True
-                    unlock = lambda: fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+                    def unlock_posix() -> None:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+                    unlock = unlock_posix
                     break
-                except BlockingIOError:
+                except BlockingIOError as exc:
                     if time.monotonic() >= deadline:
-                        raise RecurrenceLockError("timed out waiting for recurrence lock")
+                        raise RecurrenceLockError(
+                            "timed out waiting for recurrence lock"
+                        ) from exc
                     time.sleep(0.025)
-        except ImportError:
+        except ModuleNotFoundError:
             try:
-                import msvcrt  # type: ignore[import-not-found]
+                msvcrt: Any = importlib.import_module("msvcrt")
 
                 if path.stat().st_size == 0:
                     handle.write(b"\0")
@@ -588,11 +610,13 @@ def _advisory_lock(path: Path) -> Iterator[bool]:
 
                         unlock = unlock_windows
                         break
-                    except OSError:
+                    except OSError as exc:
                         if time.monotonic() >= deadline:
-                            raise RecurrenceLockError("timed out waiting for recurrence lock")
+                            raise RecurrenceLockError(
+                                "timed out waiting for recurrence lock"
+                            ) from exc
                         time.sleep(0.025)
-            except ImportError:
+            except ModuleNotFoundError:
                 warnings.warn(
                     "advisory file locking is unavailable; recurrence writes are not process-safe",
                     RuntimeWarning,
@@ -613,9 +637,9 @@ def _advisory_lock(path: Path) -> Iterator[bool]:
 
 
 __all__ = [
+    "MAX_ENTRIES",
     "AcknowledgementAction",
     "IssueObservation",
-    "MAX_ENTRIES",
     "RecurrenceDecision",
     "RecurrenceLockError",
     "RecurrenceStateError",
