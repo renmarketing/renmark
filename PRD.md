@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-07-15
+last_reviewed: 2026-07-17
 status: draft
 ---
 
@@ -241,6 +241,21 @@ first-class hosts for the same product workflow, not separate product forks.
       and every selector/fallback is recommended-first; done when plan →
       dispatch → verify and bounded loop → pause → resume trajectories reach the
       same golden outcomes on Claude Code and Codex.
+24. `REQ-24` **Proactive recurring-issue prevention.** Before dispatching another
+    model attempt after the same materially equivalent implementation or testing
+    issue recurs, Renmark detects the recurrence using a host-neutral fingerprint
+    within the active run and bounded structured project memory across runs. It
+    notifies the user with concise recurrence evidence and recommends either
+    patching the reproducible underlying defect or proposing a mirrored durable
+    guard in `CLAUDE.md` and `AGENTS.md` when workflow instruction would prevent
+    another occurrence. It preserves human approval gates, never auto-writes
+    product or rule documents, avoids loading raw histories into orchestrator
+    context, and behaves equivalently on Claude Code and Codex (extends REQ-2,
+    REQ-3, REQ-5, REQ-20, REQ-21, and REQ-23).
+    - *Acceptance:* done when the second equivalent occurrence is surfaced before
+      a third model attempt; done when the warning includes bounded evidence and
+      a concrete patch-or-durable-guard recommendation; done when recurrence
+      evidence persists locally without raw transcript or history injection.
 
 ## Success metrics
 
@@ -257,6 +272,8 @@ first-class hosts for the same product workflow, not separate product forks.
   registration, identity, cache, and version faults.
 - Natural-language trigger, selector-ordering, full-pipeline, and loop/resume
   parity fixtures pass on both Claude Code and Codex.
+- Repeated-issue parity fixtures confirm that both hosts warn before a third
+  futile attempt and produce the same remediation class.
 
 ## Scope boundaries
 

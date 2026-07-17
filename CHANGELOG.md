@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — PRD updated: proactive recurring-issue prevention
+
+**Request:** Detect materially equivalent implementation or testing issues before Codex or Claude repeats a futile attempt, then proactively recommend either a patch or a durable mirrored instruction.
+**Built:** Added human-approved `REQ-24` and a success metric covering host-neutral recurrence fingerprints, bounded within-run and cross-run evidence, early notification, and patch-or-`CLAUDE.md`/`AGENTS.md` remediation guidance; bumped `last_reviewed`.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Warn before a third equivalent model attempt; keep evidence local and bounded; preserve approval gates; never auto-write `PRD.md`, `CLAUDE.md`, or `AGENTS.md`; keep Claude Code and Codex behavior equivalent.
+
 ## [2026-07-17] — v0.38.1: ship and route Claude specialist subagents
 
 **Request:** Stop Renmark's Claude runs from falling back to general-purpose agents and make the expected nine-role dispatch model install automatically.
