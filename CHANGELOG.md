@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - release: proactive repeated-issue prevention v0.38.2
+
+**Request:** Deploy the completed proactive repeated-issue prevention feature as a new Codex release and distribution zip.
+**Built:** Bumped Renmark to v0.38.2 and packaged the committed recurrence guard, Codex/Claude rule parity, and verification work for Codex deployment.
+**Files changed:** `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `.claude-plugin/marketplace.json`, `README.md`, `CHANGELOG.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.2-2026-07-17.zip`.
+**Do not change:** Keep Codex deployment separate from the user's Claude/Renmark-AI installation; retain version parity across all release metadata and validate the archive before distribution.
+
 ## [2026-07-17] - verify: proactive repeated-issue monitor
 
 **Request:** Auto-verify the resumed feature after isolating and fixing its repeated failures.
