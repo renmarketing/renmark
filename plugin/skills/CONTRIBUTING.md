@@ -6,7 +6,7 @@ A new skill that cannot tick all 9 boxes below does not merge.
 
 ## The 9-rule compliance checklist
 
-For each new **pipeline-class or quality-gate-class** SKILL.md, confirm and document in a `## Governance compliance` section at the bottom of the skill file. Aux/meta skills (class 3 per `_shared/next-steps.md`) MAY use a shorter form — a single-sentence compliance note per applicable rule — but MUST still call out any rule the skill actively relies on:
+For each new **pipeline-class or quality-gate-class** SKILL.md, confirm and document in a `## Governance compliance` section at the bottom of the skill file. Aux/meta skills (class 3 per `.shared/next-steps.md`) MAY use a shorter form — a single-sentence compliance note per applicable rule — but MUST still call out any rule the skill actively relies on:
 
 | # | Rule | Check |
 |---|---|---|
@@ -87,7 +87,7 @@ surface as a one-line note. Do NOT block — user decides.
 
 ## Long-form rules
 
-If a skill's full rule set runs more than ~50 lines, extract the long-form rules into a sibling file (pattern: `_shared/scope-contract.md` referenced from both `plan/SKILL.md` and `brainstorm/SKILL.md`). Skill files stay scannable; depth lives next to them. Rules shared by 2+ skills go in `skills/_shared/` so they have a single source of truth.
+If a skill's full rule set runs more than ~50 lines, extract the long-form rules into a sibling file (pattern: `.shared/scope-contract.md` referenced from both `plan/SKILL.md` and `brainstorm/SKILL.md`). Skill files stay scannable; depth lives next to them. Rules shared by 2+ skills go in `skills/.shared/` so they have a single source of truth.
 
 ## Adding a new rule block
 

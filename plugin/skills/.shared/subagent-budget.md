@@ -98,7 +98,7 @@ Early drafts left subagent dispatch discipline to individual skills. One skill s
 
 When citing in a SKILL.md, write:
 
-> *Honor subagent budget discipline in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/subagent-budget.md`: local-first (grep/read before spawning); each dispatch packet carries mission, files, output_format, stop_condition, model_tier, and verification_expectation; prefer cheaper models for read-only work; warn when >5 subagents are needed. Do not pass full skill bodies in dispatch packets (see `_shared/context-taxonomy.md`).*
+> *Honor subagent budget discipline in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/subagent-budget.md`: local-first (grep/read before spawning); each dispatch packet carries mission, files, output_format, stop_condition, model_tier, and verification_expectation; prefer cheaper models for read-only work; warn when >5 subagents are needed. Do not pass full skill bodies in dispatch packets (see `_shared/context-taxonomy.md`).*
 
 Do not paste the contract table or examples into the calling SKILL.md — cite this file.
 

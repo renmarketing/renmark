@@ -7,7 +7,7 @@ description: "Use for the Feature pipeline (/renmark:feature) when adding to or 
 
 ## Overview
 
-The **Feature pipeline** — adding or changing something in an existing build, with branch isolation. Creates a feature branch, checks PRD alignment (creating a PRD only if none exists), honors the reuse check (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md`) at plan time, runs the pipeline end-to-end, and offers PR / merge / release on finish. Continues automatically and pauses only at the Pause-Policy gates (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`) — chiefly PRD drift, the cost gate before tokens flow, and merge/release.
+The **Feature pipeline** — adding or changing something in an existing build, with branch isolation. Creates a feature branch, checks PRD alignment (creating a PRD only if none exists), honors the reuse check (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/reuse-check.md`) at plan time, runs the pipeline end-to-end, and offers PR / merge / release on finish. Continues automatically and pauses only at the Pause-Policy gates (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`) — chiefly PRD drift, the cost gate before tokens flow, and merge/release.
 
 **Pipeline (proportional — cost tracks size/risk):**
 ```
@@ -31,7 +31,7 @@ full signals (lite must never skip the full review on a risky change).
 
 ## When Agency Mode is active
 
-In Agency Mode, **feature selects the next milestone/feature from the roadmap** rather than treating each feature request as an isolated change. The PRD-alignment check (Step 2) runs against the selected milestone, and scope drift is surfaced immediately — feedback that changes scope updates the roadmap and PRD rather than silently expanding the feature. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for the full delivery contract.
+In Agency Mode, **feature selects the next milestone/feature from the roadmap** rather than treating each feature request as an isolated change. The PRD-alignment check (Step 2) runs against the selected milestone, and scope drift is surfaced immediately — feedback that changes scope updates the roadmap and PRD rather than silently expanding the feature. See `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` for the full delivery contract.
 
 ## When to Use
 
@@ -78,10 +78,10 @@ lifecycle.begin_feature(repo, feature="<slug>", branch="feature/<slug>")
 ### 2. PRD Alignment
 
 Before planning, dispatch the PRD alignment subagent per
-`plugin/skills/_shared/prd-alignment.md` (the single source of truth — do NOT inline its logic here).
+`plugin/skills/.shared/prd-alignment.md` (the single source of truth — do NOT inline its logic here).
 
 *Dispatch the PRD alignment subagent from
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`: Agent tool call,
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/prd-alignment.md`: Agent tool call,
 passing ONLY `feature_description` + `file_scope`. Receive ONLY the ≤5-line
 verdict summary. Do NOT read PRD.md in the orchestrator context.*
 
@@ -277,7 +277,7 @@ smoke tests — ALWAYS, all tiers; there is no menu choice for this since v0.3.3
 **Next-step hand-off (pipeline skill, class 1):**
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "feature")` and render the
-> result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+> result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
 > Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
 > 6–9); the state-derived next command is the `(Recommended)` option. Require an
 > explicit choice — never auto-proceed.*

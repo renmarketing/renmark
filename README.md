@@ -1,6 +1,6 @@
-# renmark v0.37.0
+# renmark v0.38.2
 
-A Claude Code plugin that turns Claude into a **pipeline-first** build assistant. Instead of memorizing commands, pick the pipeline that matches your situation and renmark runs the whole sequence — continuing on its own and pausing only at real decisions (unclear intent, PRD approval, scope change, risky action, cost, a blocker, or merge/release).
+A Claude Code and Codex plugin that provides a **pipeline-first** build assistant. Instead of memorizing commands, describe the work naturally or pick the pipeline that matches your situation; renmark runs the sequence and pauses only at real decisions (unclear intent, PRD approval, scope change, risky action, cost, a blocker, or merge/release).
 
 - **`/renmark:init`** — adopt renmark into any repo (new, in-progress, or production)
 - **`/renmark:start`** — build something new from plain English
@@ -10,6 +10,14 @@ A Claude Code plugin that turns Claude into a **pipeline-first** build assistant
 - **`/renmark:finish`** — verify, review, and ship
 
 Each pipeline runs its internal stages (PRD → plan → build → verify → QA → review → ship) under renmark's context-hygiene discipline. The supporting skills (plan, orchestrate, prd, audit, …) are the machinery underneath — run `/renmark:help` for the full command list with modifiers.
+
+Claude Code also receives eight plugin-provided specialists: `docs-editor`,
+`code-implementer`, `test-writer`, `reviewer`, `release-manager`, `researcher`,
+`audit-reader`, and `finish-lane-specialist`. They appear in `/agents` as
+`renmark:<role>`; Claude's built-in `general-purpose` is the ninth, fallback-only
+dispatch role. Nothing needs to be copied into global `~/.claude/agents/`.
+Renmark spawns only the specialists required by the current plan, not all nine
+on every run.
 
 ---
 
@@ -31,9 +39,10 @@ bash install.sh
 
 The installer:
 1. Symlinks the plugin into `~/.claude/plugins/renmark`
-2. `pip install -e .` for the Python runtime (`renmark.init`, `renmark.doctor`, dispatch)
-3. Asks about installing **Codex CLI** (optional, see below)
-4. Writes the Claude Code registry entries (`settings.json` + `installed_plugins.json`)
+2. Loads the eight bundled Claude specialists from the plugin's `agents/` directory
+3. `pip install -e .` for the Python runtime (`renmark.init`, `renmark.doctor`, dispatch)
+4. Asks about installing **Codex CLI** (optional, see below)
+5. Writes the Claude Code registry entries (`settings.json` + `installed_plugins.json`)
 
 After install, **restart Claude Code or run `/reload-plugins`** so the new slash commands appear. Then in any project: `/renmark:start`.
 

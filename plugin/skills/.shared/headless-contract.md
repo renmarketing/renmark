@@ -10,7 +10,9 @@ headless, suppress the picker, **auto-pick the recommended option at safe gates*
 machine-readable result plus one classifier-friendly prose line.
 
 Interactive mode is unchanged — when a human is present, the entire contract is
-inert and skills render menus exactly as today (see `handoff-menu.md`).
+inert and skills render a host-native selector or its numbered fallback (see
+`handoff-menu.md`). A selector tool being unavailable is a presentation
+capability gap, not proof that the session is headless.
 
 ---
 
@@ -22,9 +24,7 @@ Resolve in this order; the **first** layer that decides wins:
 1. RENMARK_HEADLESS=1   -> headless     (forces ON)
 2. RENMARK_HEADLESS=0   -> interactive  (forces OFF — explicit OFF wins over config)
 3. .renmark/config.json "headless": true|false   -> per-project / per-session config
-4. tool-availability fallback adapter:
-      AskUserQuestion absent from the tool list -> headless
-5. default -> interactive
+4. default -> interactive
 ```
 
 - **Python `config.is_headless(repo)` owns layers 1–3 and 5** — it reads the
@@ -32,12 +32,11 @@ Resolve in this order; the **first** layer that decides wins:
   the precedence above (`=1` → True, `=0` → False even if config says True, config
   flag otherwise, else False). It mirrors the P11 `is_proactive`/`set_proactive`
   pattern exactly (stdlib `json`, read-modify-write).
-- **Layer 4 (tool-availability) is skill-side** — the Python runtime cannot see
-  the model's tool list, so the *skill* observes its own available tools (or runs
-  a `ToolSearch("select:AskUserQuestion")` probe). `AskUserQuestion` is
-  intentionally **absent from spawned subagents** and this is a reliable headless
-  signal (Claude Code issue #34592, closed "not planned"). The skill combines the
-  Python verdict (layers 1–3,5) with this layer-4 adapter to reach the final mode.
+- **Selector availability is handled separately** by `renmark.interaction`.
+  Claude Code uses `AskUserQuestion`; Codex uses `request_user_input` when the
+  current surface exposes it. If either tool is absent, render the numbered
+  fallback and keep the session interactive unless layers 1–3 explicitly say
+  it is headless.
 - **NEVER infer headless from `CLAUDE_JOB_DIR` or `CLAUDECODE`.** Claude Code sets
   `CLAUDECODE=1` in *every* subprocess (including `renmark-execute` with a live
   human answering), so it is useless as a signal. A background job is not the same
@@ -51,10 +50,9 @@ was unsure. Safe gates in the uncertain case may still render the interactive
 menu (if a human is present they answer; if absent, the run is only stalled on a
 recoverable safe gate).
 
-> **`=0` caveat:** `RENMARK_HEADLESS=0` suppresses auto-pick; it does **not**
-> conjure a missing tool. If a forced-interactive run is actually in a subagent
-> where `AskUserQuestion` is absent, the skill must degrade to the prose+JSON
-> return rather than stalling on a picker it cannot render.
+> **`=0` caveat:** `RENMARK_HEADLESS=0` suppresses auto-pick; it does not conjure
+> a missing selector. The skill must render the recommended-first numbered
+> fallback rather than stalling on a tool it cannot invoke.
 
 ---
 
@@ -134,7 +132,7 @@ result = headless.resolve_gate(
     gate,                       # e.g. "merge", "next-steps", "prd"
     kind="safe",                # "safe" | "dangerous"
     recommended=<the (Recommended) option>,
-    tool_available=<is AskUserQuestion available?>,   # Layer-4 signal
+    tool_available=<deprecated compatibility input; does not decide headless>,
     originating_skill=<skill>,  # e.g. "finish"
     what=<one-line description of what the gate decides>,
 )
@@ -147,9 +145,9 @@ result = headless.resolve_gate(
   envelope; on a headless **dangerous** gate (or any unknown/uncertain gate, per
   the fail-safe uncertainty rule) it returns the `halt_for_human_review`
   `needs_input` envelope and writes the decision artifact.
-- **Layer-4:** pass `tool_available=False` when `AskUserQuestion` is absent from
-  the tool list to force headless — the Python runtime can't see the model's tool
-  list, so the skill supplies this signal (see §1, layer 4).
+- Build the visible menu separately with `renmark.interaction.build_selector`;
+  pass `tool_available=False` there when the host selector is absent. This does
+  not alter the headless verdict.
 
 When `resolve_gate(...)` returns anything other than `{"mode": "interactive"}`,
 the skill emits the **returned envelope** as the fenced JSON block **and**
@@ -207,8 +205,8 @@ trigger-only / disable-model-invocation frontmatter from any description bloat.
 
 When citing this contract in a menu file, write:
 
-> *If headless (per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/headless-contract.md`
-> detection), do not render `AskUserQuestion`: auto-pick the `(Recommended)`
+> *If headless (per `skills/.shared/headless-contract.md` in the active plugin
+> root), do not render a selector: auto-pick the `(Recommended)`
 > option at safe gates and continue; at dangerous gates halt, write
 > `.renmark/decisions/<gate>-approval.json`, set `human_review_required=true`, and
 > return the `needs_input` JSON + `needs input:` prose line.*

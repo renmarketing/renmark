@@ -13,7 +13,7 @@ Strict separation from ``pipeline.json``:
 If lifecycle.json exceeds ~1KB it's a bug — runtime cruft has leaked in.
 
 ``next_steps()`` is the contract helper for
-``plugin/skills/_shared/next-steps.md`` — the single source of truth for the
+``plugin/skills/.shared/next-steps.md`` — the single source of truth for the
 "what should the user do next?" hand-off rule across every renmark skill.
 """
 
@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from . import skillmeta
+from .hosts import HostKind, capabilities_for
 from .summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ PREAMBLE_TIER_BY_SKILL: dict[str, str] = {
 
 # ── Skill classes (next-steps.md contract) ────────────────────────────────────
 #
-# Three classes from plugin/skills/_shared/next-steps.md. The class decides what
+# Three classes from plugin/skills/.shared/next-steps.md. The class decides what
 # `next_steps()` surfaces. Mirror the DOMAIN_BY_SKILL style — module-level
 # frozensets, names aligned with the contract.
 
@@ -602,17 +603,23 @@ def preamble_tier(skill: str) -> str:
 
 
 def persist_compact_checkpoint(
-    repo: "Path | str", skill: str, reason: str
+    repo: Path | str,
+    skill: str,
+    reason: str,
+    host: str | HostKind | None = None,
 ) -> None:
     """Write a compact checkpoint to .renmark/state/compact_checkpoint.json.
 
     Called by skill_preamble before emitting a context gate message so the
-    user can resume after running /compact or /clear.  Never raises.
+    user can resume after a host-supported context reset. Never raises. Hosts
+    without a manual resume command persist ``resume_cmd: null``.
     """
-    from . import state as _state  # lazy — avoid circular import at module load
     import json as _json
 
+    from . import state as _state  # lazy — avoid circular import at module load
+
     try:
+        host_capabilities = capabilities_for(host)
         state_path = _state.state_dir(repo) / "compact_checkpoint.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
         state_path.write_text(
@@ -620,7 +627,11 @@ def persist_compact_checkpoint(
                 {
                     "skill": skill,
                     "reason": reason,
-                    "resume_cmd": "/renmark:resume",
+                    "resume_cmd": (
+                        "/renmark:resume"
+                        if host_capabilities.supports_resume
+                        else None
+                    ),
                     "timestamp": _state.now_iso(),
                 },
                 indent=2,
@@ -631,7 +642,11 @@ def persist_compact_checkpoint(
         pass
 
 
-def skill_preamble(repo: Path | str, skill: str) -> str | None:
+def skill_preamble(
+    repo: Path | str,
+    skill: str,
+    host: str | HostKind | None = None,
+) -> str | None:
     """Single-call Step-0 boilerplate for every SKILL.md.
 
     Performs the calls every skill used to inline by hand, gated by tier:
@@ -650,13 +665,17 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
 
     Returns the hint string the skill should surface to the user, or None when
     no hint is needed. Domain is resolved from `DOMAIN_BY_SKILL` — callers do
-    not need to pass it, so the per-skill prose can't drift.
+    not need to pass it, so the per-skill prose can't drift. Host resolution is
+    explicit argument → ``RENMARK_HOST`` → backward-compatible Claude default.
+    Hosts that do not support manual clear/resume commands record the domain
+    transition and continue without presenting an unusable gate.
     """
     # Imported lazily to avoid a state ↔ lifecycle circular import at module load.
     from . import state as _state
 
     domain = domain_of(skill)
     tier = preamble_tier(skill)
+    host_capabilities = capabilities_for(host)
 
     if tier == "minimal":
         # INVARIANT: record_skill_invocation runs for ALL tiers so that the next
@@ -673,10 +692,16 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
     fragments: list[str] = []
     if verdict == "clear" and skill not in _CONTEXT_BYPASS_SKILLS:
         prev_domain = last.get("domain", "?") if last else "?"
-        persist_compact_checkpoint(repo, skill, reason="clear")
+        if not host_capabilities.supports_clear:
+            # Codex and unknown hosts have no user-runnable /clear + resume
+            # pair. Treat the transition as observed, record it below, and
+            # continue without manufacturing an unsupported command gate.
+            verdict = None
+        else:
+            persist_compact_checkpoint(repo, skill, reason="clear", host=host)
         # Headless: skip the interactive gate so non-interactive runs are not blocked.
         from . import config as _config
-        if _config.is_headless(repo):
+        if verdict == "clear" and _config.is_headless(repo):
             # Record now — headless runs proceed automatically past the gate.
             _state.record_skill_invocation(repo, skill, domain)
             return _with_agency_note(
@@ -694,32 +719,33 @@ def skill_preamble(repo: Path | str, skill: str) -> str | None:
         # Interactive: return the gate prefix WITHOUT recording the invocation.
         # Not recording keeps the gate live on re-entry — the user must choose
         # explicitly before the skill proceeds.
-        return (
-            f"CONTEXT_GATE_CLEAR: cross-domain transition detected "
-            f"(prev: `{prev_domain}` \u2192 `{domain}`).\n"
-            "State persisted to .renmark/state/compact_checkpoint.json.\n"
-            "Present the user with AskUserQuestion before proceeding with this skill:\n"
-            '  header: "Context hygiene"\n'
-            '  question: "Domain change detected. Run /clear to start fresh '
-            '(memory survives), or continue with accumulated context?"\n'
-            "  options:\n"
-            "    1. Stop here \u2014 I will run /clear then /renmark:resume (Recommended)\n"
-            "    2. Continue in same context (this step only)\n"
-            "    3. Queue this as next task after current work finishes\n"
-            "    4. Cancel"
-        )
+        if verdict == "clear":
+            return (
+                f"CONTEXT_GATE_CLEAR: cross-domain transition detected "
+                f"(prev: `{prev_domain}` \u2192 `{domain}`).\n"
+                "State persisted to .renmark/state/compact_checkpoint.json.\n"
+                "Present the user with AskUserQuestion before proceeding with this skill:\n"
+                '  header: "Context hygiene"\n'
+                '  question: "Domain change detected. Run /clear to start fresh '
+                '(memory survives), or continue with accumulated context?"\n'
+                "  options:\n"
+                "    1. Stop here \u2014 I will run /clear then /renmark:resume (Recommended)\n"
+                "    2. Continue in same context (this step only)\n"
+                "    3. Queue this as next task after current work finishes\n"
+                "    4. Cancel"
+            )
 
     # Record the invocation here — after the gate, so a gated-then-stopped skill
     # does not corrupt the domain state for subsequent cross-domain detection.
     _state.record_skill_invocation(repo, skill, domain)
 
-    if verdict == "clear":
+    if verdict == "clear" and host_capabilities.supports_clear:
         # Must be a bypass skill (finish/approve/resume) — advisory only.
         fragments.append(
             f"context: cross-domain transition into `{domain}` — consider `/clear` "
             "before continuing (`.renmark/memory/` survives clears)"
         )
-    elif verdict == "compact":
+    elif verdict == "compact" and host_capabilities.supports_compact:
         fragments.append("context: approaching budget — consider `/compact` before continuing")
 
     if tier == "full" and skill in SYNTHESIS_SKILLS:

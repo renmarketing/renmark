@@ -1,8 +1,8 @@
 """Read-only consistency linter for SKILL.md files (P7 — pure lint, no generation).
 
 Doc-slimming already single-sourced every shared boilerplate region into
-``plugin/skills/_shared/*.md`` and had each SKILL.md cite it **by pointer**
-(``${CLAUDE_PLUGIN_ROOT}/skills/_shared/<name>.md``). There is therefore no
+``plugin/skills/.shared/*.md`` and had each SKILL.md cite it **by pointer**
+(``${CLAUDE_PLUGIN_ROOT}/skills/.shared/<name>.md``). There is therefore no
 duplicated verbatim block left to generate or migrate — so this module carries
 NO generator. It is a pure, read-only consistency lint over the registered
 SKILL.md files.
@@ -12,13 +12,13 @@ Two checks per skill:
 1. **Frontmatter discipline.** A non-empty ``description`` that is
    trigger-only-shaped (opens with the imperative "Use" and names at least one
    invocation trigger — a ``/renmark:<skill>`` mention or a quoted phrase), and
-   a ``disable-model-invocation`` frontmatter flag that is present-and-true IFF
-   :mod:`renmark.skillmeta` records ``disable_model_invocation=True`` for the
-   skill (any mismatch is a violation).
+   a ``disable-model-invocation`` frontmatter flag that is always false so
+   Codex can route natural-language requests into every skill. The value must
+   also match :mod:`renmark.skillmeta` (any mismatch is a violation).
 
-2. **Doc-slimming guard.** The skill body must NOT re-inline a ``_shared``
+2. **Doc-slimming guard.** The skill body must NOT re-inline a ``.shared``
    canonical blockquote verbatim — it must cite the pointer instead. Detection
-   uses distinctive signature substrings pulled from the ``_shared`` files at
+   uses distinctive signature substrings pulled from the ``.shared`` files at
    runtime (never hardcoded in full); if a signature appears verbatim in the
    skill body (whitespace-normalized, so markdown re-wrapping can't hide it),
    the skill is flagged to cite the pointer instead.
@@ -50,11 +50,11 @@ from .skillmeta import SkillMeta
 # /home/renmark/projects/ai-system/renmark/skillgen.py  →  /home/renmark/projects/ai-system
 RENMARK_ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_SOURCE = RENMARK_ROOT / "plugin"
-SHARED_DIR = PLUGIN_SOURCE / "skills" / "_shared"
+SHARED_DIR = PLUGIN_SOURCE / "skills" / ".shared"
 
-# Each _shared canonical region is single-sourced and cited by pointer. To catch
+# Each .shared canonical region is single-sourced and cited by pointer. To catch
 # a skill that re-inlines one verbatim, we derive the comparison signature FROM
-# the live _shared file at runtime — never from a frozen copy. Per region we keep
+# the live .shared file at runtime — never from a frozen copy. Per region we keep
 # only a short, stable *anchor*: a needle used to LOCATE the canonical line in the
 # current file. The signature actually compared against skill bodies is the live
 # text of the line carrying that anchor (whitespace/quote-normalized), so any
@@ -87,9 +87,9 @@ def _normalize(text: str) -> str:
 
 
 def _shared_signature(name: str) -> str | None:
-    """Return a live-derived, whitespace-normalized signature for a ``_shared`` region.
+    """Return a live-derived, whitespace-normalized signature for a ``.shared`` region.
 
-    The signature is DERIVED FROM the current ``_shared/<name>.md`` file content,
+    The signature is DERIVED FROM the current ``.shared/<name>.md`` file content,
     not from a frozen copy: we locate the canonical line by its short anchor in
     :data:`_SHARED_ANCHORS`, then return that line's live text (after the same
     whitespace/quote normalization applied to skill bodies). Because the compared
@@ -159,9 +159,9 @@ def lint_skill(skill: str, text: str, meta: SkillMeta) -> list[str]:
     families of checks are run:
 
     1. **Frontmatter discipline** — non-empty trigger-only-shaped ``description``;
-       ``disable-model-invocation`` present-and-true IFF
+       ``disable-model-invocation`` is false and matches
        ``meta.disable_model_invocation``.
-    2. **Doc-slimming guard** — the body must not re-inline a ``_shared``
+    2. **Doc-slimming guard** — the body must not re-inline a ``.shared``
        canonical blockquote verbatim (it must cite the pointer instead).
 
     Returns a list of human-readable violation strings (empty = clean).
@@ -183,19 +183,23 @@ def lint_skill(skill: str, text: str, meta: SkillMeta) -> list[str]:
             issues.append(f"{skill}: description names no trigger (/renmark: or quoted phrase)")
 
     declared = _truthy(fm.get("disable-model-invocation"))
+    if declared:
+        issues.append(
+            f"{skill}: disable-model-invocation must be false for Codex implicit routing"
+        )
     if declared != meta.disable_model_invocation:
         issues.append(
             f"{skill}: disable-model-invocation={declared} "
             f"but skillmeta expects {meta.disable_model_invocation}"
         )
 
-    # 2. Doc-slimming guard — no re-inlined _shared canonical blockquote.
+    # 2. Doc-slimming guard — no re-inlined .shared canonical blockquote.
     normalized_body = _normalize(text)
     for name in _SHARED_ANCHORS:
         sig = _shared_signature(name)
         if sig and sig in normalized_body:
             issues.append(
-                f"{skill}: re-inlines _shared/{name}.md blockquote verbatim — cite the pointer instead"
+                f"{skill}: re-inlines .shared/{name}.md blockquote verbatim — cite the pointer instead"
             )
 
     return issues
@@ -211,7 +215,8 @@ def lint_all(repo: str = ".") -> dict[str, list[str]]:
     The skill name is the directory name; its metadata comes from
     :func:`skillmeta.get`. ``repo`` selects the project root whose ``plugin/``
     tree is linted (defaults to the in-package plugin source — the same source
-    the rest of P7 reads). Underscore-prefixed support dirs (e.g. ``_shared/``)
+    the rest of P7 reads). Hidden or underscore-prefixed support dirs (for
+    example ``.shared/``)
     and any directory without a SKILL.md are skipped. Skills with no registry
     metadata are reported with a single "no skillmeta entry" violation rather
     than silently skipped (a registry/skill mismatch is itself drift).
@@ -230,7 +235,7 @@ def lint_all(repo: str = ".") -> dict[str, list[str]]:
         return results
 
     for skill_path in sorted(skills_dir.iterdir()):
-        if not skill_path.is_dir() or skill_path.name.startswith("_"):
+        if not skill_path.is_dir() or skill_path.name.startswith(("_", ".")):
             continue
         skill = skill_path.name
         skill_md = skill_path / "SKILL.md"

@@ -110,6 +110,6 @@ Finish-lane logic was originally inline in `/renmark:finish` skill, then copied 
 
 When citing in a SKILL.md or skill prompt, write:
 
-> *Use the finish lanes in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/finish-lanes.md`: quick (verify only), release (merge+tag), self-update (renmark only: merge+release+package+WSL), full (explicit-only). Consult `renmark.finish_lanes.recommend_lane` for the default by lifecycle stage. Do not invent new lanes.*
+> *Use the finish lanes in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/finish-lanes.md`: quick (verify only), release (merge+tag), self-update (renmark only: merge+release+package+WSL), full (explicit-only). Consult `renmark.finish_lanes.recommend_lane` for the default by lifecycle stage. Do not invent new lanes.*
 
 Do not paste the lane table into the calling SKILL.md — cite this file.

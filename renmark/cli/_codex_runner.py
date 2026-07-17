@@ -19,6 +19,7 @@ from ..providers.codex import (
     codex_available,
     run_codex_task,
 )
+from ..recurrence import IssueObservation, RecurrenceDecision, observe_issue, pre_attempt
 from ..state import (
     UsageRecord,
     append_usage,
@@ -219,6 +220,74 @@ def _judge_lane_and_rollback(
 # Codex execution helpers
 # ---------------------------------------------------------------------------
 
+_CODEX_RECURRENCE_CHECK = "codex-retry"
+_CODEX_RECURRENCE_RULES = (
+    "nonzero-executor-exit",
+    "lane-violation",
+    "verifier-failure",
+)
+_RECURRENCE_SIGNAL_LIMIT = 1_200
+
+
+def _bounded_recurrence_signal(task: Task, signal: str) -> str:
+    """Build bounded, in-memory-only input for recurrence fingerprinting."""
+    verifier = str(task.verifier)
+    if len(verifier) > 240:
+        verifier = verifier[:240]
+    if len(signal) > _RECURRENCE_SIGNAL_LIMIT:
+        signal = signal[-_RECURRENCE_SIGNAL_LIMIT:]
+    return f"verifier={verifier}\nsignal={signal}"
+
+
+def _observe_codex_failure(
+    repo: Path,
+    task: Task,
+    run_id: str,
+    *,
+    rule_id: str,
+    signal: str,
+) -> RecurrenceDecision:
+    """Record one retry-eligible failure without persisting its raw signal."""
+    return observe_issue(
+        repo,
+        IssueObservation(
+            check=_CODEX_RECURRENCE_CHECK,
+            rule_id=rule_id,
+            target=task.target,
+            title=f"Codex {rule_id}: {task.title}",
+            summary_text=_bounded_recurrence_signal(task, signal),
+            source="renmark.cli._codex_runner",
+            run_id=run_id,
+        ),
+    )
+
+
+def _pre_attempt_recurrence_guard(repo: Path, task: Task) -> RecurrenceDecision | None:
+    """Return the first persisted recurrence guard blocking a Codex call."""
+    for rule_id in _CODEX_RECURRENCE_RULES:
+        decision = pre_attempt(
+            repo,
+            check=_CODEX_RECURRENCE_CHECK,
+            rule_id=rule_id,
+            target=task.target,
+        )
+        if decision is not None and decision.retry_blocked:
+            return decision
+    return None
+
+
+def _recurrence_status_note(decision: RecurrenceDecision) -> str:
+    """Render bounded evidence plus the required proactive remediation hint."""
+    evidence = (
+        f"repeated issue x{decision.occurrence_count} "
+        f"key={decision.key[:12]} fingerprint={decision.fingerprint[:12]}"
+    )
+    detail = " | ".join(line.strip()[:100] for line in decision.summary_lines[:2] if line.strip())
+    note = f"{evidence}; recommend patch or durable_guard"
+    if detail:
+        note = f"{note}; {detail}"
+    return note[:320]
+
 def _codex_fail_after_retries(
     task: Task,
     total: int,
@@ -247,6 +316,34 @@ def _codex_fail_after_retries(
         completion_tokens=0,
     )
     return False, fail_code, 0, ""
+
+
+def _codex_fail_recurrence_guard(
+    task: Task,
+    total: int,
+    repo: Path,
+    run_id: str,
+    cfg: Any,
+    retries_left: int,
+    start: float,
+    decision: RecurrenceDecision,
+    *,
+    verifier_log: str | None = None,
+) -> tuple[bool, str, int, str]:
+    """Stop a repeated issue with bounded evidence before another Codex call."""
+    note = _recurrence_status_note(decision)
+    return _codex_fail_after_retries(
+        task,
+        total,
+        repo,
+        run_id,
+        cfg,
+        retries_left,
+        start,
+        note,
+        verifier_log or note,
+        "repeated_issue_guard",
+    )
 
 
 def _codex_verify_and_commit(
@@ -290,6 +387,28 @@ def _codex_verify_and_commit(
     # ones — classification + rollback under ONE lock (no TOCTOU gap).
     last_verifier_tail = vres.tail
     _classify_and_rollback(repo, [task.target])
+    recurrence = _observe_codex_failure(
+        repo,
+        task,
+        run_id,
+        rule_id="verifier-failure",
+        signal=f"exit_code={vres.exit_code}\n{last_verifier_tail}",
+    )
+    if recurrence.retry_blocked:
+        return _codex_fail_recurrence_guard(
+            task,
+            total,
+            repo,
+            run_id,
+            cfg,
+            retries_left,
+            start,
+            recurrence,
+            verifier_log=(
+                f"verifier:\n{last_verifier_tail}\n\n"
+                f"codex tail:\n{last_output_tail}"
+            ),
+        )
     if retries_left > 0:
         return None, "", 0, ""  # sentinel: retry
 
@@ -338,6 +457,12 @@ def _execute_task_codex(
     last_output_tail = ""
 
     while True:
+        recurrence_guard = _pre_attempt_recurrence_guard(repo, task)
+        if recurrence_guard is not None:
+            return _codex_fail_recurrence_guard(
+                task, total, repo, run_id, cfg, retries_left, start, recurrence_guard
+            )
+
         try:
             result = run_codex_task(task, repo, timeout_s=cfg.default_verifier_timeout_s * 10)
         except CodexError as e:
@@ -369,6 +494,25 @@ def _execute_task_codex(
         last_output_tail = result.output_tail
 
         if result.exit_code != 0:
+            recurrence = _observe_codex_failure(
+                repo,
+                task,
+                run_id,
+                rule_id="nonzero-executor-exit",
+                signal=f"exit_code={result.exit_code}\n{result.output_tail}",
+            )
+            if recurrence.retry_blocked:
+                return _codex_fail_recurrence_guard(
+                    task,
+                    total,
+                    repo,
+                    run_id,
+                    cfg,
+                    retries_left,
+                    start,
+                    recurrence,
+                    verifier_log=result.output_tail,
+                )
             if retries_left > 0:
                 retries_left -= 1
                 continue
@@ -394,6 +538,25 @@ def _execute_task_codex(
             sibling_targets=sibling_targets,
         )
         if not ok:
+            recurrence = _observe_codex_failure(
+                repo,
+                task,
+                run_id,
+                rule_id="lane-violation",
+                signal=f"reason={reason}\n{result.output_tail}",
+            )
+            if recurrence.retry_blocked:
+                return _codex_fail_recurrence_guard(
+                    task,
+                    total,
+                    repo,
+                    run_id,
+                    cfg,
+                    retries_left,
+                    start,
+                    recurrence,
+                    verifier_log=f"{reason}\n\n{result.output_tail}",
+                )
             if retries_left > 0:
                 retries_left -= 1
                 continue

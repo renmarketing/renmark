@@ -72,7 +72,7 @@ def test_context_kind_members_and_taxonomy_match() -> None:
         ("CLAUDE.md", context.ContextKind.STATIC),
         ("AGENTS.md", context.ContextKind.STATIC),
         ("plugin/skills/plan/SKILL.md", context.ContextKind.DYNAMIC),
-        ("plugin/skills/_shared/reuse-check.md", context.ContextKind.DYNAMIC),
+        ("plugin/skills/.shared/reuse-check.md", context.ContextKind.DYNAMIC),
         (".renmark/memory/INDEX.md", context.ContextKind.MEMORY),
         ("src/foo.py", context.ContextKind.TASK_LOCAL),
         ("", context.ContextKind.TASK_LOCAL),
@@ -116,7 +116,7 @@ def test_skill_metadata_and_pointer_contract() -> None:
 def test_body_loaders_are_on_demand(tmp_path: Path) -> None:
     plugin_root = tmp_path / "plugin"
     skill_dir = plugin_root / "skills" / "foo"
-    shared_dir = plugin_root / "skills" / "_shared"
+    shared_dir = plugin_root / "skills" / ".shared"
     skill_dir.mkdir(parents=True)
     shared_dir.mkdir(parents=True)
 

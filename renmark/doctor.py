@@ -1,6 +1,6 @@
-"""renmark.doctor — diagnose Claude Code plugin install health.
+"""renmark.doctor — diagnose Claude Code and Codex plugin install health.
 
-Checks that renmark is properly registered with Claude Code and surfaces
+Checks that renmark is properly registered with both supported hosts and surfaces
 remediation commands for anything broken. Pure diagnostic by default;
 ``--fix`` mode applies the obvious safe fixes (add to settings.json,
 register in installed_plugins.json, refresh cache symlink).
@@ -8,6 +8,7 @@ register in installed_plugins.json, refresh cache symlink).
 CLI:
     python -m renmark.doctor                    # check + report, exit 1 if any issue
     python -m renmark.doctor --fix              # apply safe registry/settings/cache fixes
+    python -m renmark.doctor --refresh-codex     # stage a cache-busted local Codex source
     python -m renmark.doctor --install-routing  # opt-in: write the global routing rule
     python -m renmark.doctor --json             # machine-readable output
 
@@ -31,9 +32,11 @@ the failure by typing ``/renmark:*`` and seeing nothing.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import json
 import shutil
+import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -56,6 +59,11 @@ PLUGINS_DIR = CLAUDE_DIR / "plugins"
 INSTALLED_PLUGINS_JSON = PLUGINS_DIR / "installed_plugins.json"
 KNOWN_MARKETPLACES_JSON = PLUGINS_DIR / "known_marketplaces.json"
 SYMLINK_PATH = PLUGINS_DIR / "renmark"
+
+CODEX_MARKETPLACE_JSON = Path.home() / ".agents" / "plugins" / "marketplace.json"
+CODEX_PLUGIN_SOURCE = Path.home() / "plugins" / "renmark"
+CODEX_MARKETPLACE_NAME = "personal"
+CODEX_MARKETPLACE_RELATIVE_SOURCE = "./plugins/renmark"
 
 MARKETPLACE_NAME = "renmark-local"
 PLUGIN_KEY = "renmark@renmark-local"  # `<plugin>@<marketplace>` per CC convention
@@ -158,20 +166,156 @@ def check_version_file() -> Check:
 
 
 def check_plugin_manifest() -> Check:
-    manifest = PLUGIN_SOURCE / ".claude-plugin" / "plugin.json"
-    if not manifest.exists():
-        return Check("Plugin manifest", "fail", f"{manifest} missing")
-    data = _load_json(manifest)
-    v = data.get("version")
     src_v = _current_version()
-    if v and src_v and v != src_v:
+    manifests = {
+        "Claude Code": PLUGIN_SOURCE / ".claude-plugin" / "plugin.json",
+        "Codex": PLUGIN_SOURCE / ".codex-plugin" / "plugin.json",
+    }
+    identities: dict[str, tuple[object, object]] = {}
+    for host, manifest in manifests.items():
+        if not manifest.exists():
+            return Check("Cross-host plugin manifests", "fail", f"{host} manifest missing: {manifest}")
+        data = _load_json(manifest)
+        identities[host] = (data.get("name"), data.get("version"))
+
+    names = {identity[0] for identity in identities.values()}
+    if names != {"renmark"}:
         return Check(
-            "Plugin manifest version",
+            "Cross-host plugin manifests",
             "fail",
-            f"manifest at v{v} but VERSION says v{src_v} — version drift",
+            f"manifest names must both be 'renmark': {identities}",
             fix_cmd="python -m renmark.release check",
         )
-    return Check("Plugin manifest", "pass", f"plugin.json at v{v}")
+    versions = {identity[1] for identity in identities.values()}
+    if len(versions) != 1 or (src_v and versions != {src_v}):
+        return Check(
+            "Cross-host plugin manifests",
+            "fail",
+            f"manifest versions must both match VERSION v{src_v}: {identities}",
+            fix_cmd="python -m renmark.release check",
+        )
+    return Check("Cross-host plugin manifests", "pass", f"renmark v{src_v} for Claude Code and Codex")
+
+
+def check_codex_marketplace() -> Check:
+    """Codex's personal marketplace must point at the shared plugin root."""
+    data = _load_json(CODEX_MARKETPLACE_JSON)
+    entries = data.get("plugins", [])
+    entry = next(
+        (item for item in entries if isinstance(item, dict) and item.get("name") == "renmark"),
+        None,
+    )
+    expected = {"source": "local", "path": CODEX_MARKETPLACE_RELATIVE_SOURCE}
+    if not entry:
+        return Check(
+            "Codex marketplace",
+            "fail",
+            f"renmark missing from {CODEX_MARKETPLACE_JSON}",
+            fix_cmd="python -m renmark.doctor --fix",
+            auto_fixable=True,
+            fix_fn=_fix_codex_marketplace,
+        )
+    if entry.get("source") != expected:
+        return Check(
+            "Codex marketplace",
+            "fail",
+            f"renmark source is {entry.get('source')!r}, expected {expected!r}",
+            fix_cmd="python -m renmark.doctor --fix",
+            auto_fixable=True,
+            fix_fn=_fix_codex_marketplace,
+        )
+    return Check("Codex marketplace", "pass", f"{CODEX_MARKETPLACE_NAME} → {CODEX_PLUGIN_SOURCE}")
+
+
+def check_codex_plugin_source() -> Check:
+    """The Codex marketplace source must resolve to this checkout's plugin root."""
+    if not CODEX_PLUGIN_SOURCE.exists():
+        return Check(
+            "Codex plugin source",
+            "fail",
+            f"{CODEX_PLUGIN_SOURCE} missing",
+            fix_cmd="python -m renmark.doctor --fix",
+            auto_fixable=True,
+            fix_fn=_fix_codex_source_link,
+        )
+    if CODEX_PLUGIN_SOURCE.is_symlink() and CODEX_PLUGIN_SOURCE.resolve() != PLUGIN_SOURCE.resolve():
+        return Check(
+            "Codex plugin source",
+            "fail",
+            f"{CODEX_PLUGIN_SOURCE} points to {CODEX_PLUGIN_SOURCE.resolve()}, not {PLUGIN_SOURCE}",
+            fix_cmd="python -m renmark.doctor --fix",
+            auto_fixable=True,
+            fix_fn=_fix_codex_source_link,
+        )
+    manifest = CODEX_PLUGIN_SOURCE / ".codex-plugin" / "plugin.json"
+    if not manifest.exists():
+        return Check("Codex plugin source", "fail", f"{manifest} missing")
+    data = _load_json(manifest)
+    source_version = data.get("version")
+    current = _current_version()
+    if (
+        data.get("name") != "renmark"
+        or not isinstance(source_version, str)
+        or (current and source_version != current and not source_version.startswith(f"{current}+"))
+    ):
+        return Check(
+            "Codex plugin source",
+            "fail",
+            f"{manifest} identity/version does not match renmark v{current}",
+        )
+    return Check("Codex plugin source", "pass", str(CODEX_PLUGIN_SOURCE))
+
+
+def check_codex_installed() -> Check:
+    """Use Codex's JSON registry view to verify installed and enabled state."""
+    cli = shutil.which("codex")
+    if not cli:
+        return Check("Codex installed plugin", "warn", "Codex CLI is not on PATH; install state cannot be checked")
+    try:
+        result = subprocess.run(
+            [cli, "plugin", "list", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        payload = json.loads(result.stdout) if result.returncode == 0 else {}
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        return Check("Codex installed plugin", "fail", f"could not read Codex plugin registry: {exc}")
+    installed = payload.get("installed", []) if isinstance(payload, dict) else []
+    entry = next(
+        (item for item in installed if isinstance(item, dict) and item.get("pluginId") == "renmark@personal"),
+        None,
+    )
+    if not entry:
+        return Check(
+            "Codex installed plugin",
+            "fail",
+            "renmark@personal is available but not installed",
+            fix_cmd="codex plugin add renmark@personal",
+        )
+    if not entry.get("installed") or not entry.get("enabled"):
+        return Check(
+            "Codex installed plugin",
+            "fail",
+            f"renmark@personal installed/enabled state is invalid: {entry}",
+            fix_cmd="codex plugin add renmark@personal",
+        )
+    installed_version = entry.get("version")
+    current = _current_version()
+    if (
+        current
+        and isinstance(installed_version, str)
+        and installed_version != current
+        and not installed_version.startswith(f"{current}+")
+    ):
+        return Check(
+            "Codex installed plugin",
+            "fail",
+            f"Codex has v{installed_version}, source is v{current}",
+            fix_cmd="codex plugin add renmark@personal",
+        )
+    return Check("Codex installed plugin", "pass", f"renmark@personal v{installed_version} enabled")
 
 
 def check_settings_marketplace() -> Check:
@@ -342,6 +486,9 @@ CHECKS = [
     check_settings_enabled,
     check_cache_install_path,
     check_plugin_symlink,
+    check_codex_marketplace,
+    check_codex_plugin_source,
+    check_codex_installed,
     check_global_routing_rule,
 ]
 
@@ -412,6 +559,46 @@ def _fix_cache_symlink() -> str:
     return f"cache symlink {cache_path} → {PLUGIN_SOURCE}"
 
 
+def _fix_codex_marketplace() -> str:
+    CODEX_MARKETPLACE_JSON.parent.mkdir(parents=True, exist_ok=True)
+    _backup(CODEX_MARKETPLACE_JSON)
+    data = _load_json(CODEX_MARKETPLACE_JSON)
+    data.setdefault("name", CODEX_MARKETPLACE_NAME)
+    data.setdefault("interface", {"displayName": "Personal"})
+    plugins = data.setdefault("plugins", [])
+    if not isinstance(plugins, list):
+        raise ValueError(f"{CODEX_MARKETPLACE_JSON}: plugins must be a list")
+    entry = {
+        "name": "renmark",
+        "source": {"source": "local", "path": CODEX_MARKETPLACE_RELATIVE_SOURCE},
+        "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+        "category": "Engineering",
+    }
+    plugins[:] = [item for item in plugins if not isinstance(item, dict) or item.get("name") != "renmark"]
+    plugins.append(entry)
+    CODEX_MARKETPLACE_JSON.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return f"registered renmark in {CODEX_MARKETPLACE_JSON}"
+
+
+def _fix_codex_source_link() -> str:
+    CODEX_PLUGIN_SOURCE.parent.mkdir(parents=True, exist_ok=True)
+    if CODEX_PLUGIN_SOURCE.is_symlink():
+        CODEX_PLUGIN_SOURCE.unlink()
+    elif CODEX_PLUGIN_SOURCE.exists():
+        existing = _load_json(CODEX_PLUGIN_SOURCE / ".codex-plugin" / "plugin.json")
+        if existing.get("name") != "renmark":
+            raise FileExistsError(f"refusing to replace non-renmark directory {CODEX_PLUGIN_SOURCE}")
+        shutil.rmtree(CODEX_PLUGIN_SOURCE)
+    shutil.copytree(PLUGIN_SOURCE, CODEX_PLUGIN_SOURCE, symlinks=True)
+    manifest = CODEX_PLUGIN_SOURCE / ".codex-plugin" / "plugin.json"
+    data = _load_json(manifest)
+    version = _current_version() or str(data.get("version") or "0.0.0")
+    stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d%H%M%S")
+    data["version"] = f"{version}+codex.local.{stamp}"
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return f"staged cache-busted Codex source at {CODEX_PLUGIN_SOURCE}"
+
+
 def install_routing_rule() -> tuple[bool, str]:
     """EXPLICIT opt-in: install the global routing rule (only on --install-routing).
 
@@ -470,7 +657,7 @@ def render_human(report: DoctorReport) -> str:
     n_fail = len(report.failed())
     n_warn = len(report.warned())
     if n_fail == 0 and n_warn == 0:
-        out.append("✅ All checks pass. /renmark:* slash commands should be available.")
+        out.append("✅ All checks pass. Renmark should be available in Claude Code and Codex.")
     else:
         bits = []
         if n_fail:
@@ -499,9 +686,22 @@ def render_json(report: DoctorReport) -> str:
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
+def _allow_unencodable_status_glyphs() -> None:
+    """Keep human diagnostics printable on legacy Windows console encodings."""
+    # Windows PowerShell may expose a cp1252 stdout stream. Doctor reports use
+    # status glyphs, so degrade unsupported glyphs instead of crashing while
+    # reporting the actual install failure.
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        with contextlib.suppress(OSError, ValueError):
+            reconfigure(errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _allow_unencodable_status_glyphs()
     argv = list(sys.argv[1:] if argv is None else argv)
     fix = "--fix" in argv
+    refresh_codex = "--refresh-codex" in argv
     install_routing = "--install-routing" in argv
     as_json = "--json" in argv
     if "-h" in argv or "--help" in argv or "help" in argv:
@@ -511,6 +711,16 @@ def main(argv: list[str] | None = None) -> int:
     # An explicitly-requested --install-routing that fails must flip the exit
     # code; the advisory detect in normal/--fix runs never does.
     explicit_install_failed = False
+
+    if refresh_codex:
+        try:
+            refreshed = _fix_codex_source_link()
+        except Exception as exc:
+            if not as_json:
+                sys.stderr.write(f"Codex source refresh FAILED: {exc}\n")
+            return 1
+        if not as_json:
+            sys.stdout.write(f"Codex source refresh: {refreshed}\n\n")
 
     report = run_checks()
     if fix:

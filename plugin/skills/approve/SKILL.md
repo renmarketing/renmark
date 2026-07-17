@@ -1,7 +1,7 @@
 ---
 name: approve
 description: "Use to clear a pending human-approval gate — typed as /renmark:approve or \"approve the release\", \"what's pending approval\", \"approve this\"."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # approve
@@ -62,7 +62,9 @@ else:
 ### 2. Confirm with the human
 
 Display `human_review_for` verbatim (what is being approved). Ask for an
-**explicit** decision via `AskUserQuestion` (two options: `Approve` / `Reject`).
+**explicit** decision via `renmark.interaction.build_selector` (two options:
+`Reject (Recommended)` first, then `Approve`). A recommendation is not approval;
+only the user's explicit `Approve` selection grants the gate.
 Never assume a default — this is the one gate the human must own. If
 `$ARGUMENTS` already carries `approve` or `reject`, treat that as the answer but
 still echo what is being approved before acting.
@@ -111,14 +113,14 @@ for d in (sorted(root.glob('loop-*')) if root.is_dir() else []):
 ### 4. Hand off
 
 approve is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It records a decision and
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`). It records a decision and
 returns the human to the in-flight feature.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "approve")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion`
-> (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules 6–9); require an
+> (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules 6–9); require an
 > explicit choice.*
 
 After an **approve**, the recommended local follow-up is the consuming skill

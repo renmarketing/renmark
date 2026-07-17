@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-07-02
+last_reviewed: 2026-07-17
 status: draft
 ---
 
@@ -21,12 +21,14 @@ model does which job, validation, verification, and keeping a project's memory
 coherent across sessions. Meanwhile, ad-hoc "just ask the AI" coding burns
 context, loses state on `/clear`, and silently drifts from the original intent.
 
-renmark turns Claude Code into a **guided build assistant**: a vibe coder types
-`/renmark:start`, describes the goal in plain English, and renmark handles stack
-selection, scope, best practices, and a full build pipeline — while experienced
-developers get the same pipeline exposed as direct commands. It is opinionated
-about one thing above all: **context hygiene** — the orchestrator coordinates,
-it never accumulates, and durable state lives on disk, not in the conversation.
+renmark turns Claude Code and Codex into a **guided build assistant**: a vibe
+coder describes the goal in plain English (or invokes a direct `/renmark:*`
+skill), and renmark handles stack selection, scope, best practices, and a full
+build pipeline — while experienced developers get the same pipeline exposed as
+direct commands. It is opinionated about one thing above all: **context
+hygiene** — the orchestrator coordinates, it never accumulates, and durable
+state lives on disk, not in the conversation. Claude Code and Codex are
+first-class hosts for the same product workflow, not separate product forks.
 
 ## Target users
 
@@ -55,12 +57,13 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   — never generated code, diffs, or large bodies.
 
 **Non-goals (product-level, durable)**
-- **Not a standalone app or hosted service.** renmark is a Claude Code plugin;
-  it runs *inside* Claude Code and has no server, GUI, or web deployment.
+- **Not a standalone app or hosted service.** renmark is a plugin/workflow
+  bundle for Claude Code and Codex; it uses host-provided interaction surfaces
+  and has no server, standalone GUI, or web deployment.
 - **Not its own model or model provider.** renmark orchestrates existing LLMs;
   it never ships or hosts a model.
-- **Not a replacement for Claude Code or for the human.** AI may generate code;
-  the human owns merges and releases (approval gates are load-bearing).
+- **Not a replacement for Claude Code, Codex, or the human.** AI may generate
+  code; the human owns merges and releases (approval gates are load-bearing).
 - **No third-party runtime dependencies in the core.** The Python runtime is
   stdlib-only; *capability layers* MAY require optional, opt-in external tools
   (Codex CLI as an executor; Playwright for browser automation) that are never
@@ -218,6 +221,41 @@ it never accumulates, and durable state lives on disk, not in the conversation.
     REUSES, never re-implements, the cost-control, finish-lane, and
     deterministic-first infrastructure; milestone-readiness checks run
     deterministically (extends REQ-3, REQ-4, REQ-5, REQ-21).
+23. `REQ-23` **Claude Code / Codex host parity.** Renmark ships the same named,
+    versioned plugin and the same product-level pipeline outcomes on both hosts.
+    Host adapters translate interaction, implicit routing, plugin installation,
+    and subagent dispatch without forking lifecycle, loop, approval, verifier,
+    or artifact semantics. Every user-choice menu has exactly one visibly
+    labeled `(Recommended)` option at index 0; it uses the host-native selector
+    when that selector is available and an identically ordered numbered
+    fallback otherwise. An unavailable Claude-only picker MUST NOT classify an
+    interactive Codex session as headless. Plain-English triggers including
+    “plan this”, “dispatch this”, “loop until this passes”, “fix this”, “build
+    this”, “what's next”, and “ship this” route to the same intended pipeline
+    on both hosts without requiring `/renmark:*` syntax. Host-native subagents
+    preserve the existing bounded input/output, cost, wave, verifier, pause,
+    and resume contracts (extends REQ-1, REQ-2, REQ-3, REQ-5, REQ-7, REQ-20,
+    REQ-21).
+    - *Acceptance:* done when both hosts report the same installed Renmark name
+      and release version; done when the trigger matrix selects the same skills
+      and every selector/fallback is recommended-first; done when plan →
+      dispatch → verify and bounded loop → pause → resume trajectories reach the
+      same golden outcomes on Claude Code and Codex.
+24. `REQ-24` **Proactive recurring-issue prevention.** Before dispatching another
+    model attempt after the same materially equivalent implementation or testing
+    issue recurs, Renmark detects the recurrence using a host-neutral fingerprint
+    within the active run and bounded structured project memory across runs. It
+    notifies the user with concise recurrence evidence and recommends either
+    patching the reproducible underlying defect or proposing a mirrored durable
+    guard in `CLAUDE.md` and `AGENTS.md` when workflow instruction would prevent
+    another occurrence. It preserves human approval gates, never auto-writes
+    product or rule documents, avoids loading raw histories into orchestrator
+    context, and behaves equivalently on Claude Code and Codex (extends REQ-2,
+    REQ-3, REQ-5, REQ-20, REQ-21, and REQ-23).
+    - *Acceptance:* done when the second equivalent occurrence is surfaced before
+      a third model attempt; done when the warning includes bounded evidence and
+      a concrete patch-or-durable-guard recommendation; done when recurrence
+      evidence persists locally without raw transcript or history injection.
 
 ## Success metrics
 
@@ -230,7 +268,12 @@ it never accumulates, and durable state lives on disk, not in the conversation.
 - Routing sends mechanical/bulk work to cheaper models, escalating only on
   capability need; cost preview matches realized spend within reason.
 - The plugin installs and registers cleanly across Mac / Linux / WSL / native
-  Windows, with `/renmark:doctor` catching registration faults.
+  Windows on Claude Code and Codex, with `/renmark:doctor` catching host-specific
+  registration, identity, cache, and version faults.
+- Natural-language trigger, selector-ordering, full-pipeline, and loop/resume
+  parity fixtures pass on both Claude Code and Codex.
+- Repeated-issue parity fixtures confirm that both hosts warn before a third
+  futile attempt and produce the same remediation class.
 
 ## Scope boundaries
 
@@ -246,7 +289,9 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   for loops and orchestrated runs); the self-audit surface (`/renmark:audit`,
   `/renmark:inventory`) and the human-approval gate surface (`/renmark:approve`);
   the Python runtime (CLI dispatch, verifier, lifecycle, memory); persistent
-  `.renmark/` state and memory; cross-platform install; the OPTIONAL Playwright
+  `.renmark/` state and memory; cross-platform, dual-host plugin installation;
+  host-neutral interaction/routing contracts and Claude Code/Codex native
+  subagent adapters; cross-host deterministic and live trajectory tests; the OPTIONAL Playwright
   browser-automation + session-persistence layer (opt-in, falls back to the
   Chrome DevTools MCP channel); graduated skill-preamble tiers that give
   zero-LLM / meta skills minimal context injection while pipeline skills receive
@@ -256,7 +301,8 @@ it never accumulates, and durable state lives on disk, not in the conversation.
   project-delivery loop that drives Orchestrator internally and does not
   replace Conductor/Orchestrator (REQ-22).
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
-  managing user secrets, and feature parity dual-writing with `legacy-plugin`.
+  replacing host-provided selectors with a standalone Renmark UI, managing user
+  secrets, and feature parity dual-writing with `legacy-plugin`.
 - **Deferred:** a roadmap "PRD progress view" (genuine altitude overlap, but
   bloat now — see ADR-005); first-class requirement-coverage reporting in
   verify (coverage flows implicitly via plan → tasks → verify traceability);
@@ -387,3 +433,12 @@ lane/deterministic-first infra) and a matching In-scope clause. Proposed by the
 agency-mode feature's PRD-alignment gate; spec at
 `.renmark/specs/2026-07-02-agency-mode.spec.md`. Reviewed and approved by the
 project owner on 2026-07-02 via the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-07-15, human-approved diff):** Expanded Renmark from a
+Claude Code-only plugin to a first-class Claude Code + Codex plugin/workflow
+bundle; added REQ-23 for dual-host distribution identity, recommended-first
+selector/fallback behavior, implicit trigger parity, host-native subagent
+dispatch, and shared pipeline/loop trajectory proof. Updated Vision, durable
+non-goals, success metrics, and scope boundaries. Proposed by the
+Codex/Claude-parity feature's PRD-alignment gate and explicitly approved by the
+project owner on 2026-07-15.

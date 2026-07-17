@@ -1,5 +1,138 @@
 # Changelog
 
+## [2026-07-17] - release: proactive repeated-issue prevention v0.38.2
+
+**Request:** Deploy the completed proactive repeated-issue prevention feature as a new Codex release and distribution zip.
+**Built:** Bumped Renmark to v0.38.2 and packaged the committed recurrence guard, Codex/Claude rule parity, and verification work for Codex deployment.
+**Files changed:** `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `.claude-plugin/marketplace.json`, `README.md`, `CHANGELOG.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.2-2026-07-17.zip`.
+**Do not change:** Keep Codex deployment separate from the user's Claude/Renmark-AI installation; retain version parity across all release metadata and validate the archive before distribution.
+
+## [2026-07-17] - verify: proactive repeated-issue monitor
+
+**Request:** Auto-verify the resumed feature after isolating and fixing its repeated failures.
+**Built:** Verified four goal-level behaviors for equivalent-attempt blocking, patch/guard/retry decisions, actionable escalation evidence, and mirrored Claude/Codex rule propagation; all nine task verifiers and repository-wide gates also passed.
+**Files changed:** `.renmark/reviews/2026-07-17-f87b955.verification.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** A green deterministic smoke run does not bypass code review, merge, release, or human approval gates.
+
+## [2026-07-17] - docs(template): propagate Codex repeated-issue rule
+
+**Request:** Ensure Codex receives proactive repeated-issue prevention when Renmark initializes or refreshes a project.
+**Built:** Added the root AGENTS rule verbatim to the managed AGENTS template while preserving every existing rule and marker.
+**Files changed:** `plugin/templates/AGENTS.md.template`, `CHANGELOG.md`.
+**Do not change:** Keep the managed block byte-for-byte aligned with the root AGENTS rule and preserve surrounding template content.
+
+## [2026-07-17] - docs(codex): mirror repeated-issue prevention
+
+**Request:** Give Codex the same proactive repeated-issue contract as Claude Code.
+**Built:** Added the concise AGENTS rule requiring the persisted recurrence ledger before a third equivalent implementation/test attempt, bounded evidence, explicit patch-or-durable-guard guidance, and mirrored approved guards.
+**Files changed:** `AGENTS.md`, `CHANGELOG.md`.
+**Do not change:** Keep this rule semantically synchronized with the authoritative `CLAUDE.md` contract and never retry or edit rules silently.
+
+## [2026-07-17] - docs(template): propagate repeated-issue prevention
+
+**Request:** Ensure projects adopted through Renmark receive the same proactive Claude rule as this repository.
+**Built:** Added the semantically identical repeated-issue prevention block to the managed Claude template while preserving managed markers and existing content.
+**Files changed:** `plugin/templates/CLAUDE.md.template`, `CHANGELOG.md`.
+**Do not change:** Keep the template rule identical to the authoritative `CLAUDE.md` block and preserve both managed block markers.
+
+## [2026-07-17] - docs(claude): require proactive repeated-issue prevention
+
+**Request:** Make Claude's authoritative project contract stop materially equivalent implementation/test attempts before a third retry.
+**Built:** Added a host-neutral core rule requiring the deterministic recurrence ledger, bounded evidence, an explicit patch-or-durable-guard recommendation, human acknowledgement, and mirrored approved guards without weakening Codex context invariants.
+**Files changed:** `CLAUDE.md`, `CHANGELOG.md`.
+**Do not change:** Never retry or edit rules silently; approved durable guards must remain mirrored in `CLAUDE.md` and `AGENTS.md`; Codex must not receive unsupported clear/compact/resume instructions.
+
+## [2026-07-17] - test(recurrence): prove bounded retries and preserve evidence
+
+**Request:** Resume the proactive monitor build after fixing the recurrence classifier, without spending another blind Codex retry.
+**Built:** Added deterministic coverage for stable Scan identity, cross-run recurrence, changed fingerprints, bounded/corrupt/atomic/lock state, raw-signal exclusion, patch/guard/retry acknowledgements, two-attempt Codex limits, and host-neutral Orchestrate wording; recurrence stops now retain the concrete current verifier, executor, or lane evidence in escalation artifacts.
+**Files changed:** `tests/test_recurrence.py`, `renmark/cli/_codex_runner.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`.
+**Do not change:** Never launch a third equivalent attempt; never replace actionable failure evidence with only a guard summary; keep raw model transcripts out of recurrence state and rule-file changes human-gated.
+
+## [2026-07-17] - fix(recurrence): classify remediation by failure kind
+
+**Request:** Isolate the repeated-issue monitor failure, fix its root cause, and resume the paused feature run without another wasteful Codex retry.
+**Built:** Replaced count-based remediation selection with stable rule-kind classification, persisted bounded check/rule identity with legacy-key recovery, and proved verifier failures recommend a patch while lane/instruction failures recommend a durable guard.
+**Files changed:** `renmark/recurrence.py`, `.renmark/plans/2026-07-17-debug-recurrence-remediation.plan.md`, `.renmark/debug/20260717-200049-c9ee/`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** Occurrence count controls when another attempt is blocked, never which remediation is recommended; technical failures default to a code patch and process/instruction failures to a human-approved durable guard.
+
+## [2026-07-17] — feat(orchestrate): surface repeated-issue remediation
+
+**Request:** Give Claude Code and Codex the same proactive warning and remediation choice before another equivalent implementation attempt.
+**Built:** Added host-neutral recurrence observation and pre-attempt gating to Orchestrate, with bounded evidence and recommended-first patch, durable-guard, or explicit one-time-retry choices; rule-document changes remain proposal-only and human-gated.
+**Files changed:** `plugin/skills/orchestrate/SKILL.md`, `CHANGELOG.md`.
+**Do not change:** Preserve usage-limit handling, fable fallback, Codex rerouting, SubagentOutput isolation, recommended-first host selectors, and Codex's no-clear/compact/resume invariant.
+
+## [2026-07-17] — feat(codex): stop equivalent retries before a third call
+
+**Request:** Prevent Codex from repeatedly spending model calls on the same implementation or verifier failure.
+**Built:** Added recurrence observations for executor exits, lane violations, and verifier failures; the second equivalent failure returns a bounded `repeated_issue_guard` result instead of launching a third Codex call, while preserving rollback, usage, escalation, and sibling-lane behavior.
+**Files changed:** `renmark/cli/_codex_runner.py`, `CHANGELOG.md`.
+**Do not change:** Keep Codex tasks on the subprocess lane; preserve provider-limit pauses and truthful retry accounting; never persist raw model or verifier bodies in recurrence state.
+
+## [2026-07-17] — feat(recurrence): add bounded repeated-issue state
+
+**Request:** Detect equivalent implementation and verifier failures across attempts and runs without storing raw histories or wasting a third model call.
+**Built:** Added a stdlib-only recurrence ledger with stable fingerprints, second-occurrence blocking decisions, bounded summaries, atomic/capped persistence, corruption recovery, and explicit patch, durable-guard, resolve, and one-time-retry acknowledgements; the focused Ruff, mypy, and compile gates pass.
+**Files changed:** `renmark/recurrence.py`, `CHANGELOG.md`.
+**Do not change:** Keep recurrence state separate from Scan's proposal ledger; persist no raw verifier/model bodies; block an unacknowledged third equivalent attempt; keep acknowledgement and resolution explicit.
+
+## [2026-07-17] — feat(recurrence): expose stable Scan identity helpers
+
+**Request:** Reuse Scan's proven finding identity model as the foundation for proactive repeated-issue detection.
+**Built:** Added public key-from-parts and content-fingerprint helpers while preserving `finding_key` behavior and the private compatibility alias; corrected the plan's pytest verifiers to use the repository virtual environment explicitly.
+**Files changed:** `renmark/scan.py`, `.renmark/plans/2026-07-17-proactive-repeated-issue-monitor.plan.md`, `CHANGELOG.md`.
+**Do not change:** Preserve Scan's `check:rule_id:target` key, SHA-1/12-hex fingerprint semantics, proposal ledger, backlog resurface behavior, and read-only lane invariants.
+
+## [2026-07-17] — PRD updated: proactive recurring-issue prevention
+
+**Request:** Detect materially equivalent implementation or testing issues before Codex or Claude repeats a futile attempt, then proactively recommend either a patch or a durable mirrored instruction.
+**Built:** Added human-approved `REQ-24` and a success metric covering host-neutral recurrence fingerprints, bounded within-run and cross-run evidence, early notification, and patch-or-`CLAUDE.md`/`AGENTS.md` remediation guidance; bumped `last_reviewed`.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Warn before a third equivalent model attempt; keep evidence local and bounded; preserve approval gates; never auto-write `PRD.md`, `CLAUDE.md`, or `AGENTS.md`; keep Claude Code and Codex behavior equivalent.
+
+## [2026-07-17] — v0.38.1: ship and route Claude specialist subagents
+
+**Request:** Stop Renmark's Claude runs from falling back to general-purpose agents and make the expected nine-role dispatch model install automatically.
+**Built:** Added eight Claude plugin agent definitions under `plugin/agents/`, dispatched them with collision-safe `renmark:<role>` names, made native-agent detection verify shipped files, honored explicit plan roles, and classified ordinary project source as `code-implementer`. Plans now require a specialist role and a reason for any `general-purpose` fallback. Claude supplies the ninth role through its built-in general-purpose agent; no global `~/.claude/agents/` copy is required, and Renmark intentionally spawns only the roles relevant to each plan. The Windows installer now rejects unreadable WSL-to-NTFS junctions and falls back to a verified copy, doctor reports degrade unsupported console glyphs instead of crashing, and deployable archives exclude mypy/Ruff caches.
+**Files changed:** `plugin/agents/`, `renmark/subagent_profiles.py`, `renmark/dispatch.py`, `renmark/lint.py`, `renmark/plan_lint.py`, `renmark/doctor.py`, `renmark/release.py`, subagent/plan shared contracts and rules, installers, README, version files, regression tests, `.renmark/debug/20260717-130707-1eb8/session.md`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.1-2026-07-17.zip`.
+**Do not change:** Keep the eight specialists plugin-scoped and file-verified; do not require global Claude agent files or spawn all roles on every run; preserve explicit plan roles and require `role_reason` whenever general-purpose is chosen; verify a Windows junction by reading the plugin manifest before accepting it.
+
+## [2026-07-17] — fix: restore Claude Code native selectors after install
+
+**Request:** Restore Renmark's Claude Code arrow-key selector and the recommended-first option after the parity installation regressed to plain prose.
+**Built:** Reproduced an enabled-but-unloadable Claude plugin whose registry pointed at a missing cache path, repaired the live cache, and made `install.sh` perform an authoritative post-install doctor check. The installer now fails instead of announcing success when Claude's registry/cache repair is unhealthy, and integration coverage pins both the valid cache path and the failure exit.
+**Files changed:** `install.sh`, `tests/integration/test_plugin_install.py`, `CHANGELOG.md`, `.renmark/debug/20260717-124915-8d72/session.md`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.0-2026-07-17.zip`.
+**Do not change:** A successful install must leave `renmark@renmark-local` enabled with an existing registered cache path; Claude uses `AskUserQuestion` with exactly one `(Recommended)` option first, while Codex keeps `request_user_input` and never receives clear/resume instructions.
+
+## [2026-07-16] — package: deployable Renmark v0.38.0 archive
+
+**Request:** Create a deployable Renmark zip in the shared `/home/renmark/projects/releases/` folder.
+**Built:** Prepared the sanitized offline distribution `ai-system-renmark-v0.38.0-2026-07-16.zip` using Renmark's version-drift-aware packager; the archive excludes repository state, virtual environments, caches, generated `.renmark/` data, and secret-bearing file patterns.
+**Files changed:** `CHANGELOG.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.0-2026-07-16.zip`.
+**Do not change:** Keep deployable archives version-anchored, rooted under one extraction directory, free of `.git`/`.venv`/`.renmark` and secret-bearing files, and validate archive integrity before distribution.
+
+## [2026-07-16] — release: Claude Code / Codex parity (v0.38.0)
+
+**Request:** Give Renmark first-class Claude Code and Codex parity across distribution, recommended-first selectors, natural-language routing, isolated dispatch, pipelines, loops, recovery, and installed-machine behavior; Codex must never ask the user to run unsupported `/clear`, `/compact`, or `/renmark:resume` commands.
+**Built:** Unified both hosts under the canonical `plugin/` bundle with synchronized manifests and a Codex personal-marketplace installer; added host capability resolution, exactly-one/recommended-first selector adapters with numbered fallback, exact natural triggers such as “plan this” and “dispatch this,” native Codex subagent dispatch semantics, host-aware lifecycle/context gates, and deterministic cross-host pipeline/loop E2E proof. Hidden shared contracts now live under `plugin/skills/.shared/` so Codex discovers only callable skills, all skill frontmatter permits implicit routing, and the Windows installer is ASCII-safe, uses Codex Desktop's bundled Python when needed, and installs a PATH-visible native `renmark-execute` launcher that preserves UNC project directories. The CLI now exposes its documented `--version` proof. Verified Codex plugin validation, release drift, Ruff, mypy, strict plugin lint, six behavioral fixtures, installer smoke tests, and the full suite (1,462 passed, 29 skipped).
+**Files changed:** `plugin/`, `renmark/`, `tests/`, `install.sh`, `install.ps1`, host manifests/templates, `README.md`, `VERSION`, `pyproject.toml`, `CLAUDE.md`, `AGENTS.md`, `.renmark/memory/features.md`, `CHANGELOG.md`.
+**Do not change:** Keep one product identity and artifact/state model across hosts; every choice has exactly one `(Recommended)` option at index 0; selector unavailability alone is not headless mode; pass the active host explicitly at Windows/WSL boundaries; Codex must continue from persisted state without clear/compact/resume instructions; keep internal shared contracts hidden from Codex skill discovery.
+
+## [2026-07-16] — fix: restore repository quality gates
+
+**Request:** Repair the pre-existing lint and type-check debt before implementing Claude Code / Codex parity.
+**Built:** Applied safe Ruff cleanup, restored compatibility aliases removed by the mechanical pass, fixed the heartbeat datetime annotation, and wrapped remaining long lines. Verified Ruff, mypy, focused regression tests, and the full suite (1,423 passed, 28 skipped).
+**Files changed:** `renmark/`, `tests/`, `.renmark/memory/bugs.md`, `CHANGELOG.md`.
+**Do not change:** Keep the `_engine` compatibility aliases until their direct test/API consumers migrate; repository-wide Ruff, mypy, and pytest must all remain green.
+
+## [2026-07-15] — PRD updated: Claude Code / Codex host parity
+
+**Request:** Make Renmark a first-class Codex host with the same selector, natural-language routing, pipeline, loop, and resume outcomes as Claude Code.
+**Built:** Reconciled Vision, Non-goals, Requirements, Success metrics, and Scope boundaries; added REQ-23 with product-level parity acceptance criteria; bumped `last_reviewed` to 2026-07-15.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Both hosts share one product workflow and artifact/state semantics; every choice has exactly one `(Recommended)` option at index 0; selector unavailability alone never means an interactive Codex session is headless; PRD changes remain human-approved.
+
 ## [2026-07-15] — audit: Codex / Claude Code parity
 
 **Request:** Deep-audit renmark's Codex parity with Claude Code, especially native selectors, recommended-first ordering, natural-language pipeline triggers, orchestration, loops, and resume behavior.

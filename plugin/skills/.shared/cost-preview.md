@@ -127,7 +127,7 @@ Cost transparency was scattered across skills. One skill silently escalated to F
 
 When citing in a SKILL.md, write:
 
-> *Show a cost preview before expensive work via `renmark/cost.py::estimate_cost`. Format per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/cost-preview.md`: model tiers, token/cost band, subagent count, escalation justification (cite `requires_escalation`), and cheaper alternatives. Do not route to Opus/Fable without justifying and surfacing the cost.*
+> *Show a cost preview before expensive work via `renmark/cost.py::estimate_cost`. Format per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/cost-preview.md`: model tiers, token/cost band, subagent count, escalation justification (cite `requires_escalation`), and cheaper alternatives. Do not route to Opus/Fable without justifying and surfacing the cost.*
 
 Do not paste the matrix or examples into the calling SKILL.md — cite this file.
 

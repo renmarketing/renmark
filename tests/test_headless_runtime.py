@@ -69,34 +69,26 @@ def test_headless_dangerous_halts_and_writes_artifact(tmp_path: Path, monkeypatc
     assert state.human_review_for == "merge"
 
 
-# ── resolve_gate: layer-4 (tool_available is False forces headless) ───────────
+# ── selector availability is independent from headless detection ─────────────
 
 
-def test_layer4_tool_unavailable_forces_headless_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Env off/unset but tool_available=False → treated headless; safe → success."""
+def test_tool_unavailable_does_not_force_headless_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing selector uses fallback UI; it does not make the run headless."""
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
     env = headless.resolve_gate(
         tmp_path, "next-step", kind="safe", recommended="/renmark:verify", tool_available=False
     )
-    assert env["status"] == "success"
-    assert env["mode"] == "headless"
-    assert env["decision"] == "auto_picked_recommended"
-    assert env["recommended"] == "/renmark:verify"
+    assert env == {"mode": "interactive"}
 
 
-def test_layer4_tool_unavailable_forces_headless_dangerous(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Env off/unset but tool_available=False + dangerous → needs_input (halt)."""
+def test_tool_unavailable_does_not_force_headless_dangerous(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing selector alone does not arm a dangerous human-review gate."""
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
     env = headless.resolve_gate(
         tmp_path, "merge", kind="dangerous", originating_skill="finish", tool_available=False
     )
-    assert env["status"] == "needs_input"
-    assert env["decision"] == "halted_for_human_review"
-
-    state = lifecycle.read_lifecycle(tmp_path)
-    assert state is not None
-    assert state.human_review_required is True
-    assert state.human_review_for == "merge"
+    assert env == {"mode": "interactive"}
+    assert lifecycle.read_lifecycle(tmp_path) is None
 
 
 # ── resolve_gate: tool_available True/None does NOT force headless ────────────

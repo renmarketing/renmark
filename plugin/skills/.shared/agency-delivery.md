@@ -116,6 +116,6 @@ Owner gates were earlier scattered across individual skill prompts: `/renmark:st
 
 When citing this contract in a SKILL.md or subagent dispatch, write:
 
-> *Honor the agency delivery contract in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md`: discovery → PRD → stack signoff → roadmap/milestones → build → demo/feedback → verification → final signoff → finish. Ask owner-level questions only (goal, users, constraints, risks, success, signoff). Milestone checkpoints pause for owner review — they do not pass automatically when tests pass. Background agents handle implementation; main agent coordinates and reads bounded summaries. Delegate cost infra to finish_lanes / cost.py / context_budget_hint / subagent-profiles — do not inline those rules.*
+> *Honor the agency delivery contract in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`: discovery → PRD → stack signoff → roadmap/milestones → build → demo/feedback → verification → final signoff → finish. Ask owner-level questions only (goal, users, constraints, risks, success, signoff). Milestone checkpoints pause for owner review — they do not pass automatically when tests pass. Background agents handle implementation; main agent coordinates and reads bounded summaries. Delegate cost infra to finish_lanes / cost.py / context_budget_hint / subagent-profiles — do not inline those rules.*
 
 Do not paste the delivery loop or gate table into the calling SKILL.md — cite this file.

@@ -370,13 +370,20 @@ def _check_secrets_risk(repo: Path, gaps: list[Gap]) -> None:
 
 def _check_package_managers(repo: Path, gaps: list[Gap]) -> None:
     """Append a Gap if multiple JS package manager lockfiles coexist."""
-    lockfiles_present = [lf for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml") if (repo / lf).exists()]
+    lockfiles_present = [
+        lockfile
+        for lockfile in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml")
+        if (repo / lockfile).exists()
+    ]
     if len(lockfiles_present) > 1:
         gaps.append(
             Gap(
                 "danger",
                 f"Multiple JS package managers: {', '.join(lockfiles_present)}",
-                "Each lockfile implies a different installer. Concurrent use causes ghost dependencies and silent breakage.",
+                (
+                    "Each lockfile implies a different installer. Concurrent use causes "
+                    "ghost dependencies and silent breakage."
+                ),
                 "Pick one — delete the others. Common choice: keep `package-lock.json` (npm).",
             )
         )
@@ -702,9 +709,9 @@ def render_standards_md(repo_name: str, today: str, git_sha: str | None, standar
         for g in standards.gaps:
             counts[g.severity] = counts.get(g.severity, 0) + 1
         summary = ", ".join(f"{n} {sev}" for sev, n in counts.items() if n)
-        out.append(
-            f"**{len(standards.gaps)} gap{'s' if len(standards.gaps) != 1 else ''} detected** ({summary}). Tightening recommendations below."
-        )
+        gap_count = len(standards.gaps)
+        suffix = "s" if gap_count != 1 else ""
+        out.append(f"**{gap_count} gap{suffix} detected** ({summary}). Tightening recommendations below.")
         out.append("")
         for g in standards.gaps:
             prefix = _SEVERITY_PREFIX.get(g.severity, "•")

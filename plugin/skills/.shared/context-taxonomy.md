@@ -66,7 +66,7 @@ Centralizing here means:
 
 - One edit point. The four kinds and the load policy are defined once; every
   skill and the `renmark.context` code path cite the same taxonomy.
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint` (it's a
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint` (it's a
   reference dir, not a skill), so this file never trips the command-pair check.
 - Symmetric with `_shared/reasoning-contract.md` and `_shared/handoff-menu.md` —
   same pattern, same precedent.
@@ -74,7 +74,7 @@ Centralizing here means:
 When citing this taxonomy in a SKILL.md or rule block, write:
 
 > *Honor the context taxonomy in
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/context-taxonomy.md`: static rules are
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/context-taxonomy.md`: static rules are
 > always present; dynamic skill/fragment bodies load on demand (metadata
 > upfront only); memory is durable and read by pointer; the per-subagent
 > dispatch packet carries task-local context + required-skill metadata, never a
@@ -86,10 +86,15 @@ Do not paste the taxonomy table into the calling SKILL.md — cite this file.
 
 ## Context hygiene gates
 
-Renmark enforces two hygiene gates as blocking AskUserQuestion menus:
+Renmark resolves host capabilities through `renmark.hosts.capabilities_for`
+(explicit host → `RENMARK_HOST` → Codex process marker → Claude-compatible default)
+before emitting either hygiene gate. Claude Code uses its manual context
+controls; Codex does not expose a compatible `/clear` + `/renmark:resume` pair,
+so Codex records the domain transition and continues without asking the user to
+run unsupported commands.
 
-**Clear gate (Python-enforced):** `skill_preamble` → `context_budget_check` returns `"clear"` on cross-domain transition → `persist_compact_checkpoint(repo, skill, reason="clear")` called → returns `CONTEXT_GATE_CLEAR:`-prefixed string → CLAUDE.md rule triggers `AskUserQuestion` menu. Bypass skills (advisory only): `finish`, `approve`, `resume`.
+**Clear gate (Python-enforced, Claude Code only):** `skill_preamble` → `context_budget_check` returns `"clear"` on cross-domain transition → host supports clear/resume → `persist_compact_checkpoint(repo, skill, reason="clear")` called → returns `CONTEXT_GATE_CLEAR:`-prefixed string → CLAUDE.md rule triggers `AskUserQuestion`. Bypass skills (advisory only): `finish`, `approve`, `resume`. On Codex or an unknown host, the preamble records the invocation and emits no clear/resume gate.
 
-**Compact gate (rule-enforced):** Threshold in `config.json["compact_gate_tokens"]` (default 120k, 0 = disabled). CLI helper: `renmark-execute --compact-checkpoint`. Enforced by CLAUDE.md rule at ≥120k tokens; Python provides persist + CLI helper only. Python cannot detect real % context utilization — absolute token count is the proxy.
+**Compact gate (rule-enforced, hosts with manual compact only):** Threshold in `config.json["compact_gate_tokens"]` (default 120k, 0 = disabled). CLI helper: `renmark-execute --compact-checkpoint`. Enforced by host rule at ≥120k tokens only when `supports_compact` is true; Python provides persist + CLI helper only. Codex relies on host-managed compaction and must not be blocked on an unavailable `/compact`, `/clear`, or resume command.
 
-**`persist_compact_checkpoint(repo, skill, reason)`:** writes `.renmark/state/compact_checkpoint.json` with `{skill, reason, resume_cmd: "/renmark:resume", timestamp}`. Consumed by `/renmark:resume` for state recovery. Never raises.
+**`persist_compact_checkpoint(repo, skill, reason, host=None)`:** writes `.renmark/state/compact_checkpoint.json` with `{skill, reason, resume_cmd, timestamp}`. `resume_cmd` is `/renmark:resume` only when the resolved host supports it; otherwise it is null. Never raises.

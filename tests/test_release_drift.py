@@ -40,6 +40,16 @@ def _make_repo(tmp_path: Path, version: str = "0.3.1", *, mismatch: dict[str, st
             }
         )
     )
+    (tmp_path / "plugin" / ".codex-plugin").mkdir(parents=True)
+    (tmp_path / "plugin" / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps(
+            {
+                "name": "renmark",
+                "version": v("plugin/.codex-plugin/plugin.json"),
+                "description": "test",
+            }
+        )
+    )
     (tmp_path / ".claude-plugin").mkdir()
     (tmp_path / ".claude-plugin" / "marketplace.json").write_text(
         json.dumps(
@@ -104,6 +114,18 @@ def test_current_version(tmp_path: Path):
 def test_check_drift_all_in_sync(tmp_path: Path):
     repo = _make_repo(tmp_path, version="0.3.1")
     assert release.drift_report(repo) == []
+
+
+def test_check_drift_catches_cross_host_manifest_name_mismatch(tmp_path: Path):
+    repo = _make_repo(tmp_path, version="0.3.1")
+    codex_manifest = repo / "plugin" / ".codex-plugin" / "plugin.json"
+    data = json.loads(codex_manifest.read_text())
+    data["name"] = "different-name"
+    codex_manifest.write_text(json.dumps(data))
+
+    issues = release.drift_report(repo)
+
+    assert any("Codex plugin manifest name" in issue for issue in issues)
 
 
 def test_check_drift_catches_pyproject(tmp_path: Path):
@@ -200,6 +222,10 @@ def test_build_package_excludes_junk_and_project_dirs(tmp_path: Path):
     # seed things that MUST NOT be packaged
     (repo / "__pycache__").mkdir()
     (repo / "__pycache__" / "x.pyc").write_text("junk")
+    (repo / ".mypy_cache").mkdir()
+    (repo / ".mypy_cache" / "cache.db").write_text("junk")
+    (repo / ".ruff_cache").mkdir()
+    (repo / ".ruff_cache" / "cache.db").write_text("junk")
     (repo / ".env").write_text("SECRET=1")
     (repo / ".renmark" / "state").mkdir(parents=True)
     (repo / ".renmark" / "state" / "pipeline.json").write_text("{}")
@@ -209,6 +235,8 @@ def test_build_package_excludes_junk_and_project_dirs(tmp_path: Path):
     joined = "\n".join(names)
     assert ".env" not in joined
     assert "__pycache__" not in joined
+    assert ".mypy_cache" not in joined
+    assert ".ruff_cache" not in joined
     assert ".pyc" not in joined
     assert ".renmark/" not in joined  # whole project-internal tree excluded
     assert "PLAN.md" not in joined

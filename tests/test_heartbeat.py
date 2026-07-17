@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from renmark import heartbeat
 from renmark.state.pause import usage_limit_pause, write_pause

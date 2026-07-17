@@ -1,7 +1,7 @@
 ---
 name: audit
 description: "Use to run a deterministic plugin/registry health audit — typed as /renmark:audit (--quick or --inventory-only). Read-only: writes only under .renmark/audits/."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # audit
@@ -77,7 +77,7 @@ all writes stay inside `.renmark/audits/` — no behavior change beyond where
 refutation passes run.
 
 > *Include the reasoning/output-discipline contract from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` in every
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` in every
 > dispatched subagent prompt: multi-perspective decomposition → explicit
 > assumptions/edge cases → synthesis; blocking vs deferrable; findings vs
 > recommendations; evidence preserved; missing context stated, never guessed.*
@@ -85,14 +85,14 @@ refutation passes run.
 ### 3. Hand off
 
 audit is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`). It reports; it never
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`). It reports; it never
 advances the pipeline.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "audit")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion`
-> (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules 6–9); require an
+> (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules 6–9); require an
 > explicit choice.*
 
 Local follow-ups to offer: `/renmark:inventory` (the inventory-only view), or —

@@ -50,6 +50,56 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-17 - Recurrence guard discarded the actionable verifier failure
+
+**Severity:** medium
+**Symptom:** A blocked third Codex attempt left only the recurrence summary in `verifier.log`, so the patch path could not inspect the failure that triggered the stop.
+**Root cause:** `_codex_fail_recurrence_guard` forwarded its status note as the escalation verifier log and had no parameter for the current bounded failure evidence.
+**Fix:** Pass the current verifier tail, executor tail, or lane reason into the guard escalation while keeping the bounded status note user-facing.
+**Lesson:** A retry guard must preserve the failure evidence needed to repair the issue it stops.
+
+---
+
+### 2026-07-17 — Repeated verifier failures recommended an instruction guard
+
+**Severity:** medium
+**Symptom:** The second equivalent verifier failure blocked another retry but recommended durable_guard instead of patch.
+**Root cause:** Remediation was derived solely from occurrence_count, so failure kind never influenced the recommendation.
+**Fix:** Classify remediation from the stable rule_id and persist bounded check/rule identity with legacy-key recovery.
+**Lesson:** Use recurrence count to decide when to stop retrying; use failure identity to decide how to remediate.
+
+---
+
+### 2026-07-17 — Claude specialist agents fell back to general-purpose
+
+**Severity:** major
+**Symptom:** Claude runs showed general-purpose agents instead of Renmark specialist roles
+**Root cause:** Renmark shipped no plugin agent definitions, falsely reported static native roles, ignored explicit plan roles, and failed to classify ordinary project source as code work.
+**Fix:** Shipped eight plugin-scoped agent definitions, verified files before native dispatch, honored explicit roles, and expanded source classification.
+**Lesson:** A dispatch-role registry is not host capability proof; package the host-native definition and resolve its installed scoped name before dispatch.
+
+---
+
+### 2026-07-17 — Claude native picker missing after parity install
+
+**Severity:** high
+**Symptom:** Claude Code answered Renmark gates as prose without an arrow-key selector or recommended-first option.
+**Root cause:** The installer had no authoritative post-install health gate: its pre-Codex doctor pass could return nonzero and was discarded by `|| true`, so it could announce success while Claude's registered Renmark cache path was missing; without the loaded skill, Claude could not invoke AskUserQuestion or render the recommended-first picker.
+**Fix:** Repaired the live Claude cache and made install.sh fail unless a final doctor pass confirms the registry and cache are healthy.
+**Lesson:** Treat plugin-manager registration and cache existence as installation postconditions; never suppress the final health check behind an output-filtering pipeline.
+
+---
+
+### 2026-07-16 — Repository-wide Ruff and mypy baseline was red
+
+**Severity:** medium
+**Symptom:** Ruff reported 60+ violations and mypy reported an undefined datetime annotation while pytest was green.
+**Root cause:** The heartbeat and reduce-complexity changes landed with tests green but without a green repo-wide Ruff/mypy gate, leaving lazy annotation imports, stale extracted imports, and mechanical formatting debt in the committed baseline.
+**Fix:** Applied safe Ruff fixes, repaired remaining annotations and formatting, preserved legacy engine aliases, then passed Ruff, mypy, focused tests, and the full 1,423-test suite.
+**Lesson:** A green pytest run is not a substitute for running every repository quality gate after cross-file extraction work.
+
+---
+
 ### 2026-07-01 — harness-modes: mode mutators silently swallowed write failures + wrong CLI path
 
 **Severity:** medium (was Major in codereview)

@@ -110,9 +110,10 @@ grep -q '^## Model tiers' .renmark/memory/routing.md
 - **Block present** → **never overwrite it.** Report the current declaration in
   one line (e.g. `Model tiers: top_tier=fable (declared 2026-06-12)`) and move on.
   This keeps the step idempotent — re-running init never re-asks or rewrites.
-- **Block absent** → ask **once** via `AskUserQuestion`:
+- **Block absent** → ask **once** via `renmark.interaction.build_selector`:
   *"Do you have Claude Fable 5 access for this project?"* with exactly two
-  options: `Yes` → `top_tier: fable`, `No` → `top_tier: opus`. Then insert the
+  options: `No (Recommended)` → `top_tier: opus`, `Yes` → `top_tier: fable`.
+  Then insert the
   block into `routing.md` **above the `## Learned overrides` section**, using
   exactly this grammar:
 
@@ -144,14 +145,15 @@ python -c "from renmark.global_routing import detect_global_rule; print(detect_g
 
 - `present-with-rule` → the rule is already installed. **Skip silently** — do not
   re-ask, do not report. This keeps the step idempotent across re-runs.
-- `missing` or `present-without-rule` → offer **once** via `AskUserQuestion` (text
+- `missing` or `present-without-rule` → offer **once** via
+  `renmark.interaction.build_selector` (text
   fallback below for non-interactive runs):
 
   > "Want renmark to be the default for build/dev work in every project on this
   > machine? I can add a routing rule to `~/.claude/CLAUDE.md` — it's backed up
   > first and never overwrites your other rules.
   >
-  > 1. [y] Yes — make renmark the default everywhere
+  > 1. [y] Yes (Recommended) — make renmark the default everywhere
   > 2. [n] Skip"
 
   - **Yes** → run `/renmark:doctor --install-routing` (the dedicated opt-in flag
@@ -181,7 +183,7 @@ an informational dead-end. If the project has no `PRD.md`, nudge `/renmark:prd`
 first so gap discovery has a source of truth to compare against.
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "init")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
 > rules 6–9); require an explicit choice.*

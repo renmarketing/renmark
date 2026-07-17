@@ -160,7 +160,7 @@ PRD is only updated after explicit approval. AI proposes; the human owns the PRD
 When citing this contract in a SKILL.md, write:
 
 > *Dispatch the PRD alignment subagent from
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/prd-alignment.md`: Agent tool call
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/prd-alignment.md`: Agent tool call
 > (`model: haiku`; `sonnet` when PRD.md > ~800 lines), passing ONLY
 > `feature_description` + `file_scope`. Receive ONLY the ≤5-line verdict
 > summary. Do NOT read PRD.md in the orchestrator context.*
@@ -176,7 +176,7 @@ drifted the moment a second feature-entry skill was added. Centralizing here mea
 
 - One edit point. Any future skill that needs PRD alignment (e.g. `/renmark:change`,
   `/renmark:migrate`) reads the same contract.
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint` (it's
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint` (it's
   a reference dir, not a skill).
 - Symmetric with `_shared/scope-contract.md` and `_shared/handoff-menu.md` —
   same pattern, same precedent.

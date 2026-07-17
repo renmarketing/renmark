@@ -187,8 +187,8 @@ def resolve_lane(recommended: Lane, override: str | None) -> Lane:
     recommended lane:
 
     - exact lane name in :data:`LANES` (e.g. ``"self-update"``) → that lane;
-    - the menu position ``"1".."4"`` in :data:`LANE_ORDER` order
-      (quick / release / self-update / full) → the lane at that position;
+    - the menu position ``"1".."4"`` in :func:`ordered_lanes` order, with the
+      recommendation at position 1;
     - a unique case-insensitive prefix of a lane name (e.g. ``"self"``,
       ``"rel"``, ``"q"``) → that lane;
     - ``None`` / empty / whitespace / unrecognized → *recommended* unchanged.
@@ -205,8 +205,9 @@ def resolve_lane(recommended: Lane, override: str | None) -> Lane:
             return token
         if token.isdigit():
             idx = int(token) - 1
-            if 0 <= idx < len(LANE_ORDER):
-                return LANE_ORDER[idx]
+            menu_order = ordered_lanes(recommended)
+            if 0 <= idx < len(menu_order):
+                return menu_order[idx]
             return recommended
         matches = [name for name in LANE_ORDER if name.startswith(token)]
         if len(matches) == 1:
@@ -214,6 +215,16 @@ def resolve_lane(recommended: Lane, override: str | None) -> Lane:
         return recommended
     except Exception:
         return recommended
+
+
+def ordered_lanes(recommended: Lane) -> tuple[Lane, ...]:
+    """Return all lanes once, with *recommended* at index zero."""
+    try:
+        if recommended not in LANES:
+            return LANE_ORDER
+        return (recommended, *(lane for lane in LANE_ORDER if lane != recommended))
+    except Exception:
+        return LANE_ORDER
 
 
 def lane_table() -> str:

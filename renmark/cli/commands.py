@@ -103,8 +103,9 @@ def cmd_scan(repo: Path, *, propose: bool = False, emit_cron: bool = False) -> i
 
 
 def cmd_heartbeat(repo: Path, *, emit_cron: bool = False, auto_resume: bool = False, interval_minutes: int = 30) -> int:
-    from .. import heartbeat as _heartbeat
     import datetime
+
+    from .. import heartbeat as _heartbeat
 
     if emit_cron:
         print(_heartbeat.emit_cron(repo, interval_minutes=interval_minutes))
@@ -131,7 +132,7 @@ def cmd_heartbeat_check_cron() -> int:
     return 0
 
 
-def _fail_response(out_path: "Path | str", summary_lines: list[str]) -> str:
+def _fail_response(out_path: Path | str, summary_lines: list[str]) -> str:
     """Return the standard FAIL JSON string for cmd_task early exits."""
     return json.dumps(
         {

@@ -123,7 +123,7 @@ investigating.
 
 ## What's next
 
-Debug is a class-3 aux / terminal skill. End by calling `renmark.lifecycle.next_steps(repo, "debug")` and render per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline + 1–2 local actions). The in-flight feature's next command is `(Recommended)`; add debug's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md rules 6–9); require an explicit choice — never auto-proceed.
+Debug is a class-3 aux / terminal skill. End by calling `renmark.lifecycle.next_steps(repo, "debug")` and render per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline + 1–2 local actions). The in-flight feature's next command is `(Recommended)`; add debug's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md rules 6–9); require an explicit choice — never auto-proceed.
 
 Debug-specific local actions, after a confirmed fix:
 - **`/renmark:verify`** — re-run the verifier to confirm the bug is gone and no regression slipped in (the repro must now pass, plus the goal-backward smoke test).

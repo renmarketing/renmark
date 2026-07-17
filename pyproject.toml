@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "renmark"
-version = "0.37.0"
+version = "0.38.2"
 description = "Multi-LLM orchestration: brainstorm, plan, orchestrate, debug, codereview. Persistent project memory."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,9 +25,12 @@ browser = [
     "playwright>=1.40.0",
 ]
 
-# Note: no [project.scripts] entry — the canonical CLI is the bash wrapper at
-# bin/renmark-execute, which install.sh symlinks to ~/.local/bin/. On Windows or
-# where the wrapper is unavailable, invoke via `python -m renmark` instead.
+[project.scripts]
+renmark-execute = "renmark.cli:main"
+
+# install.sh still symlinks the canonical repo-aware Bash wrapper on Unix. The
+# console entry point gives Windows/Codex a native executable that preserves UNC
+# working directories and dispatches to the same Python main function.
 
 [tool.setuptools.packages.find]
 include = ["renmark*"]

@@ -124,6 +124,14 @@ def test_resolve_lane_accepts_menu_aliases() -> None:
     assert resolve_lane(LANE_RELEASE, "bogus") == LANE_RELEASE
 
 
+def test_recommended_lane_is_first_without_duplication() -> None:
+    from renmark.finish_lanes import ordered_lanes
+
+    assert ordered_lanes(LANE_RELEASE) == (LANE_RELEASE, LANE_QUICK, LANE_SELF_UPDATE, LANE_FULL)
+    assert resolve_lane(LANE_RELEASE, "1") == LANE_RELEASE
+    assert len(set(ordered_lanes(LANE_RELEASE))) == 4
+
+
 # ---------------------------------------------------------------------------
 # REQ-21: release_readiness gates + lane_table Worktree column
 # ---------------------------------------------------------------------------

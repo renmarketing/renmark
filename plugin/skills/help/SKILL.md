@@ -1,7 +1,7 @@
 ---
 name: help
 description: "Use when the user types /renmark:help or asks \"what can renmark do\", \"list renmark commands\", \"renmark overview\"."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # help
@@ -170,7 +170,7 @@ skill's SKILL.md or invoke it directly.
 ## What's next
 
 `help` is a class-3 aux/terminal skill under
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (resume-pipeline + local
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (resume-pipeline + local
 actions). To keep `help` zero-cost / no-LLM, do **not** call
 `renmark.lifecycle.next_steps` here — emit a **static** pointer instead: after
 printing the block, append one line steering the user back to a pipeline. If a

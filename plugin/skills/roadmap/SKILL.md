@@ -94,9 +94,9 @@ orchestrator MUST NOT proceed to execution with an unapproved program.
 
 Shared contracts to apply (read by path, never pasted inline):
 
-- `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reuse-check.md` — before deriving a
+- `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reuse-check.md` — before deriving a
   custom stage sequence, confirm no existing plan covers it.
-- `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md` — governs the
+- `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` — governs the
   subagent's output discipline.
 
 ### Do not (forward plan mode)
@@ -187,7 +187,7 @@ This mode is strictly **read-only, advisory, and human-gated**:
   *routed* to `/renmark:prd` update mode (human-gated) — AI proposes, the human
   owns the PRD.
 - **No inline PRD body.** Roadmap MUST NOT read the `PRD.md` body into its own
-  context. It dispatches the **ALIGN subagent** (the `_shared/prd-alignment.md`
+  context. It dispatches the **ALIGN subagent** (the `.shared/prd-alignment.md`
   pattern) so the PRD body stays isolated; roadmap sees only the bounded
   ≤5-line verdict.
 - **Heavy work runs in subagents.** Gap analysis (T1) and any web research (T2)
@@ -195,7 +195,7 @@ This mode is strictly **read-only, advisory, and human-gated**:
   orchestrator/roadmap context never absorbs PRD bodies, CHANGELOG dumps, or
   research transcripts.
 
-### Tiered cost gating (per `_shared/next-steps.md`)
+### Tiered cost gating (per `.shared/next-steps.md`)
 
 Cost escalates deliberately — never jump to an expensive tier silently:
 
@@ -250,14 +250,14 @@ Any concrete PRD addition is handed to `/renmark:prd` for the human to approve.
 
 ## When Agency Mode is active
 
-When Agency Mode delivery is selected, `/renmark:roadmap` emits **MILESTONES** instead of generic task tables. Each milestone carries: sequenced checkpoints (deterministic gates), demo points (user-observable proof), and SIGNOFF points (formal acceptance). Roadmap annotates each with risk/dependency notes and writes `roadmap_ref` into agency state for orchestration handoff. Contract details: `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` (read by pointer only).
+When Agency Mode delivery is selected, `/renmark:roadmap` emits **MILESTONES** instead of generic task tables. Each milestone carries: sequenced checkpoints (deterministic gates), demo points (user-observable proof), and SIGNOFF points (formal acceptance). Roadmap annotates each with risk/dependency notes and writes `roadmap_ref` into agency state for orchestration handoff. Contract details: `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` (read by pointer only).
 
 ---
 
 ## What's next
 
 *End by calling `renmark.lifecycle.next_steps(repo, "roadmap")` and render per
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 add the skill's local follow-ups (e.g. open the top-ranked gap item, or re-run
 `--gaps --research`). Render via `AskUserQuestion` (handoff-menu.md rules 6–9);

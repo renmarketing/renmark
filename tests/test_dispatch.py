@@ -173,7 +173,7 @@ def _fanout_expected(tasks: list) -> list:
     for task in tasks:
         inp = dispatch.build_subagent_input(task)
         payload = inp.to_dict()
-        payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
+        payload["agent_type"] = subagent_profiles.native_agent_type(inp.role)
         result.append(payload)
     return result
 
@@ -210,7 +210,7 @@ def test_build_workflow_fanout_args_returns_empty_for_all_codex_wave() -> None:
 
 
 def test_build_workflow_fanout_args_includes_agent_type_for_native_roles() -> None:
-    """agent_type is pre-resolved: native roles get the role name, others get None."""
+    """agent_type is pre-resolved: native roles get a scoped name, others get None."""
     from renmark import subagent_profiles
 
     # docs-editor target resolves to docs-editor (has native file) → agent_type != None
@@ -219,11 +219,91 @@ def test_build_workflow_fanout_args_includes_agent_type_for_native_roles() -> No
     assert len(result) == 1
     role = result[0]["role"]
     if subagent_profiles.has_native_agent_file(role):
-        assert result[0]["agent_type"] == role
+        assert result[0]["agent_type"] == f"renmark:{role}"
     else:
         assert result[0]["agent_type"] is None
 
-    # src/a.py resolves to general-purpose → agent_type is None
-    wave_gp = [_task(2, "src/a.py", executor="sonnet", parallel_group=1)]
+    # An unsupported asset target remains on Claude's built-in fallback.
+    wave_gp = [_task(2, "assets/logo.svg", executor="sonnet", parallel_group=1)]
     result_gp = dispatch.build_workflow_fanout_args(wave_gp)
     assert result_gp[0]["agent_type"] is None
+
+
+def test_host_dispatch_plan_maps_single_task_to_native_tools() -> None:
+    task = _task(1, "src/a.py", executor="sonnet")
+
+    claude = dispatch.build_host_dispatch_plan([task], host="claude")
+    codex = dispatch.build_host_dispatch_plan([task], host="codex")
+
+    assert claude.strategy == codex.strategy == "single"
+    assert claude.task_packets == codex.task_packets
+    assert [call.tool for call in claude.calls] == ["Agent"]
+    assert [call.tool for call in codex.calls] == ["spawn_agent"]
+    assert codex.wait_tool == "wait_agent"
+    assert codex.followup_tool == "followup_task"
+    assert codex.calls[0].arguments["fork_turns"] == "none"
+    assert codex.calls[0].model_route is not None
+    assert claude.calls[0].arguments["subagent_type"] == "renmark:code-implementer"
+
+
+def test_claude_host_dispatch_uses_scoped_plugin_agent_type() -> None:
+    task = _task(1, "plugin/skills/example/SKILL.md", executor="haiku")
+
+    plan = dispatch.build_host_dispatch_plan([task], host="claude")
+
+    assert plan.calls[0].tool == "Agent"
+    assert plan.calls[0].arguments["subagent_type"] == "renmark:docs-editor"
+
+
+def test_host_dispatch_plan_maps_parallel_wave_to_native_fanout() -> None:
+    wave = [
+        _task(1, "src/a.py", executor="sonnet", parallel_group=1),
+        _task(2, "src/b.py", executor="opus", parallel_group=1),
+    ]
+
+    claude = dispatch.build_host_dispatch_plan(wave, host="claude")
+    codex = dispatch.build_host_dispatch_plan(wave, host="codex")
+
+    assert claude.strategy == codex.strategy == "fanout"
+    assert claude.task_packets == codex.task_packets
+    assert len(claude.calls) == 1
+    assert claude.calls[0].tool == "Workflow"
+    assert claude.calls[0].task_indices == (1, 2)
+    assert [call.tool for call in codex.calls] == ["spawn_agent", "spawn_agent"]
+    assert [call.task_indices for call in codex.calls] == [(1,), (2,)]
+
+
+def test_host_dispatch_plan_leaves_codex_executor_on_subprocess_path() -> None:
+    task = _task(1, "src/a.py", executor="codex")
+
+    for host in ("claude", "codex"):
+        plan = dispatch.build_host_dispatch_plan([task], host=host)
+        assert plan.strategy == "none"
+        assert plan.task_packets == ()
+        assert plan.calls == ()
+
+
+def test_bounded_host_prompt_refuses_oversized_packet() -> None:
+    task = _task(1, "src/a.py", executor="sonnet")
+    task.spec = "x" * dispatch.MAX_HOST_DISPATCH_PROMPT_CHARS
+    inp = dispatch.build_subagent_input(task)
+
+    with pytest.raises(dispatch.IsolationViolation, match="bounded-input contract"):
+        dispatch.render_bounded_subagent_prompt(inp)
+
+
+def test_host_prompt_carries_canonical_reasoning_instruction() -> None:
+    task = _task(1, "src/a.py", executor="sonnet")
+    plan = dispatch.build_host_dispatch_plan(
+        [task],
+        host="codex",
+        reasoning_instruction="Challenge assumptions before editing.",
+    )
+
+    assert "CANONICAL_REASONING_INSTRUCTION" in plan.calls[0].arguments["message"]
+    assert "Challenge assumptions before editing." in plan.calls[0].arguments["message"]
+
+
+def test_host_dispatch_plan_rejects_unknown_host() -> None:
+    with pytest.raises(ValueError, match="unsupported host"):
+        dispatch.build_host_dispatch_plan([_task(1, "src/a.py", executor="sonnet")], host="other")

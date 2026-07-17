@@ -1,19 +1,23 @@
 ---
 name: orchestrate
-description: "Use to execute a renmark plan — `/renmark:orchestrate` or \"execute the plan\", \"build it\", \"run the plan\". Dispatches each task in an isolated subagent and commits passing tasks."
+description: "Use to execute a renmark plan — `/renmark:orchestrate` or \"dispatch this\", \"execute the plan\", \"build it\", \"run the plan\". Dispatches each task in an isolated subagent and commits passing tasks."
 ---
 
 # orchestrate
 
 ## Overview
 
-Dispatches plan tasks in waves with **strict task isolation** (G11). Within a `parallel_group`, tasks run concurrently. Two dispatch paths — never mix them:
+Dispatches plan tasks in waves with **strict task isolation** (G11). Within a `parallel_group`, tasks run concurrently. The executor selects the work lane; the active host selects only the host-agent transport:
 
-| Executor | Dispatch path | Quota consumed |
+| Executor | Work lane |
 |---|---|---|
-| `codex` | Bash call to `renmark-execute` (subprocess) | Codex account (OpenAI subscription) |
-| `haiku`, `sonnet`, `opus` | Agent tool calls (no model override) | Claude Code account (Anthropic subscription) |
-| `fable` | Agent tool call with `model: "fable"` override (one-shot fallback to no override — opus tier — if fable is unavailable; see Step 3b) | Claude Code account (Anthropic subscription) |
+| `codex` | `renmark-execute` subprocess on both hosts |
+| `haiku`, `sonnet`, `opus`, `fable` | Host-native isolated subagent; model labels are native on Claude and routing metadata on Codex |
+
+| Active host | Single task | Parallel wave | Collection/correction |
+|---|---|---|---|
+| Claude Code | `Agent` | `Workflow` | synchronous return |
+| Codex | `spawn_agent` | concurrent `spawn_agent` calls | `wait_agent`; bounded correction via `followup_task` |
 
 After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (the per-task `SubagentOutput` dicts) and commits passing tasks serially in task-index order.
 
@@ -30,7 +34,7 @@ After each wave, the skill writes `.renmark/state/wave-summaries/wave-N.json` (t
 
 ## When Agency Mode is active
 
-In Agency Mode, orchestrate runs tasks via scoped background agents and advances to the next milestone **checkpoint** rather than halting after each task. The owner agent continues coordination while background agents execute in parallel; progress emits compact summaries only. See `${CLAUDE_PLUGIN_ROOT}/skills/_shared/agency-delivery.md` for the delivery contract. When Agency is off, orchestrate behaves as above — no changes to isolation or task dispatch.
+In Agency Mode, orchestrate runs tasks via scoped background agents and advances to the next milestone **checkpoint** rather than halting after each task. The owner agent continues coordination while background agents execute in parallel; progress emits compact summaries only. See `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` for the delivery contract. When Agency is off, orchestrate behaves as above — no changes to isolation or task dispatch.
 
 ## When to Use
 
@@ -95,9 +99,9 @@ require explicit acknowledgment before dispatch — do NOT auto-proceed on a
 subagent-heavy or deterministic-eligible plan. Prefer converting flagged tasks to
 deterministic checks or assigning a scoped profile (`subagent-profiles.md`).
 
-**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost. The cost preview MUST also carry the subagent-gate line (`renmark.subagent_gate.preview_line`), per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/cost-preview.md`.
+**Cost preview** — `renmark-execute --dry-run <plan>` shows the task list + estimated cost. The cost preview MUST also carry the subagent-gate line (`renmark.subagent_gate.preview_line`), per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/cost-preview.md`.
 
-**Headless gate (cost approval).** Before the `Proceed? [y/N]` prompt below, consult the headless contract (`plugin/skills/_shared/headless-contract.md`):
+**Headless gate (cost approval).** Before the `Proceed? [y/N]` prompt below, consult the headless contract (`plugin/skills/.shared/headless-contract.md`):
 
 ```python
 from renmark import headless
@@ -156,11 +160,70 @@ if view.get("limit_exceeded"):  # a configured local limit is already over budge
 
 The PauseState carries `pause_kind="usage_limit"` and a `resume_after` timestamp (provider reset if known, else the next local rolling-window boundary, else now+60min). Surface: *"Local usage limit reached — orchestrate paused before wave N. Resume with `/renmark:orchestrate --resume` after `resume_after`."* Then stop; do not enter 3b. MVP: no polling, no auto-retry — the user (or `/renmark:resume`) re-enters later.
 
+**3a-ter. Repeated-issue pre-attempt gate (deterministic, host-neutral)**
+
+After the usage preflight above, but before **any** Codex subprocess or host-agent
+dispatch, check both failure channels for every target in the wave. This check runs
+once per target on both hosts, before constructing or issuing transport calls:
+
+```python
+from renmark import recurrence
+
+attempt_checks = (
+    ("orchestrate-task", "non-usage-fail"),
+    (task.verifier, "verifier-downgrade"),
+)
+for check, rule_id in attempt_checks:
+    decision = recurrence.pre_attempt(
+        repo, check=check, rule_id=rule_id, target=str(task.target)
+    )
+    if decision is not None and decision.retry_blocked:
+        # STOP the whole wave before dispatch; render the bounded handoff below.
+        ...
+```
+
+`pre_attempt` is the sole authority for the threshold gate and consumes an
+acknowledged `retry_once` exactly once. Never parse recurrence state, reconstruct
+attempt history, or calculate a fingerprint in skill prose. A blocked decision
+prevents a third equivalent attempt from starting silently on either Claude Code
+or Codex.
+
+For a blocked decision, surface at most five lines total: include
+`occurrence_count`, bounded fingerprint evidence from `fingerprint`, the API's
+bounded `summary_lines`, and the recommended action. Use `remediation_class` to
+put the recommended choice first: reproducible implementation/test failures
+recommend patching through `/renmark:debug`; workflow/contract failures recommend
+a durable-guard proposal mirrored in both `CLAUDE.md` and `AGENTS.md`. Render the
+three host-native choices per
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`:
+
+- patch/debug;
+- propose a durable guard;
+- explicitly retry once.
+
+Record the selected action through the deterministic API, passing back the exact
+decision identity:
+
+```python
+recurrence.acknowledge_issue(
+    repo, key=decision.key, action=<"patch" | "durable_guard" | "retry_once">,
+    fingerprint=decision.fingerprint, run_id=<run_id>,
+)
+```
+
+A `durable_guard` selection authorizes only a proposal; changing either rule file
+still requires the normal human approval gate, and an approved guard must update
+both mirrors. A `retry_once` selection must re-enter this pre-attempt gate so the
+API consumes the acknowledgement; never dispatch directly from the menu. Patch
+and guard paths remain paused until their remediation is applied and verified;
+only then call `recurrence.resolve_issue(repo, key=decision.key,
+action=<selected action>, fingerprint=decision.fingerprint, run_id=<run_id>)`.
+
 **3b. Dispatch each task in this wave (parallel)**
 
 For `executor: codex` tasks:
 
-> **RED FLAG — never dispatch a `codex` task as an Agent call.** Codex tasks run exclusively through `renmark-execute` (a Bash subprocess). Dispatching them as Agents runs them on the parent Claude model, consuming Anthropic credits and ignoring the cost/routing intent.
+> **RED FLAG — never dispatch a `codex` task through a host agent (`Agent` or `spawn_agent`).** Codex tasks run exclusively through `renmark-execute` (a subprocess) on both hosts; changing transport would bypass the executor ledger and routing intent.
 >
 > **RED FLAG — never merge a subagent transcript into orchestrator context.** The subagent's reasoning lives in its artifact file. The orchestrator reads only the parsed `SubagentOutput` JSON.
 
@@ -173,11 +236,26 @@ renmark-execute <plan>
 
 `renmark-execute` returns one JSON line per task with the `SubagentOutput` shape. The orchestrator passes each through `dispatch.parse_subagent_response()`, which raises `IsolationViolation` on any extra field.
 
-**Wave-level dispatch shape.** Before looping over individual tasks, count this wave's non-`codex` (`needs_agent`) tasks. If that count is **> 1**, dispatch the whole wave per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/workflow-fanout.md` instead of issuing one `Agent` call per task: build the args via `dispatch.build_workflow_fanout_args(wave, dependency_summaries=...)` (this pre-resolves each item's native `subagent_type` via `subagent_profiles.has_native_agent_file` in Python, per the fragment), invoke the `Workflow` tool once for the wave, then pass each item of the returned array through `dispatch.parse_subagent_response()` — same `IsolationViolation` → FAIL handling, same per-task `state.log_agent_call` ledgering — exactly as the single-task path below does. Do **not** use the Workflow tool's own budget/token tracking (see the fragment's cost/ledger note); `log_agent_call` remains the single ledger. If the non-codex count is **≤ 1**, skip the fan-out and use the single `Agent` call path below unchanged. Codex tasks are unaffected either way — they always dispatch via `renmark-execute` per the RED FLAG above.
+**Host-agent dispatch shape.** For non-`codex` (`needs_agent`) tasks, build one pure transport plan before invoking any host tool:
 
-For `executor: haiku | sonnet | opus | fable` tasks (single-task path):
+```python
+host_plan = dispatch.build_host_dispatch_plan(
+    wave,
+    host=<"claude" | "codex">,
+    dependency_summaries=dependency_summaries,
+    upstream_artifact_pointers=<approved artifact paths>,
+    reasoning_instruction=<canonical reasoning blockquote>,
+)
+```
 
-Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `executor: fable`, pass `model: "fable"` on the Agent call. Build the subagent prompt from `dispatch.build_subagent_input(task, dependency_summaries=...)`, whose `role` field is resolved via `subagent_profiles.resolve_profile`. Before issuing the Agent call, check `subagent_profiles.has_native_agent_file(role)`: if true, pass `subagent_type: <role>` on the Agent call; if false (role is `general-purpose` or the file doesn't exist), omit `subagent_type` (defaults to the harness's general-purpose agent, unchanged from today). `subagent_type` only selects the tool allowlist — it does not change the `model` override rules above; those still apply exactly as written. The Agent prompt MUST instruct the subagent:
+`host_plan.task_packets` is the parity surface: the same `SubagentInput` dicts, in the same order, on both hosts. `build_host_dispatch_plan` performs no model call, state write, ledger write, or verifier run.
+
+- **Claude Code:** execute the returned `Agent` call for one task or the returned `Workflow` call for a fan-out. The Workflow branch still follows `${CLAUDE_PLUGIN_ROOT}/skills/.shared/workflow-fanout.md`. A native `subagent_type` is used only when available; `fable` alone receives a `model: "fable"` override.
+- **Codex:** issue every returned `spawn_agent` call before waiting so independent wave members run concurrently. Each call has `fork_turns: "none"`; never change it to inherit conversation history. Collect completions through `wait_agent`. Use `followup_task` only for one bounded correction such as “return valid SubagentOutput JSON”; never paste a transcript, diff, generated code, or accumulated prior summaries into the follow-up. The Codex route on each call is metadata because the host tool does not expose a per-spawn model override—do not add unsupported arguments or claim that route was selected live.
+
+The canonical prompt comes from `dispatch.render_bounded_subagent_prompt` and carries the complete `SubagentOutput` instruction. It refuses oversized input rather than truncating task intent. Pass the canonical reasoning instruction blockquote from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` as `reasoning_instruction`; the Claude Workflow adapter loads the same block per its fragment. This requirement applies equally to Codex host-agent calls and `renmark-execute --task` specs.
+
+The canonical output instruction consumed by the Claude Workflow fragment is:
 
 > "Your final response MUST be valid JSON matching this shape:
 > ```json
@@ -185,15 +263,15 @@ Plain `Agent` call — no `model` override for `haiku | sonnet | opus`; for `exe
 >  "touched_files": [...], "sha": "<sha or null>",
 >  "summary_lines": ["<≤5 lines>"], "dependency_notes": "<what downstream tasks need>",
 >  "token_count": <int>, "completion_state": "complete|partial|failed",
->  "confidence": "low|medium|high", "retry_count": 0}
+>  "confidence": "low|medium|high", "retry_count": 0,
+>  "validation_status": "validated|unvalidated|failed",
+>  "parser_success": <bool>, "schema_compliance": <bool>}
 > ```
 > The generated code goes in the artifact file at `<artifact_path>`, NOT in your response. Do not paste code or diffs back. If you cannot complete with the inputs provided, return `status: FAIL` with a one-line reason."
 
-The Agent prompt MUST also include the canonical reasoning instruction blockquote — the one under "The canonical reasoning instruction (verbatim — single source)" in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/reasoning-contract.md`, NOT the skill-author "Dispatch reference" blockquote — read it from that file at dispatch time and append it verbatim to the subagent prompt. This applies to BOTH dispatch paths: Agent-path dispatches above AND codex ad-hoc task specs (`renmark-execute --task`).
+For every host-agent return, pass only the returned JSON object through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark that task FAIL with reason “subagent leaked forbidden fields”; do not retry. Subsequent wave-summary, verifier, pause, and commit steps are host-independent.
 
-After the Agent returns, parse its response through `dispatch.parse_subagent_response()`. If it raises `IsolationViolation`, mark the task as FAIL with reason "subagent leaked forbidden fields" — do not retry.
-
-**Fable-unavailable fallback (defense-in-depth).** If an Agent call with `model: "fable"` errors **on dispatch** — the model is unavailable or the override is rejected by the harness — retry the task **exactly once** with no `model` override (the opus tier, same as `executor: opus`). Requirements (all mandatory — degradation is never silent):
+**Claude-only fable-unavailable fallback (defense-in-depth).** If an Agent call with `model: "fable"` errors **on dispatch** — the model is unavailable or the override is rejected by the harness — retry the task **exactly once** with no `model` override (the opus tier, same as `executor: opus`). Requirements (all mandatory — degradation is never silent):
 
 - record `fallback: fable→opus` in that task's wave-summary entry — in `dependency_notes` or a dedicated note field — so downstream waves and `/renmark:verify` see what actually ran;
 - log the fallback via `memory.append_routing(repo, signature=<task signature>, executor="opus", outcome=<"passed"|"failed">)` so repeated fable fallbacks accumulate as routing evidence in `.renmark/memory/routing.md`;
@@ -201,7 +279,7 @@ After the Agent returns, parse its response through `dispatch.parse_subagent_res
 
 One retry only: if the no-override retry also fails, that is an ordinary task FAIL — no further reroutes, no second fallback tier. Note that orchestrate's pre-flight `plan_lint` fable gates (checks 9–10: undeclared `top_tier: fable`, fable-on-mechanical) make an undeclared fable dispatch unreachable in the normal flow — this fallback is defense-in-depth for harness-side unavailability, not a routing surface. It is distinct from and complementary to the codex-side "Reroute-first on codex limits" rule in Step 5: that rule handles usage limits on the subprocess path; this one handles model availability on the Agent path.
 
-**Ledger the call.** Immediately after parsing each successful Agent return, log the spend so `/renmark:roadmap` reports honestly:
+**Ledger the call.** Immediately after parsing each successful host-agent return, log it once so `/renmark:roadmap` reports honestly. The row shape and timing are identical across hosts; only truthful model attribution differs (`task.executor` for Claude, the host-reported Codex model when available, otherwise `codex-host-agent`):
 
 ```python
 from renmark import state
@@ -209,7 +287,7 @@ from renmark.roadmap import AGENT_OVERHEAD_TOKENS
 state.log_agent_call(
     repo,
     task_id=task.index,
-    model=task.executor,                            # 'haiku' | 'sonnet' | 'opus' | 'fable'
+    model=<actual host model attribution>,
     tokens_in=AGENT_OVERHEAD_TOKENS,                # ~10k system + spec overhead per call
     tokens_out=out.token_count,                     # SubagentOutput.token_count
     run_id=<run_id>,
@@ -221,6 +299,38 @@ Codex tasks are ledgered by `renmark-execute` directly — do NOT call `log_agen
 **3c. Run verifier per task**
 
 For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, cwd=repo, tail_lines=3)` (`cwd` is a required keyword-only argument). Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
+
+**3c-bis. Observe non-usage failures deterministically**
+
+After executor fallback/rerouting has settled, observe each final non-usage task
+FAIL exactly once. Also observe a PASS that Step 3c downgraded because its verifier
+failed. Build the observation only from the parsed `SubagentOutput`, task metadata,
+and the already-bounded verifier result; never use a transcript, artifact, diff,
+raw log, or hand-parsed recurrence history:
+
+```python
+from renmark import recurrence, state
+
+observation = recurrence.IssueObservation(
+    check=(task.verifier if <verifier downgrade> else "orchestrate-task"),
+    rule_id=("verifier-downgrade" if <verifier downgrade> else "non-usage-fail"),
+    target=str(task.target),
+    title=task.title,
+    summary_text=<bounded failure reason or verifier result>,
+    source=("verifier" if <verifier downgrade> else "subagent_output"),
+    run_id=<run_id>,
+    observed_at=state.now_iso(),
+)
+decision = recurrence.observe_issue(repo, observation)
+```
+
+When `decision.retry_blocked` is true, use the same at-most-five-line evidence and
+recommended-first host-native handoff from Step 3a-ter. Do not observe Tier-1 or
+Tier-2 usage-limit pauses. Do not observe a recoverable fable dispatch error when
+its one fallback passes, or a Codex usage signal that is paused/rerouted; if the
+final fallback or rerouted execution ends in a non-usage FAIL, observe that final
+result once. `IsolationViolation` is a workflow/contract FAIL and uses this path,
+while its existing no-retry isolation rule remains authoritative.
 
 **3d. Escalation decision log**
 
@@ -278,7 +388,7 @@ Use the task's `summary_lines` and `touched_files` from `SubagentOutput` to fill
 |---|---|
 | All tasks PASS | Continue to next wave or finalize |
 | Task failed on a **provider usage signal** (rate-limit / quota / retry-later / usage-exceeded) | Classify as **PAUSED, not FAIL** — see Tier-2 below; STOP the wave so `/renmark:resume` continues later |
-| Any other FAIL in wave | Pause via `state.write_pause(...)`; show resume command; stop |
+| Any other FAIL in wave | Observe through Step 3c-bis, then pause via `state.write_pause(...)`; if recurrence reaches threshold, use the Step 3a-ter handoff instead of allowing another silent dispatch |
 | `IsolationViolation` raised | Mark task FAIL; aggregate summary anyway; alert user to skill-side bug |
 | Plan parse error | Route to `/renmark:plan` |
 
@@ -343,9 +453,9 @@ Report the orchestrate completion line first, then let verify take over:
 
 > *"All N tasks committed (M commits, ~$X spent). Running verification…"*
 
-→ invoke `/renmark:verify`. From here the user follows verify's hand-off menu, rendered per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` (an interactive `AskUserQuestion` choice when available, numbered text only as fallback; the user must pick a choice to continue).
+→ invoke `/renmark:verify`. From here the user follows verify's hand-off menu, rendered per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` (an interactive `AskUserQuestion` choice when available, numbered text only as fallback; the user must pick a choice to continue).
 
-**Next step is state-derived (pipeline skill, next-steps.md class 1).** Orchestrate's own next action after a clean run is the stage-routed `next_recommended(repo)` (= `/renmark:verify` at stage `created`), which it auto-invokes above. On a paused/failed run it does NOT advance — it surfaces the resume command. Per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 — Tier-0 stage routing); orchestrate hands directly to verify rather than rendering a separate picker.
+**Next step is state-derived (pipeline skill, next-steps.md class 1).** Orchestrate's own next action after a clean run is the stage-routed `next_recommended(repo)` (= `/renmark:verify` at stage `created`), which it auto-invokes above. On a paused/failed run it does NOT advance — it surfaces the resume command. Per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 — Tier-0 stage routing); orchestrate hands directly to verify rather than rendering a separate picker.
 
 **Browser QA recommendation (not automatic).** The default auto-verify above stays a shell smoke test — browser QA is **not automatic**. When a clean run's changed files / feature scope touch user-visible or browser surfaces (templates, frontend JS/CSS, page routes/controllers, forms/buttons, settings, preview/render UI, checkout/pricing, browser-facing pages), Recommend `/renmark:verify --qa` for a live happy-path flow — and `--deep-qa` for risky UI/runtime changes or after a normal `--qa` passes. This is a recommendation surfaced to the user, not an automatic step.
 

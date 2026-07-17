@@ -1,7 +1,7 @@
 ---
 name: inventory
 description: "Use to harvest a flat inventory of every renmark command and skill — typed as /renmark:inventory or \"list all commands\", \"inventory the skills\". Alias of /renmark:audit --inventory-only."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # inventory
@@ -44,13 +44,13 @@ for the full table.
 ### 2. Hand off
 
 inventory is an **aux / terminal skill** (class 3 in
-`${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md`).
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`).
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "inventory")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion`
-> (`${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md` rules 6–9); require an
+> (`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules 6–9); require an
 > explicit choice.*
 
 The natural local follow-up is **`/renmark:audit`** (the full health audit this

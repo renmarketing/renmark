@@ -9,6 +9,8 @@ set -euo pipefail
 VERSION="$(cat "$(dirname "${BASH_SOURCE[0]}")/VERSION" | tr -d '[:space:]')"
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_PLUGINS_DIR="$HOME/.claude/plugins"
+CODEX_PLUGIN_DIR="$HOME/plugins/renmark"
+CODEX_MARKETPLACE_JSON="$HOME/.agents/plugins/marketplace.json"
 LOCAL_BIN_DIR="$HOME/.local/bin"
 DEV_HOOK_PATH="$INSTALL_DIR/.git/hooks/pre-commit"
 
@@ -24,6 +26,9 @@ if [[ "${1:-}" == "--uninstall" ]]; then
     rm -f "$CLAUDE_PLUGINS_DIR/renmark"
     rm -f "$LOCAL_BIN_DIR/renmark-execute"
     rm -f "$LOCAL_BIN_DIR/renmark-browser"
+    if command -v codex >/dev/null 2>&1; then
+        codex plugin remove renmark@personal >/dev/null 2>&1 || true
+    fi
     # Remove from settings.json + installed_plugins.json + cache symlink
     python3 - <<'PY' || echo "Settings cleanup: skipped (python3 not available or settings.json missing)"
 import json, pathlib, shutil, sys
@@ -32,6 +37,8 @@ claude = pathlib.Path.home() / ".claude"
 settings = claude / "settings.json"
 installed = claude / "plugins" / "installed_plugins.json"
 cache_root = claude / "plugins" / "cache" / "renmark-local"
+codex_marketplace = pathlib.Path.home() / ".agents" / "plugins" / "marketplace.json"
+codex_source = pathlib.Path.home() / "plugins" / "renmark"
 
 if settings.exists():
     s = json.loads(settings.read_text())
@@ -56,6 +63,24 @@ if installed.exists():
 if cache_root.exists():
     shutil.rmtree(cache_root)
     print(f"Cache:    removed {cache_root}")
+
+if codex_marketplace.exists():
+    m = json.loads(codex_marketplace.read_text())
+    plugins = m.get("plugins", [])
+    kept = [entry for entry in plugins if not isinstance(entry, dict) or entry.get("name") != "renmark"]
+    if kept != plugins:
+        m["plugins"] = kept
+        codex_marketplace.write_text(json.dumps(m, indent=2) + "\n")
+        print("Codex:    removed renmark from personal marketplace")
+
+if codex_source.is_symlink():
+    codex_source.unlink()
+elif codex_source.is_dir():
+    manifest = codex_source / ".codex-plugin" / "plugin.json"
+    data = json.loads(manifest.read_text()) if manifest.exists() else {}
+    if data.get("name") == "renmark":
+        shutil.rmtree(codex_source)
+        print(f"Codex:    removed {codex_source}")
 PY
     if [[ -L "$DEV_HOOK_PATH" ]]; then
         rm -f "$DEV_HOOK_PATH"
@@ -165,10 +190,45 @@ fi
 if command -v python3 >/dev/null 2>&1; then
     if python3 -c "import renmark.doctor" 2>/dev/null; then
         echo ""
-        echo "Registering with Claude Code (settings.json + installed_plugins.json):"
-        python3 -m renmark.doctor --fix 2>&1 | grep -E "^(Applying|  •|\[)" | head -20 || true
+        echo "Registering with Claude Code and Codex:"
+        # This registration pass runs before `codex plugin add`, so doctor may
+        # still report the pending Codex install. The authoritative health
+        # check runs after that install below.
+        if doctor_output="$(
+            PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m renmark.doctor \
+                --fix --refresh-codex 2>&1
+        )"; then
+            :
+        fi
+        printf '%s\n' "$doctor_output" \
+            | grep -E "^(Applying|  •|\[)" \
+            | head -24 || true
     else
         echo "Registry: skipped (renmark.doctor not importable yet — re-run install.sh after pip succeeds)"
+    fi
+fi
+
+# The marketplace entry alone is not an install. When Codex is present, ask its
+# native plugin manager to cache and enable the freshly cache-busted source.
+if command -v codex >/dev/null 2>&1; then
+    echo ""
+    echo "Installing renmark@personal in Codex:"
+    if codex plugin add renmark@personal --json >/dev/null; then
+        echo "Codex:   renmark@personal installed and enabled"
+    else
+        echo "Codex:   plugin add failed; run: codex plugin add renmark@personal" >&2
+    fi
+fi
+
+# Do not announce a successful installation until the registry and cache paths
+# are healthy after every host-specific install step has finished.
+if command -v python3 >/dev/null 2>&1 && python3 -c "import renmark.doctor" 2>/dev/null; then
+    if ! doctor_output="$(
+        PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m renmark.doctor --fix 2>&1
+    )"; then
+        echo "ERROR: Claude Code registry/cache repair failed:" >&2
+        printf '%s\n' "$doctor_output" >&2
+        exit 1
     fi
 fi
 
@@ -195,6 +255,15 @@ fi
 cat <<EOF
 
 renmark v${VERSION} installed.
+
+Hosts:
+  Claude Code — reload plugins to pick up this version
+  Codex       — start a new task to pick up this version
+
+Claude agents:
+  8 Renmark specialists load from the plugin as renmark:<role>
+  general-purpose remains Claude's ninth, fallback-only dispatch role
+  no ~/.claude/agents copy is required
 
 Skills:
   /renmark:start       — vibe coder entry: describe what you want, renmark builds the rest

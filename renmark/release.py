@@ -120,6 +120,11 @@ VERSION_FILES: list[VersionFile] = [
         description="Claude Code plugin manifest",
     ),
     VersionFile(
+        "plugin/.codex-plugin/plugin.json",
+        _extract_plugin_json,
+        description="Codex plugin manifest",
+    ),
+    VersionFile(
         ".claude-plugin/marketplace.json",
         _extract_marketplace,
         description="marketplace metadata.version",
@@ -154,6 +159,8 @@ PACKAGE_EXCLUDES: tuple[str, ...] = (
     ".venv",
     "venv",
     ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
     "__pycache__",
     "*.pyc",
     "*.egg-info",
@@ -211,14 +218,19 @@ def _safe_archive_stem(value: str) -> str:
 def package_basename(repo: Path | str = ".") -> str:
     """Archive base name = plugin manifest name, falling back to the repo dir."""
     repo = Path(repo)
-    manifest = repo / "plugin" / ".claude-plugin" / "plugin.json"
-    if manifest.exists():
+    manifests = (
+        repo / "plugin" / ".claude-plugin" / "plugin.json",
+        repo / "plugin" / ".codex-plugin" / "plugin.json",
+    )
+    for manifest in manifests:
+        if not manifest.exists():
+            continue
         try:
             name = json.loads(manifest.read_text(encoding="utf-8")).get("name")
             if isinstance(name, str) and name:
                 return name
         except (json.JSONDecodeError, OSError):
-            pass
+            continue
     return repo.resolve().name
 
 
@@ -565,7 +577,8 @@ def check_drift(repo: Path | str = ".") -> dict[str, str | None]:
 
 
 def drift_report(repo: Path | str = ".") -> list[str]:
-    """Return a list of human-readable drift issues. Empty list = all in sync."""
+    """Return version and cross-host manifest drift. Empty list = all in sync."""
+    repo = Path(repo)
     canonical = current_version(repo)
     issues: list[str] = []
     found = check_drift(repo)
@@ -574,6 +587,25 @@ def drift_report(repo: Path | str = ".") -> list[str]:
             issues.append(f"{label}: could not extract version")
         elif version != canonical:
             issues.append(f"{label}: found {version!r}, expected {canonical!r}")
+    manifest_names: dict[str, str | None] = {}
+    for host, rel in (
+        ("Claude Code", "plugin/.claude-plugin/plugin.json"),
+        ("Codex", "plugin/.codex-plugin/plugin.json"),
+    ):
+        data: dict[str, object] = {}
+        try:
+            loaded = json.loads((repo / rel).read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (json.JSONDecodeError, OSError):
+            pass
+        name = data.get("name")
+        manifest_names[host] = name if isinstance(name, str) and name else None
+    expected_name = manifest_names["Claude Code"] or manifest_names["Codex"]
+    if expected_name:
+        for host, name in manifest_names.items():
+            if name is not None and name != expected_name:
+                issues.append(f"{host} plugin manifest name: found {name!r}, expected {expected_name!r}")
     return issues
 
 
@@ -681,7 +713,7 @@ def _cmd_scan(argv: list[str]) -> int:
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
-_COMMANDS: dict[str, "Callable[[list[str]], int]"] = {
+_COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "current": _cmd_current,
     "package": _cmd_package,
     "snapshot": _cmd_snapshot,

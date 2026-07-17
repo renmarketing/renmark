@@ -1,8 +1,8 @@
 """Deterministic gate-resolution helper bridging the P10 headless contract to
-skills (single source of truth: ``plugin/skills/_shared/headless-contract.md``).
+skills (single source of truth: ``plugin/skills/.shared/headless-contract.md``).
 
-When renmark runs non-interactively there is no human to answer an
-``AskUserQuestion`` picker. A skill that reaches a Pause-Policy gate calls
+When renmark runs non-interactively there is no human to answer a host selector.
+A skill that reaches a Pause-Policy gate calls
 :func:`resolve_gate` to decide, deterministically, what to do:
 
 - **interactive** — a human is present; the skill renders its normal menu.
@@ -43,17 +43,14 @@ def resolve_gate(
     """Resolve a Pause-Policy gate for the project at *repo*.
 
     Detection precedence (headless-contract.md §1): :func:`config.is_headless`
-    owns the env/config layers; layer-4 (tool availability) is supplied by the
-    skill via *tool_available*. If the config/env verdict is interactive **and**
-    ``tool_available is False`` (``AskUserQuestion`` absent from a spawned
-    subagent's tool list), the run is forced headless — a picker that can never
-    be answered must not stall the run. ``tool_available`` of ``None`` (unknown)
-    or ``True`` (present) does not force headless.
+    owns the env/config layers. *tool_available* is retained for backward API
+    compatibility, but selector availability no longer decides whether a
+    session is headless. Skills pass it to :mod:`renmark.interaction` instead.
 
     *kind* is ``"safe"`` or ``"dangerous"``:
 
     - **interactive** → ``{"mode": "interactive"}``; the skill renders its own
-      ``AskUserQuestion`` menu (the contract is inert when a human is present).
+      host-native menu (the contract is inert when a human is present).
     - **headless + safe** → success envelope with
       ``decision="auto_picked_recommended"`` carrying *recommended*.
     - **headless + dangerous** (or any other / unrecognised *kind* — uncertainty
@@ -64,11 +61,7 @@ def resolve_gate(
     Never raises.
     """
     headless = config.is_headless(repo)
-    # Layer-4 fallback: a forced-interactive verdict still degrades to headless
-    # when the picker tool is provably absent (spawned subagent). Only an
-    # explicit False forces it; None (unknown) / True leave the verdict alone.
-    if not headless and tool_available is False:
-        headless = True
+    _ = tool_available  # Compatibility-only; selector absence != headless.
 
     if not headless:
         return {"mode": "interactive"}

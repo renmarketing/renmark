@@ -21,6 +21,11 @@ def _make_snapshot_repo(tmp_path: Path, version: str = "1.2.3") -> Path:
     plugin_dir = tmp_path / "plugin" / ".claude-plugin"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "plugin.json").write_text(json.dumps({"name": "renmark", "version": version, "description": "test"}))
+    codex_plugin_dir = tmp_path / "plugin" / ".codex-plugin"
+    codex_plugin_dir.mkdir(parents=True)
+    (codex_plugin_dir / "plugin.json").write_text(
+        json.dumps({"name": "renmark", "version": version, "description": "test"})
+    )
 
     # CHANGELOG with a real section containing a unique marker
     (tmp_path / "CHANGELOG.md").write_text(

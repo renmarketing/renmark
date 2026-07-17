@@ -16,19 +16,19 @@ Design contract:
 
 from __future__ import annotations
 
+import datetime
 import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from renmark.state.pause import PauseState, read_pause
+from renmark.state.pause import PauseState
 
 HEARTBEAT_OK = "HEARTBEAT_OK"
 
 
-def _parse_iso(ts: str) -> "datetime.datetime":
+def _parse_iso(ts: str) -> datetime.datetime:
     """Parse an ISO8601 timestamp string, normalising the trailing ``Z``."""
-    import datetime
     return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
 
@@ -191,4 +191,4 @@ def is_cron_installed() -> bool:
         return False
 
 
-__all__ = ["HEARTBEAT_OK", "HeartbeatResult", "check", "auto_resume", "emit_cron", "is_cron_installed"]
+__all__ = ["HEARTBEAT_OK", "HeartbeatResult", "auto_resume", "check", "emit_cron", "is_cron_installed"]

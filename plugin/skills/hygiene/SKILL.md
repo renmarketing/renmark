@@ -1,7 +1,7 @@
 ---
 name: hygiene
 description: "Use to garbage-collect stale renmark artifacts and prune append-only memory logs — typed as /renmark:hygiene. Default dry-run; --apply to make changes."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # hygiene
@@ -64,7 +64,7 @@ never advances `lifecycle.json`. After a hygiene pass, return the user to the
 in-flight feature rather than leaving them on a terminal cliff:
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "hygiene")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
 > + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
 > add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
 > rules 6–9); require an explicit choice.*

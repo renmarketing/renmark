@@ -14,6 +14,24 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-17, .renmark/reviews/2026-07-17-f87b955.verification.md) model `verify`: **verify-proactive-repeated-issue-monitor** — 4/4 behaviors verified; failed: none; regressions: 0
+
+- (2026-07-17, bug) **Recurrence guard discarded the actionable verifier failure** - A retry guard must preserve the failure evidence needed to repair the issue it stops.
+
+- (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard
+
+- (2026-07-17, bug) **Repeated verifier failures recommended an instruction guard** — Use recurrence count to decide when to stop retrying; use failure identity to decide how to remediate.
+
+- (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard
+
+- (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard
+
+- (2026-07-17, bug) **Claude specialist agents fell back to general-purpose** — A dispatch-role registry is not host capability proof; package the host-native definition and resolve its installed scoped name before dispatch.
+
+- (2026-07-17, bug) **Claude native picker missing after parity install** — Treat plugin-manager registration and cache existence as installation postconditions; never suppress the final health check behind an output-filtering pipeline.
+
+- (2026-07-16, bug) **Repository-wide Ruff and mypy baseline was red** — A green pytest run is not a substitute for running every repository quality gate after cross-file extraction work.
+
 - (2026-07-06, .renmark/reviews/2026-07-06-c89a3320872dc49cbe62209cdf740f2a4c7dcd69.verification.md) model `verify`: **verify-agent-team-migration** — 7/7 behaviors verified; failed: none; regressions: 0
 
 - (2026-07-02, .renmark/reviews/2026-07-02-85b12b34f7d608199efad59895d9826593500f62.verification.md) model `verify`: **verify-agent-turn-runner** — 5/5 behaviors verified; failed: none; regressions: 1257 passed

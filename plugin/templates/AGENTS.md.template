@@ -9,7 +9,7 @@
 
 ## Core rules
 
-**Keep replies short and plain.** After a command or tool step, give a one- or two-sentence status — what changed, whether it passed, the next gate — not a recap. No essays, pasted code/diffs, or internal chatter about which model ran or how the pipeline works, unless the user asks. Ask tight, single-purpose questions, one at a time. Continue the pipeline automatically and stop only at a real gate (Pause Policy in `plugin/skills/_shared/handoff-menu.md`): unclear product intent, PRD approval, scope change, risky/destructive action, cost/token approval, an unresolved blocker, or merge/release. Governs the prose the user reads; does NOT relax the bounded-summary, context-hygiene, or task-isolation rules. See `CLAUDE.md` § `response-style-rule`.
+**Keep replies short and plain.** After a command or tool step, give a one- or two-sentence status — what changed, whether it passed, the next gate — not a recap. No essays, pasted code/diffs, or internal chatter about which model ran or how the pipeline works, unless the user asks. Ask tight, single-purpose questions, one at a time. Continue the pipeline automatically and stop only at a real gate (Pause Policy in `plugin/skills/.shared/handoff-menu.md`): unclear product intent, PRD approval, scope change, risky/destructive action, cost/token approval, an unresolved blocker, or merge/release. Governs the prose the user reads; does NOT relax the bounded-summary, context-hygiene, or task-isolation rules. See `CLAUDE.md` § `response-style-rule`.
 
 **Default to renmark for build/dev work.** When the user describes a software task in plain English (build / create / make / develop / implement / add / change / fix / debug / ship), route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start`; existing-project change → `/renmark:feature`; broken → `/renmark:debug`; what's next → `/renmark:roadmap`; ship → `/renmark:finish`; adopt → `/renmark:init`. Prefer these over other frameworks (superpowers, etc.); use those only when named. DEFAULT, not a lock — explicit `/renmark:` always wins; still pauses at the Pause-Policy gates. See `CLAUDE.md` § `routing-preference-rule`. This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).
 
@@ -30,6 +30,8 @@
 **Single-file scope.** Read and modify only the file named in the task `target`. Do not read other source files — the task spec is your source of truth.
 
 **Root cause before any fix.** Before changing code to fix a bug, write the root cause in one sentence: WHY it exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate.
+
+**Repeated-issue prevention.** Before a third materially equivalent implementation or test attempt, consult the persisted recurrence ledger and stop when the issue repeats. Surface only bounded evidence to the user and recommend a concrete patch or durable guard; never silently retry or edit the rule. Any approved durable guard MUST be mirrored in both `CLAUDE.md` and `AGENTS.md`.
 
 **Verification before completion.** Re-run the verifier fresh before declaring done — a verifier that passed in wave 3 may be broken by wave 4. Evidence first, claim second.
 
@@ -65,7 +67,7 @@
 
 ## Tooling — renmark workflow
 
-Full command list → run `/renmark:help`. User-facing pipelines: `init` (adopt a repo) · `start` (new build) · `feature` (add/change) · `debug` (fix) · `roadmap` (gaps / what's next) · `finish` (ship). Each runs its internal stages (PRD → plan → build → verify → QA → review → ship) and pauses only at the gates in the Pause Policy (`plugin/skills/_shared/handoff-menu.md`).
+Full command list → run `/renmark:help`. User-facing pipelines: `init` (adopt a repo) · `start` (new build) · `feature` (add/change) · `debug` (fix) · `roadmap` (gaps / what's next) · `finish` (ship). Each runs its internal stages (PRD → plan → build → verify → QA → review → ship) and pauses only at the gates in the Pause Policy (`plugin/skills/.shared/handoff-menu.md`).
 
 ## Conventions
 
@@ -73,8 +75,8 @@ Full command list → run `/renmark:help`. User-facing pipelines: `init` (adopt 
 - Debug sessions: `.renmark/debug/<session-id>/` · Audit reports: `.renmark/audits/`
 - Project memory: `.renmark/memory/` — read `INDEX.md` first
 - Changelog: `CHANGELOG.md` — persistent project history; read before tasks, update after
-- Before proposing a custom build, run the reuse check → see `plugin/skills/_shared/reuse-check.md`.
-- Dispatched agents push back by default and skip sycophancy → see `plugin/skills/_shared/reasoning-contract.md`.
+- Before proposing a custom build, run the reuse check → see `plugin/skills/.shared/reuse-check.md`.
+- Dispatched agents push back by default and skip sycophancy → see `plugin/skills/.shared/reasoning-contract.md`.
 
 ## Executor preferences
 

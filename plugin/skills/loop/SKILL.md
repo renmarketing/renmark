@@ -1,6 +1,6 @@
 ---
 name: loop
-description: "Use when the user wants a bounded agentic loop toward a verifier — typed as /renmark:loop or phrases like \"loop until X passes\", \"keep iterating until green\". Cycles build → verify under a budget and max-iteration cap, stopping on success or exhaustion; loop state survives /clear."
+description: "Use when the user wants a bounded agentic loop toward a verifier — typed as /renmark:loop or phrases like \"loop this\", \"loop until X passes\", \"keep iterating until green\". Cycles build → verify under a budget and max-iteration cap, stopping on success or exhaustion; loop state survives host context resets."
 ---
 
 # loop
@@ -265,7 +265,7 @@ against measured spend, and `loop.json` carries runtime state only (not `lifecyc
 ## Next step
 
 *End by calling `renmark.lifecycle.next_steps(repo, "loop")` and render the
-result per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 1 —
+result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
 Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
 6–9); the state-derived next command (`/renmark:finish` at a terminal loop) is
 the `(Recommended)` option. Require an explicit choice — never auto-proceed.*

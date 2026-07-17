@@ -1,7 +1,7 @@
 ---
 name: heartbeat
 description: "Use to monitor for usage-limit recovery — typed as /renmark:heartbeat or run renmark-execute --heartbeat. Checks when a paused run can resume; notifies when the limit clears. Zero LLM calls. Use --emit-cron to set up automated polling."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # heartbeat
@@ -82,7 +82,7 @@ logic (the actual re-invocation is external to heartbeat).
 
 ## Next Steps
 
-> `${CLAUDE_PLUGIN_ROOT}/skills/_shared/next-steps.md` (class 3 — resume-pipeline)
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline)
 
 After running heartbeat, typical next actions:
 - If `HEARTBEAT_OK`: no action needed.

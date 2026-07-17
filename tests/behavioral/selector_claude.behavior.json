@@ -1,0 +1,17 @@
+{
+  "skill": "plan",
+  "prompt": "Plan validated. What is next?",
+  "deterministic": {
+    "call": "interaction.selector_claude",
+    "assertions": [
+      "contains:AskUserQuestion",
+      "contains:Dispatch (Recommended)",
+      "not_contains:request_user_input",
+      "contains:\"overflow\": false"
+    ]
+  },
+  "eval": {
+    "contract": "Claude Code renders a real selector whose first option is the sole recommendation.",
+    "golden_ref": "selector-claude.golden"
+  }
+}

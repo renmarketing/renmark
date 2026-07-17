@@ -34,12 +34,12 @@ silence is a no**, and `/renmark:approve` is the only grant surface.
 
 ### Headless mode
 
-When renmark runs non-interactively (spawned subagent, `-p`/piped/CI, no TTY) the
-`AskUserQuestion` picker has no one to answer it. The headless behavior lives in
-one place so the skills can't drift:
+When renmark runs non-interactively (spawned subagent, `-p`/piped/CI, no TTY),
+the host selector has no one to answer it. The headless behavior lives in one
+place so the skills can't drift:
 
-> *If headless (per `${CLAUDE_PLUGIN_ROOT}/skills/_shared/headless-contract.md`
-> detection), do not render `AskUserQuestion`: auto-pick the `(Recommended)`
+> *If headless (per `skills/.shared/headless-contract.md` in the active plugin
+> root), do not render a selector: auto-pick the `(Recommended)`
 > option at safe gates and continue; at dangerous gates halt, write
 > `.renmark/decisions/<gate>-approval.json`, set `human_review_required=true`, and
 > return the `needs_input` JSON + `needs input:` prose line.*
@@ -70,7 +70,7 @@ Plus the terminal actions `Finish`, `Debug`, and `Nothing`.
 
 This is the master list of every gate, keyed by its `[x]` bracket code. It is
 **not** shown verbatim — the calling skill filters it (rules 1–5), then presents
-the survivors as an interactive `AskUserQuestion` choice when available (rule 6),
+the survivors as an interactive host-native choice when available (rule 6),
 falling back to a printed numbered list (rule 7).
 
 ```
@@ -111,9 +111,12 @@ contextual:
    stays committed; the artifact stays on disk.
 
 6. **Present the survivors as an interactive choice (PRIMARY path).** After
-   applying filters 1–5, render the menu by **calling the `AskUserQuestion`
-   tool** — an arrow-key-selectable picker — not by printing markdown. This is
-   the default behavior; the printed list (rule 7) is only a fallback.
+   applying filters 1–5, construct `renmark.interaction.Choice` values, mark
+   exactly one option `recommended=True`, and call `build_selector(...)`. The
+   helper moves that recommendation to index 0 and adds `(Recommended)` exactly
+   once. Invoke the returned host-native tool — `AskUserQuestion` on Claude Code
+   or `request_user_input` on Codex — instead of printing markdown. The printed
+   list (rule 7) is only a fallback.
    - One question. The `question` field holds ONLY the prompt (`What's next?`)
      — a short interrogative sentence. `multiSelect: false`.
    - **Every option MUST be a real entry in the `options` array — never list the
@@ -125,22 +128,21 @@ contextual:
      that is the failure this rule forbids. If you cannot populate a real
      `options` array (≥2 entries), do NOT call the tool — print the rule 7
      fallback instead.
-   - `AskUserQuestion` is blocking and offers no default — that is what enforces
-     rule 8 (no auto-proceed).
+   - A rendered selector is blocking and offers no implicit default — that is
+     what enforces rule 8 (no auto-proceed).
    - **Fall back to rule 7 the moment the picker does not present visible,
      selectable choices — for ANY reason.** Concretely, immediately print the
-     numbered list (rule 7) if the call: is unavailable (subagents, headless /
-     `-p` / piped / CI, no TTY); errors or throws; is declined / rejected /
+     numbered list (rule 7) if the call: is unavailable on the current host or
+     surface; errors or throws; is declined / rejected /
      interrupted by the user; returns no selection or no valid option; or would
      render only the question header with no visible options. Never block on,
      retry indefinitely, or wait after a picker that showed nothing. **A
      declined or empty picker is a signal to print the fallback, not to stop.**
-   - **4-option cap.** `AskUserQuestion` allows **at most 4 options** per
-     question. If **≤4 options survive, every one is a selectable choice.** If
-     **>4 survive, surface the 4 highest-priority as choices AND also print the
-     full numbered fallback list (rule 7)** beneath, so the overflow options stay
-     reachable by typing their number or bracket code (free-text is always
-     accepted). Priority for which 4 to surface (highest first): failure actions
+   - **Host option cap.** Claude Code `AskUserQuestion` allows at most 4 options;
+     Codex `request_user_input` allows 2–3. Surface up to the active host's cap
+     AND print the full recommended-first fallback list (rule 7) beneath any
+     overflow selector, so every option stays reachable by number or bracket
+     code. Priority after the recommendation (which is always index 0): failure actions
      (`[d]`, or `[fix]` on critical findings) → `[c]` → `[qa]` → `[f]` → `[dq]`
      → `[o]` → `[s]`, and ALWAYS keep `[n] Nothing` as one of the four so "stop"
      is one selection away.
@@ -152,11 +154,12 @@ contextual:
      hand-off stays open until an actual action is chosen — never reply to a
      non-selection with a prose / inline list of the options.**
 
-7. **Fallback — printed numbered list.** Used when `AskUserQuestion` is
-   unavailable/non-interactive or errors, AND printed as the reference list
-   beneath an overflow (>4) picker. Render the survivors as a numbered markdown
-   list — `1.`, `2.`, `3.`, … in priority order — keeping the `[x]` bracket code
-   on each line, and accept either the number or the bracket code:
+7. **Fallback — printed numbered list.** Used when the host selector is
+   unavailable/non-interactive or errors, AND printed beneath an overflow
+   selector. Selector unavailability alone does **not** make the session
+   headless. Render the survivors as a numbered markdown list — `1.`, `2.`,
+   `3.`, … with the sole `(Recommended)` option first, keeping the `[x]` bracket
+   code on each line, and accept either the number or the bracket code:
 
    ```
    1. [qa] QA          — run one happy-path flow live in the browser via /renmark:verify --qa
@@ -165,7 +168,7 @@ contextual:
    4. [n]  Nothing     — stop here; work stays committed
    ```
 
-   Prefer the interactive picker (rule 6) whenever `AskUserQuestion` is available
+   Prefer the interactive selector (rule 6) whenever the current host exposes it
    — this printed list is the fallback, not the primary presentation.
 
 8. **A choice is required — with a bounded default-forward (owner rule,
@@ -195,8 +198,8 @@ contextual:
    > (above) already accounts for them when they are present.
 
 9. **Hard guarantee — visible choices XOR printed fallback, never neither.**
-   Every hand-off MUST end in one of exactly two visible states: (a) an
-   `AskUserQuestion` picker showing the selectable choices, OR (b) the printed
+   Every hand-off MUST end in one of exactly two visible states: (a) a host-native
+   selector showing the selectable choices, OR (b) the printed
    numbered list (rule 7). It must **never** end on the bare question
    (`What's next?`) with no visible options. If the picker did not render visible
    choices — declined, errored, header-only, or no valid selection — print the
@@ -225,17 +228,17 @@ skill forgot to list Debug). Centralizing here means:
 
 - One edit point. Add a future gate (e.g. perf, security) and every skill picks
   it up next run.
-- Linter-friendly. `plugin/skills/_shared/` is skipped by `renmark.lint` (it's
+- Linter-friendly. `plugin/skills/.shared/` is skipped by `renmark.lint` (it's
   a reference dir, not a skill), so this file never trips the "missing command
   pair" check.
 - Symmetric with `_shared/scope-contract.md` — same pattern, same precedent.
 
 When citing this menu in a SKILL.md, write:
 
-> *Render the hand-off menu from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/handoff-menu.md`,
+> *Render the hand-off menu from `skills/.shared/handoff-menu.md` in the active plugin root,
 > applying the rendering rules: filter (omit the gate just run; `[dq]` only after
 > `--qa` passes; `[d]` only on failure), then present the survivors as an
-> interactive `AskUserQuestion` choice when available — printed numbered list only
+> interactive host-native choice when available — printed numbered list only
 > as fallback (or beneath a >4-option picker) — and require an explicit choice.*
 
 Do not paste the menu text into the calling SKILL.md.

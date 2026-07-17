@@ -106,7 +106,7 @@ Early drafts of renmark routed many cheap, deterministic tasks to models: "is th
 
 When citing this discipline in a SKILL.md or subagent dispatch, write:
 
-> *Honor deterministic-first discipline in `${CLAUDE_PLUGIN_ROOT}/skills/_shared/deterministic-first.md`: before any task dispatch or model call, answer the 4-question gate (existing state? script? reusable? AI-needed?). Deterministic checks: git/worktree state, artifact existence/metadata, version/release readiness, plan lint, mirror validation, test baseline. Route judgment-heavy tasks (merge risk, release-readiness reasoning, branch strategy) only to model-based agents. See `renmark/worktree.py` for shared checks.*
+> *Honor deterministic-first discipline in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/deterministic-first.md`: before any task dispatch or model call, answer the 4-question gate (existing state? script? reusable? AI-needed?). Deterministic checks: git/worktree state, artifact existence/metadata, version/release readiness, plan lint, mirror validation, test baseline. Route judgment-heavy tasks (merge risk, release-readiness reasoning, branch strategy) only to model-based agents. See `renmark/worktree.py` for shared checks.*
 
 Do not paste the gate or matrix into the calling SKILL.md — cite this file.
 

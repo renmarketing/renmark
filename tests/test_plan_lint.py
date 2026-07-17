@@ -553,6 +553,38 @@ def test_negative_est_tokens_warn(tmp_path: Path) -> None:
     assert block_issues == []
 
 
+def test_unknown_explicit_subagent_role_blocks(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER + _task(extra_fields="- **role:** imaginary-agent\n"),
+    )
+    report = lint_plan(plan)
+    assert report.verdict == "BLOCK"
+    assert any("unknown subagent role" in issue for issue in report.issues)
+
+
+def test_general_purpose_role_requires_reason(tmp_path: Path) -> None:
+    plan = _write(
+        tmp_path,
+        _BASE_HEADER + _task(extra_fields="- **role:** general-purpose\n"),
+    )
+    report = lint_plan(plan)
+    assert report.verdict == "WARN"
+    assert any("role_reason" in issue for issue in report.issues)
+
+    explained = _write(
+        tmp_path,
+        _BASE_HEADER
+        + _task(
+            extra_fields=(
+                "- **role:** general-purpose\n"
+                "- **role_reason:** binary asset task has no specialist\n"
+            )
+        ),
+    )
+    assert lint_plan(explained).verdict == "PASS"
+
+
 # ---------------------------------------------------------------------------
 # 16. CLI exit codes
 # ---------------------------------------------------------------------------

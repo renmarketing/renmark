@@ -226,10 +226,14 @@ _REGISTRY_AHEAD_OF_DIRS: set[str] = set()
 
 
 def _skill_dirs() -> set[str]:
-    """Every plugin/skills/<name>/ dir (with a SKILL.md), minus _shared."""
+    """Every user-facing plugin/skills/<name>/ directory with a SKILL.md."""
     repo_root = Path(__file__).resolve().parent.parent
     skills = repo_root / "plugin" / "skills"
-    return {d.name for d in skills.iterdir() if d.is_dir() and d.name != "_shared" and (d / "SKILL.md").exists()}
+    return {
+        d.name
+        for d in skills.iterdir()
+        if d.is_dir() and not d.name.startswith(("_", ".")) and (d / "SKILL.md").exists()
+    }
 
 
 def test_registry_covers_every_skill_dir() -> None:
@@ -371,6 +375,42 @@ def test_cross_domain_checkpoint_written(tmp_path: Path) -> None:
     assert cp.exists(), "checkpoint must be written when the clear gate fires"
     data = json.loads(cp.read_text(encoding="utf-8"))
     assert data["reason"] == "clear"
+
+
+def test_codex_cross_domain_transition_never_asks_clear_or_resume(tmp_path: Path) -> None:
+    lifecycle.skill_preamble(tmp_path, "debug", host="codex")
+
+    hint = lifecycle.skill_preamble(tmp_path, "start", host="codex")
+
+    assert hint is None or "/clear" not in hint
+    assert hint is None or "/renmark:resume" not in hint
+    assert not (tmp_path / ".renmark" / "state" / "compact_checkpoint.json").exists()
+    from renmark.state import last_skill_invocation
+
+    assert last_skill_invocation(tmp_path)["skill"] == "start"
+
+
+def test_codex_host_can_be_selected_by_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RENMARK_HOST", "codex")
+    lifecycle.skill_preamble(tmp_path, "debug")
+
+    hint = lifecycle.skill_preamble(tmp_path, "start")
+
+    assert hint is None or "CONTEXT_GATE_CLEAR:" not in hint
+    assert hint is None or "/clear" not in hint
+
+
+def test_codex_checkpoint_omits_unsupported_resume_command(tmp_path: Path) -> None:
+    lifecycle.persist_compact_checkpoint(tmp_path, "start", "manual", host="codex")
+
+    checkpoint = json.loads(
+        (tmp_path / ".renmark" / "state" / "compact_checkpoint.json").read_text()
+    )
+
+    assert checkpoint["resume_cmd"] is None
 
 
 def test_corrupt_lifecycle_returns_none(tmp_path: Path) -> None:
@@ -872,7 +912,7 @@ def test_agency_hint_inactive_none_is_passthrough(tmp_path):
 
 
 def test_agency_hint_active_contains_marker(tmp_path):
-    from renmark import lifecycle, agency
+    from renmark import agency, lifecycle
     agency.activate(tmp_path)
     result = lifecycle._with_agency_note(tmp_path, "start", None)
     assert result is not None
@@ -880,7 +920,7 @@ def test_agency_hint_active_contains_marker(tmp_path):
 
 
 def test_agency_hint_non_aware_skill_is_passthrough(tmp_path):
-    from renmark import lifecycle, agency
+    from renmark import agency, lifecycle
     agency.activate(tmp_path)
     result = lifecycle._with_agency_note(tmp_path, "help", "original")
     assert result == "original"

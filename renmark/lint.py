@@ -64,9 +64,9 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
     for skill_path in sorted(skills_dir.iterdir()):
         if not skill_path.is_dir():
             continue
-        # Underscore-prefixed dirs (e.g. _shared/) hold cross-skill reference
+        # Hidden/support dirs (e.g. .shared/) hold cross-skill reference
         # files, not skills — they have no SKILL.md and no paired command.
-        if skill_path.name.startswith("_"):
+        if skill_path.name.startswith(("_", ".")):
             continue
         skill_md = skill_path / "SKILL.md"
         if not skill_md.exists():
@@ -89,6 +89,42 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
             )
         if "description" not in fm or not fm["description"]:
             issues.append(f"skills/{skill_path.name}/SKILL.md: frontmatter missing 'description'")
+    return issues
+
+
+def lint_agent_files(plugin_dir: Path) -> list[str]:
+    """Validate any Claude plugin subagents shipped under ``agents/``."""
+    issues: list[str] = []
+    agents_dir = plugin_dir / "agents"
+    if not agents_dir.is_dir():
+        return issues
+
+    allowed_models = {"haiku", "sonnet", "opus", "inherit"}
+    unsupported_plugin_fields = {"hooks", "mcpServers", "permissionMode"}
+    for agent_path in sorted(agents_dir.glob("*.md")):
+        rel = f"agents/{agent_path.name}"
+        try:
+            text = agent_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            issues.append(f"{rel}: file unreadable")
+            continue
+        fm = parse_frontmatter(text)
+        if fm is None:
+            issues.append(f"{rel}: missing YAML frontmatter")
+            continue
+        if fm.get("name") != agent_path.stem:
+            issues.append(f"{rel}: name={fm.get('name')!r} doesn't match filename {agent_path.stem!r}")
+        if not fm.get("description"):
+            issues.append(f"{rel}: frontmatter missing 'description'")
+        if fm.get("model") not in allowed_models:
+            issues.append(f"{rel}: unsupported Claude model {fm.get('model')!r}")
+        if not fm.get("tools"):
+            issues.append(f"{rel}: frontmatter missing 'tools'")
+        for field in sorted(unsupported_plugin_fields.intersection(fm)):
+            issues.append(f"{rel}: plugin agents do not support frontmatter field {field!r}")
+        match = _FRONTMATTER_RE.match(text)
+        if match is not None and not text[match.end() :].strip():
+            issues.append(f"{rel}: missing agent system prompt")
     return issues
 
 
@@ -116,9 +152,9 @@ def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
     for skill_path in sorted(skills_dir.iterdir()):
         if not skill_path.is_dir():
             continue
-        # Underscore-prefixed dirs (e.g. _shared/) hold cross-skill reference
+        # Hidden/support dirs (e.g. .shared/) hold cross-skill reference
         # files, not skills — they have no SKILL.md and no paired command.
-        if skill_path.name.startswith("_"):
+        if skill_path.name.startswith(("_", ".")):
             continue
         skill_md = skill_path / "SKILL.md"
         if not skill_md.exists():
@@ -134,12 +170,12 @@ def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
             if not (cites_umbrella or cites_gate):
                 issues.append(
                     f"skills/{skill_path.name}/SKILL.md: missing hand-off citation "
-                    "(gate skill must cite _shared/next-steps.md or handoff-menu.md)"
+                    "(gate skill must cite .shared/next-steps.md or handoff-menu.md)"
                 )
         elif not cites_umbrella:
             issues.append(
                 f"skills/{skill_path.name}/SKILL.md: missing next-steps.md citation "
-                "(pipeline/aux skill must cite _shared/next-steps.md)"
+                "(pipeline/aux skill must cite .shared/next-steps.md)"
             )
     return issues
 
@@ -157,8 +193,12 @@ def lint_command_shims(plugin_dir: Path) -> list[str]:
         return [f"plugin: missing skills/ directory at {skills_dir}"]
 
     command_names = {p.stem for p in commands_dir.glob("*.md")}
-    # Skip underscore-prefixed support dirs (e.g. _shared/) — not user-facing skills.
-    skill_names = {p.name for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith("_")}
+    # Skip hidden/support dirs (e.g. .shared/) — not user-facing skills.
+    skill_names = {
+        p.name
+        for p in skills_dir.iterdir()
+        if p.is_dir() and not p.name.startswith(("_", "."))
+    }
 
     for orphan in sorted(command_names - skill_names):
         issues.append(f"commands/{orphan}.md: no matching skills/{orphan}/SKILL.md")
@@ -392,7 +432,7 @@ def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
     """
     issues: list[str] = []
     md_files: list[Path] = []
-    for sub in (plugin_dir / "commands", plugin_dir / "skills"):
+    for sub in (plugin_dir / "commands", plugin_dir / "skills", plugin_dir / "agents"):
         if sub.is_dir():
             md_files.extend(sub.rglob("*.md"))
 
@@ -434,6 +474,7 @@ def lint_all(
     issues: list[str] = []
     issues.extend(lint_plugin_json(plugin_dir))
     issues.extend(lint_skill_files(plugin_dir))
+    issues.extend(lint_agent_files(plugin_dir))
     issues.extend(lint_next_steps_citation(plugin_dir))
     issues.extend(lint_command_shims(plugin_dir))
     if template_path is None:

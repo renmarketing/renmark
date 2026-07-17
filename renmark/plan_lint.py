@@ -32,7 +32,8 @@ Check severities (behaviour-preserving — mirrors the SKILL's definitions):
          a declared `top_tier: fable`), 10 fable-mechanical REQ-2 (executor
          fable on a simple/mechanical task).
   WARN:  2b test -f only verifier, 7 unbounded verifier output, 8 spec
-         length >80 lines, and sanity extras (negative/absurd est_ fields).
+         length >80 lines, 11 general-purpose without role_reason, and sanity
+         extras (negative/absurd est_ fields).
 """
 
 from __future__ import annotations
@@ -321,6 +322,27 @@ def _check_fable_mechanical(tasks: list[Task]) -> list[tuple[str, str]]:
     return issues
 
 
+def _check_role_profiles(tasks: list[Task]) -> list[tuple[str, str]]:
+    """Check 11 — explicit roles must be registered; fallback needs a reason."""
+    from . import subagent_profiles
+
+    issues: list[tuple[str, str]] = []
+    for task in tasks:
+        role = (task.role or "").strip()
+        if not role:
+            continue
+        if role not in subagent_profiles.PROFILES:
+            issues.append(("BLOCK", f"Task {task.index}: unknown subagent role `{role}`."))
+        elif role == "general-purpose" and not task.role_reason.strip():
+            issues.append(
+                (
+                    "WARN",
+                    f"Task {task.index}: general-purpose requires a role_reason explaining why no specialist fits.",
+                )
+            )
+    return issues
+
+
 def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
     """Sanity extras — all WARN only, never BLOCK (behaviour-preserving)."""
     issues: list[tuple[str, str]] = []
@@ -421,6 +443,7 @@ def lint_plan(path: str | Path) -> PlanLintReport:
     raw.extend(_check_spec_length(tasks))
     raw.extend(_check_fable_declared(tasks, repo_root))
     raw.extend(_check_fable_mechanical(tasks))
+    raw.extend(_check_role_profiles(tasks))
     raw.extend(_check_sanity_extras(tasks))
 
     verdict = _derive_verdict(raw)

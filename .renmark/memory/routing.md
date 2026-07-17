@@ -35,6 +35,12 @@ Opus and Fable are escalation-only executors — never default them for finish, 
 
 ## Learned overrides
 
+- (2026-07-17) `target=tests/**, complexity=medium, mode=A` → **codex** (failed, run=20260717-201012-cd1f)
+
+- (2026-07-17) `target=*.py, complexity=medium, mode=B` → **codex** (failed, run=20260717-200327-79ab)
+
+- (2026-07-17) `target=tests/**, complexity=medium, mode=A` → **codex** (failed, run=20260717-195403-ce81)
+
 - (2026-06-26) `target=tests/test_lifecycle.py, complexity=medium, mode=B (codex->sonnet)` → **sonnet** (passed (rerouted: codex verifier-env exit 127))
 
 - (2026-06-26) `target=tests/test_config.py, complexity=medium, mode=B (codex->sonnet)` → **sonnet** (passed (rerouted: codex verifier-env exit 127))
