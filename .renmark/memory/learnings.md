@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-17, .renmark/reviews/2026-07-17-f87b955.verification.md) model `verify`: **verify-proactive-repeated-issue-monitor** — 4/4 behaviors verified; failed: none; regressions: 0
+
 - (2026-07-17, bug) **Recurrence guard discarded the actionable verifier failure** - A retry guard must preserve the failure evidence needed to repair the issue it stops.
 
 - (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard

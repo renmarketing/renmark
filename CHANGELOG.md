@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - verify: proactive repeated-issue monitor
+
+**Request:** Auto-verify the resumed feature after isolating and fixing its repeated failures.
+**Built:** Verified four goal-level behaviors for equivalent-attempt blocking, patch/guard/retry decisions, actionable escalation evidence, and mirrored Claude/Codex rule propagation; all nine task verifiers and repository-wide gates also passed.
+**Files changed:** `.renmark/reviews/2026-07-17-f87b955.verification.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** A green deterministic smoke run does not bypass code review, merge, release, or human approval gates.
+
 ## [2026-07-17] - docs(template): propagate Codex repeated-issue rule
 
 **Request:** Ensure Codex receives proactive repeated-issue prevention when Renmark initializes or refreshes a project.
