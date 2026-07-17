@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — feat(recurrence): add bounded repeated-issue state
+
+**Request:** Detect equivalent implementation and verifier failures across attempts and runs without storing raw histories or wasting a third model call.
+**Built:** Added a stdlib-only recurrence ledger with stable fingerprints, second-occurrence blocking decisions, bounded summaries, atomic/capped persistence, corruption recovery, and explicit patch, durable-guard, resolve, and one-time-retry acknowledgements.
+**Files changed:** `renmark/recurrence.py`, `CHANGELOG.md`.
+**Do not change:** Keep recurrence state separate from Scan's proposal ledger; persist no raw verifier/model bodies; block an unacknowledged third equivalent attempt; keep acknowledgement and resolution explicit.
+
 ## [2026-07-17] — feat(recurrence): expose stable Scan identity helpers
 
 **Request:** Reuse Scan's proven finding identity model as the foundation for proactive repeated-issue detection.
