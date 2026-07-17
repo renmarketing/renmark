@@ -148,12 +148,22 @@ function Install-Plugin($target, $source) {
     try {
         # Junction: works without admin, only works for dirs, only on NTFS.
         New-Item -ItemType Junction -Path $target -Value $source -ErrorAction Stop | Out-Null
+        $manifest = Join-Path $target ".claude-plugin\plugin.json"
+        if (-not (Test-Path -LiteralPath $manifest)) {
+            throw "junction target is not readable at $manifest"
+        }
         Write-Host "  $target  (junction -> $source)"
         return $true
     } catch {
-        # Fall back to copy. Edits to source won't propagate until reinstall.
-        Write-Host "  (junction failed, falling back to copy)"
+        # UNC-backed WSL sources can produce a junction object whose contents
+        # are unreadable. Verify above, remove that object, and copy instead.
+        Remove-LinkOrDir $target
+        Write-Host "  (junction unavailable or unreadable, falling back to copy)"
         Copy-Item -Recurse -Force $source $target
+        $manifest = Join-Path $target ".claude-plugin\plugin.json"
+        if (-not (Test-Path -LiteralPath $manifest)) {
+            throw "copied plugin is missing $manifest"
+        }
         Write-Host "  $target  (copy of $source)"
         return $false
     }

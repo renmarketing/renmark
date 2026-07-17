@@ -83,3 +83,17 @@ def test_codex_registry_check_requires_installed_and_enabled(monkeypatch):
         ),
     )
     assert doctor.check_codex_installed().status == "pass"
+
+
+def test_doctor_allows_unencodable_status_glyphs(monkeypatch):
+    calls: list[dict[str, str]] = []
+
+    class LegacyStdout:
+        def reconfigure(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(doctor.sys, "stdout", LegacyStdout())
+
+    doctor._allow_unencodable_status_glyphs()
+
+    assert calls == [{"errors": "replace"}]

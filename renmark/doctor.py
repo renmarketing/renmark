@@ -32,6 +32,7 @@ the failure by typing ``/renmark:*`` and seeing nothing.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import json
 import shutil
@@ -685,7 +686,19 @@ def render_json(report: DoctorReport) -> str:
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
+def _allow_unencodable_status_glyphs() -> None:
+    """Keep human diagnostics printable on legacy Windows console encodings."""
+    # Windows PowerShell may expose a cp1252 stdout stream. Doctor reports use
+    # status glyphs, so degrade unsupported glyphs instead of crashing while
+    # reporting the actual install failure.
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        with contextlib.suppress(OSError, ValueError):
+            reconfigure(errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _allow_unencodable_status_glyphs()
     argv = list(sys.argv[1:] if argv is None else argv)
     fix = "--fix" in argv
     refresh_codex = "--refresh-codex" in argv

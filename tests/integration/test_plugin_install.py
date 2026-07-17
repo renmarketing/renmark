@@ -281,3 +281,13 @@ def test_commands_directory_complete(repo_root: Path):
         f"  in skills not commands: {skill_names - command_names}\n"
         f"  in commands not skills: {command_names - skill_names}"
     )
+
+
+def test_windows_installer_rejects_unreadable_wsl_junctions(repo_root: Path):
+    installer = (repo_root / "install.ps1").read_text(encoding="utf-8")
+
+    assert "Test-Path -LiteralPath $manifest" in installer
+    assert 'throw "junction target is not readable at $manifest"' in installer
+    assert installer.index("New-Item -ItemType Junction") < installer.index(
+        "Test-Path -LiteralPath $manifest"
+    )
