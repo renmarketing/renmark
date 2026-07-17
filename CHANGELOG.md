@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — feat(recurrence): expose stable Scan identity helpers
+
+**Request:** Reuse Scan's proven finding identity model as the foundation for proactive repeated-issue detection.
+**Built:** Added public key-from-parts and content-fingerprint helpers while preserving `finding_key` behavior and the private compatibility alias; corrected the plan's pytest verifiers to use the repository virtual environment explicitly.
+**Files changed:** `renmark/scan.py`, `.renmark/plans/2026-07-17-proactive-repeated-issue-monitor.plan.md`, `CHANGELOG.md`.
+**Do not change:** Preserve Scan's `check:rule_id:target` key, SHA-1/12-hex fingerprint semantics, proposal ledger, backlog resurface behavior, and read-only lane invariants.
+
 ## [2026-07-17] — PRD updated: proactive recurring-issue prevention
 
 **Request:** Detect materially equivalent implementation or testing issues before Codex or Claude repeats a futile attempt, then proactively recommend either a patch or a durable mirrored instruction.

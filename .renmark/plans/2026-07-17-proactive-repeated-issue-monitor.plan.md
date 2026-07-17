@@ -30,7 +30,7 @@ Implement REQ-24 by reusing Scan's stable finding identity model, adding a separ
 - **parallel_group:** 1
 - **est_tokens:** 700
 - **est_cost_usd:** 0.0321
-- **verifier:** pytest -q tests/test_scan.py
+- **verifier:** .venv/bin/pytest -q tests/test_scan.py
 - **serves:** REQ-24
 - **spec:**
   Turn Scan's proven stable identity behavior into a small public reuse seam without changing Scan's proposer-lane behavior.
@@ -105,7 +105,7 @@ Implement REQ-24 by reusing Scan's stable finding identity model, adding a separ
 - **parallel_group:** 4
 - **est_tokens:** 2200
 - **est_cost_usd:** 0.0500
-- **verifier:** pytest -q tests/test_recurrence.py tests/test_scan.py tests/test_cross_host_dispatch_e2e.py
+- **verifier:** .venv/bin/pytest -q tests/test_recurrence.py tests/test_scan.py tests/test_cross_host_dispatch_e2e.py
 - **serves:** REQ-24
 - **spec:**
   Add focused deterministic tests for the new recurrence module and its two integration surfaces.

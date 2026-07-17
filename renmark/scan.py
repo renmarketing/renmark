@@ -119,16 +119,26 @@ class Finding:
     fingerprint: str
 
 
-def finding_key(f: Finding) -> str:
+def finding_key_from_parts(*, check: str, rule_id: str, target: str) -> str:
     """Return the SARIF-style stable dedup key ``check:rule_id:target``.
+
+    Accepting the key's explicit parts lets other proposer lanes reuse Scan's
+    stable identity contract without needing to construct a :class:`Finding`.
+    Never raises.
+    """
+    return f"{check}:{rule_id}:{target}"
+
+
+def finding_key(f: Finding) -> str:
+    """Return the stable dedup key for ``f``.
 
     This is the dedup primitive — stable across runs for the same logical
     finding regardless of its (content-derived) fingerprint. Never raises.
     """
-    return f"{f.check}:{f.rule_id}:{f.target}"
+    return finding_key_from_parts(check=f.check, rule_id=f.rule_id, target=f.target)
 
 
-def _fingerprint(*, title: str, summary_text: str, target: str) -> str:
+def content_fingerprint(*, title: str, summary_text: str, target: str) -> str:
     """Short stable content hash of a finding's salient text.
 
     A change in this value for the same :func:`finding_key` signals the finding
@@ -138,6 +148,10 @@ def _fingerprint(*, title: str, summary_text: str, target: str) -> str:
     """
     payload = f"{title}\n{summary_text}\n{target}".encode("utf-8", errors="replace")
     return hashlib.sha1(payload).hexdigest()[:12]
+
+
+# Backward compatibility for existing callers and tests.
+_fingerprint = content_fingerprint
 
 
 def make_finding(
