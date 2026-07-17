@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - docs(template): propagate repeated-issue prevention
+
+**Request:** Ensure projects adopted through Renmark receive the same proactive Claude rule as this repository.
+**Built:** Added the semantically identical repeated-issue prevention block to the managed Claude template while preserving managed markers and existing content.
+**Files changed:** `plugin/templates/CLAUDE.md.template`, `CHANGELOG.md`.
+**Do not change:** Keep the template rule identical to the authoritative `CLAUDE.md` block and preserve both managed block markers.
+
 ## [2026-07-17] - docs(claude): require proactive repeated-issue prevention
 
 **Request:** Make Claude's authoritative project contract stop materially equivalent implementation/test attempts before a third retry.
