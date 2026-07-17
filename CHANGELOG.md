@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - docs(claude): require proactive repeated-issue prevention
+
+**Request:** Make Claude's authoritative project contract stop materially equivalent implementation/test attempts before a third retry.
+**Built:** Added a host-neutral core rule requiring the deterministic recurrence ledger, bounded evidence, an explicit patch-or-durable-guard recommendation, human acknowledgement, and mirrored approved guards without weakening Codex context invariants.
+**Files changed:** `CLAUDE.md`, `CHANGELOG.md`.
+**Do not change:** Never retry or edit rules silently; approved durable guards must remain mirrored in `CLAUDE.md` and `AGENTS.md`; Codex must not receive unsupported clear/compact/resume instructions.
+
 ## [2026-07-17] - test(recurrence): prove bounded retries and preserve evidence
 
 **Request:** Resume the proactive monitor build after fixing the recurrence classifier, without spending another blind Codex retry.

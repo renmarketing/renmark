@@ -76,6 +76,10 @@ renmark separates working context into four kinds: **static** (always-present `C
 ## Root cause before any fix
 Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate. See Iron Law in `/renmark:debug`.
 <!-- END:root-cause-rule -->
+<!-- BEGIN:repeated-issue-prevention-rule -->
+## Repeated-issue prevention
+Before a third materially equivalent implementation/test attempt, check the deterministic recurrence ledger. At its threshold, stop and show the user no more than five lines of count/fingerprint evidence plus one concrete recommendation: patch/debug a reproducible implementation or test failure, or propose a durable guard for a workflow or contract failure. Never retry silently or edit a rule silently: one retry requires explicit acknowledgement, and a durable guard remains proposal-only until normal human approval. Every approved durable guard MUST be mirrored in both `CLAUDE.md` and `AGENTS.md`. This host-neutral gate must not introduce unsupported clear, compact, or resume instructions on Codex.
+<!-- END:repeated-issue-prevention-rule -->
 <!-- BEGIN:verify-before-done-rule -->
 ## Verification before completion
 Before claiming any task or plan complete, re-run the verifier fresh — a verifier that passed in wave 3 may be broken by wave 4. Evidence first, claim second.
