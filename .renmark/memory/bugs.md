@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-17 - Recurrence guard discarded the actionable verifier failure
+
+**Severity:** medium
+**Symptom:** A blocked third Codex attempt left only the recurrence summary in `verifier.log`, so the patch path could not inspect the failure that triggered the stop.
+**Root cause:** `_codex_fail_recurrence_guard` forwarded its status note as the escalation verifier log and had no parameter for the current bounded failure evidence.
+**Fix:** Pass the current verifier tail, executor tail, or lane reason into the guard escalation while keeping the bounded status note user-facing.
+**Lesson:** A retry guard must preserve the failure evidence needed to repair the issue it stops.
+
+---
+
 ### 2026-07-17 — Repeated verifier failures recommended an instruction guard
 
 **Severity:** medium

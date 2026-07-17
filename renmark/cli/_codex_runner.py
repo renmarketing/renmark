@@ -327,6 +327,8 @@ def _codex_fail_recurrence_guard(
     retries_left: int,
     start: float,
     decision: RecurrenceDecision,
+    *,
+    verifier_log: str | None = None,
 ) -> tuple[bool, str, int, str]:
     """Stop a repeated issue with bounded evidence before another Codex call."""
     note = _recurrence_status_note(decision)
@@ -339,7 +341,7 @@ def _codex_fail_recurrence_guard(
         retries_left,
         start,
         note,
-        note,
+        verifier_log or note,
         "repeated_issue_guard",
     )
 
@@ -394,7 +396,18 @@ def _codex_verify_and_commit(
     )
     if recurrence.retry_blocked:
         return _codex_fail_recurrence_guard(
-            task, total, repo, run_id, cfg, retries_left, start, recurrence
+            task,
+            total,
+            repo,
+            run_id,
+            cfg,
+            retries_left,
+            start,
+            recurrence,
+            verifier_log=(
+                f"verifier:\n{last_verifier_tail}\n\n"
+                f"codex tail:\n{last_output_tail}"
+            ),
         )
     if retries_left > 0:
         return None, "", 0, ""  # sentinel: retry
@@ -490,7 +503,15 @@ def _execute_task_codex(
             )
             if recurrence.retry_blocked:
                 return _codex_fail_recurrence_guard(
-                    task, total, repo, run_id, cfg, retries_left, start, recurrence
+                    task,
+                    total,
+                    repo,
+                    run_id,
+                    cfg,
+                    retries_left,
+                    start,
+                    recurrence,
+                    verifier_log=result.output_tail,
                 )
             if retries_left > 0:
                 retries_left -= 1
@@ -526,7 +547,15 @@ def _execute_task_codex(
             )
             if recurrence.retry_blocked:
                 return _codex_fail_recurrence_guard(
-                    task, total, repo, run_id, cfg, retries_left, start, recurrence
+                    task,
+                    total,
+                    repo,
+                    run_id,
+                    cfg,
+                    retries_left,
+                    start,
+                    recurrence,
+                    verifier_log=f"{reason}\n\n{result.output_tail}",
                 )
             if retries_left > 0:
                 retries_left -= 1

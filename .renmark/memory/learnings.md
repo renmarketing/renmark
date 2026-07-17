@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-17, bug) **Recurrence guard discarded the actionable verifier failure** - A retry guard must preserve the failure evidence needed to repair the issue it stops.
+
+- (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard
+
 - (2026-07-17, bug) **Repeated verifier failures recommended an instruction guard** — Use recurrence count to decide when to stop retrying; use failure identity to decide how to remediate.
 
 - (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard

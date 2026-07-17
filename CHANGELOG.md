@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - test(recurrence): prove bounded retries and preserve evidence
+
+**Request:** Resume the proactive monitor build after fixing the recurrence classifier, without spending another blind Codex retry.
+**Built:** Added deterministic coverage for stable Scan identity, cross-run recurrence, changed fingerprints, bounded/corrupt/atomic/lock state, raw-signal exclusion, patch/guard/retry acknowledgements, two-attempt Codex limits, and host-neutral Orchestrate wording; recurrence stops now retain the concrete current verifier, executor, or lane evidence in escalation artifacts.
+**Files changed:** `tests/test_recurrence.py`, `renmark/cli/_codex_runner.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`.
+**Do not change:** Never launch a third equivalent attempt; never replace actionable failure evidence with only a guard summary; keep raw model transcripts out of recurrence state and rule-file changes human-gated.
+
 ## [2026-07-17] - fix(recurrence): classify remediation by failure kind
 
 **Request:** Isolate the repeated-issue monitor failure, fix its root cause, and resume the paused feature run without another wasteful Codex retry.
