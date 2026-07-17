@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - docs(template): propagate Codex repeated-issue rule
+
+**Request:** Ensure Codex receives proactive repeated-issue prevention when Renmark initializes or refreshes a project.
+**Built:** Added the root AGENTS rule verbatim to the managed AGENTS template while preserving every existing rule and marker.
+**Files changed:** `plugin/templates/AGENTS.md.template`, `CHANGELOG.md`.
+**Do not change:** Keep the managed block byte-for-byte aligned with the root AGENTS rule and preserve surrounding template content.
+
 ## [2026-07-17] - docs(codex): mirror repeated-issue prevention
 
 **Request:** Give Codex the same proactive repeated-issue contract as Claude Code.
