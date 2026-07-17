@@ -39,6 +39,7 @@ def _make_plugin(
     *,
     skills: dict[str, str] | None = None,
     commands: dict[str, str] | None = None,
+    agents: dict[str, str] | None = None,
     plugin_json: str | None = None,
     template: str | None = None,
 ) -> Path:
@@ -60,6 +61,11 @@ def _make_plugin(
     for name, body in (commands or {}).items():
         (plugin_dir / "commands" / f"{name}.md").write_text(body)
 
+    if agents:
+        (plugin_dir / "agents").mkdir()
+        for name, body in agents.items():
+            (plugin_dir / "agents" / f"{name}.md").write_text(body)
+
     (plugin_dir / "templates" / "CLAUDE.md.template").write_text(
         template if template is not None else "<!-- BEGIN:demo-rule -->\nfoo\n<!-- END:demo-rule -->\n"
     )
@@ -78,6 +84,14 @@ def _valid_command_md(name: str) -> str:
     return (
         f"---\ndescription: a skill for {name}\nargument-hint: '[shape]'\n---\n\n"
         f"Read ${{CLAUDE_PLUGIN_ROOT}}/skills/{name}/SKILL.md and follow its instructions.\n"
+    )
+
+
+def _valid_agent_md(name: str) -> str:
+    return (
+        f"---\nname: {name}\ndescription: Use proactively for {name}\n"
+        "model: sonnet\ntools: Read, Grep, Glob\n---\n\n"
+        f"You are the {name} specialist.\n"
     )
 
 
@@ -113,6 +127,28 @@ def test_lint_skill_files_catches_missing_description(tmp_path: Path):
     plugin = _make_plugin(tmp_path, skills={"foo": body})
     issues = lint.lint_skill_files(plugin)
     assert any("missing 'description'" in i for i in issues)
+
+
+# ── Claude plugin agents ─────────────────────────────────────────────────────
+
+
+def test_lint_agent_files_passes_valid_agent(tmp_path: Path) -> None:
+    plugin = _make_plugin(tmp_path, agents={"reviewer": _valid_agent_md("reviewer")})
+    assert lint.lint_agent_files(plugin) == []
+
+
+def test_lint_agent_files_catches_invalid_contract(tmp_path: Path) -> None:
+    body = (
+        "---\nname: wrong\ndescription: reviewer\nmodel: codex\n"
+        "permissionMode: bypassPermissions\n---\n"
+    )
+    plugin = _make_plugin(tmp_path, agents={"reviewer": body})
+    issues = lint.lint_agent_files(plugin)
+    assert any("doesn't match filename" in issue for issue in issues)
+    assert any("unsupported Claude model" in issue for issue in issues)
+    assert any("missing 'tools'" in issue for issue in issues)
+    assert any("do not support" in issue for issue in issues)
+    assert any("missing agent system prompt" in issue for issue in issues)
 
 
 # ── command shim linter ──────────────────────────────────────────────────────

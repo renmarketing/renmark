@@ -92,6 +92,42 @@ def lint_skill_files(plugin_dir: Path) -> list[str]:
     return issues
 
 
+def lint_agent_files(plugin_dir: Path) -> list[str]:
+    """Validate any Claude plugin subagents shipped under ``agents/``."""
+    issues: list[str] = []
+    agents_dir = plugin_dir / "agents"
+    if not agents_dir.is_dir():
+        return issues
+
+    allowed_models = {"haiku", "sonnet", "opus", "inherit"}
+    unsupported_plugin_fields = {"hooks", "mcpServers", "permissionMode"}
+    for agent_path in sorted(agents_dir.glob("*.md")):
+        rel = f"agents/{agent_path.name}"
+        try:
+            text = agent_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            issues.append(f"{rel}: file unreadable")
+            continue
+        fm = parse_frontmatter(text)
+        if fm is None:
+            issues.append(f"{rel}: missing YAML frontmatter")
+            continue
+        if fm.get("name") != agent_path.stem:
+            issues.append(f"{rel}: name={fm.get('name')!r} doesn't match filename {agent_path.stem!r}")
+        if not fm.get("description"):
+            issues.append(f"{rel}: frontmatter missing 'description'")
+        if fm.get("model") not in allowed_models:
+            issues.append(f"{rel}: unsupported Claude model {fm.get('model')!r}")
+        if not fm.get("tools"):
+            issues.append(f"{rel}: frontmatter missing 'tools'")
+        for field in sorted(unsupported_plugin_fields.intersection(fm)):
+            issues.append(f"{rel}: plugin agents do not support frontmatter field {field!r}")
+        match = _FRONTMATTER_RE.match(text)
+        if match is not None and not text[match.end() :].strip():
+            issues.append(f"{rel}: missing agent system prompt")
+    return issues
+
+
 def lint_next_steps_citation(plugin_dir: Path) -> list[str]:
     """Verify every skills/<name>/SKILL.md cites the hand-off contract.
 
@@ -396,7 +432,7 @@ def lint_frontmatter_values(plugin_dir: Path) -> list[str]:
     """
     issues: list[str] = []
     md_files: list[Path] = []
-    for sub in (plugin_dir / "commands", plugin_dir / "skills"):
+    for sub in (plugin_dir / "commands", plugin_dir / "skills", plugin_dir / "agents"):
         if sub.is_dir():
             md_files.extend(sub.rglob("*.md"))
 
@@ -438,6 +474,7 @@ def lint_all(
     issues: list[str] = []
     issues.extend(lint_plugin_json(plugin_dir))
     issues.extend(lint_skill_files(plugin_dir))
+    issues.extend(lint_agent_files(plugin_dir))
     issues.extend(lint_next_steps_citation(plugin_dir))
     issues.extend(lint_command_shims(plugin_dir))
     if template_path is None:

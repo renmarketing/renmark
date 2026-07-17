@@ -122,6 +122,18 @@ Default routing (override if `.renmark/memory/routing.md` says otherwise):
 
 Complexity → executor mapping: `hard` → opus, `medium` → codex (file-write + verifier) or sonnet (reasoning-heavy), `simple` → haiku; `fable` is never auto-assigned by complexity alone — only by explicit escalation signals (REQ-2); and never assigned at all in undeclared projects (capabilities.top_tier).
 
+### 4b. Assign the specialized subagent role
+
+Every emitted task MUST carry `role`. Choose one of `docs-editor`,
+`code-implementer`, `test-writer`, `reviewer`, `release-manager`, `researcher`,
+`audit-reader`, or `finish-lane-specialist` using
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/subagent-profiles.md`. Use
+`general-purpose` only when none fits, and then add a non-empty `role_reason`.
+The role is independent of executor: Claude addresses plugin agents as
+`renmark:<role>`, while Codex uses the same role to shape its bounded packet.
+Do not create one task per role or spawn all roles automatically—assign only the
+specialist needed by each real plan task.
+
 ### 5. Assign parallel_group
 
 Tasks that touch disjoint files AND don't depend on each other's outputs get the same `parallel_group`. Conservative default: each task in its own group (serial). Set the same group only when you're confident the targets won't collide.
@@ -248,6 +260,8 @@ the single-dispatch-gate ownership rules in 8b are unchanged.)
 - **target:** .gitignore
 - **complexity:** simple
 - **executor:** haiku
+- **role:** general-purpose
+- **role_reason:** configuration target has no specialized profile
 - **parallel_group:** 1
 - **est_tokens:** 150
 - **est_cost_usd:** 0.00
@@ -261,6 +275,7 @@ the single-dispatch-gate ownership rules in 8b are unchanged.)
 - **target:** server.py
 - **complexity:** medium
 - **executor:** codex
+- **role:** code-implementer
 - **parallel_group:** 2
 - **est_tokens:** 900
 - **est_cost_usd:** 0.02

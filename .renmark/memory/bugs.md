@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-17 — Claude specialist agents fell back to general-purpose
+
+**Severity:** major
+**Symptom:** Claude runs showed general-purpose agents instead of Renmark specialist roles
+**Root cause:** Renmark shipped no plugin agent definitions, falsely reported static native roles, ignored explicit plan roles, and failed to classify ordinary project source as code work.
+**Fix:** Shipped eight plugin-scoped agent definitions, verified files before native dispatch, honored explicit roles, and expanded source classification.
+**Lesson:** A dispatch-role registry is not host capability proof; package the host-native definition and resolve its installed scoped name before dispatch.
+
+---
+
 ### 2026-07-17 — Claude native picker missing after parity install
 
 **Severity:** high

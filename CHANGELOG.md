@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — v0.38.1: ship and route Claude specialist subagents
+
+**Request:** Stop Renmark's Claude runs from falling back to general-purpose agents and make the expected nine-role dispatch model install automatically.
+**Built:** Added eight Claude plugin agent definitions under `plugin/agents/`, dispatched them with collision-safe `renmark:<role>` names, made native-agent detection verify shipped files, honored explicit plan roles, and classified ordinary project source as `code-implementer`. Plans now require a specialist role and a reason for any `general-purpose` fallback. Claude supplies the ninth role through its built-in general-purpose agent; no global `~/.claude/agents/` copy is required, and Renmark intentionally spawns only the roles relevant to each plan.
+**Files changed:** `plugin/agents/`, `renmark/subagent_profiles.py`, `renmark/dispatch.py`, `renmark/lint.py`, `renmark/plan_lint.py`, subagent/plan shared contracts and rules, installers, README, version files, regression tests, `.renmark/debug/20260717-130707-1eb8/session.md`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.1-2026-07-17.zip`.
+**Do not change:** Keep the eight specialists plugin-scoped and file-verified; do not require global Claude agent files or spawn all roles on every run; preserve explicit plan roles and require `role_reason` whenever general-purpose is chosen.
+
 ## [2026-07-17] — fix: restore Claude Code native selectors after install
 
 **Request:** Restore Renmark's Claude Code arrow-key selector and the recommended-first option after the parity installation regressed to plain prose.

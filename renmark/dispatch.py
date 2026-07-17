@@ -465,7 +465,7 @@ def build_workflow_fanout_args(
         payload = inp.to_dict()
         # Pre-resolve agent_type so the Workflow script never needs to call back
         # into Python — it reads this field directly to pass agentType on agent().
-        payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
+        payload["agent_type"] = subagent_profiles.native_agent_type(inp.role)
         args.append(payload)
     return args
 
@@ -627,7 +627,7 @@ def _build_claude_host_calls(
         args: list[dict[str, Any]] = []
         for inp in inputs:
             payload = inp.to_dict()
-            payload["agent_type"] = inp.role if subagent_profiles.has_native_agent_file(inp.role) else None
+            payload["agent_type"] = subagent_profiles.native_agent_type(inp.role)
             args.append(payload)
         return (
             HostDispatchCall(
@@ -646,8 +646,9 @@ def _build_claude_host_calls(
             reasoning_instruction=reasoning_instruction,
         ),
     }
-    if subagent_profiles.has_native_agent_file(inp.role):
-        arguments["subagent_type"] = inp.role
+    agent_type = subagent_profiles.native_agent_type(inp.role)
+    if agent_type is not None:
+        arguments["subagent_type"] = agent_type
     if task.executor == "fable":
         arguments["model"] = "fable"
     return (

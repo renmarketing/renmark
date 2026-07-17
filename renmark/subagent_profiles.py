@@ -6,13 +6,13 @@ cheaper-capable (Haiku for read-only/docs/audit roles, Sonnet for code/tests/rev
 and declares a deliberately narrow ``context_scope`` so the dispatch packet
 carries less context.
 
-The UI may still surface Claude's built-in "general-purpose" label, but renmark
-tracks and logs the intended role from this module, which drives packet shaping
-and future Agency Mode routing. Specialized profiles declared here are reused by
-the Agency Mode (forthcoming).
+Claude Code discovers the eight specialized profiles from the enabled Renmark
+plugin's ``agents/`` directory. Its built-in ``general-purpose`` agent remains
+the ninth dispatch role and fallback. Renmark tracks and logs the role from this
+module and emits a plugin-scoped native type such as ``renmark:reviewer``.
 
 Design contract:
-- Pure data — no LLM calls, no I/O, no side effects.
+- No LLM calls or writes; native-agent detection performs bounded local reads.
 - ``resolve_profile`` and ``profile_tier`` never raise into the caller.
 - On any error both return the safe fallback (``"general-purpose"`` / ``"sonnet"``).
 """
@@ -22,6 +22,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+PLUGIN_NAME = "renmark"
+PLUGIN_AGENT_DIR = Path(__file__).resolve().parents[1] / "plugin" / "agents"
 
 # ── Profile dataclass ─────────────────────────────────────────────────────────
 
@@ -167,16 +170,21 @@ def resolve_profile(task: Any) -> str:
 
     Accepts objects with attributes *or* plain dicts. Heuristic priority order:
 
-    1. ``tests/`` path prefix OR ``test_*`` / ``*_test.*`` filename → ``"test-writer"``
-    2. ``.md`` suffix OR path under ``plugin/skills/`` / ``docs/`` → ``"docs-editor"``
-    3. title / task kind mentioning ``review`` → ``"reviewer"``
-    4. title / task kind mentioning ``audit`` or ``audit-read`` → ``"audit-reader"``
-    5. target under ``renmark/`` or ``bin/`` (core code) → ``"code-implementer"``
-    6. fallback → ``"general-purpose"``
+    1. A valid explicit ``role`` field → that role.
+    2. Intent names finish-lane, review, audit, research, or release work → the
+       corresponding specialist.
+    3. ``tests/`` path prefix OR ``test_*`` / ``*_test.*`` filename → ``"test-writer"``.
+    4. ``.md`` suffix OR path under ``plugin/skills/`` / ``docs/`` → ``"docs-editor"``.
+    5. A recognized source-code target in any project → ``"code-implementer"``.
+    6. Fallback → ``"general-purpose"``.
 
     Never raises: any exception returns ``"general-purpose"``.
     """
     try:
+        explicit_role = _get_field(task, "role", "").strip()
+        if explicit_role in PROFILES:
+            return explicit_role
+
         target = _get_field(task, "target", "")
         title = _get_field(task, "title", "") or _get_field(task, "spec", "")
         kind = _get_field(task, "kind", "")
@@ -184,6 +192,18 @@ def resolve_profile(task: Any) -> str:
         target = (target or "").strip()
         title = (title or "").strip().lower()
         kind = (kind or "").strip().lower()
+
+        intent = f"{title} {kind}"
+        if "finish lane" in intent or "finish-lane" in intent:
+            return "finish-lane-specialist"
+        if "review" in intent:
+            return "reviewer"
+        if "audit" in intent:
+            return "audit-reader"
+        if any(signal in intent for signal in ("research", "reuse check", "prior art", "library lookup")):
+            return "researcher"
+        if any(signal in intent for signal in ("release", "version bump", "package metadata", "publish readiness")):
+            return "release-manager"
 
         # ── 1. Test files ─────────────────────────────────────────────────────
         if _is_test_target(target):
@@ -193,16 +213,8 @@ def resolve_profile(task: Any) -> str:
         if _is_doc_target(target):
             return "docs-editor"
 
-        # ── 3. Review ─────────────────────────────────────────────────────────
-        if "review" in title or "review" in kind:
-            return "reviewer"
-
-        # ── 4. Audit ─────────────────────────────────────────────────────────
-        if "audit" in title or "audit" in kind:
-            return "audit-reader"
-
-        # ── 5. Core code ──────────────────────────────────────────────────────
-        if _is_core_code_target(target):
+        # ── 3. Source code in any project ─────────────────────────────────────
+        if _is_code_target(target):
             return "code-implementer"
 
         # ── 6. Fallback ───────────────────────────────────────────────────────
@@ -249,24 +261,42 @@ _NATIVE_AGENT_ROLES: frozenset[str] = frozenset(
 
 
 def has_native_agent_file(role: str, repo: Path | None = None) -> bool:
-    """True when *role* has a native ``.claude/agents/<role>.md`` file.
+    """Return whether *role* has a real native agent definition on disk.
 
-    ``general-purpose`` and any unrecognized role always return ``False``.
-    When *repo* is given, additionally confirms the file exists on disk under
-    ``repo / ".claude" / "agents" / f"{role}.md"`` — defensive, since a role
-    could land in ``_NATIVE_AGENT_ROLES`` before its file is added. Never
-    raises: any filesystem error falls back to the static-set-only answer.
+    With no *repo*, inspect Renmark's canonical plugin ``agents/`` directory.
+    With *repo*, accept a Renmark checkout (``plugin/agents``), a plugin root
+    (``agents``), or a standalone Claude project (``.claude/agents``).
+    ``general-purpose`` is Claude's built-in fallback and intentionally has no
+    Renmark file. Filesystem errors fail closed instead of claiming a native
+    type Claude cannot load.
     """
     try:
-        in_static_set = role in _NATIVE_AGENT_ROLES
-        if not in_static_set or repo is None:
-            return in_static_set
-        try:
-            return (repo / ".claude" / "agents" / f"{role}.md").exists()
-        except Exception:
-            return in_static_set
+        if role not in _NATIVE_AGENT_ROLES:
+            return False
+        candidates: tuple[Path, ...]
+        if repo is None:
+            candidates = (PLUGIN_AGENT_DIR / f"{role}.md",)
+        else:
+            candidates = (
+                repo / "plugin" / "agents" / f"{role}.md",
+                repo / "agents" / f"{role}.md",
+                repo / ".claude" / "agents" / f"{role}.md",
+            )
+        return any(path.is_file() for path in candidates)
     except Exception:
         return False
+
+
+def native_agent_roles() -> tuple[str, ...]:
+    """Return the stable ordered roster of plugin-provided specialist roles."""
+    return tuple(sorted(_NATIVE_AGENT_ROLES))
+
+
+def native_agent_type(role: str) -> str | None:
+    """Return Claude's plugin-scoped agent type, or ``None`` for fallback."""
+    if not has_native_agent_file(role):
+        return None
+    return f"{PLUGIN_NAME}:{role}"
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -315,17 +345,55 @@ def _is_doc_target(target: str) -> bool:
     return norm.startswith("docs/") or "/docs/" in norm
 
 
-def _is_core_code_target(target: str) -> bool:
-    """True when *target* is a Python/shell file under renmark/ or bin/."""
+def _is_code_target(target: str) -> bool:
+    """Return whether *target* is a recognized implementation source file."""
     if not target:
         return False
     from pathlib import Path
 
     norm = target.replace("\\", "/")
     norm_stripped = norm.lstrip("./")
-    code_suffixes = {".py", ".pyi", ".sh", ".bash"}
+    code_suffixes = {
+        ".bash",
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cs",
+        ".css",
+        ".dart",
+        ".ex",
+        ".exs",
+        ".fs",
+        ".fsx",
+        ".go",
+        ".h",
+        ".hpp",
+        ".html",
+        ".java",
+        ".js",
+        ".jsx",
+        ".kt",
+        ".kts",
+        ".lua",
+        ".mjs",
+        ".php",
+        ".py",
+        ".pyi",
+        ".r",
+        ".rb",
+        ".rs",
+        ".scala",
+        ".scss",
+        ".sh",
+        ".sql",
+        ".svelte",
+        ".swift",
+        ".ts",
+        ".tsx",
+        ".vue",
+        ".zsh",
+    }
     suffix = Path(target).suffix.lower()
-    if suffix not in code_suffixes and suffix != "":
-        return False
-    core_roots = ("renmark/", "bin/")
-    return any(norm_stripped.startswith(root) for root in core_roots)
+    if suffix in code_suffixes:
+        return True
+    return suffix == "" and norm_stripped.startswith("bin/")

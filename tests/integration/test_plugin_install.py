@@ -100,6 +100,16 @@ def test_install_sh_creates_symlinks(repo_root: Path, tmp_path: Path):
     )
     assert cache_path.is_symlink(), f"missing Claude cache install at {cache_path}"
     assert cache_path.resolve() == (repo_root / "plugin").resolve()
+    assert {path.stem for path in (cache_path / "agents").glob("*.md")} == {
+        "audit-reader",
+        "code-implementer",
+        "docs-editor",
+        "finish-lane-specialist",
+        "release-manager",
+        "researcher",
+        "reviewer",
+        "test-writer",
+    }
     installed = json.loads(
         (fake_home / ".claude" / "plugins" / "installed_plugins.json").read_text()
     )

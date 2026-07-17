@@ -56,13 +56,13 @@ payloads — produced by `dispatch.build_workflow_fanout_args(tasks)` in
 Python import access, so the `has_native_agent_file` check happens **before**
 the payloads leave Python: `build_workflow_fanout_args` resolves, per task,
 whether `subagent_profiles.has_native_agent_file(item.role)` is true and bakes
-the result into the payload as a plain field (e.g. `agent_type: <role> |
+the result into the payload as a plain field (e.g. `agent_type: renmark:<role> |
 null`) — the Workflow script only ever reads that pre-resolved field, it never
 calls back into Python. For each item the script then:
 
 1. Reads `agent_type` from the payload: pass `agentType: item.agent_type` to
    the `agent()` call when it is non-null (so the task's subagent gets its own
-   tool allowlist from `.claude/agents/<role>.md`); omit `agentType` (default
+   tool allowlist from the plugin's `agents/<role>.md`); omit `agentType` (default
    agent) when it is `null`.
 2. Builds the prompt by embedding `task_spec` + `verifier_expectations` from
    the item, plus the same G11 JSON-shape instruction Step 3b already gives

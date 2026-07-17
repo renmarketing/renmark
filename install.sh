@@ -260,6 +260,11 @@ Hosts:
   Claude Code — reload plugins to pick up this version
   Codex       — start a new task to pick up this version
 
+Claude agents:
+  8 Renmark specialists load from the plugin as renmark:<role>
+  general-purpose remains Claude's ninth, fallback-only dispatch role
+  no ~/.claude/agents copy is required
+
 Skills:
   /renmark:start       — vibe coder entry: describe what you want, renmark builds the rest
   /renmark:setup       — prepare any project for renmark workflow
