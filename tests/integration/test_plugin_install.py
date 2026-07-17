@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -33,6 +35,22 @@ case "$*" in
     ;;
   *) exit 2 ;;
 esac
+"""
+    )
+    cli.chmod(0o755)
+    return cli
+
+
+def _install_failing_doctor_python(fake_home: Path) -> Path:
+    """Proxy python3, but make the installer's doctor repair fail."""
+    cli = fake_home / ".local" / "bin" / "python3"
+    cli.write_text(
+        f"""#!/usr/bin/env bash
+if [[ "$*" == *"-m renmark.doctor"* ]]; then
+  echo "simulated doctor failure" >&2
+  exit 17
+fi
+exec {shlex.quote(sys.executable)} "$@"
 """
     )
     cli.chmod(0o755)
@@ -71,10 +89,52 @@ def test_install_sh_creates_symlinks(repo_root: Path, tmp_path: Path):
     expected_version = (repo_root / "VERSION").read_text().strip()
     assert codex_manifest["version"].startswith(f"{expected_version}+codex.local.")
     assert cli_link.resolve() == (repo_root / "bin" / "renmark-execute").resolve()
+    cache_path = (
+        fake_home
+        / ".claude"
+        / "plugins"
+        / "cache"
+        / "renmark-local"
+        / "renmark"
+        / expected_version
+    )
+    assert cache_path.is_symlink(), f"missing Claude cache install at {cache_path}"
+    assert cache_path.resolve() == (repo_root / "plugin").resolve()
+    installed = json.loads(
+        (fake_home / ".claude" / "plugins" / "installed_plugins.json").read_text()
+    )
+    install_path = Path(installed["plugins"]["renmark@renmark-local"][0]["installPath"])
+    assert install_path.exists(), f"Claude registry points to missing path {install_path}"
     marketplace = json.loads((fake_home / ".agents" / "plugins" / "marketplace.json").read_text())
     renmark_entry = next(entry for entry in marketplace["plugins"] if entry["name"] == "renmark")
     assert renmark_entry["source"] == {"source": "local", "path": "./plugins/renmark"}
     assert (fake_home / ".codex-renmark-installed").exists()
+
+
+def test_install_sh_fails_when_claude_registry_repair_fails(
+    repo_root: Path, tmp_path: Path
+):
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    fake_local_bin = fake_home / ".local" / "bin"
+    fake_local_bin.mkdir(parents=True)
+    _install_fake_codex(fake_home)
+    _install_failing_doctor_python(fake_home)
+
+    env = os.environ.copy()
+    env["HOME"] = str(fake_home)
+    env["PATH"] = f"{fake_local_bin}:{env['PATH']}"
+
+    result = subprocess.run(
+        ["bash", str(repo_root / "install.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode != 0
+    assert "simulated doctor failure" in result.stderr
 
 
 def test_install_sh_uninstall_cleans_up(repo_root: Path, tmp_path: Path):

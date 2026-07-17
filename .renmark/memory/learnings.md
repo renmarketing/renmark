@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-17, bug) **Claude native picker missing after parity install** — Treat plugin-manager registration and cache existence as installation postconditions; never suppress the final health check behind an output-filtering pipeline.
+
 - (2026-07-16, bug) **Repository-wide Ruff and mypy baseline was red** — A green pytest run is not a substitute for running every repository quality gate after cross-file extraction work.
 
 - (2026-07-06, .renmark/reviews/2026-07-06-c89a3320872dc49cbe62209cdf740f2a4c7dcd69.verification.md) model `verify`: **verify-agent-team-migration** — 7/7 behaviors verified; failed: none; regressions: 0

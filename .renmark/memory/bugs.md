@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-17 — Claude native picker missing after parity install
+
+**Severity:** high
+**Symptom:** Claude Code answered Renmark gates as prose without an arrow-key selector or recommended-first option.
+**Root cause:** The installer had no authoritative post-install health gate: its pre-Codex doctor pass could return nonzero and was discarded by `|| true`, so it could announce success while Claude's registered Renmark cache path was missing; without the loaded skill, Claude could not invoke AskUserQuestion or render the recommended-first picker.
+**Fix:** Repaired the live Claude cache and made install.sh fail unless a final doctor pass confirms the registry and cache are healthy.
+**Lesson:** Treat plugin-manager registration and cache existence as installation postconditions; never suppress the final health check behind an output-filtering pipeline.
+
+---
+
 ### 2026-07-16 — Repository-wide Ruff and mypy baseline was red
 
 **Severity:** medium

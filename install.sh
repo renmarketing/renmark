@@ -191,9 +191,18 @@ if command -v python3 >/dev/null 2>&1; then
     if python3 -c "import renmark.doctor" 2>/dev/null; then
         echo ""
         echo "Registering with Claude Code and Codex:"
-        PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m renmark.doctor \
-            --fix --refresh-codex \
-            2>&1 | grep -E "^(Applying|  •|\[)" | head -24 || true
+        # This registration pass runs before `codex plugin add`, so doctor may
+        # still report the pending Codex install. The authoritative health
+        # check runs after that install below.
+        if doctor_output="$(
+            PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m renmark.doctor \
+                --fix --refresh-codex 2>&1
+        )"; then
+            :
+        fi
+        printf '%s\n' "$doctor_output" \
+            | grep -E "^(Applying|  •|\[)" \
+            | head -24 || true
     else
         echo "Registry: skipped (renmark.doctor not importable yet — re-run install.sh after pip succeeds)"
     fi
@@ -208,6 +217,18 @@ if command -v codex >/dev/null 2>&1; then
         echo "Codex:   renmark@personal installed and enabled"
     else
         echo "Codex:   plugin add failed; run: codex plugin add renmark@personal" >&2
+    fi
+fi
+
+# Do not announce a successful installation until the registry and cache paths
+# are healthy after every host-specific install step has finished.
+if command -v python3 >/dev/null 2>&1 && python3 -c "import renmark.doctor" 2>/dev/null; then
+    if ! doctor_output="$(
+        PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m renmark.doctor --fix 2>&1
+    )"; then
+        echo "ERROR: Claude Code registry/cache repair failed:" >&2
+        printf '%s\n' "$doctor_output" >&2
+        exit 1
     fi
 fi
 

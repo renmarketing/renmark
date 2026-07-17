@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — fix: restore Claude Code native selectors after install
+
+**Request:** Restore Renmark's Claude Code arrow-key selector and the recommended-first option after the parity installation regressed to plain prose.
+**Built:** Reproduced an enabled-but-unloadable Claude plugin whose registry pointed at a missing cache path, repaired the live cache, and made `install.sh` perform an authoritative post-install doctor check. The installer now fails instead of announcing success when Claude's registry/cache repair is unhealthy, and integration coverage pins both the valid cache path and the failure exit.
+**Files changed:** `install.sh`, `tests/integration/test_plugin_install.py`, `CHANGELOG.md`, `.renmark/debug/20260717-124915-8d72/session.md`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`; external artifact `/home/renmark/projects/releases/ai-system-renmark-v0.38.0-2026-07-17.zip`.
+**Do not change:** A successful install must leave `renmark@renmark-local` enabled with an existing registered cache path; Claude uses `AskUserQuestion` with exactly one `(Recommended)` option first, while Codex keeps `request_user_input` and never receives clear/resume instructions.
+
 ## [2026-07-16] — package: deployable Renmark v0.38.0 archive
 
 **Request:** Create a deployable Renmark zip in the shared `/home/renmark/projects/releases/` folder.
