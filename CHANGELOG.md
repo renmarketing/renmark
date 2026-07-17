@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — feat(codex): stop equivalent retries before a third call
+
+**Request:** Prevent Codex from repeatedly spending model calls on the same implementation or verifier failure.
+**Built:** Added recurrence observations for executor exits, lane violations, and verifier failures; the second equivalent failure returns a bounded `repeated_issue_guard` result instead of launching a third Codex call, while preserving rollback, usage, escalation, and sibling-lane behavior.
+**Files changed:** `renmark/cli/_codex_runner.py`, `CHANGELOG.md`.
+**Do not change:** Keep Codex tasks on the subprocess lane; preserve provider-limit pauses and truthful retry accounting; never persist raw model or verifier bodies in recurrence state.
+
 ## [2026-07-17] — feat(recurrence): add bounded repeated-issue state
 
 **Request:** Detect equivalent implementation and verifier failures across attempts and runs without storing raw histories or wasting a third model call.
