@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] — feat(orchestrate): surface repeated-issue remediation
+
+**Request:** Give Claude Code and Codex the same proactive warning and remediation choice before another equivalent implementation attempt.
+**Built:** Added host-neutral recurrence observation and pre-attempt gating to Orchestrate, with bounded evidence and recommended-first patch, durable-guard, or explicit one-time-retry choices; rule-document changes remain proposal-only and human-gated.
+**Files changed:** `plugin/skills/orchestrate/SKILL.md`, `CHANGELOG.md`.
+**Do not change:** Preserve usage-limit handling, fable fallback, Codex rerouting, SubagentOutput isolation, recommended-first host selectors, and Codex's no-clear/compact/resume invariant.
+
 ## [2026-07-17] — feat(codex): stop equivalent retries before a third call
 
 **Request:** Prevent Codex from repeatedly spending model calls on the same implementation or verifier failure.

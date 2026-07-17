@@ -160,6 +160,65 @@ if view.get("limit_exceeded"):  # a configured local limit is already over budge
 
 The PauseState carries `pause_kind="usage_limit"` and a `resume_after` timestamp (provider reset if known, else the next local rolling-window boundary, else now+60min). Surface: *"Local usage limit reached — orchestrate paused before wave N. Resume with `/renmark:orchestrate --resume` after `resume_after`."* Then stop; do not enter 3b. MVP: no polling, no auto-retry — the user (or `/renmark:resume`) re-enters later.
 
+**3a-ter. Repeated-issue pre-attempt gate (deterministic, host-neutral)**
+
+After the usage preflight above, but before **any** Codex subprocess or host-agent
+dispatch, check both failure channels for every target in the wave. This check runs
+once per target on both hosts, before constructing or issuing transport calls:
+
+```python
+from renmark import recurrence
+
+attempt_checks = (
+    ("orchestrate-task", "non-usage-fail"),
+    (task.verifier, "verifier-downgrade"),
+)
+for check, rule_id in attempt_checks:
+    decision = recurrence.pre_attempt(
+        repo, check=check, rule_id=rule_id, target=str(task.target)
+    )
+    if decision is not None and decision.retry_blocked:
+        # STOP the whole wave before dispatch; render the bounded handoff below.
+        ...
+```
+
+`pre_attempt` is the sole authority for the threshold gate and consumes an
+acknowledged `retry_once` exactly once. Never parse recurrence state, reconstruct
+attempt history, or calculate a fingerprint in skill prose. A blocked decision
+prevents a third equivalent attempt from starting silently on either Claude Code
+or Codex.
+
+For a blocked decision, surface at most five lines total: include
+`occurrence_count`, bounded fingerprint evidence from `fingerprint`, the API's
+bounded `summary_lines`, and the recommended action. Use `remediation_class` to
+put the recommended choice first: reproducible implementation/test failures
+recommend patching through `/renmark:debug`; workflow/contract failures recommend
+a durable-guard proposal mirrored in both `CLAUDE.md` and `AGENTS.md`. Render the
+three host-native choices per
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`:
+
+- patch/debug;
+- propose a durable guard;
+- explicitly retry once.
+
+Record the selected action through the deterministic API, passing back the exact
+decision identity:
+
+```python
+recurrence.acknowledge_issue(
+    repo, key=decision.key, action=<"patch" | "durable_guard" | "retry_once">,
+    fingerprint=decision.fingerprint, run_id=<run_id>,
+)
+```
+
+A `durable_guard` selection authorizes only a proposal; changing either rule file
+still requires the normal human approval gate, and an approved guard must update
+both mirrors. A `retry_once` selection must re-enter this pre-attempt gate so the
+API consumes the acknowledgement; never dispatch directly from the menu. Patch
+and guard paths remain paused until their remediation is applied and verified;
+only then call `recurrence.resolve_issue(repo, key=decision.key,
+action=<selected action>, fingerprint=decision.fingerprint, run_id=<run_id>)`.
+
 **3b. Dispatch each task in this wave (parallel)**
 
 For `executor: codex` tasks:
@@ -241,6 +300,38 @@ Codex tasks are ledgered by `renmark-execute` directly — do NOT call `log_agen
 
 For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, cwd=repo, tail_lines=3)` (`cwd` is a required keyword-only argument). Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
 
+**3c-bis. Observe non-usage failures deterministically**
+
+After executor fallback/rerouting has settled, observe each final non-usage task
+FAIL exactly once. Also observe a PASS that Step 3c downgraded because its verifier
+failed. Build the observation only from the parsed `SubagentOutput`, task metadata,
+and the already-bounded verifier result; never use a transcript, artifact, diff,
+raw log, or hand-parsed recurrence history:
+
+```python
+from renmark import recurrence, state
+
+observation = recurrence.IssueObservation(
+    check=(task.verifier if <verifier downgrade> else "orchestrate-task"),
+    rule_id=("verifier-downgrade" if <verifier downgrade> else "non-usage-fail"),
+    target=str(task.target),
+    title=task.title,
+    summary_text=<bounded failure reason or verifier result>,
+    source=("verifier" if <verifier downgrade> else "subagent_output"),
+    run_id=<run_id>,
+    observed_at=state.now_iso(),
+)
+decision = recurrence.observe_issue(repo, observation)
+```
+
+When `decision.retry_blocked` is true, use the same at-most-five-line evidence and
+recommended-first host-native handoff from Step 3a-ter. Do not observe Tier-1 or
+Tier-2 usage-limit pauses. Do not observe a recoverable fable dispatch error when
+its one fallback passes, or a Codex usage signal that is paused/rerouted; if the
+final fallback or rerouted execution ends in a non-usage FAIL, observe that final
+result once. `IsolationViolation` is a workflow/contract FAIL and uses this path,
+while its existing no-retry isolation rule remains authoritative.
+
 **3d. Escalation decision log**
 
 When a task is escalated to a higher-tier executor, an ADR is appended to `.renmark/memory/decisions.md` via `memory.log_escalation_decision()`. This is automatic — handled inside `renmark/cli/_engine.py`'s `_record_escalation` when `escalated_to=` is passed. Idempotent on (title, date): re-running the same escalation on the same day does not duplicate the ADR. Best-effort: decision-logging failures do NOT break orchestrate. Pointer-only — the orchestrator never reads `decisions.md` into conversation.
@@ -297,7 +388,7 @@ Use the task's `summary_lines` and `touched_files` from `SubagentOutput` to fill
 |---|---|
 | All tasks PASS | Continue to next wave or finalize |
 | Task failed on a **provider usage signal** (rate-limit / quota / retry-later / usage-exceeded) | Classify as **PAUSED, not FAIL** — see Tier-2 below; STOP the wave so `/renmark:resume` continues later |
-| Any other FAIL in wave | Pause via `state.write_pause(...)`; show resume command; stop |
+| Any other FAIL in wave | Observe through Step 3c-bis, then pause via `state.write_pause(...)`; if recurrence reaches threshold, use the Step 3a-ter handoff instead of allowing another silent dispatch |
 | `IsolationViolation` raised | Mark task FAIL; aggregate summary anyway; alert user to skill-side bug |
 | Plan parse error | Route to `/renmark:plan` |
 
