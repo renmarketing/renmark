@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - docs(codex): mirror repeated-issue prevention
+
+**Request:** Give Codex the same proactive repeated-issue contract as Claude Code.
+**Built:** Added the concise AGENTS rule requiring the persisted recurrence ledger before a third equivalent implementation/test attempt, bounded evidence, explicit patch-or-durable-guard guidance, and mirrored approved guards.
+**Files changed:** `AGENTS.md`, `CHANGELOG.md`.
+**Do not change:** Keep this rule semantically synchronized with the authoritative `CLAUDE.md` contract and never retry or edit rules silently.
+
 ## [2026-07-17] - docs(template): propagate repeated-issue prevention
 
 **Request:** Ensure projects adopted through Renmark receive the same proactive Claude rule as this repository.

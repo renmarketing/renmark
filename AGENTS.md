@@ -34,6 +34,8 @@ renmark separates working context into four kinds: **static** (always-present `C
 
 **Root cause before any fix.** Before changing code to fix a bug, write the root cause in one sentence: WHY the bug exists, not what fixes it. If you can't write it, keep investigating. And don't hypothesize about a failure you haven't reproduced with a real, red-capable command first — the feedback loop is the gate. See Iron Law in `/renmark:debug`.
 
+**Repeated-issue prevention.** Before a third materially equivalent implementation or test attempt, consult the persisted recurrence ledger and stop when the issue repeats. Surface only bounded evidence to the user and recommend a concrete patch or durable guard; never silently retry or edit the rule. Any approved durable guard MUST be mirrored in both `CLAUDE.md` and `AGENTS.md`.
+
 **Verification before completion.** Before claiming any task or plan complete, re-run the verifier fresh — a verifier that passed in wave 3 may be broken by wave 4. Evidence first, claim second.
 
 **The orchestrator coordinates; it does not accumulate.** Treat orchestrator context as a degrading resource, not durable memory; quality drops before the window fills. Never fix an orchestration problem by adding inline context. Prefer artifact emission, structured summaries, file pointers, persistent state, resumable workflows. See `CLAUDE.md` § `orchestrator-role-rule`.
