@@ -222,6 +222,10 @@ def test_build_package_excludes_junk_and_project_dirs(tmp_path: Path):
     # seed things that MUST NOT be packaged
     (repo / "__pycache__").mkdir()
     (repo / "__pycache__" / "x.pyc").write_text("junk")
+    (repo / ".mypy_cache").mkdir()
+    (repo / ".mypy_cache" / "cache.db").write_text("junk")
+    (repo / ".ruff_cache").mkdir()
+    (repo / ".ruff_cache" / "cache.db").write_text("junk")
     (repo / ".env").write_text("SECRET=1")
     (repo / ".renmark" / "state").mkdir(parents=True)
     (repo / ".renmark" / "state" / "pipeline.json").write_text("{}")
@@ -231,6 +235,8 @@ def test_build_package_excludes_junk_and_project_dirs(tmp_path: Path):
     joined = "\n".join(names)
     assert ".env" not in joined
     assert "__pycache__" not in joined
+    assert ".mypy_cache" not in joined
+    assert ".ruff_cache" not in joined
     assert ".pyc" not in joined
     assert ".renmark/" not in joined  # whole project-internal tree excluded
     assert "PLAN.md" not in joined

@@ -159,6 +159,8 @@ PACKAGE_EXCLUDES: tuple[str, ...] = (
     ".venv",
     "venv",
     ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
     "__pycache__",
     "*.pyc",
     "*.egg-info",
