@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-17 — Repeated verifier failures recommended an instruction guard
+
+**Severity:** medium
+**Symptom:** The second equivalent verifier failure blocked another retry but recommended durable_guard instead of patch.
+**Root cause:** Remediation was derived solely from occurrence_count, so failure kind never influenced the recommendation.
+**Fix:** Classify remediation from the stable rule_id and persist bounded check/rule identity with legacy-key recovery.
+**Lesson:** Use recurrence count to decide when to stop retrying; use failure identity to decide how to remediate.
+
+---
+
 ### 2026-07-17 — Claude specialist agents fell back to general-purpose
 
 **Severity:** major

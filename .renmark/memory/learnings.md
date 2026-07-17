@@ -14,6 +14,12 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-17, bug) **Repeated verifier failures recommended an instruction guard** — Use recurrence count to decide when to stop retrying; use failure identity to decide how to remediate.
+
+- (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard
+
+- (2026-07-17, run) **task 1 failed on codex** — repeated_issue_guard
+
 - (2026-07-17, bug) **Claude specialist agents fell back to general-purpose** — A dispatch-role registry is not host capability proof; package the host-native definition and resolve its installed scoped name before dispatch.
 
 - (2026-07-17, bug) **Claude native picker missing after parity install** — Treat plugin-manager registration and cache existence as installation postconditions; never suppress the final health check behind an output-filtering pipeline.

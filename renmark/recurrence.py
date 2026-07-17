@@ -33,6 +33,8 @@ _SHORT_FINGERPRINT_CHARS = 16
 _MAX_SOURCE_CHARS = 160
 _MAX_TARGET_CHARS = 1024
 _MAX_RUN_ID_CHARS = 160
+_MAX_IDENTITY_CHARS = 160
+_DURABLE_GUARD_RULE_MARKERS = ("instruction", "contract", "lane", "policy", "workflow")
 
 
 class RecurrenceStateError(RuntimeError):
@@ -139,9 +141,11 @@ def observe_issue(repo: str | os.PathLike[str], observation: IssueObservation) -
             entry["occurrence_count"] = _positive_int(entry.get("occurrence_count"), 1) + 1
             entry["last_observed_at"] = observed_at
             entry["last_run_id"] = _bounded_text(observation.run_id, _MAX_RUN_ID_CHARS)
+            entry["check"] = _bounded_text(observation.check, _MAX_IDENTITY_CHARS)
+            entry["rule_id"] = _bounded_text(observation.rule_id, _MAX_IDENTITY_CHARS)
             entry["source"] = _bounded_text(observation.source, _MAX_SOURCE_CHARS)
             entry["target"] = _bounded_text(observation.target, _MAX_TARGET_CHARS)
-            entry["remediation_class"] = _remediation_for(entry["occurrence_count"])
+            entry["remediation_class"] = _remediation_for(observation.rule_id)
             entry["resolved"] = False
             entry["resolved_at"] = None
             entry["resolved_run_id"] = None
@@ -289,12 +293,14 @@ def _new_entry(
         "key": key,
         "fingerprint": fingerprint,
         "occurrence_count": 1,
+        "check": _bounded_text(observation.check, _MAX_IDENTITY_CHARS),
+        "rule_id": _bounded_text(observation.rule_id, _MAX_IDENTITY_CHARS),
         "source": _bounded_text(observation.source, _MAX_SOURCE_CHARS),
         "target": _bounded_text(observation.target, _MAX_TARGET_CHARS),
         "first_observed_at": observed_at,
         "last_observed_at": observed_at,
         "last_run_id": _bounded_text(observation.run_id, _MAX_RUN_ID_CHARS),
-        "remediation_class": "patch",
+        "remediation_class": _remediation_for(observation.rule_id),
         "acknowledged": False,
         "acknowledgement_action": None,
         "acknowledged_at": None,
@@ -319,7 +325,7 @@ def _decision(
         fingerprint=_short_fingerprint(str(entry["fingerprint"])),
         occurrence_count=count,
         retry_blocked=_is_blocked(entry) and not retry_override,
-        remediation_class=_remediation_for(count),
+        remediation_class=_entry_remediation(entry),
         summary_lines=tuple(summary_lines[:MAX_SUMMARY_LINES]),
         acknowledged=bool(entry.get("acknowledged")),
         resolved=bool(entry.get("resolved")),
@@ -334,8 +340,21 @@ def _is_blocked(entry: Mapping[str, Any]) -> bool:
     )
 
 
-def _remediation_for(occurrence_count: int) -> RemediationClass:
-    return "durable_guard" if occurrence_count >= 2 else "patch"
+def _remediation_for(rule_id: object) -> RemediationClass:
+    normalized = _bounded_text(rule_id, _MAX_IDENTITY_CHARS).lower().replace("_", "-")
+    if any(marker in normalized.split("-") for marker in _DURABLE_GUARD_RULE_MARKERS):
+        return "durable_guard"
+    return "patch"
+
+
+def _identity_from_key(key: object, index: int) -> str:
+    parts = str(key).split(":", 2)
+    return parts[index] if len(parts) == 3 else ""
+
+
+def _entry_remediation(entry: Mapping[str, Any]) -> RemediationClass:
+    rule_id = entry.get("rule_id") or _identity_from_key(entry.get("key"), 1)
+    return _remediation_for(rule_id)
 
 
 def _bounded_signal_summary(title: str, signal: str) -> tuple[str, ...]:
@@ -368,7 +387,7 @@ def _structured_summary(
             f"{_bounded_text(entry.get('source'), _MAX_SOURCE_CHARS)}: "
             f"{_bounded_text(entry.get('target'), MAX_SUMMARY_LINE_CHARS)}"
         ),
-        f"occurrences={count}; remediation={_remediation_for(count)}; status={status}",
+        f"occurrences={count}; remediation={_entry_remediation(entry)}; status={status}",
         (
             "one-time retry permitted"
             if permitted_once
@@ -466,7 +485,15 @@ def _clean_entry(raw_key: object, raw_entry: object) -> dict[str, Any] | None:
     count = _positive_int(raw_entry.get("occurrence_count"), 0)
     if count <= 0:
         return None
-    remediation = _remediation_for(count)
+    check = _bounded_text(
+        raw_entry.get("check") or _identity_from_key(key, 0),
+        _MAX_IDENTITY_CHARS,
+    )
+    rule_id = _bounded_text(
+        raw_entry.get("rule_id") or _identity_from_key(key, 1),
+        _MAX_IDENTITY_CHARS,
+    )
+    remediation = _remediation_for(rule_id)
     action = raw_entry.get("acknowledgement_action")
     if action not in (None, "patch", "durable_guard", "retry_once"):
         action = None
@@ -474,6 +501,8 @@ def _clean_entry(raw_key: object, raw_entry: object) -> dict[str, Any] | None:
         "key": key,
         "fingerprint": fingerprint,
         "occurrence_count": count,
+        "check": check,
+        "rule_id": rule_id,
         "source": _bounded_text(raw_entry.get("source"), _MAX_SOURCE_CHARS),
         "target": _bounded_text(raw_entry.get("target"), _MAX_TARGET_CHARS),
         "first_observed_at": _optional_bounded(raw_entry.get("first_observed_at")),

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-17] - fix(recurrence): classify remediation by failure kind
+
+**Request:** Isolate the repeated-issue monitor failure, fix its root cause, and resume the paused feature run without another wasteful Codex retry.
+**Built:** Replaced count-based remediation selection with stable rule-kind classification, persisted bounded check/rule identity with legacy-key recovery, and proved verifier failures recommend a patch while lane/instruction failures recommend a durable guard.
+**Files changed:** `renmark/recurrence.py`, `.renmark/plans/2026-07-17-debug-recurrence-remediation.plan.md`, `.renmark/debug/20260717-200049-c9ee/`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** Occurrence count controls when another attempt is blocked, never which remediation is recommended; technical failures default to a code patch and process/instruction failures to a human-approved durable guard.
+
 ## [2026-07-17] — feat(orchestrate): surface repeated-issue remediation
 
 **Request:** Give Claude Code and Codex the same proactive warning and remediation choice before another equivalent implementation attempt.
