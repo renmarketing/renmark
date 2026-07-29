@@ -33,9 +33,12 @@ from renmark.agency import (
     AgencyBloatError,
     AgencyState,
     activate,
+    agency_to_delivery_state,
     agency_state_path,
+    current_agency_to_delivery_state,
     deactivate,
     is_active,
+    project_agency_state,
     read_agency,
     write_agency,
 )
@@ -105,6 +108,128 @@ def test_is_active_reflects_persisted_state(tmp_path: Path) -> None:
 
     write_agency(tmp_path, AgencyState(active=True, current_phase="planning"))
     assert is_active(tmp_path) is True
+
+
+def test_inactive_agency_projects_to_default_delivery_state(tmp_path: Path) -> None:
+    """Inactive agency state should not activate delivery compatibility mode."""
+    state = AgencyState(
+        active=False,
+        current_phase="delivery",
+        current_milestone="M2",
+        next_checkpoint="demo",
+        signoff_status="approved",
+        roadmap_ref=".renmark/plans/agency.md",
+    )
+
+    projected = project_agency_state(state)
+    persisted = current_agency_to_delivery_state(tmp_path)
+
+    assert projected.delivery_mode == "orchestrator"
+    assert projected.execution_policy == "guided"
+    assert projected.active_milestone_id == ""
+    assert projected.work_packages == []
+    assert projected.approval_status == "unknown"
+    assert projected.review_status == "unknown"
+    assert projected.loop_status == "unknown"
+    assert projected.legacy_refs == []
+    assert persisted.delivery_mode == projected.delivery_mode
+    assert persisted.execution_policy == projected.execution_policy
+    assert persisted.active_milestone_id == projected.active_milestone_id
+    assert persisted.work_packages == projected.work_packages
+    assert persisted.approval_status == projected.approval_status
+    assert persisted.review_status == projected.review_status
+    assert persisted.loop_status == projected.loop_status
+    assert persisted.legacy_refs == projected.legacy_refs
+
+
+def test_active_agency_projects_milestone_fields_into_delivery_state() -> None:
+    """Active agency state should project milestone fields into delivery state."""
+    state = AgencyState(
+        active=True,
+        current_phase="Delivery Phase",
+        current_milestone="Milestone 2",
+        signoff_status="pending",
+        cost_lane="balanced",
+        roadmap_ref=".renmark/plans/agency.md",
+    )
+
+    projected = agency_to_delivery_state(state)
+
+    assert projected.delivery_mode == "agency"
+    assert projected.execution_policy == "guided"
+    assert projected.active_milestone_id == "milestone-2"
+    assert projected.approval_status == "pending"
+    assert projected.review_status == "pending"
+    assert projected.loop_status == "in_progress"
+    assert projected.work_packages == []
+    assert "agency_phase:Delivery Phase" in projected.legacy_refs
+    assert "agency_milestone:Milestone 2" in projected.legacy_refs
+
+
+def test_active_agency_with_empty_milestone_fields_repairs_projection() -> None:
+    """Empty phase and milestone should fall back to discovery without bloat."""
+    projected = project_agency_state(
+        AgencyState(
+            active=True,
+            current_phase="",
+            current_milestone="",
+            next_checkpoint="",
+        )
+    )
+
+    assert projected.delivery_mode == "agency"
+    assert projected.active_milestone_id == "discovery"
+    assert projected.work_packages == []
+    assert projected.approval_status == "unknown"
+    assert projected.review_status == "unknown"
+    assert projected.provenance_events == []
+
+
+@pytest.mark.parametrize(
+    ("signoff_status", "expected"),
+    [
+        ("unknown", "unknown"),
+        ("pending", "pending"),
+        ("in_progress", "in_progress"),
+        ("approved", "approved"),
+        ("passed", "passed"),
+        ("blocked", "blocked"),
+        ("failed", "failed"),
+        ("needs-owner", "unknown"),
+    ],
+)
+def test_signoff_status_maps_to_delivery_approval_and_review(
+    signoff_status: str,
+    expected: str,
+) -> None:
+    """Agency signoff status should normalize into delivery approval fields."""
+    projected = project_agency_state(
+        AgencyState(
+            active=True,
+            current_phase="planning",
+            current_milestone="planning",
+            signoff_status=signoff_status,
+        )
+    )
+
+    assert projected.approval_status == expected
+    assert projected.review_status == expected
+
+
+def test_roadmap_ref_is_preserved_in_work_package_and_legacy_refs() -> None:
+    """Roadmap refs should survive compatibility projection in legacy refs."""
+    projected = project_agency_state(
+        AgencyState(
+            active=True,
+            current_phase="planning",
+            current_milestone="milestone alpha",
+            roadmap_ref=".renmark/plans/roadmap.md",
+            cost_lane="balanced",
+        )
+    )
+
+    assert "agency_roadmap_ref:.renmark/plans/roadmap.md" in projected.legacy_refs
+    assert "agency_cost_lane:balanced" in projected.legacy_refs
 
 
 def test_byte_budget_enforced(tmp_path: Path) -> None:
