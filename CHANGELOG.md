@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - debug(plan): make M1 dispatch WSL-safe
+
+**Request:** Resume M1 after the first task repeated without landing and fix the verified dispatch blocker rather than spending a third blind attempt.
+**Built:** Confirmed the Windows-app Codex binary lacks WSL's `bubblewrap` helper, installed the matching Linux Codex CLI in ignored project runtime state for this run, changed every M1 verifier to use `.venv`, removed forward references from Tasks 1 and 13 to tests created in later waves, and bumped the plan retry provenance.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m1.plan.md`, `.renmark/debug/20260729-212046-79d2/session.md`, `CHANGELOG.md`; runtime-only tool cache under `.renmark/state/tool-cache/codex-linux/`.
+**Do not change:** Keep Codex on `workspace-write`; do not bypass sandboxing; use project-local virtual-environment executables in plan verifiers; source-task verification cannot depend on a later test-task target.
+
 ## [2026-07-29] - plan: integrate adaptive decision interaction
 
 **Request:** Incorporate Claude/Codex selector capability, Codex Plan-versus-Default behavior, overflow navigation, and decision-only menus into the approved two-mode milestone roadmap.

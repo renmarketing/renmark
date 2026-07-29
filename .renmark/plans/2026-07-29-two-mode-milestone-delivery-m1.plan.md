@@ -13,10 +13,11 @@ dependency_refs:
   - renmark/program.py
   - renmark/lifecycle.py
   - renmark/state/pipeline.py
+  - .renmark/debug/20260729-212046-79d2/session.md
 completion_state: complete
 confidence: high
 validation_status: validated
-retry_count: 0
+retry_count: 1
 parser_success: validated
 schema_compliance: validated
 ---
@@ -28,6 +29,8 @@ schema_compliance: validated
 This plan is intentionally executable by the current Renmark engine. The current parser requires each task to name exactly one target file, so this bootstrap milestone uses one-file task packets even when the future work-package format will allow a bounded multi-file surface. That restriction is temporary and is removed by the later milestone-planner/work-package milestone.
 
 M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggregate, stable milestone and work-package IDs, schema/version/migration adapters, current-state drift repair, bounded event/provenance support, and tests. Do not change source, tests, docs, state, memory, or templates beyond each task's target.
+
+Verifier commands use the repository virtual environment explicitly. A source task may compile/import its own target and run already-existing regression tests, but it must not depend on a test file created by a later task; the immediately following test task supplies the new behavioral proof.
 
 ## Tasks
 
@@ -42,7 +45,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 3200
 - **est_cost_usd:** 0.096
 - **serves:** REQ-22, REQ-25
-- **verifier:** python -m py_compile renmark/delivery_state.py && pytest -q tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/delivery_state.py >/dev/null && .venv/bin/python -c "import renmark.delivery_state" >/dev/null
 - **spec:**
   Create a stdlib-only `renmark.delivery_state` module.
   Allowed reads: the context files named above and existing schema/state conventions.
@@ -63,7 +66,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 2600
 - **est_cost_usd:** 0.078
 - **serves:** REQ-22, REQ-25
-- **verifier:** pytest -q tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_delivery_state.py
 - **spec:**
   Add focused tests for the new delivery state module.
   Allowed reads: the context files named above and existing test style.
@@ -83,7 +86,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1800
 - **est_cost_usd:** 0.054
 - **serves:** REQ-22, REQ-25
-- **verifier:** python -m py_compile renmark/schemas.py && pytest -q tests/test_schemas.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/schemas.py && .venv/bin/pytest -q tests/test_schemas.py tests/test_delivery_state.py
 - **spec:**
   Extend schema validation with a delivery-state validator that checks schema_version, delivery_mode, execution_policy, stable IDs, status vocabularies, bounded event count, contract fields, and legacy_refs shape.
   Allowed reads: the context files named above.
@@ -103,7 +106,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1500
 - **est_cost_usd:** 0.045
 - **serves:** REQ-22, REQ-25
-- **verifier:** pytest -q tests/test_schemas.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_schemas.py tests/test_delivery_state.py
 - **spec:**
   Add tests for the delivery-state validator.
   Allowed reads: the context files named above.
@@ -123,7 +126,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1800
 - **est_cost_usd:** 0.054
 - **serves:** REQ-22
-- **verifier:** python -m py_compile renmark/agency.py && pytest -q tests/test_agency.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/agency.py && .venv/bin/pytest -q tests/test_agency.py tests/test_delivery_state.py
 - **spec:**
   Add a compatibility adapter that can project current AgencyState into the canonical delivery aggregate without changing AgencyState's stored schema.
   Allowed reads: the context files named above.
@@ -143,7 +146,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1500
 - **est_cost_usd:** 0.045
 - **serves:** REQ-22
-- **verifier:** pytest -q tests/test_agency.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_agency.py tests/test_delivery_state.py
 - **spec:**
   Add tests for Agency-to-delivery compatibility.
   Allowed reads: the context files named above.
@@ -163,7 +166,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1900
 - **est_cost_usd:** 0.057
 - **serves:** REQ-22
-- **verifier:** python -m py_compile renmark/program.py && pytest -q tests/test_program.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/program.py && .venv/bin/pytest -q tests/test_program.py tests/test_delivery_state.py
 - **spec:**
   Add a compatibility adapter that projects Program stages and tasks into delivery milestones and work-package summaries.
   Allowed reads: the context files named above.
@@ -184,7 +187,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1500
 - **est_cost_usd:** 0.045
 - **serves:** REQ-22
-- **verifier:** pytest -q tests/test_program.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_program.py tests/test_delivery_state.py
 - **spec:**
   Add tests for Program-to-delivery compatibility.
   Allowed reads: the context files named above.
@@ -204,7 +207,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 2600
 - **est_cost_usd:** 0.078
 - **serves:** REQ-22, REQ-25
-- **verifier:** python -m py_compile renmark/lifecycle.py && pytest -q tests/test_lifecycle.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/lifecycle.py && .venv/bin/pytest -q tests/test_lifecycle.py tests/test_delivery_state.py
 - **spec:**
   Add a lifecycle-facing helper that reads legacy workflow state and returns the canonical delivery summary plus drift-repair notes.
   Allowed reads: the context files named above.
@@ -224,7 +227,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1700
 - **est_cost_usd:** 0.051
 - **serves:** REQ-22, REQ-25
-- **verifier:** pytest -q tests/test_lifecycle.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_lifecycle.py tests/test_delivery_state.py
 - **spec:**
   Add focused tests for the lifecycle delivery-state seam.
   Allowed reads: the context files named above.
@@ -244,7 +247,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1700
 - **est_cost_usd:** 0.051
 - **serves:** REQ-22
-- **verifier:** python -m py_compile renmark/state/pipeline.py && pytest -q tests/test_state_pipeline.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/state/pipeline.py && .venv/bin/pytest -q tests/test_state_pipeline.py tests/test_delivery_state.py
 - **spec:**
   Add additive helpers that expose pipeline runtime progress as delivery-run runtime fields without changing pipeline.json structure.
   Allowed reads: the context files named above.
@@ -264,7 +267,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1400
 - **est_cost_usd:** 0.042
 - **serves:** REQ-22
-- **verifier:** pytest -q tests/test_state_pipeline.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_state_pipeline.py tests/test_delivery_state.py
 - **spec:**
   Add tests for pipeline-to-delivery runtime mapping.
   Allowed reads: the context files named above.
@@ -284,7 +287,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 2100
 - **est_cost_usd:** 0.063
 - **serves:** REQ-22, REQ-25
-- **verifier:** python -m py_compile renmark/cli/_engine.py && pytest -q tests/test_cli_delivery_state.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/python -m py_compile renmark/cli/_engine.py && .venv/bin/pytest -q tests/test_cli_task_mode.py tests/test_mode_cli.py tests/test_delivery_state.py
 - **spec:**
   Add a non-disruptive CLI seam for deterministic current-state inspection, such as an internal helper or flag wired to delivery_state summary if an existing parser pattern supports it.
   Allowed reads: the context files named above.
@@ -304,7 +307,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1700
 - **est_cost_usd:** 0.051
 - **serves:** REQ-22, REQ-25
-- **verifier:** pytest -q tests/test_cli_delivery_state.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_cli_delivery_state.py tests/test_delivery_state.py
 - **spec:**
   Add tests for the CLI current-state inspection seam.
   Allowed reads: the context files named above.
@@ -324,7 +327,7 @@ M1 implements the foundation for REQ-22 and REQ-25: one per-run delivery aggrega
 - **est_tokens:** 1900
 - **est_cost_usd:** 0.057
 - **serves:** REQ-22, REQ-25
-- **verifier:** pytest -q tests/test_delivery_state_integration.py tests/test_delivery_state.py
+- **verifier:** .venv/bin/pytest -q tests/test_delivery_state_integration.py tests/test_delivery_state.py
 - **spec:**
   Add an integration-style smoke test for canonical state projection across legacy state files.
   Allowed reads: the context files named above.
