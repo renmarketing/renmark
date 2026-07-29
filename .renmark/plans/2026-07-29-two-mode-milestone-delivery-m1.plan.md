@@ -2,7 +2,7 @@
 artifact_type: renmark_execution_plan
 schema_version: 1
 created_at: 2026-07-29T00:00:00-04:00
-source_sha: 527bdf5
+source_sha: 6a3258c
 related_plan: .renmark/plans/2026-07-29-two-mode-milestone-delivery.plan.md
 generator: codex
 stale_after: null

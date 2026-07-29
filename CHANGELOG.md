@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - plan: integrate adaptive decision interaction
+
+**Request:** Incorporate Claude/Codex selector capability, Codex Plan-versus-Default behavior, overflow navigation, and decision-only menus into the approved two-mode milestone roadmap.
+**Built:** Updated the master program so M2 owns surface-aware host capabilities and semantic choice sets, M4 consumes them for loop/review/signoff decisions, M5 propagates the concise rule, and M6 proves cross-surface golden trajectories; refreshed M1 provenance to the approved PRD SHA without changing its 15 tasks, scope, or cost.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery.plan.md`, `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m1.plan.md`, `CHANGELOG.md`.
+**Do not change:** M1 remains the canonical-state bootstrap only; native picker availability and pagination are presentation details resolved in M2; numbered fallback is fully functional; informational status does not create a gate; no host collaboration mode is switched programmatically.
+
 ## [2026-07-29] - prd: clarify surface-adaptive decisions
 
 **Request:** Make Renmark selector-capable across Claude Code and Codex while acknowledging that native clickability depends on the active host surface.
