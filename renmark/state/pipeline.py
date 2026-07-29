@@ -22,6 +22,9 @@ from ._core import (
     state_dir,
 )
 
+DELIVERY_RUNTIME_TEXT_LIMIT = 96
+DELIVERY_RUNTIME_TASK_SAMPLE_LIMIT = 5
+
 
 @dataclass
 class PipelineState:
@@ -139,6 +142,102 @@ def pipeline_is_resumable(repo_root: str | Path) -> bool:
     if state is None:
         return False
     return state.current_phase in {"orchestrate", "paused"} and state.wave_index < state.wave_total
+
+
+def delivery_runtime_summary_from_pipeline_state(state: PipelineState | None) -> dict[str, object]:
+    """Return a bounded delivery-runtime view of pipeline progress.
+
+    This is intentionally additive and read-only: callers can surface pipeline
+    progress in delivery-run runtime fields without changing pipeline.json.
+    """
+    current_plan = ""
+    current_phase = "idle"
+    wave_index = 0
+    wave_total = 0
+    completed_tasks: list[int] = []
+    failed_tasks: list[int] = []
+    last_updated = ""
+    resumable = False
+
+    if state is not None:
+        current_plan = _bounded_text(state.current_plan, DELIVERY_RUNTIME_TEXT_LIMIT)
+        current_phase = state.current_phase
+        wave_index = state.wave_index
+        wave_total = state.wave_total
+        completed_tasks = _bounded_task_sample(state.completed_tasks)
+        failed_tasks = _bounded_task_sample(state.failed_tasks)
+        last_updated = state.last_updated
+        resumable = state.current_phase in {"orchestrate", "paused"} and state.wave_index < state.wave_total
+
+    return {
+        "runtime_phase": current_phase,
+        "runtime_plan_ref": current_plan,
+        "runtime_wave_index": wave_index,
+        "runtime_wave_total": wave_total,
+        "runtime_wave_label": _wave_label(wave_index, wave_total),
+        "runtime_completed_task_count": len(state.completed_tasks) if state is not None else 0,
+        "runtime_failed_task_count": len(state.failed_tasks) if state is not None else 0,
+        "runtime_completed_task_sample": completed_tasks,
+        "runtime_failed_task_sample": failed_tasks,
+        "runtime_resumable": resumable,
+        "runtime_last_updated": last_updated,
+        "runtime_summary": _runtime_summary_line(
+            current_phase=current_phase,
+            wave_index=wave_index,
+            wave_total=wave_total,
+            completed_count=len(state.completed_tasks) if state is not None else 0,
+            failed_count=len(state.failed_tasks) if state is not None else 0,
+            resumable=resumable,
+        ),
+    }
+
+
+def delivery_runtime_summary_from_pipeline(repo_root: str | Path) -> dict[str, object]:
+    """Read pipeline.json and expose its delivery-runtime summary fields."""
+    return delivery_runtime_summary_from_pipeline_state(read_pipeline_state(repo_root))
+
+
+def pipeline_delivery_runtime_fields(repo_root: str | Path) -> dict[str, object]:
+    """Backward-friendly alias for delivery runtime field extraction."""
+    return delivery_runtime_summary_from_pipeline(repo_root)
+
+
+def pipeline_delivery_runtime_fields_from_state(state: PipelineState | None) -> dict[str, object]:
+    """Backward-friendly alias for delivery runtime field extraction from state."""
+    return delivery_runtime_summary_from_pipeline_state(state)
+
+
+def _bounded_text(value: str, limit: int) -> str:
+    return " ".join(value.split())[:limit]
+
+
+def _bounded_task_sample(values: list[int]) -> list[int]:
+    return list(values[:DELIVERY_RUNTIME_TASK_SAMPLE_LIMIT])
+
+
+def _wave_label(wave_index: int, wave_total: int) -> str:
+    if wave_total <= 0:
+        return "wave 0/0"
+    return f"wave {max(wave_index, 0)}/{wave_total}"
+
+
+def _runtime_summary_line(
+    *,
+    current_phase: str,
+    wave_index: int,
+    wave_total: int,
+    completed_count: int,
+    failed_count: int,
+    resumable: bool,
+) -> str:
+    parts = [
+        current_phase or "idle",
+        _wave_label(wave_index, wave_total),
+        f"done={completed_count}",
+        f"failed={failed_count}",
+        f"resumable={'yes' if resumable else 'no'}",
+    ]
+    return " | ".join(parts)
 
 
 # --- Wave summaries (.renmark/state/wave-summaries/) -----------------------
