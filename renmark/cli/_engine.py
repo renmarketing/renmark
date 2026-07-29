@@ -790,6 +790,39 @@ def _judge_est_cost() -> float:
     return JUDGE_EST_COST_USD
 
 
+def _delivery_state_line(repo: Path) -> str:
+    """Return a bounded read-only current-state summary for deterministic inspection."""
+    from ..delivery_state import read_delivery_state_with_report
+    from ..lifecycle import read_legacy_delivery_summary
+
+    state, report = read_delivery_state_with_report(repo)
+    drift_count: str | int = "n/a"
+
+    # If canonical delivery state is absent/corrupt, fall back to the existing
+    # legacy projection helper rather than inventing a second projection path.
+    if report.state != "loaded":
+        legacy = read_legacy_delivery_summary(repo)
+        state = legacy.canonical_delivery
+        drift_count = len(legacy.drift_repair_notes)
+        freshness = report.state
+    else:
+        legacy = read_legacy_delivery_summary(repo)
+        drift_count = len(legacy.drift_repair_notes)
+        freshness = "loaded"
+
+    milestone = state.active_milestone_id or "(none)"
+    contract = state.contract_version or "(unknown)"
+    return (
+        "delivery_state "
+        f"delivery_mode={state.delivery_mode} "
+        f"execution_policy={state.execution_policy} "
+        f"active_milestone={milestone} "
+        f"contract_version={contract} "
+        f"freshness={freshness} "
+        f"drift_count={drift_count}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sub-command dispatch helpers — group the main() dispatch chain into logical
 # clusters. Each returns int (the exit code) when it handled the flag, or
@@ -801,6 +834,9 @@ def _dispatch_query_flags(
     args: argparse.Namespace, ap: argparse.ArgumentParser, repo: Path
 ) -> int | None:
     """Handle --usage/--analytics/--roadmap/--logs/--scan/--behavior/--task."""
+    if args.delivery_state:
+        print(_delivery_state_line(repo))
+        return 0
     if args.usage:
         return cmd_usage(repo)
     if args.analytics:
@@ -1056,6 +1092,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--resume", action="store_true", help="resume a paused run")
     ap.add_argument("--dry-run", action="store_true", help="parse plan, list tasks, exit")
     ap.add_argument("--usage", action="store_true", help="show usage and exit")
+    ap.add_argument(
+        "--delivery-state",
+        action="store_true",
+        help=(
+            "print a bounded read-only delivery-state summary "
+            "(delivery_mode, execution_policy, active milestone, contract/freshness, drift count)"
+        ),
+    )
     ap.add_argument("--analytics", action="store_true", help="show build-health analytics and exit")
     ap.add_argument(
         "--roadmap",
@@ -1263,7 +1307,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.plan:
         ap.error(
-            "plan path is required unless --usage / --analytics / --roadmap / --logs / "
+            "plan path is required unless --usage / --delivery-state / --analytics / --roadmap / --logs / "
             "--scan / --heartbeat / --heartbeat-check-cron / --behavior / --task / --task-brief / --review-package / "
             "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode"
         )
