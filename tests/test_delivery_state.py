@@ -8,7 +8,6 @@ import pytest
 
 from renmark import delivery_state
 from renmark.delivery_state import (
-    DELIVERY_JSON_BYTE_BUDGET,
     PROVENANCE_EVENT_CAP,
     DeliveryProvenanceEvent,
     DeliveryReadReport,
@@ -105,7 +104,7 @@ def test_write_read_round_trip_preserves_schema_version(tmp_path: Path) -> None:
     assert loaded.source_sha == "abc123"
     assert loaded.legacy_refs == ["legacy/ref-1"]
     assert len(loaded.work_packages) == 1
-    assert loaded.work_packages[0].package_id.startswith("milestone-one--")
+    assert loaded.work_packages[0].package_id == "milestone-one--draft-spec"
     assert loaded.provenance_events[0].kind == "created"
     assert report.state == "loaded"
     assert report.path == str(path)

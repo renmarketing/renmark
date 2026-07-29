@@ -14,6 +14,14 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-29, .renmark/debug/20260729-220633-3642/session.md) model `debug`: **debug-m1-delivery-state-normalization** — Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.
+
+- (2026-07-29, bug) **M1 delivery-state CLI crashed on legacy work packages** — Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.
+
+- (2026-07-29, .renmark/reviews/2026-07-29-3a35610.verification.md) model `verify`: **verify-m1-canonical-delivery-state** — 3/4 behaviors verified; failed: bounded current-state CLI; regressions: repository suite
+
+- (2026-07-29, run) **task 1 failed on codex** — repeated_issue_guard
+
 - (2026-07-17, .renmark/reviews/2026-07-17-f87b955.verification.md) model `verify`: **verify-proactive-repeated-issue-monitor** — 4/4 behaviors verified; failed: none; regressions: 0
 
 - (2026-07-17, bug) **Recurrence guard discarded the actionable verifier failure** - A retry guard must preserve the failure evidence needed to repair the issue it stops.

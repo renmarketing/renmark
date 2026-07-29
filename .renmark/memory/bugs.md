@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-29 — M1 delivery-state CLI crashed on legacy work packages
+
+**Severity:** medium
+**Symptom:** ./bin/renmark-execute --delivery-state raised AttributeError on dict.normalized()
+**Root cause:** The live CLI projection both round-trips DeliveryState through asdict, which erases nested types, and re-normalizes already-qualified work-package IDs as raw tokens, so reconstruction either crashes on dictionaries or silently drifts stable IDs.
+**Fix:** Use dataclasses.replace for typed lifecycle cloning, make stable_work_package_id idempotent for already-qualified IDs, add live CLI and exact round-trip regressions, and clear M1 lint/type defects.
+**Lesson:** Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.
+
+---
+
 ### 2026-07-17 - Recurrence guard discarded the actionable verifier failure
 
 **Severity:** medium

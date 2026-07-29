@@ -265,7 +265,7 @@ def project_agency_state(state: AgencyState) -> DeliveryState:
                 status="pending",
                 summary=phase,
                 owner="agency",
-                artifact_ref=_clean_text(state.roadmap_ref, 96),
+                artifact_ref=_clean_text(state.roadmap_ref, limit=96),
             )
         )
 

@@ -77,7 +77,7 @@ class DeliveryProvenanceEvent:
     source: str = ""
     ref: str = ""
 
-    def normalized(self) -> "DeliveryProvenanceEvent":
+    def normalized(self) -> DeliveryProvenanceEvent:
         return DeliveryProvenanceEvent(
             ts=_clean_text(self.ts, 48),
             kind=_clean_text(self.kind, 40),
@@ -100,7 +100,7 @@ class WorkPackageSummary:
     updated_at: str = ""
     artifact_ref: str = ""
 
-    def normalized(self) -> "WorkPackageSummary":
+    def normalized(self) -> WorkPackageSummary:
         status = self.status if self.status in _VALID_STATUSES else "pending"
         return WorkPackageSummary(
             package_id=stable_work_package_id(self.milestone_id, self.package_id or self.title),
@@ -180,7 +180,13 @@ def stable_milestone_id(value: str) -> str:
 
 def stable_work_package_id(milestone_id: str, value: str) -> str:
     milestone = stable_milestone_id(milestone_id)
-    token = _slug(value)
+    qualified_prefix = f"{milestone}--"
+    raw_value = " ".join(value.split()).strip().lower()
+    token = (
+        _slug(raw_value[len(qualified_prefix) :])
+        if raw_value.startswith(qualified_prefix)
+        else _slug(value)
+    )
     return f"{milestone}--{token or 'work-package'}"
 
 
@@ -418,9 +424,7 @@ def _normalized_state(state: DeliveryState) -> DeliveryState:
                 active_milestone_id = item.milestone_id
                 break
 
-    return DeliveryState.__new__(  # type: ignore[misc]
-        DeliveryState
-    ) if False else _build_state(
+    return _build_state(
         schema_version=state.schema_version if isinstance(state.schema_version, int) else SCHEMA_VERSION,
         run_id=_clean_text(state.run_id, 48) or new_run_id(),
         delivery_mode=delivery_mode,

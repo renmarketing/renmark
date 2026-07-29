@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
-from renmark import cli
+from renmark import cli, program
 from renmark.cli._engine import _delivery_state_line
 from renmark.delivery_state import DeliveryState, write_delivery_state
 
@@ -142,3 +142,35 @@ def test_delivery_state_inspection_does_not_mutate_state_file(
 
     assert "freshness=loaded" in line
     assert path.read_text(encoding="utf-8") == before
+
+
+def test_delivery_state_cli_projects_legacy_program_work_packages(
+    tmp_path: Path, capsys
+) -> None:
+    program.write_program(
+        tmp_path,
+        program.Program(
+            feature="Canonical delivery state",
+            current_stage_id="build",
+            stages=[
+                program.StageNode(
+                    id="build",
+                    title="Build",
+                    status="in_progress",
+                    tasks=[
+                        program.TaskNode(
+                            id="state-model",
+                            title="Implement state model",
+                            status="done",
+                        )
+                    ],
+                )
+            ],
+        ),
+    )
+
+    line = _run_delivery_state_cli(tmp_path, capsys)
+
+    assert "delivery_mode=orchestrator" in line
+    assert "active_milestone=build" in line
+    assert "drift_count=" in line

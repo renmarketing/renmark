@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - fix(delivery-state): preserve typed legacy projections
+
+**Request:** Complete M1 verification by fixing the live `--delivery-state` crash and any related quality-gate findings before milestone review.
+**Built:** Replaced lossy `asdict()` lifecycle cloning with typed dataclass replacement, made stable work-package ID normalization idempotent, added live legacy-program CLI and exact persistence round-trip regressions, and cleared the affected lint/type defects.
+**Files changed:** `renmark/delivery_state.py`, `renmark/agency.py`, `renmark/lifecycle.py`, `tests/test_delivery_state.py`, `tests/test_cli_delivery_state.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `.renmark/reviews/2026-07-29-3a35610.verification.md`, `CHANGELOG.md`; runtime debug evidence under `.renmark/debug/20260729-220633-3642/`.
+**Do not change:** Delivery-state cloning must preserve nested dataclass types; stable milestone/work-package IDs must remain unchanged across repeated normalization and write/read cycles; `--delivery-state` stays bounded and read-only.
+
 ## [2026-07-29] - debug(plan): make M1 dispatch WSL-safe
 
 **Request:** Resume M1 after the first task repeated without landing and fix the verified dispatch blocker rather than spending a third blind attempt.

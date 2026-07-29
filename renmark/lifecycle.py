@@ -23,11 +23,12 @@ import contextlib
 import json
 import os
 import subprocess
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import skillmeta
 from .agency import AgencyState, project_agency_state, read_agency
 from .delivery_state import (
     DeliveryState,
@@ -35,7 +36,6 @@ from .delivery_state import (
     append_provenance_event,
     default_delivery_state,
 )
-from . import skillmeta
 from .hosts import HostKind, capabilities_for
 from .mode import mode_state_path
 from .program import (
@@ -1224,8 +1224,7 @@ def read_legacy_delivery_summary(repo: Path | str) -> LegacyDeliverySummary:
     if mode_note:
         notes.append(mode_note)
     if execution_policy:
-        delivery.execution_policy = execution_policy
-        delivery = DeliveryState(**delivery.to_dict())
+        delivery = replace(delivery, execution_policy=execution_policy)
 
     notes.extend(
         _workflow_drift_notes(
@@ -1291,7 +1290,7 @@ def _project_workflow_delivery(
     if pipeline_state is not None and pipeline_state.current_phase in {"orchestrate", "paused"}:
         delivery.loop_status = "in_progress"
 
-    return DeliveryState(**delivery.to_dict())
+    return replace(delivery)
 
 
 def _workflow_drift_notes(
