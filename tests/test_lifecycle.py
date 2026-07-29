@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -924,3 +925,109 @@ def test_agency_hint_non_aware_skill_is_passthrough(tmp_path):
     agency.activate(tmp_path)
     result = lifecycle._with_agency_note(tmp_path, "help", "original")
     assert result == "original"
+
+
+def test_read_legacy_delivery_summary_projects_clean_lifecycle_state(tmp_path: Path) -> None:
+    lifecycle.write_lifecycle(tmp_path, stage="verified", feature="x")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.drift_repair_notes == []
+    assert summary.delivery.delivery_mode == "orchestrator"
+    assert summary.delivery.execution_policy == "guided"
+    assert summary.delivery.active_milestone_id == "verify"
+    assert summary.delivery.verification_status == "passed"
+    assert summary.delivery.review_status == "unknown"
+    assert summary.delivery.approval_status == "unknown"
+    assert summary.delivery.provenance_events == []
+
+
+def test_read_legacy_delivery_summary_reports_contradictory_lifecycle_program_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lifecycle, "read_lifecycle", lambda repo: lifecycle.LifecycleState(stage="verified"))
+    monkeypatch.setattr(
+        lifecycle,
+        "read_agency",
+        lambda repo: SimpleNamespace(active=False, current_phase="", current_milestone=""),
+    )
+    monkeypatch.setattr(lifecycle, "read_pipeline_state", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "_safe_read_program", lambda repo, notes: object())
+    monkeypatch.setattr(lifecycle, "_project_workflow_delivery", lambda *args, **kwargs: lifecycle.default_delivery_state())
+    monkeypatch.setattr(lifecycle, "_program_milestone", lambda program_state: "build")
+    monkeypatch.setattr(
+        lifecycle,
+        "_current_program_stage",
+        lambda program_state: SimpleNamespace(id="build-stage"),
+    )
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert any("contradictory active states" in note for note in summary.drift_repair_notes)
+    assert any("lifecycle/program drift" in note for note in summary.drift_repair_notes)
+
+
+def test_read_legacy_delivery_summary_maps_legacy_conductor_mode_to_guided_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "conductor")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.delivery.execution_policy == "guided"
+    assert all("mode" not in note for note in summary.drift_repair_notes)
+
+
+def test_read_legacy_delivery_summary_notes_empty_active_agency_phase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agency_state = SimpleNamespace(active=True, current_phase="   ", current_milestone="Launch Prep")
+    monkeypatch.setattr(lifecycle, "read_lifecycle", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "read_agency", lambda repo: agency_state)
+    monkeypatch.setattr(lifecycle, "read_pipeline_state", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "_safe_read_program", lambda repo, notes: None)
+    monkeypatch.setattr(
+        lifecycle,
+        "project_agency_state",
+        lambda state: lifecycle.DeliveryState(delivery_mode="agency", active_milestone_id="launch-prep"),
+    )
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.delivery.delivery_mode == "agency"
+    assert any("agency repair: active agency had empty current_phase" in note for note in summary.drift_repair_notes)
+    assert any("projected 'Launch Prep' as phase" in note for note in summary.drift_repair_notes)
+
+
+def test_read_legacy_delivery_summary_bounds_notes_and_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lifecycle, "read_lifecycle", lambda repo: None)
+    monkeypatch.setattr(
+        lifecycle,
+        "read_agency",
+        lambda repo: SimpleNamespace(active=False, current_phase="", current_milestone=""),
+    )
+    monkeypatch.setattr(lifecycle, "read_pipeline_state", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "_safe_read_program", lambda repo, notes: None)
+    monkeypatch.setattr(lifecycle, "_project_workflow_delivery", lambda *args, **kwargs: lifecycle.default_delivery_state())
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "direct")
+    monkeypatch.setattr(
+        lifecycle,
+        "_workflow_drift_notes",
+        lambda **kwargs: [f"note-{index}" for index in range(1, 7)],
+    )
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.drift_repair_notes == [
+        "mode repair: legacy mode token 'direct' treated as execution_policy 'direct'",
+        "note-1",
+        "note-2",
+        "note-3",
+        "note-4",
+    ]
+    assert len(summary.delivery.provenance_events) == 3
+    assert [event.detail for event in summary.delivery.provenance_events] == summary.drift_repair_notes[:3]
