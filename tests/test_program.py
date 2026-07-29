@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from renmark import delivery_state
 from renmark import program
 
 
@@ -239,6 +240,89 @@ def test_stage_digest_is_bounded_to_five_lines() -> None:
     assert lines[4] == "  - … (+2 more tasks)"
 
 
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("pending", "pending"),
+        ("in_progress", "in_progress"),
+        ("done", "passed"),
+        ("partial", "blocked"),
+        ("needed", "blocked"),
+        ("blocked", "blocked"),
+        ("unknown-status", "unknown"),
+    ],
+)
+def test_delivery_state_for_program_status_maps_to_bounded_delivery_values(
+    status: str, expected: str
+) -> None:
+    assert program.delivery_state_for_program_status(status) == expected
+
+
+def test_program_delivery_milestones_projects_current_stage_and_bounded_fields() -> None:
+    state = _sample_program()
+    program.snapshot_stage_sha(state, "stage-2", "deadbeef")
+
+    milestones = program.program_delivery_milestones(state)
+
+    assert [item["milestone_id"] for item in milestones] == ["stage-1", "stage-2"]
+    assert [item["delivery_state"] for item in milestones] == ["passed", "in_progress"]
+    assert [item["current"] for item in milestones] == [False, True]
+    assert [item["index"] for item in milestones] == [1, 2]
+    assert [item["completed_task_count"] for item in milestones] == [1, 1]
+    assert milestones[0]["completion_sha"] == ""
+    assert milestones[1]["completion_sha"] == "deadbeef"
+    assert milestones[1]["status"] == "in_progress"
+    assert milestones[1]["task_count"] == 2
+    assert milestones[1]["pipeline_phases"] == ["orchestrate", "verify"]
+    assert [pkg["package_id"] for pkg in milestones[1]["work_packages"]] == [
+        "stage-2--task-3",
+        "stage-2--task-4",
+    ]
+    assert [pkg["delivery_state"] for pkg in milestones[1]["work_packages"]] == [
+        "passed",
+        "in_progress",
+    ]
+
+
+def test_stage_work_package_summaries_normalize_summary_and_keep_stable_ids() -> None:
+    stage = _sample_program().stages[1]
+
+    packages = program.stage_work_package_summaries(stage)
+
+    assert [item["package_id"] for item in packages] == [
+        "stage-2--task-3",
+        "stage-2--task-4",
+    ]
+    assert all(item["milestone_id"] == "stage-2" for item in packages)
+    assert packages[0]["summary"] == "Atomic writes complete"
+    assert packages[1]["summary"] == "Summary with extra whitespace"
+    assert packages[1]["status"] == "in_progress"
+    assert packages[1]["delivery_state"] == "in_progress"
+    assert packages[1]["retry_count"] == 0
+
+
+def test_stable_program_delivery_ids_match_delivery_state_helpers() -> None:
+    stage = program.StageNode(id="Build & Verify", title="Ignored title", serves="REQ-9")
+    task = program.TaskNode(id="Task: Render + publish")
+
+    milestone_id = program.stable_milestone_id_for_stage(stage)
+    package_id = program.stable_work_package_id_for_task(stage, task)
+
+    assert milestone_id == delivery_state.stable_milestone_id(stage.id)
+    assert package_id == delivery_state.stable_work_package_id(milestone_id, task.id)
+
+
+def test_stable_program_delivery_ids_use_stage_aliases_and_task_title_fallback() -> None:
+    stage = program.StageNode(id="", title="Quality Assurance", serves="Verify")
+    task = program.TaskNode(id="", title="Review rendered output")
+
+    milestone_id = program.stable_milestone_id_for_stage(stage)
+    package_id = program.stable_work_package_id_for_task(stage, task)
+
+    assert milestone_id == "verify"
+    assert package_id == "verify--review-rendered-output"
+
+
 # ── Hardening regressions (codereview 2026-06-14) ───────────────────────────────
 
 
@@ -316,4 +400,3 @@ def test_write_program_leaves_no_temp_litter(repo: Path) -> None:
     leftovers = list(state_dir.glob(".program-*.tmp"))
     assert leftovers == [], f"temp litter left behind: {leftovers}"
     assert program.read_program(repo) is not None
-
