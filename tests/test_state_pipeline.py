@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from renmark import state
+from renmark.state import pipeline as pipeline_state
 
 
 def test_pipeline_state_none_when_missing(tmp_path: Path) -> None:
@@ -191,3 +194,84 @@ def test_legacy_unknown_phase_normalized_on_read(tmp_path: Path) -> None:
     assert loaded.current_phase == "idle"
     # And the write path stays legal:
     state.write_pipeline_state(tmp_path, add_completed_task=1)
+
+
+def test_pipeline_delivery_runtime_fields_missing_pipeline_state(tmp_path: Path) -> None:
+    runtime = pipeline_state.pipeline_delivery_runtime_fields(tmp_path)
+
+    assert runtime == {
+        "runtime_phase": "idle",
+        "runtime_plan_ref": "",
+        "runtime_wave_index": 0,
+        "runtime_wave_total": 0,
+        "runtime_wave_label": "wave 0/0",
+        "runtime_completed_task_count": 0,
+        "runtime_failed_task_count": 0,
+        "runtime_completed_task_sample": [],
+        "runtime_failed_task_sample": [],
+        "runtime_resumable": False,
+        "runtime_last_updated": "",
+        "runtime_summary": "idle | wave 0/0 | done=0 | failed=0 | resumable=no",
+    }
+
+
+@pytest.mark.parametrize(
+    ("phase", "wave_index", "wave_total", "expected_resumable"),
+    [
+        ("idle", 0, 0, False),
+        ("orchestrate", 2, 4, True),
+        ("paused", 2, 4, True),
+        ("orchestrate", 4, 4, False),
+        ("paused", 5, 4, False),
+    ],
+)
+def test_pipeline_delivery_runtime_phase_and_resumable_mapping(
+    phase: str,
+    wave_index: int,
+    wave_total: int,
+    expected_resumable: bool,
+) -> None:
+    pipeline_runtime_state = state.PipelineState(
+        current_phase=phase,
+        current_plan=".renmark/plans/runtime.plan.md",
+        wave_index=wave_index,
+        wave_total=wave_total,
+    )
+
+    runtime = pipeline_state.pipeline_delivery_runtime_fields_from_state(pipeline_runtime_state)
+
+    assert runtime["runtime_phase"] == phase
+    assert runtime["runtime_wave_index"] == wave_index
+    assert runtime["runtime_wave_total"] == wave_total
+    assert runtime["runtime_wave_label"] == f"wave {wave_index}/{wave_total}" if wave_total > 0 else "wave 0/0"
+    assert runtime["runtime_resumable"] is expected_resumable
+    assert runtime["runtime_summary"] == (
+        f"{phase} | wave {wave_index}/{wave_total} | done=0 | failed=0 | "
+        f"resumable={'yes' if expected_resumable else 'no'}"
+        if wave_total > 0
+        else f"{phase} | wave 0/0 | done=0 | failed=0 | resumable={'yes' if expected_resumable else 'no'}"
+    )
+
+
+def test_pipeline_delivery_runtime_task_lists_are_counted_and_bounded() -> None:
+    pipeline_runtime_state = state.PipelineState(
+        current_phase="orchestrate",
+        current_plan=".renmark/plans/" + ("x" * 200) + ".plan.md",
+        wave_index=3,
+        wave_total=8,
+        completed_tasks=[1, 2, 3, 4, 5, 6, 7],
+        failed_tasks=[8, 9, 10, 11, 12, 13],
+        last_updated="2026-07-29T12:00:00Z",
+    )
+
+    runtime = pipeline_state.pipeline_delivery_runtime_fields_from_state(pipeline_runtime_state)
+
+    assert runtime["runtime_phase"] == "orchestrate"
+    assert runtime["runtime_plan_ref"] == ".renmark/plans/" + ("x" * 81)
+    assert runtime["runtime_completed_task_count"] == 7
+    assert runtime["runtime_failed_task_count"] == 6
+    assert runtime["runtime_completed_task_sample"] == [1, 2, 3, 4, 5]
+    assert runtime["runtime_failed_task_sample"] == [8, 9, 10, 11, 12]
+    assert runtime["runtime_last_updated"] == "2026-07-29T12:00:00Z"
+    assert runtime["runtime_resumable"] is True
+    assert runtime["runtime_summary"] == "orchestrate | wave 3/8 | done=7 | failed=6 | resumable=yes"
