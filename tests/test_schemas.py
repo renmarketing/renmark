@@ -116,6 +116,86 @@ def test_validate_pipeline_rejects_non_int_task_index():
     assert any("completed_tasks[1]" in i for i in issues)
 
 
+# ── delivery ────────────────────────────────────────────────────────────────
+
+
+def _valid_delivery_state() -> dict:
+    return {
+        "schema_version": 1,
+        "run_id": "delivery-0123456789ab",
+        "delivery_mode": "agency",
+        "execution_policy": "guided",
+        "active_milestone_id": "milestone-alpha",
+        "milestone_execution": "orchestrator",
+        "work_packages": [],
+        "approval_status": "pending",
+        "review_status": "unknown",
+        "verification_status": "passed",
+        "loop_status": "in_progress",
+        "contract_version": "delivery-state/v1",
+        "source_sha": "abc123",
+        "provenance_events": [],
+        "legacy_refs": [],
+    }
+
+
+def test_validate_delivery_state_accepts_valid_aggregate():
+    assert schemas.validate_delivery_state(_valid_delivery_state()) == []
+
+
+def test_validate_delivery_state_rejects_invalid_public_mode():
+    data = _valid_delivery_state()
+    data["delivery_mode"] = "conductor"
+    issues = schemas.validate_delivery_state(data)
+    assert any("delivery_mode" in i for i in issues)
+
+
+def test_validate_delivery_state_rejects_invalid_execution_policy():
+    data = _valid_delivery_state()
+    data["execution_policy"] = "manual"
+    issues = schemas.validate_delivery_state(data)
+    assert any("execution_policy" in i for i in issues)
+
+
+def test_validate_delivery_state_rejects_invalid_run_id():
+    data = _valid_delivery_state()
+    data["run_id"] = "delivery-not-hex"
+    issues = schemas.validate_delivery_state(data)
+    assert any("run_id" in i for i in issues)
+
+
+def test_validate_delivery_state_rejects_malformed_legacy_refs():
+    data = _valid_delivery_state()
+    data["legacy_refs"] = ["ok", 7, ""]
+    issues = schemas.validate_delivery_state(data)
+    assert any("legacy_refs[1]" in i for i in issues)
+    assert any("legacy_refs[2]" in i and "empty" in i for i in issues)
+
+
+def test_validate_delivery_state_rejects_too_many_provenance_events():
+    data = _valid_delivery_state()
+    data["provenance_events"] = [
+        {
+            "ts": f"2026-05-21T00:00:{i:02d}+00:00",
+            "kind": "status",
+            "detail": "ok",
+            "source": "test",
+            "ref": "r",
+        }
+        for i in range(schemas.PROVENANCE_EVENT_CAP + 1)
+    ]
+    issues = schemas.validate_delivery_state(data)
+    assert any("provenance_events" in i and "cap" in i for i in issues)
+
+
+def test_validate_delivery_state_rejects_missing_contract_version_when_freshness_declared():
+    data = _valid_delivery_state()
+    data["source_sha"] = "deadbeef"
+    del data["contract_version"]
+    issues = schemas.validate_delivery_state(data)
+    assert any("contract_version" in i and "missing" in i for i in issues)
+
+
 # ── subagent output ─────────────────────────────────────────────────────────
 
 
