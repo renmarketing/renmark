@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - verify: M1 canonical delivery state
+
+**Request:** Re-verify M1 after repairing the live delivery-state inspection path, and do not advance to milestone review until the complete state flow is green.
+**Built:** Verified the bounded read-only CLI, canonical legacy projection, Agency/Program/Lifecycle/Pipeline compatibility, all 15 task verifiers, lint, strict typing, and the repository-wide regression suite (`1539 passed, 31 skipped`).
+**Files changed:** `.renmark/reviews/2026-07-29-4702acb.verification.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** Deterministic smoke remains required before milestone review; task-level PASS results alone are not milestone acceptance; browser QA is not applicable to this CLI/library milestone.
+
 ## [2026-07-29] - fix(delivery-state): preserve typed legacy projections
 
 **Request:** Complete M1 verification by fixing the live `--delivery-state` crash and any related quality-gate findings before milestone review.
