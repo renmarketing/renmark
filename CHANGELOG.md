@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - plan: stage two-mode delivery migration
+
+**Request:** Proceed from the approved two-mode PRD into milestone planning for the cohesive Agency / Orchestrator redesign.
+**Built:** Created a six-milestone master program and a validated 15-task M1 bootstrap plan for canonical delivery state; corrected plan pricing against `renmark.cost` to 28,900 tokens and $0.867.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery.plan.md`, `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m1.plan.md`, `CHANGELOG.md`.
+**Do not change:** M1 uses one-file task packets only as a temporary current-engine bridge; later milestones introduce bounded multi-file work packages. Agency delegates milestone execution to Orchestrator, and every milestone retains verify, independent review, bounded repair, demo/signoff, and rollback gates.
+
 ## [2026-07-29] - prd: define two-mode milestone delivery
 
 **Request:** Make Renmark a cohesive vibe-coding solution with Agency and Orchestrator as its two modes, place bounded loops inside milestones, and propagate a concise mirrored project contract through `init`, `start`, and `feature`.
