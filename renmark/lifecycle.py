@@ -21,14 +21,34 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .agency import AgencyState, project_agency_state, read_agency
+from .delivery_state import (
+    DeliveryState,
+    WorkPackageSummary,
+    append_provenance_event,
+    default_delivery_state,
+)
 from . import skillmeta
 from .hosts import HostKind, capabilities_for
+from .mode import mode_state_path
+from .program import (
+    Program,
+    ProgramStateError,
+    StageNode,
+    delivery_state_for_program_status,
+    program_delivery_milestones,
+    read_program,
+    stable_milestone_id_for_stage,
+    stable_work_package_id_for_task,
+)
+from .state.pipeline import PipelineState, read_pipeline_state
 from .summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
@@ -477,6 +497,34 @@ class NextSteps:
         return asdict(self)
 
 
+@dataclass
+class LegacyDeliverySummary:
+    """Canonical delivery summary projected from legacy workflow state.
+
+    ``delivery`` is the normalized delivery-facing summary. ``drift_repair_notes``
+    is a bounded list of concise compatibility/drift findings derived from the
+    legacy state readers; callers can surface it directly without scanning the
+    full underlying state files.
+    """
+
+    delivery: DeliveryState
+    drift_repair_notes: list[str] = field(default_factory=list)
+
+    @property
+    def canonical_delivery(self) -> DeliveryState:
+        return self.delivery
+
+    @property
+    def notes(self) -> list[str]:
+        return self.drift_repair_notes
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "delivery": self.delivery.to_dict(),
+            "drift_repair_notes": list(self.drift_repair_notes),
+        }
+
+
 def next_steps(repo: Path | str, skill: object) -> NextSteps:
     """Compute the structured next-step set for ``skill`` (next-steps.md contract).
 
@@ -619,7 +667,7 @@ def persist_compact_checkpoint(
     from . import state as _state  # lazy — avoid circular import at module load
 
     try:
-        host_capabilities = capabilities_for(host)
+        host_capabilities = capabilities_for(_lifecycle_host(host))
         state_path = _state.state_dir(repo) / "compact_checkpoint.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
         state_path.write_text(
@@ -675,7 +723,7 @@ def skill_preamble(
 
     domain = domain_of(skill)
     tier = preamble_tier(skill)
-    host_capabilities = capabilities_for(host)
+    host_capabilities = capabilities_for(_lifecycle_host(host))
 
     if tier == "minimal":
         # INVARIANT: record_skill_invocation runs for ALL tiers so that the next
@@ -1125,6 +1173,284 @@ def validate_artifact_refs(
 
     warn_issues.sort(key=lambda i: i["artifact"])
     return block_issues + warn_issues
+
+
+_LIFECYCLE_MILESTONE_BY_STAGE: dict[str, str] = {
+    "init": "discovery",
+    "brainstorm-complete": "discovery",
+    "plan-drafted": "plan",
+    "plan-validated": "plan",
+    "created": "build",
+    "verified": "verify",
+    "reviewed": "review",
+    "documented": "documented",
+    "ready-to-release": "release",
+    "released": "release",
+}
+
+_MODE_POLICY_BY_TOKEN: dict[str, str] = {
+    "conductor": "guided",
+    "orchestrator": "async",
+    # Legacy/stale tokens tolerated as execution policies.
+    "guided": "guided",
+    "direct": "direct",
+    "async": "async",
+}
+
+
+def read_legacy_delivery_summary(repo: Path | str) -> LegacyDeliverySummary:
+    """Read legacy workflow state and project it into a canonical delivery summary.
+
+    This helper is read-only and additive: it never writes delivery state,
+    lifecycle state, or any repair artifact. It tolerates legacy/corrupt reads
+    by degrading to the default delivery summary plus bounded drift notes.
+    """
+    repo_path = Path(repo)
+    notes: list[str] = []
+
+    lifecycle_state = read_lifecycle(repo_path)
+    agency_state = read_agency(repo_path)
+    pipeline_state = read_pipeline_state(repo_path)
+    program_state = _safe_read_program(repo_path, notes)
+
+    delivery = (
+        project_agency_state(agency_state)
+        if agency_state.active
+        else _project_workflow_delivery(lifecycle_state, program_state, pipeline_state)
+    )
+
+    raw_mode_token = _read_raw_mode_token(repo_path)
+    mode_note, execution_policy = _normalize_mode_note(raw_mode_token)
+    if mode_note:
+        notes.append(mode_note)
+    if execution_policy:
+        delivery.execution_policy = execution_policy
+        delivery = DeliveryState(**delivery.to_dict())
+
+    notes.extend(
+        _workflow_drift_notes(
+            lifecycle_state=lifecycle_state,
+            agency_state=agency_state,
+            program_state=program_state,
+            pipeline_state=pipeline_state,
+        )
+    )
+    bounded_notes = notes[:5]
+    for detail in bounded_notes[:3]:
+        delivery = append_provenance_event(
+            delivery,
+            ts="",
+            kind="compat-drift-repair",
+            detail=detail,
+            source="lifecycle",
+            ref="legacy-workflow-state",
+        )
+    return LegacyDeliverySummary(delivery=delivery, drift_repair_notes=bounded_notes)
+
+
+# Back-compat aliases for callers/tests that prefer a function-style name.
+legacy_delivery_summary = read_legacy_delivery_summary
+read_delivery_summary_from_legacy_state = read_legacy_delivery_summary
+
+
+def _safe_read_program(repo: Path, notes: list[str]) -> Program | None:
+    try:
+        return read_program(repo)
+    except ProgramStateError as exc:
+        notes.append(f"program state unreadable; ignored legacy program drift ({str(exc).splitlines()[0][:72]})")
+        return None
+
+
+def _project_workflow_delivery(
+    lifecycle_state: LifecycleState | None,
+    program_state: Program | None,
+    pipeline_state: PipelineState | None,
+) -> DeliveryState:
+    delivery = default_delivery_state()
+    delivery.delivery_mode = "orchestrator"
+
+    current_program_stage = _current_program_stage(program_state)
+    if current_program_stage is not None:
+        delivery.active_milestone_id = stable_milestone_id_for_stage(current_program_stage)
+        delivery.work_packages = _work_package_summaries_for_stage(current_program_stage)
+        delivery.loop_status = delivery_state_for_program_status(current_program_stage.status)
+
+    if lifecycle_state is not None:
+        lifecycle_milestone = _LIFECYCLE_MILESTONE_BY_STAGE.get(lifecycle_state.stage, "")
+        if lifecycle_milestone and not delivery.active_milestone_id:
+            delivery.active_milestone_id = lifecycle_milestone
+        if lifecycle_state.stage in {"verified", "reviewed", "documented", "ready-to-release", "released"}:
+            delivery.verification_status = "passed"
+        if lifecycle_state.stage in {"reviewed", "documented", "ready-to-release", "released"}:
+            delivery.review_status = "passed"
+        if lifecycle_state.stage in {"ready-to-release", "released"}:
+            delivery.approval_status = "approved"
+        if lifecycle_state.stage == "released":
+            delivery.loop_status = "passed"
+
+    if pipeline_state is not None and pipeline_state.current_phase in {"orchestrate", "paused"}:
+        delivery.loop_status = "in_progress"
+
+    return DeliveryState(**delivery.to_dict())
+
+
+def _workflow_drift_notes(
+    *,
+    lifecycle_state: LifecycleState | None,
+    agency_state: AgencyState,
+    program_state: Program | None,
+    pipeline_state: PipelineState | None,
+) -> list[str]:
+    notes: list[str] = []
+
+    if agency_state.active and not " ".join(agency_state.current_phase.split()):
+        projected = " ".join(agency_state.current_milestone.split()) or "discovery"
+        notes.append(
+            f"agency repair: active agency had empty current_phase; projected {projected!r} as phase"
+        )
+
+    lifecycle_milestone = _lifecycle_milestone(lifecycle_state)
+    program_milestone = _program_milestone(program_state)
+    agency_milestone = _agency_milestone(agency_state)
+
+    active_markers = [
+        marker
+        for marker in (
+            f"agency:{agency_milestone}" if agency_state.active else "",
+            f"lifecycle:{lifecycle_milestone}" if lifecycle_milestone else "",
+            f"program:{program_milestone}" if program_milestone else "",
+        )
+        if marker
+    ]
+    distinct_active = {marker.split(":", 1)[1] for marker in active_markers}
+    if len(active_markers) > 1 and len(distinct_active) > 1:
+        notes.append(
+            f"contradictory active states: {', '.join(active_markers[:3])}"
+        )
+
+    if lifecycle_milestone and program_milestone and lifecycle_milestone != program_milestone:
+        lifecycle_stage = lifecycle_state.stage if lifecycle_state is not None else "unknown"
+        program_stage = _current_program_stage(program_state)
+        program_stage_id = program_stage.id if program_stage is not None else "unknown"
+        notes.append(
+            "lifecycle/program drift: "
+            f"lifecycle stage {lifecycle_stage!r}->{lifecycle_milestone}, "
+            f"program stage {program_stage_id!r}->{program_milestone}"
+        )
+
+    if (
+        pipeline_state is not None
+        and pipeline_state.current_phase in {"orchestrate", "paused"}
+        and lifecycle_state is not None
+        and lifecycle_state.stage in {"init", "brainstorm-complete", "plan-drafted", "plan-validated"}
+    ):
+        notes.append(
+            "runtime/workflow drift: "
+            f"pipeline phase {pipeline_state.current_phase!r} active while lifecycle stage is {lifecycle_state.stage!r}"
+        )
+
+    return notes[:5]
+
+
+def _current_program_stage(program_state: Program | None) -> StageNode | None:
+    if program_state is None or not program_state.stages:
+        return None
+    if program_state.current_stage_id:
+        for stage in program_state.stages:
+            if stage.id == program_state.current_stage_id:
+                return stage
+    for milestone in program_delivery_milestones(program_state):
+        if milestone.get("delivery_state") not in {"passed"}:
+            stage_id = milestone.get("stage_id")
+            for stage in program_state.stages:
+                if stage.id == stage_id:
+                    return stage
+    return program_state.stages[-1]
+
+
+def _work_package_summaries_for_stage(stage: StageNode) -> list[WorkPackageSummary]:
+    packages: list[WorkPackageSummary] = []
+    milestone_id = stable_milestone_id_for_stage(stage)
+    for task in stage.tasks[:8]:
+        packages.append(
+            WorkPackageSummary(
+                package_id=stable_work_package_id_for_task(stage, task),
+                milestone_id=milestone_id,
+                title=task.title or task.id or "(untitled task)",
+                status=delivery_state_for_program_status(task.status),
+                summary=" ".join(task.summary.split()) if task.summary else "",
+                owner="program",
+            )
+        )
+    return packages
+
+
+def _lifecycle_milestone(state: LifecycleState | None) -> str:
+    if state is None:
+        return ""
+    return _LIFECYCLE_MILESTONE_BY_STAGE.get(state.stage, "")
+
+
+def _program_milestone(state: Program | None) -> str:
+    stage = _current_program_stage(state)
+    return stable_milestone_id_for_stage(stage) if stage is not None else ""
+
+
+def _agency_milestone(state: AgencyState) -> str:
+    if not state.active:
+        return ""
+    milestone = " ".join(state.current_milestone.split())
+    phase = " ".join(state.current_phase.split())
+    token = milestone or phase or "discovery"
+    from .delivery_state import stable_milestone_id
+
+    return stable_milestone_id(token)
+
+
+def _read_raw_mode_token(repo: Path) -> str:
+    path = mode_state_path(repo)
+    if not path.exists():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    raw = payload.get("mode")
+    return raw if isinstance(raw, str) else ""
+
+
+def _normalize_mode_note(raw_mode_token: str) -> tuple[str, str]:
+    token = " ".join(raw_mode_token.split()).lower()
+    if not token:
+        return "", ""
+    policy = _MODE_POLICY_BY_TOKEN.get(token, "")
+    if token in {"guided", "direct", "async"}:
+        return (
+            f"mode repair: legacy mode token {token!r} treated as execution_policy {policy!r}",
+            policy,
+        )
+    if token not in {"conductor", "orchestrator"}:
+        return (f"mode drift: stale mode token {token!r} ignored", "")
+    return "", policy
+
+
+def _lifecycle_host(host: str | HostKind | None) -> str | HostKind:
+    """Lifecycle-local host resolution contract.
+
+    This module preserves the historical behavior documented in its own
+    preamble helpers: explicit ``host`` wins, then ``RENMARK_HOST``, and with
+    neither set it defaults to Claude-compatible capabilities. That keeps the
+    lifecycle/preamble contract stable even when the surrounding process is a
+    Codex-hosted test runner.
+    """
+    if host is not None:
+        return host
+    raw = os.getenv("RENMARK_HOST")
+    if raw and raw.strip():
+        return raw
+    return "claude"
 
 
 # ── Internal ──────────────────────────────────────────────────────────────────
