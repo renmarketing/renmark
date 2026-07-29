@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - prd: clarify surface-adaptive decisions
+
+**Request:** Make Renmark selector-capable across Claude Code and Codex while acknowledging that native clickability depends on the active host surface.
+**Built:** Amended REQ-23 with decision-only menus, runtime picker capability, recommended-first fallback, bounded overflow navigation, continuation/resume semantics, and Codex Plan-versus-Default behavior; amended REQ-25 and success metrics so the concise contract propagates and is proven across hosts.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Renmark never promises or creates host UI that is unavailable; informational status stays prose; every real decision has exactly one recommended-first action and a complete fallback; dangerous gates retain an explicit refusal path and never default-forward.
+
 ## [2026-07-29] - plan: stage two-mode delivery migration
 
 **Request:** Proceed from the approved two-mode PRD into milestone planning for the cohesive Agency / Orchestrator redesign.

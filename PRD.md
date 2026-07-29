@@ -247,19 +247,40 @@ first-class hosts for the same product workflow, not separate product forks.
     or artifact semantics. Every user-choice menu has exactly one visibly
     labeled `(Recommended)` option at index 0; it uses the host-native selector
     when that selector is available and an identically ordered numbered
-    fallback otherwise. An unavailable Claude-only picker MUST NOT classify an
-    interactive Codex session as headless. Plain-English triggers including
-    “plan this”, “dispatch this”, “loop until this passes”, “fix this”, “build
-    this”, “what's next”, and “ship this” route to the same intended pipeline
-    on both hosts without requiring `/renmark:*` syntax. Host-native subagents
-    preserve the existing bounded input/output, cost, wave, verifier, pause,
-    and resume contracts (extends REQ-1, REQ-2, REQ-3, REQ-5, REQ-7, REQ-20,
-    REQ-21).
+    fallback otherwise. This is a **selector-capable** contract, not a promise
+    that every host surface can render native buttons: only unresolved
+    decisions, approval gates, and handoffs use a choice menu, while
+    informational status remains ordinary prose and never creates a pause.
+    The active adapter resolves selector availability and option capacity at
+    render time rather than persisting a host assumption. When choices exceed
+    the native capacity, no action is silently truncated: an explicit
+    `More options…` action pages to the remaining choices, continuation pages
+    provide `Back` and `Cancel` / `Reject` as appropriate, and dangerous gates
+    keep their safe refusal action reachable. If the selector is unavailable,
+    errors, or returns no valid selection, Renmark renders the complete
+    recommended-first numbered fallback and accepts a number, stable choice
+    code, exact label, or free-text continuation.
+
+    The semantic pending decision and approval class are recoverable from
+    canonical workflow state, but native-tool availability and page position
+    are presentation details re-resolved on continuation or resume. Renmark
+    does not attempt to switch a host's collaboration mode. In particular,
+    Codex may expose its native picker in Plan mode while Default mode requires
+    the numbered fallback; selector absence MUST NOT classify an interactive
+    Codex session as headless. Plain-English triggers including “plan this”,
+    “dispatch this”, “loop until this passes”, “fix this”, “build this”,
+    “what's next”, and “ship this” route to the same intended pipeline on both
+    hosts without requiring `/renmark:*` syntax. Host-native subagents preserve
+    the existing bounded input/output, cost, wave, verifier, pause, and resume
+    contracts (extends REQ-1, REQ-2, REQ-3, REQ-5, REQ-7, REQ-20, REQ-21).
     - *Acceptance:* done when both hosts report the same installed Renmark name
       and release version; done when the trigger matrix selects the same skills
-      and every selector/fallback is recommended-first; done when plan →
-      dispatch → verify and bounded loop → pause → resume trajectories reach the
-      same golden outcomes on Claude Code and Codex.
+      and every selector/fallback is recommended-first; done when interaction
+      fixtures prove Claude native selection, Codex Plan-mode native selection
+      within the active option cap, Codex Default-mode fallback, overflow
+      navigation, cancellation, free-text continuation, and resume; done when
+      plan → dispatch → verify and bounded loop → pause → resume trajectories
+      reach the same golden outcomes on Claude Code and Codex.
 24. `REQ-24` **Proactive recurring-issue prevention.** Before dispatching another
     model attempt after the same materially equivalent implementation or testing
     issue recurs, Renmark detects the recurrence using a host-neutral fingerprint
@@ -284,7 +305,11 @@ first-class hosts for the same product workflow, not separate product forks.
     outcomes, bounded work-package scope, planner/executor/reviewer role
     separation, deterministic verification, milestone-local loops, independent
     review and repair, canonical state, stop conditions, and human gates. It
-    cites dynamically loaded skills and shared contracts by pointer instead of
+    also states the selector-capable interaction rule: real decisions use the
+    active host's native picker when available and the equivalent numbered
+    fallback otherwise; informational status stays prose; native clickability
+    may require a user-selected host surface such as Codex Plan mode. It cites
+    dynamically loaded skills and shared contracts by pointer instead of
     inlining their full bodies.
 
     `/renmark:init` owns the non-destructive managed-block merge.
@@ -323,7 +348,10 @@ first-class hosts for the same product workflow, not separate product forks.
   Windows on Claude Code and Codex, with `/renmark:doctor` catching host-specific
   registration, identity, cache, and version faults.
 - Natural-language trigger, selector-ordering, full-pipeline, and loop/resume
-  parity fixtures pass on both Claude Code and Codex.
+  parity fixtures pass on both Claude Code and Codex; the interaction matrix
+  covers Claude native selectors, Codex Plan-mode selectors, Codex Default-mode
+  numbered fallback, overflow navigation, cancellation, continuation, and
+  resume.
 - Repeated-issue parity fixtures confirm that both hosts warn before a third
   futile attempt and produce the same remediation class.
 
@@ -511,3 +539,13 @@ Updated success metrics, scope boundaries, and Loop Mode placement. This
 supersedes the peer-mode language in the original REQ-22 and requires a
 follow-up ADR to supersede ADR-039. Approved explicitly by the project owner on
 2026-07-29 via `/renmark:approve`.
+
+**Revision note (2026-07-29, human-approved diff):** Amended REQ-23 to
+distinguish Renmark's host-neutral selector-capable contract from native
+clickability, resolve picker availability and capacity per active surface, add
+bounded `More` / `Back` / `Cancel` overflow behavior, preserve numbered
+fallback and continuation semantics, and cover Codex Plan versus Default mode.
+Amended REQ-25 and success metrics so the same concise rule propagates through
+managed project contracts and cross-host golden fixtures. M1 delivery-state
+scope remains unchanged; interaction implementation begins in M2. Approved
+explicitly by the project owner on 2026-07-29 via `/renmark:approve`.
