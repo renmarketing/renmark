@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-07-17
+last_reviewed: 2026-07-29
 status: draft
 ---
 
@@ -205,22 +205,41 @@ first-class hosts for the same product workflow, not separate product forks.
     included. Cost preview labels each task step as deterministic vs
     model-driven. **Deterministic-first execution**: git / grep / state /
     parser checks before subagents; deterministic checks before model calls.
-22. `REQ-22` **Agency Mode** is an OPTIONAL higher-level project-delivery
-    workflow — it does NOT replace Conductor or Orchestrator (they remain the
-    execution engines it drives) — that adds sustained, owner-facing project
-    governance: owner intent → PRD agreement → tech-stack recommendation →
-    roadmap/milestones → iterative build → demo/feedback → verification →
-    signoff → release. It carries lightweight, resumable agency phase state
-    (current phase, current milestone, next checkpoint, signoff status, cost
-    lane, roadmap ref), owner-level approval gates distinct from technical
-    gates, and milestone checkpoints that pause for owner feedback. Activation
-    is explicit opt-in (via `/renmark:start`), never auto-detected; a main agent
-    communicates with the owner while scoped background agents do the work.
-    Agency behavior loads dynamically — agency metadata upfront, full agency
-    instructions only when Agency Mode is active (extends REQ-20). Agency Mode
-    REUSES, never re-implements, the cost-control, finish-lane, and
-    deterministic-first infrastructure; milestone-readiness checks run
-    deterministically (extends REQ-3, REQ-4, REQ-5, REQ-21).
+22. `REQ-22` **Two-mode milestone delivery.** Renmark exposes exactly two
+    owner-selectable delivery modes: **Agency** and **Orchestrator**. Agency
+    starts from an idea or product-level outcome and owns discovery, PRD
+    agreement, stack recommendation, milestone-roadmap approval, demos,
+    feedback, milestone signoff, and release. Orchestrator starts from a defined
+    goal, feature, bug, specification, or approved milestone and owns scope and
+    acceptance validation, work-package planning, model routing, dispatch,
+    verification, independent code review, bounded repair, and finish. Agency
+    delegates every milestone build to Orchestrator; the modes share one
+    milestone/work-package execution engine rather than duplicating pipeline,
+    state, cost, or verification logic. Conductor is no longer a public or
+    persisted mode: its useful behavior survives only as an automatically
+    selected `guided/direct` execution policy inside Orchestrator. Mode is
+    selected per delivery run, persists for resume, and may be explicitly
+    overridden by the owner.
+
+    Every milestone carries a goal, expected outcome, acceptance evidence,
+    dependencies, risks, cost lane, demo point, and signoff policy. A milestone
+    is complete only after fresh verification and independent review are clean.
+    `/renmark:loop` is a bounded, milestone-local Orchestrator primitive, not a
+    third mode: implementation failures may enter
+    `build → verify → repair → verify`, and review findings may enter
+    `review → scoped fix → verify → re-review`. Each loop requires a verifier,
+    budget, maximum iterations, fresh evidence, and no-progress fingerprint; it
+    stops on success, exhaustion, repeated evidence, scope drift, or an approval
+    gate. A loop may not change product scope, advance a milestone, or bypass
+    owner signoff. Before a third materially equivalent attempt, recurring-issue
+    prevention takes control (extends REQ-3, REQ-4, REQ-5, REQ-7, REQ-9,
+    REQ-11, REQ-20, REQ-21, REQ-24).
+    - *Acceptance:* done when Agency executes each approved milestone through
+      Orchestrator without duplicating state or pipeline code; done when a clear
+      feature can run directly in Orchestrator without Agency discovery gates;
+      done when Conductor cannot be selected or persisted as a public mode; done
+      when milestone-local build and review loops stop at their evidence,
+      budget, recurrence, scope, and approval boundaries.
 23. `REQ-23` **Claude Code / Codex host parity.** Renmark ships the same named,
     versioned plugin and the same product-level pipeline outcomes on both hosts.
     Host adapters translate interaction, implicit routing, plugin installation,
@@ -256,11 +275,44 @@ first-class hosts for the same product workflow, not separate product forks.
       a third model attempt; done when the warning includes bounded evidence and
       a concrete patch-or-durable-guard recommendation; done when recurrence
       evidence persists locally without raw transcript or history injection.
+25. `REQ-25` **Project contract propagation.** Every project adopted or built
+    through Renmark carries a concise managed delivery contract in both
+    `CLAUDE.md` and `AGENTS.md`. The two blocks are semantically mirrored, with
+    host-specific wording only where host behavior genuinely differs, and are
+    derived from one canonical source rather than hand-maintained copies. The
+    contract explains the Agency and Orchestrator paths, milestone goals and
+    outcomes, bounded work-package scope, planner/executor/reviewer role
+    separation, deterministic verification, milestone-local loops, independent
+    review and repair, canonical state, stop conditions, and human gates. It
+    cites dynamically loaded skills and shared contracts by pointer instead of
+    inlining their full bodies.
+
+    `/renmark:init` owns the non-destructive managed-block merge.
+    `/renmark:start` and `/renmark:feature` run the same deterministic freshness
+    check before planning and route missing or stale blocks through that single
+    refresh primitive; they do not invent their own writers or contract text.
+    Refreshes preserve all project-specific instructions outside managed
+    markers and never replace an unmarked user section. Root guidance,
+    templates, installed blocks, and host variants are guarded by deterministic
+    parity and idempotency checks (extends REQ-1, REQ-5, REQ-8, REQ-20,
+    REQ-21, REQ-22, REQ-23).
+    - *Acceptance:* done when `init` on a new or existing project and `start` or
+      `feature` on a stale project converge on the same current managed
+      contract; done when running the refresh twice produces no second diff;
+      done when custom content outside managed markers remains byte-for-byte
+      unchanged; done when deterministic checks fail on semantic drift between
+      `CLAUDE.md`, `AGENTS.md`, their templates, or installed host variants.
 
 ## Success metrics
 
 - A vibe coder reaches working, committed code from `/renmark:start` with no
   more than the entry question + 2 follow-ups before routing.
+- Agency and Orchestrator golden trajectories reach the same verified,
+  independently reviewed milestone outcome from their different entry
+  altitudes, and Agency advances only after the owner accepts that outcome.
+- `init`, `start`, and `feature` converge on the same current managed
+  `CLAUDE.md` / `AGENTS.md` contract, preserve project-specific instructions,
+  and pass parity plus second-run idempotency checks.
 - Cold-start recovery after `/clear` is a single file read (`/renmark:resume`),
   zero LLM calls.
 - Orchestrator-visible output per task stays within the bounded cap
@@ -297,9 +349,11 @@ first-class hosts for the same product workflow, not separate product forks.
   zero-LLM / meta skills minimal context injection while pipeline skills receive
   the full preamble — a finer per-turn token dial that never compromises
   cold-start recovery or cross-domain detection (complements REQ-5); the
-  OPTIONAL Agency Mode delivery workflow — an opt-in, higher-level
-  project-delivery loop that drives Orchestrator internally and does not
-  replace Conductor/Orchestrator (REQ-22).
+  two-mode Agency / Orchestrator milestone-delivery model, with Conductor
+  retained only as an internal guided/direct policy (REQ-22); and concise,
+  mirrored project delivery contracts installed and refreshed non-destructively
+  through the shared `init` primitive used by `init`, `start`, and `feature`
+  (REQ-25).
 - **Out of scope:** hosting, a GUI/web surface, shipping or fine-tuning models,
   replacing host-provided selectors with a standalone Renmark UI, managing user
   secrets, and feature parity dual-writing with `legacy-plugin`.
@@ -312,18 +366,21 @@ first-class hosts for the same product workflow, not separate product forks.
 
 ## Loop Mode
 
-renmark's execution engine for guided builds is a **bounded, verified,
-cost-aware, resumable agentic loop** — trigger + goal + verifier + budget +
-persisted state + stop condition. It wraps the existing plan → orchestrate →
-verify pipeline and iterates (run → verify evidence → decide → repeat) until the
-goal is verified, the budget is hit, max-iterations is hit, an approval gate is
-pending, or no fresh evidence supports continuing. This is the realization of
-the guided pipeline (REQ-1), not a separate product or standalone mode.
+Within Orchestrator, iterative work uses a **bounded, verified, cost-aware,
+resumable milestone-local loop** — trigger + goal + verifier + budget +
+persisted state + stop condition. It wraps a work package or milestone repair
+path and iterates from fresh evidence until the goal is verified, the budget or
+maximum iteration count is hit, recurrence/no-progress is detected, scope
+drifts, or an approval gate is pending. Independent review findings use the
+same engine but must re-enter verification before re-review. This is an internal
+execution primitive shared by Agency and direct Orchestrator runs, not a third
+delivery mode and never an authority to advance milestones or change scope.
 
 - **Experts:** `/renmark:loop "<goal>"` (with `--goal` / `--verify` / `--budget`
   / `--max-iterations`).
-- **Vibe coders:** loop behavior is hidden behind `/renmark:start` — they never
-  see the word "loop."
+- **Vibe coders:** loop behavior is selected automatically by `start` or
+  `feature` when verifier-driven iteration is warranted; they do not manage loop
+  IDs, budgets, or iteration flags.
 
 ## Backlog & lanes
 
@@ -442,3 +499,15 @@ dispatch, and shared pipeline/loop trajectory proof. Updated Vision, durable
 non-goals, success metrics, and scope boundaries. Proposed by the
 Codex/Claude-parity feature's PRD-alignment gate and explicitly approved by the
 project owner on 2026-07-15.
+
+**Revision note (2026-07-29, human-approved diff):** Amended REQ-22 to define
+Agency and Orchestrator as Renmark's two delivery modes, demote Conductor to an
+internal guided/direct policy, make milestones the owner-alignment boundary,
+and place bounded build plus review-repair loops inside Orchestrator. Added
+REQ-25 for concise, semantically mirrored `CLAUDE.md` / `AGENTS.md` contracts
+that `init` owns and `start` / `feature` refresh through the same
+non-destructive primitive, with parity, preservation, and idempotency proof.
+Updated success metrics, scope boundaries, and Loop Mode placement. This
+supersedes the peer-mode language in the original REQ-22 and requires a
+follow-up ADR to supersede ADR-039. Approved explicitly by the project owner on
+2026-07-29 via `/renmark:approve`.

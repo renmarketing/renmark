@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - prd: define two-mode milestone delivery
+
+**Request:** Make Renmark a cohesive vibe-coding solution with Agency and Orchestrator as its two modes, place bounded loops inside milestones, and propagate a concise mirrored project contract through `init`, `start`, and `feature`.
+**Built:** Amended REQ-22 with the two-mode hierarchy and milestone-local build/review loops; added REQ-25 for non-destructive `CLAUDE.md` / `AGENTS.md` contract propagation; added parity, preservation, idempotency, and two-mode success criteria.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Agency owns product governance and delegates milestone execution to Orchestrator; Conductor is internal policy only; loops cannot change scope or bypass signoff; `init` remains the single managed-contract writer and `start` / `feature` route through it.
+
 ## [2026-07-17] - release: proactive repeated-issue prevention v0.38.2
 
 **Request:** Deploy the completed proactive repeated-issue prevention feature as a new Codex release and distribution zip.
