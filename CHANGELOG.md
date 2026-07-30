@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Add canonical public delivery-mode resolver
+
+**Request:** Resolve public delivery behavior through the approved Agency or Orchestrator contract while retaining safe compatibility with legacy mode state.
+**Built:** Added canonical Agency/Orchestrator delivery resolution with guided/direct/async execution policy, explicit-choice precedence, bounded entry-intent defaults, and once-per-run DeliveryState persistence.
+**Files changed:** `renmark/mode.py`, `CHANGELOG.md`.
+**Do not change:** Preserve the legacy mode path/read/clear surface, map legacy Conductor state to Orchestrator/guided, and never create a new public Conductor value.
+
 ## [2026-07-30] - fix(codex): prove sandbox readiness before dispatch
 
 **Request:** Investigate and repair the M2 blocker where nested Codex subprocesses exited without writing their target files.
