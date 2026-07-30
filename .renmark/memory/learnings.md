@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-30, review) model `codex-reviewer`: **Codex retry target rollback** — Every rejected executor attempt must restore its own target before retry; otherwise path-set deltas can hide a legitimate edit on the next attempt and produce a false unchanged-target failure.
+
+- (2026-07-30, bug) **Codex executor accepted unchanged targets as PASS** — An agent exit plus a green verifier is not implementation completion; require attributable target change and durable commit evidence, or an explicit validated batching sentinel.
+
 - (2026-07-30, bug) **Ruff baseline regressed after M1 delivery-state additions** — Run the repository-wide Ruff gate after milestone task commits and before the next milestone preflight; passing task-local verifiers alone does not prove cross-file style convergence.
 
 - (2026-07-29, .renmark/reviews/2026-07-29-402c3ed.review-remediation.md) model `codereview-remediation`: **review-m1-canonical-delivery-state** — 2/2 blocking Major findings resolved; stable legacy identity and writer-validator convergence; full suite 1540 passed, 31 skipped

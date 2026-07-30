@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
-from renmark.cli import _engine
+from renmark.cli import _codex_runner, _engine
+from renmark.parser import Task
 from renmark.providers import codex as codex_provider
+from renmark.providers.codex import CodexResult
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -283,6 +286,171 @@ def test_judge_lane_and_rollback_in_lane_is_noop(tmp_path):
     )
     assert ok is True
     assert target.exists()
+
+
+def test_codex_runner_rejects_unchanged_target_before_verifier(tmp_path, monkeypatch):
+    """A zero-delta executor exit cannot borrow a pre-existing green verifier."""
+    _init_repo(tmp_path)
+    task = Task(index=1, title="must edit", mode="B", target="seed.txt", verifier="true")
+    cfg = SimpleNamespace(max_task_retries=0, default_verifier_timeout_s=5)
+
+    monkeypatch.setattr(_codex_runner, "codex_available", lambda: True)
+    monkeypatch.setattr(
+        _codex_runner,
+        "run_codex_task",
+        lambda *_args, **_kwargs: CodexResult(
+            exit_code=0,
+            output_tail="completed without edits",
+            changed_files=[],
+            pre_changed_files=[],
+        ),
+    )
+    monkeypatch.setattr(_codex_runner, "append_usage", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        _codex_runner,
+        "_judge_lane_and_rollback",
+        lambda *_args, **_kwargs: (True, "ok"),
+    )
+    monkeypatch.setattr(
+        _codex_runner,
+        "run_verifier",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("unchanged target must be rejected before verification")
+        ),
+    )
+    monkeypatch.setattr(_codex_runner, "_record_escalation", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(_codex_runner, "_print", lambda *_args, **_kwargs: None)
+
+    result = _codex_runner._execute_task_codex(
+        task=task,
+        repo=tmp_path,
+        run_id="unchanged-target",
+        cfg=cfg,
+        total=1,
+    )
+
+    assert result[0] is False
+    assert result[1] == "codex_no_target_change"
+
+
+def test_codex_runner_rolls_back_dirty_target_before_retry(tmp_path, monkeypatch):
+    """Executor and lane failures cannot poison the next attempt's target delta."""
+    for failure_kind in ("nonzero", "lane"):
+        repo = tmp_path / failure_kind
+        repo.mkdir()
+        _init_repo(repo)
+        task = Task(index=1, title="retry cleanly", mode="B", target="seed.txt", verifier="true")
+        cfg = SimpleNamespace(max_task_retries=1, default_verifier_timeout_s=5)
+        calls = 0
+        lane_calls = 0
+
+        def run_codex(*_args, _repo=repo, _failure_kind=failure_kind, **_kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                (_repo / "seed.txt").write_text("dirty first attempt")
+                return CodexResult(
+                    exit_code=1 if _failure_kind == "nonzero" else 0,
+                    output_tail=f"{_failure_kind} failure",
+                    changed_files=["seed.txt"],
+                    pre_changed_files=[],
+                )
+            assert (_repo / "seed.txt").read_text() == "seed"
+            (_repo / "seed.txt").write_text("fixed second attempt")
+            return CodexResult(
+                exit_code=0,
+                output_tail="completed",
+                changed_files=["seed.txt"],
+                pre_changed_files=[],
+            )
+
+        def judge_lane(*_args, _failure_kind=failure_kind, **_kwargs):
+            nonlocal lane_calls
+            lane_calls += 1
+            if _failure_kind == "lane" and lane_calls == 1:
+                return False, "out-of-lane first attempt"
+            return True, "ok"
+
+        monkeypatch.setattr(_codex_runner, "codex_available", lambda: True)
+        monkeypatch.setattr(_codex_runner, "run_codex_task", run_codex)
+        monkeypatch.setattr(_codex_runner, "append_usage", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(_codex_runner, "_judge_lane_and_rollback", judge_lane)
+        monkeypatch.setattr(
+            _codex_runner,
+            "run_verifier",
+            lambda *_args, **_kwargs: SimpleNamespace(ok=True),
+        )
+        monkeypatch.setattr(
+            _codex_runner,
+            "_git_commit",
+            lambda *_args, **_kwargs: "abc123",
+        )
+        monkeypatch.setattr(_codex_runner, "_print", lambda *_args, **_kwargs: None)
+
+        result = _codex_runner._execute_task_codex(
+            task=task,
+            repo=repo,
+            run_id=f"retry-{failure_kind}",
+            cfg=cfg,
+            total=1,
+        )
+
+        assert result == (True, "", 0, "abc123")
+        assert calls == 2
+        assert (repo / "seed.txt").read_text() == "fixed second attempt"
+
+
+def test_codex_verify_and_commit_rejects_empty_sha(tmp_path, monkeypatch):
+    """A green verifier is not completion when Git produced no commit evidence."""
+    _init_repo(tmp_path)
+    task = Task(index=1, title="must commit", mode="B", target="seed.txt", verifier="true")
+    cfg = SimpleNamespace(max_task_retries=0)
+
+    monkeypatch.setattr(_codex_runner, "_git_commit", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(_codex_runner, "_record_escalation", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(_codex_runner, "_print", lambda *_args, **_kwargs: None)
+
+    result = _codex_runner._codex_verify_and_commit(
+        SimpleNamespace(ok=True),
+        task,
+        1,
+        tmp_path,
+        "missing-commit",
+        cfg,
+        0,
+        0.0,
+        "",
+    )
+
+    assert result[0] is False
+    assert result[1] == "codex_commit_missing"
+
+
+def test_codex_verify_and_commit_accepts_sha_and_explicit_no_commit(tmp_path, monkeypatch):
+    """Real commits and the intentional batching sentinel remain successful."""
+    _init_repo(tmp_path)
+    task = Task(index=1, title="valid completion", mode="B", target="seed.txt", verifier="true")
+    cfg = SimpleNamespace(max_task_retries=0)
+    monkeypatch.setattr(_codex_runner, "_print", lambda *_args, **_kwargs: None)
+
+    for commit_result in ("abc123", "(no-commit)"):
+        monkeypatch.setattr(
+            _codex_runner,
+            "_git_commit",
+            lambda *_args, result=commit_result, **_kwargs: result,
+        )
+        result = _codex_runner._codex_verify_and_commit(
+            SimpleNamespace(ok=True),
+            task,
+            1,
+            tmp_path,
+            "valid-commit",
+            cfg,
+            0,
+            0.0,
+            "",
+        )
+        assert result == (True, "", 0, commit_result)
 
 
 # ── Dry-run cost estimate covers every executor tier ───────────────────────────

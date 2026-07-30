@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — Codex executor accepted unchanged targets as PASS
+
+**Severity:** high
+**Symptom:** M2 tasks 2–12 reported PASS while producing no target changes, artifacts, or commits.
+**Root cause:** The Codex runner enforces only that no out-of-lane files changed and then treats a green verifier as completion, so an empty target delta and empty commit SHA are mislabeled as PASS instead of failed evidence.
+**Fix:** Require the target in the executor delta before verification and require a real commit SHA or the explicit no-commit sentinel after verification.
+**Lesson:** An agent exit plus a green verifier is not implementation completion; require attributable target change and durable commit evidence, or an explicit validated batching sentinel.
+
+---
+
 ### 2026-07-30 — Ruff baseline regressed after M1 delivery-state additions
 
 **Severity:** medium

@@ -1,0 +1,25 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": "1.0",
+  "created_at": "2026-07-30T00:00:00-04:00",
+  "source_sha": "working-tree",
+  "related_plan": null,
+  "generator": "codex-reviewer",
+  "stale_after": null,
+  "dependency_refs": [
+    "renmark/cli/_codex_runner.py",
+    "tests/test_engine_budget_and_rollback.py"
+  ],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "PASS",
+  "findings": [],
+  "verification": {
+    "command": ".venv/bin/python -m pytest -q tests/test_engine_budget_and_rollback.py",
+    "result": "21 passed in 0.61s"
+  }
+}

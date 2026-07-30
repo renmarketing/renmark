@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - fix(executor): reject false Codex completion
+
+**Request:** Continue from M2’s failed executor-evidence gate and make Codex implementation tasks fail instead of reporting PASS when they produce no target change or commit.
+**Built:** Added a pre-verifier target-delta requirement with bounded recurrence handling and an independent post-verifier commit-evidence requirement; restored partial target edits before nonzero-exit and lane-violation retries; preserved real commit SHAs and the explicit `--no-commit` batching sentinel; added regressions for unchanged targets, clean retries, empty commit results, and both valid completion paths; cleared the independent remediation review.
+**Files changed:** `renmark/cli/_codex_runner.py`, `tests/test_engine_budget_and_rollback.py`, `.renmark/reviews/2026-07-30-executor-completion-guard.review.json`, `.renmark/reviews/2026-07-30-executor-completion-guard-remediation.review.json`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug evidence under `.renmark/debug/20260730-110909-96c0/`.
+**Do not change:** Keep out-of-lane rollback and sibling isolation intact; a green verifier alone is never completion; M2 remains paused at Part 1 task 2 and must not use index-only CLI `--resume`.
+
 ## [2026-07-30] — orchestrate: stop M2 on invalid Codex completions
 
 **Request:** Execute approved M2 Part 1 then Part 2 within the combined cap, stopping on any failed gate.
