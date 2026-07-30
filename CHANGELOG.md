@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - plan: compile M2 two-mode routing and interaction
+
+**Request:** After accepting M1, plan M2 only: the Agency/Orchestrator public contract, canonical entry routing, host-adaptive decisions, and cross-host behavior proof.
+**Built:** Reused the approved M2 master milestone and split its current-format implementation at the 15-task ceiling into a 13-task runtime/interaction plan followed by a 9-task entry-skill/behavior plan; encoded build and review loop bounds, compatibility guards, execution order, and an honest combined preview of 101,700 tokens including Agent overhead at USD 1.0955, with no Opus/Fable and no dispatch.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m2-part1-runtime.plan.md`, `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m2-part2-entry-contract.plan.md`, `CHANGELOG.md`; runtime lifecycle state in `.renmark/state/lifecycle.json`.
+**Do not change:** M2 Part 2 cannot execute before Part 1 is green and committed; M2 execution still requires a fresh explicit high-band cost/dispatch approval; REQ-25 propagation stays in M5; the current one-target packets are a temporary backend that M3 replaces with bounded multi-file work packages.
+
 ## [2026-07-29] - approve: accept M1 and authorize M2 planning
 
 **Request:** Accept M1, acknowledge its recorded review-budget exception, and authorize M2 planning only.
