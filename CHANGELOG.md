@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - orchestrate: pause M2 at selector compatibility verifier
+
+**Request:** Resume the approved staged M2 Part 1 then Part 2 run under the existing combined cap and stop on any failed gate.
+**Built:** Revalidated the repaired Codex sandbox, resumed from the canonical Part 1 wave graph, committed tasks 2, 4, 3, 5, 6, and 8 with independent target verifiers, and stopped at task 7 when its focused interaction test verifier failed; persisted the exact recovery boundary without dispatching tasks 9–13 or Part 2.
+**Files changed:** `.renmark/reviews/2026-07-30-eada2af.m2-part1-wave5-verifier-blocker.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`; runtime failure evidence under `.renmark/state/`.
+**Do not change:** Preserve committed Part 1 tasks and task 8’s passing parity fixtures; do not dispatch any downstream task or M2 Part 2 until `/renmark:debug` makes task 7’s focused verifier green.
+
 ## [2026-07-30] - Add cross-surface selector parity fixtures
 
 **Request:** Prove that one semantic decision renders consistently across Claude, Codex Plan, Codex Default, overflow navigation, and explicit runtime capability overrides.

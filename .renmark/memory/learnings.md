@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-30, run) **task 7 failed on codex** — codex_verifier_failed
+
 - (2026-07-30, bug) **Nested Codex workspace-write sandbox unavailable in WSL** — Executable presence is not executor readiness: prove the actual sandbox before model spend, and never launch a runtime controlled by the target workspace.
 
 - (2026-07-30, run) **task 2 failed on codex** — repeated_issue_guard
