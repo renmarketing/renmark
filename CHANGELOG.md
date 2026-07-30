@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - test(delivery): complete WP-M2-C cross-host proof
+
+**Request:** Finish M2 through bounded milestone work packages with persisted verify/review boundaries.
+**Built:** Replaced the obsolete public-mode fixture with a live two-mode resolution matrix; expanded Claude and Codex behavior adapters across native Plan and numbered Default surfaces; proved recommendation order, complete fallback, More/Back/Cancel, invalid continuation, resume stability, legacy migration, and zero-model deterministic execution.
+**Files changed:** `renmark/behavior.py`, `tests/behavioral/mode.behavior.json`, `tests/behavioral/selector_claude.behavior.json`, `tests/behavioral/selector_codex.behavior.json`, `tests/test_behavior.py`, `.renmark/reviews/2026-07-30-wp-m2-c-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Deterministic behavior must remain network/token free, Codex Default must retain the complete fallback, Codex Plan overflow must keep More/Back/Cancel reachable, and live judge/eval spend stays explicit opt-in.
+
 ## [2026-07-30] - docs(delivery): complete WP-M2-B entry routing
 
 **Request:** Continue M2 as milestone-sized work packages and keep implementation with directly related tests.

@@ -1,15 +1,20 @@
 {
-  "skill": "feature",
-  "prompt": "Add a small feature to this project.",
+  "skill": "start",
+  "prompt": "Resolve and resume the canonical delivery mode.",
   "deterministic": {
-    "call": "lifecycle.skill_preamble_fresh",
+    "call": "lifecycle.delivery_mode_matrix",
     "assertions": [
-      "contains:Operating mode: not yet set",
-      "contains:Conductor vs Orchestrator"
+      "contains:Delivery mode: not yet set",
+      "contains:Agency vs Orchestrator",
+      "contains:Delivery mode: Orchestrator",
+      "contains:\"execution_policy\": \"guided\"",
+      "contains:\"resume_preserved\": true",
+      "contains:\"resume_reasked\": false",
+      "not_contains:Operating mode: Conductor"
     ]
   },
   "eval": {
-    "contract": "With no mode set, starting a feature workflow prompts the user to choose Conductor vs Orchestrator before proceeding.",
+    "contract": "Vague start recommends Agency; defined feature/debug use Orchestrator; legacy Conductor maps to guided policy; resume preserves the canonical choice without re-asking.",
     "golden_ref": "mode.golden"
   }
 }

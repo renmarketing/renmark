@@ -471,6 +471,42 @@ def _render_skill_preamble_agency_active(repo: Path, case: Case) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _render_delivery_mode_matrix(repo: Path, case: Case) -> str:
+    """Render the canonical two-mode resolution/resume contract as JSON."""
+    import shutil
+
+    from . import lifecycle, mode
+
+    _ = case
+    tmp = repo / ".renmark" / "state" / "_behavior-delivery-mode"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        start = lifecycle.skill_preamble(tmp / "start", "start") or ""
+        feature = lifecycle.skill_preamble(tmp / "feature", "feature") or ""
+        debug = lifecycle.skill_preamble(tmp / "debug", "debug") or ""
+        resume_repo = tmp / "resume"
+        mode.set_mode(resume_repo, "agency")
+        before = mode.read_delivery_state(resume_repo)
+        resume = lifecycle.skill_preamble(resume_repo, "resume") or ""
+        after = mode.read_delivery_state(resume_repo)
+        legacy = mode.resolve_delivery_state("conductor")
+        payload = {
+            "start": start,
+            "feature": feature,
+            "debug": debug,
+            "legacy_conductor": {
+                "delivery_mode": legacy.delivery_mode,
+                "execution_policy": legacy.interaction_mode,
+            },
+            "resume_preserved": before == after,
+            "resume_reasked": "not yet set" in resume,
+        }
+        return json.dumps(payload, sort_keys=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _render_plan_lint(repo: Path, case: Case) -> str:
     """Render a NARROW, declared-policy read-only check to text (scaffolding tier).
 
@@ -542,7 +578,52 @@ def _render_selector_claude(repo: Path, case: Case) -> str:
 
 
 def _render_selector_codex(repo: Path, case: Case) -> str:
-    return _render_selector(repo, case, "codex")
+    """Render both Codex Plan and Default surfaces plus continuation behavior."""
+    import json
+
+    from .interaction import Choice, build_selector, continue_selector
+
+    _ = repo
+    choices = (
+        Choice("r", "Review", "read the plan"),
+        Choice("d", "Dispatch", "execute the plan", recommended=True),
+        Choice("e", "Edit", "change the plan"),
+        Choice("n", "No", "stop here"),
+    )
+    plan = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        render_surface="codex-plan",
+    )
+    default = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        render_surface="codex-default",
+    )
+    second_page = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        render_surface="codex-plan",
+        page=1,
+    )
+    more = continue_selector(plan, "More")
+    back = continue_selector(second_page, "Back")
+    cancel = continue_selector(second_page, "No")
+    invalid = continue_selector(plan, "explain this first")
+    return json.dumps(
+        {
+            "plan": plan,
+            "default": default,
+            "more_kind": more.kind,
+            "back_kind": back.kind,
+            "cancel_kind": cancel.kind,
+            "invalid_kind": invalid.kind,
+        },
+        sort_keys=True,
+    )
 
 
 # call key -> adapter(repo, case) -> rendered current output text.
@@ -553,6 +634,7 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "lifecycle.skill_preamble": _render_skill_preamble,
     "lifecycle.skill_preamble_fresh": _render_skill_preamble_fresh,
     "lifecycle.skill_preamble_agency_active": _render_skill_preamble_agency_active,
+    "lifecycle.delivery_mode_matrix": _render_delivery_mode_matrix,
     "interaction.selector_claude": _render_selector_claude,
     "interaction.selector_codex": _render_selector_codex,
     "plan_lint": _render_plan_lint,

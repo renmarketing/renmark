@@ -8,11 +8,17 @@
       "contains:Dispatch (Recommended)",
       "contains:\"overflow\": true",
       "contains:1. [d] Dispatch (Recommended)",
+      "contains:\"mode\": \"fallback\"",
+      "contains:\"reason\": \"selector_unavailable\"",
+      "contains:\"more_kind\": \"more\"",
+      "contains:\"back_kind\": \"back\"",
+      "contains:\"cancel_kind\": \"cancel\"",
+      "contains:\"invalid_kind\": \"invalid\"",
       "not_contains:AskUserQuestion"
     ]
   },
   "eval": {
-    "contract": "Codex renders request_user_input with the recommendation first and preserves every overflow option in the fallback.",
+    "contract": "Codex Plan uses bounded native pages with More/Back/Cancel while Codex Default keeps the complete numbered fallback; invalid free text continues without becoming a selection.",
     "golden_ref": "selector-codex.golden"
   }
 }
