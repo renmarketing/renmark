@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Add cross-surface selector parity fixtures
+
+**Request:** Prove that one semantic decision renders consistently across Claude, Codex Plan, Codex Default, overflow navigation, and explicit runtime capability overrides.
+**Built:** Added focused parity fixtures for recommended-first ordering, native capacity bounds, complete numbered fallback, More/Back/Cancel navigation, and non-persistence of presentation state.
+**Files changed:** `tests/test_selector_contract.py`, `CHANGELOG.md`.
+**Do not change:** Host surfaces may vary presentation only; they must preserve semantic choices, safe refusal, and complete reachable options without changing the collaboration mode.
+
 ## [2026-07-30] - Implement semantic choices and bounded continuation
 
 **Request:** Make one host-neutral semantic decision render safely across Claude and Codex without truncating choices or persisting presentation state.
