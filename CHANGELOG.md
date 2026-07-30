@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Prove canonical delivery-mode resolution
+
+**Request:** Replace obsolete public Conductor expectations with the approved Agency/Orchestrator routing and legacy-compatibility matrix.
+**Built:** Added focused coverage for start/feature/fix/debug routing, explicit-choice precedence, once-per-run persistence, resume stability, corruption/atomicity behavior, and legacy Conductor projection.
+**Files changed:** `tests/test_mode.py`, `CHANGELOG.md`.
+**Do not change:** New state must use canonical DeliveryState values, while legacy state remains readable and resolves effectively to Orchestrator/guided.
+
 ## [2026-07-30] - Make selector capabilities surface-aware
 
 **Request:** Resolve selector behavior from the active host surface so Claude and Codex present the same semantic decision without claiming unsupported UI.

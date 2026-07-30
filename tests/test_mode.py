@@ -9,22 +9,16 @@ generator: codex
 completion_state: complete
 confidence: high
 validation_status: unvalidated
-retry_count: 0
+retry_count: 1
 parser_success: true
 schema_compliance: true
 dependency_refs:
   - renmark/mode.py
 ---
 Pytest unit tests for ``renmark.mode`` using ``tmp_path`` as an isolated repo
-root. The tests follow the existing style in ``tests/``: direct assertions,
-small helpers only where needed, and no writes outside the temporary repo.
-
-## Summary
-- Covers set/read round-trips for both persisted operating modes.
-- Verifies missing, corrupt, non-dict, and unknown-value reads degrade to ``None``.
-- Asserts invalid ``set_mode`` raises ``ValueError`` without corrupting state.
-- Checks ``clear_mode`` is idempotent and resets persisted state.
-- Confirms per-skill default-mode mappings, including roadmap and unknown fallback.
+root. The tests assert the canonical delivery-state routing and legacy
+compatibility guarantees without re-introducing a public persisted
+``conductor`` value.
 """
 
 from __future__ import annotations
@@ -32,46 +26,173 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import unittest.mock as mock
 
 import pytest
 
 from renmark import mode
 
 
+@pytest.fixture(autouse=True)
+def clear_persisted_repos() -> None:
+    mode._PERSISTED_REPOS.clear()
+
+
 def test_mode_state_path_points_at_state_subdir(tmp_path: Path) -> None:
     path = mode.mode_state_path(tmp_path)
     assert path == tmp_path / ".renmark" / "state" / "mode.json"
-    # The public helper must agree with the module-relative constant.
     assert str(path).endswith(os.path.join(".renmark", "state", "mode.json"))
     assert mode.MODE_REL == ".renmark/state/mode.json"
 
 
-def test_set_mode_round_trip_conductor(tmp_path: Path) -> None:
-    mode.set_mode(tmp_path, "conductor")
-    assert mode.read_mode(tmp_path) == "conductor"
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        (
+            {"intent": "vague-new-product", "entry": "start"},
+            mode.DeliveryState("agency", "guided"),
+        ),
+        (
+            {"intent": "defined-feature", "entry": "feature"},
+            mode.DeliveryState("orchestrator", "async"),
+        ),
+        (
+            {"intent": "unknown", "entry": "feature"},
+            mode.DeliveryState("orchestrator", "async"),
+        ),
+        (
+            {"intent": "unknown", "entry": "fix"},
+            mode.DeliveryState("orchestrator", "async"),
+        ),
+        (
+            {"intent": "debug", "entry": "start"},
+            mode.DeliveryState("orchestrator", "guided"),
+        ),
+        (
+            {"intent": "unknown", "entry": "debug"},
+            mode.DeliveryState("orchestrator", "guided"),
+        ),
+    ],
+)
+def test_resolve_delivery_state_routing_matrix(
+    kwargs: dict[str, str], expected: mode.DeliveryState
+) -> None:
+    assert mode.resolve_delivery_state(**kwargs) == expected
+
+
+@pytest.mark.parametrize(
+    ("owner_choice", "kwargs", "expected"),
+    [
+        (
+            "agency",
+            {"intent": "debug", "entry": "debug"},
+            mode.DeliveryState("agency", "guided"),
+        ),
+        (
+            ("orchestrator", "direct"),
+            {"intent": "vague-new-product", "entry": "start"},
+            mode.DeliveryState("orchestrator", "direct"),
+        ),
+        (
+            "conductor",
+            {"intent": "defined-feature", "entry": "feature"},
+            mode.DeliveryState("orchestrator", "guided"),
+        ),
+    ],
+)
+def test_explicit_owner_choice_takes_precedence(
+    owner_choice: mode.OwnerChoice,
+    kwargs: dict[str, str],
+    expected: mode.DeliveryState,
+) -> None:
+    assert mode.resolve_delivery_state(owner_choice, **kwargs) == expected
+
+
+def test_persist_delivery_state_once_keeps_first_choice_for_repo(tmp_path: Path) -> None:
+    first = mode.persist_delivery_state_once(
+        tmp_path, None, intent="vague-new-product", entry="start"
+    )
+    second = mode.persist_delivery_state_once(
+        tmp_path, None, intent="debug", entry="debug"
+    )
+
+    assert first == mode.DeliveryState("agency", "guided")
+    assert second == mode.DeliveryState("orchestrator", "guided")
+    assert mode.read_delivery_state(tmp_path) == first
+
+
+def test_resume_reads_back_canonical_delivery_choice(tmp_path: Path) -> None:
+    state = mode.DeliveryState("agency", "guided")
+    mode.write_delivery_state(tmp_path, state)
+
+    assert mode.read_delivery_state(tmp_path) == state
+
+
+def test_write_delivery_state_persists_canonical_payload(tmp_path: Path) -> None:
+    state = mode.DeliveryState("orchestrator", "direct")
+    mode.write_delivery_state(tmp_path, state)
 
     data = json.loads((tmp_path / ".renmark" / "state" / "mode.json").read_text())
-    assert data == {"mode": "conductor"}
+    assert data == {
+        "delivery_mode": "orchestrator",
+        "interaction_mode": "direct",
+        "mode": "orchestrator",
+    }
+    assert data["mode"] != "conductor"
 
 
-def test_set_mode_round_trip_orchestrator(tmp_path: Path) -> None:
-    mode.set_mode(tmp_path, "orchestrator")
+def test_legacy_conductor_payload_reads_as_guided_orchestrator(tmp_path: Path) -> None:
+    path = tmp_path / ".renmark" / "state" / "mode.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"mode": "conductor"}), encoding="utf-8")
+
+    assert mode.read_delivery_state(tmp_path) == mode.DeliveryState(
+        "orchestrator", "guided"
+    )
     assert mode.read_mode(tmp_path) == "orchestrator"
 
+
+def test_set_mode_conductor_writes_canonical_state_only(tmp_path: Path) -> None:
+    mode.set_mode(tmp_path, "conductor")
+
     data = json.loads((tmp_path / ".renmark" / "state" / "mode.json").read_text())
-    assert data == {"mode": "orchestrator"}
+    assert data == {
+        "delivery_mode": "orchestrator",
+        "interaction_mode": "guided",
+        "mode": "orchestrator",
+    }
+    assert mode.read_delivery_state(tmp_path) == mode.DeliveryState(
+        "orchestrator", "guided"
+    )
+    assert mode.read_mode(tmp_path) == "orchestrator"
+
+
+def test_set_mode_orchestrator_writes_canonical_state_only(tmp_path: Path) -> None:
+    mode.set_mode(tmp_path, "orchestrator")
+
+    data = json.loads((tmp_path / ".renmark" / "state" / "mode.json").read_text())
+    assert data == {
+        "delivery_mode": "orchestrator",
+        "interaction_mode": "async",
+        "mode": "orchestrator",
+    }
+    assert mode.read_mode(tmp_path) == "orchestrator"
 
 
 def test_clear_mode_resets_persisted_state(tmp_path: Path) -> None:
-    mode.set_mode(tmp_path, "conductor")
-    assert mode.read_mode(tmp_path) == "conductor"
+    mode.set_mode(tmp_path, "orchestrator")
+    assert mode.read_delivery_state(tmp_path) == mode.DeliveryState(
+        "orchestrator", "async"
+    )
 
     mode.clear_mode(tmp_path)
 
+    assert mode.read_delivery_state(tmp_path) is None
     assert mode.read_mode(tmp_path) is None
 
 
 def test_read_mode_missing_file_returns_none(tmp_path: Path) -> None:
+    assert mode.read_delivery_state(tmp_path) is None
     assert mode.read_mode(tmp_path) is None
 
 
@@ -80,6 +201,7 @@ def test_read_mode_corrupt_json_returns_none(tmp_path: Path) -> None:
     path.parent.mkdir(parents=True)
     path.write_text("NOT JSON {{{", encoding="utf-8")
 
+    assert mode.read_delivery_state(tmp_path) is None
     assert mode.read_mode(tmp_path) is None
 
 
@@ -87,7 +209,8 @@ def test_read_mode_corrupt_json_returns_none(tmp_path: Path) -> None:
     ("payload", "label"),
     [
         ([1, 2, 3], "non-dict"),
-        ({"mode": "bogus"}, "unknown mode"),
+        ({"mode": "bogus"}, "unknown legacy mode"),
+        ({"delivery_mode": "agency", "interaction_mode": "bogus"}, "unknown interaction"),
     ],
 )
 def test_read_mode_invalid_payloads_return_none(
@@ -97,6 +220,7 @@ def test_read_mode_invalid_payloads_return_none(
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
 
+    assert mode.read_delivery_state(tmp_path) is None, label
     assert mode.read_mode(tmp_path) is None, label
 
 
@@ -105,11 +229,11 @@ def test_set_mode_bogus_raises_and_writes_no_file(tmp_path: Path) -> None:
         mode.set_mode(tmp_path, "bogus")
 
     assert not (tmp_path / ".renmark" / "state" / "mode.json").exists()
-    assert mode.read_mode(tmp_path) is None
+    assert mode.read_delivery_state(tmp_path) is None
 
 
 def test_set_mode_bogus_preserves_prior_value(tmp_path: Path) -> None:
-    mode.set_mode(tmp_path, "conductor")
+    mode.set_mode(tmp_path, "orchestrator")
     before = (tmp_path / ".renmark" / "state" / "mode.json").read_text(encoding="utf-8")
 
     with pytest.raises(ValueError):
@@ -117,47 +241,43 @@ def test_set_mode_bogus_preserves_prior_value(tmp_path: Path) -> None:
 
     after = (tmp_path / ".renmark" / "state" / "mode.json").read_text(encoding="utf-8")
     assert after == before
-    assert mode.read_mode(tmp_path) == "conductor"
+    assert mode.read_delivery_state(tmp_path) == mode.DeliveryState(
+        "orchestrator", "async"
+    )
 
 
 def test_clear_mode_when_absent_is_idempotent(tmp_path: Path) -> None:
     mode.clear_mode(tmp_path)
-    assert mode.read_mode(tmp_path) is None
+    assert mode.read_delivery_state(tmp_path) is None
 
 
-def test_set_mode_write_failure_propagates(
+def test_write_delivery_state_failure_propagates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A genuine filesystem write failure must NOT be swallowed."""
-
     def _boom(*_args: object, **_kwargs: object) -> None:
         raise OSError("read-only file system")
 
-    # Fail the atomic temp-file write.
     monkeypatch.setattr(Path, "write_text", _boom)
 
     with pytest.raises(OSError):
-        mode.set_mode(tmp_path, "conductor")
+        mode.write_delivery_state(tmp_path, mode.DeliveryState("agency", "guided"))
 
-    # Nothing landed at the real path, and no temp file is left behind.
     state_dir = tmp_path / ".renmark" / "state"
     assert not (state_dir / "mode.json").exists()
     leftovers = list(state_dir.glob("mode.json.tmp.*")) if state_dir.exists() else []
     assert leftovers == []
 
 
-def test_set_mode_replace_failure_propagates_and_cleans_tmp(
+def test_write_delivery_state_replace_failure_propagates_and_cleans_tmp(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """If the atomic rename fails, the error surfaces and the temp file is removed."""
-
     def _boom(*_args: object, **_kwargs: object) -> None:
         raise OSError("cannot replace")
 
     monkeypatch.setattr(os, "replace", _boom)
 
     with pytest.raises(OSError):
-        mode.set_mode(tmp_path, "orchestrator")
+        mode.write_delivery_state(tmp_path, mode.DeliveryState("orchestrator", "async"))
 
     state_dir = tmp_path / ".renmark" / "state"
     assert not (state_dir / "mode.json").exists()
@@ -165,8 +285,7 @@ def test_set_mode_replace_failure_propagates_and_cleans_tmp(
     assert leftovers == []
 
 
-def test_set_mode_is_atomic_no_partial_file(tmp_path: Path) -> None:
-    """The final file appears only via os.replace of a temp file in the same dir."""
+def test_write_delivery_state_is_atomic_no_partial_file(tmp_path: Path) -> None:
     replaced: list[tuple[str, str]] = []
     real_replace = os.replace
 
@@ -174,25 +293,21 @@ def test_set_mode_is_atomic_no_partial_file(tmp_path: Path) -> None:
         replaced.append((str(src), str(dst)))
         real_replace(src, dst)
 
-    import unittest.mock as _mock
-
-    with _mock.patch.object(os, "replace", _record):
-        mode.set_mode(tmp_path, "conductor")
+    with mock.patch.object(os, "replace", _record):
+        mode.write_delivery_state(tmp_path, mode.DeliveryState("agency", "guided"))
 
     assert len(replaced) == 1
     src, dst = replaced[0]
-    # temp file lived in the same state dir as the destination (atomic rename requirement)
     assert Path(src).parent == Path(dst).parent
     assert ".tmp." in Path(src).name
     assert dst.endswith(os.path.join(".renmark", "state", "mode.json"))
-    assert mode.read_mode(tmp_path) == "conductor"
+    assert mode.read_delivery_state(tmp_path) == mode.DeliveryState("agency", "guided")
 
 
 def test_clear_mode_delete_failure_propagates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A real delete failure (not FileNotFound) must surface, not be swallowed."""
-    mode.set_mode(tmp_path, "conductor")
+    mode.write_delivery_state(tmp_path, mode.DeliveryState("agency", "guided"))
 
     def _boom(*_args: object, **_kwargs: object) -> None:
         raise PermissionError("cannot unlink")
@@ -203,16 +318,26 @@ def test_clear_mode_delete_failure_propagates(
         mode.clear_mode(tmp_path)
 
 
-@pytest.mark.parametrize("skill", ["debug", "brainstorm"])
-def test_default_mode_for_skill_conductor_cases(skill: str) -> None:
-    assert mode.default_mode_for_skill(skill) == "conductor"
+@pytest.mark.parametrize(
+    ("skill", "expected"),
+    [
+        ("start", mode.DeliveryState("agency", "guided")),
+        ("brainstorm", mode.DeliveryState("agency", "guided")),
+        ("feature", mode.DeliveryState("orchestrator", "async")),
+        ("orchestrate", mode.DeliveryState("orchestrator", "async")),
+        ("finish", mode.DeliveryState("orchestrator", "async")),
+        ("debug", mode.DeliveryState("orchestrator", "guided")),
+        ("roadmap", mode.DeliveryState("orchestrator", "async")),
+        ("zzz", mode.DeliveryState("orchestrator", "async")),
+    ],
+)
+def test_default_delivery_state_for_skill(skill: str, expected: mode.DeliveryState) -> None:
+    assert mode.default_delivery_state_for_skill(skill) == expected
 
 
-@pytest.mark.parametrize("skill", ["start", "feature", "orchestrate", "finish", "loop"])
-def test_default_mode_for_skill_orchestrator_pipeline_cases(skill: str) -> None:
-    assert mode.default_mode_for_skill(skill) == "orchestrator"
-
-
-@pytest.mark.parametrize("skill", ["roadmap", "zzz"])
-def test_default_mode_for_skill_falls_back_to_orchestrator(skill: str) -> None:
+@pytest.mark.parametrize(
+    "skill",
+    ["start", "brainstorm", "feature", "orchestrate", "finish", "debug", "roadmap", "zzz"],
+)
+def test_default_mode_for_skill_never_returns_public_conductor(skill: str) -> None:
     assert mode.default_mode_for_skill(skill) == "orchestrator"
