@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — Fix M3 package parser/compiler typing
+
+**Severity:** medium
+**Symptom:** mypy rejected M3 package parser/compiler boundary
+**Root cause:** The parser selected a nullable milestone/package dictionary through a ternary without narrowing it, while the compiler forwarded string metadata through kwargs into a boolean parameter.
+**Fix:** Explicit narrowing and typed forwarding restored mypy compatibility.
+**Lesson:** New package adapters need explicit typed boundaries instead of nullable ternary targets or untyped forwarding.
+
+---
+
 ### 2026-07-30 — M2 task 7 selector compatibility verifier
 
 **Severity:** medium
