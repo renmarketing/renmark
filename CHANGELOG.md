@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - fix(recovery): persist executor lifecycle transitions
+
+**Request:** Debug stale lifecycle/delivery/pipeline recovery before M6.
+**Built:** Centralized runner start, wave, handoff, completion, and pause transitions so resume cannot retain a completed prior M2 run; added regression coverage for clean replacement, truthful delivery state, and resumable host-agent handoff.
+**Files changed:** `renmark/cli/_engine.py`, `tests/test_state_pipeline.py`, `CHANGELOG.md`.
+**Do not change:** A clean run clears only its runtime state and sets review pending; needs-agent/failure paths remain paused and resumable, never silently complete.
+
 ## [2026-07-30] - feat(contract): complete M5 project contract propagation
 
 **Request:** Execute the approved M5 delivery-contract milestone.

@@ -19,6 +19,7 @@ from ..providers.codex import codex_available as codex_available
 from ..state import (
     PauseState,
     clear_pause,
+    clear_pipeline_state,
     completed_task_indices,
     new_run_id,
     now_iso,
@@ -27,6 +28,7 @@ from ..state import (
     usage_this_month,
     usage_today,
     write_pause,
+    write_pipeline_state,
 )
 from ._codex_runner import (
     _classify_and_rollback as _classify_and_rollback,
@@ -402,6 +404,7 @@ def _handle_run_exit(
     run_id: str,
     plan_path: str,
     repo: Path,
+    tasks: list[Task],
 ) -> int:
     """Resolve the final exit code and write pause state if needed.
 
@@ -425,6 +428,7 @@ def _handle_run_exit(
                 ts=now_iso(),
             ),
         )
+        write_pipeline_state(repo, current_phase="paused")
         _print(
             f"PAUSED ({reason}): {budget_kind} gate tripped with "
             f"{len(skipped)} task(s) unrun {sorted(skipped)}.\n"
@@ -434,10 +438,27 @@ def _handle_run_exit(
 
     if failed_task is None and not needs_agent:
         _git_tag(repo, f"renmark-run-{run_id}-end")
+        _complete_clean_run(repo, run_id, plan_path, tasks)
+        clear_pipeline_state(repo)
         clear_pause(repo)
         _print("All tasks completed.")
         return 0
     if failed_task is None and needs_agent:
+        # A host-agent task has not run in this process, so this is a handoff
+        # rather than a clean completion.  Keep both durable resume pointers
+        # for the orchestrate skill that will dispatch it.
+        first_needed = min(needs_agent)
+        write_pause(
+            repo,
+            PauseState(
+                run_id=run_id,
+                plan_path=str(plan_path),
+                last_task_index=first_needed,
+                reason="needs_agent",
+                ts=now_iso(),
+            ),
+        )
+        write_pipeline_state(repo, current_phase="paused")
         _print(
             f"Note: tasks {sorted(needs_agent)} need Claude (opus/sonnet) dispatch "
             f"via the /renmark:orchestrate skill's Agent-tool path. "
@@ -460,12 +481,70 @@ def _handle_run_exit(
             ts=now_iso(),
         ),
     )
+    write_pipeline_state(repo, current_phase="paused", add_failed_task=failed_task.index)
     _print(
         f"PAUSED at task {failed_task.index} ({failure_kind}). "
         f"Artifacts: .renmark/state/escalations/task-{failed_task.index}/\n"
         f"Resume with: renmark-execute --resume {plan_path}"
     )
     return 10
+
+
+def _begin_run_state(
+    repo: Path,
+    plan_path: str,
+    waves: list[list[Task]],
+    run_id: str,
+) -> None:
+    """Persist a fresh, resumable runtime anchor before any task dispatch."""
+    from .. import delivery_state as _delivery
+
+    write_pipeline_state(
+        repo,
+        current_phase="orchestrate",
+        current_plan=str(plan_path),
+        wave_index=0,
+        wave_total=len(waves),
+        clear_tasks=True,
+    )
+    delivery = _delivery.read_delivery_state(repo)
+    delivery.run_id = run_id
+    delivery.loop_status = "in_progress"
+    # A new execution invalidates any independent review attached to an older
+    # run, even when that review had a clean/passed result.
+    delivery.review_status = "pending"
+    _delivery.write_delivery_state(repo, delivery)
+
+
+def _complete_clean_run(repo: Path, run_id: str, plan_path: str, tasks: list[Task]) -> None:
+    """Record the terminal workflow and delivery transitions for a clean run."""
+    from .. import delivery_state as _delivery
+    from .. import lifecycle as _lifecycle
+
+    delivery = _delivery.read_delivery_state(repo)
+    milestone_id = delivery.active_milestone_id or Path(plan_path).stem
+    delivery.run_id = run_id
+    # A clean executor run has completed its declared task verifiers, but has
+    # not performed an independent review of this run.
+    delivery.verification_status = "passed"
+    delivery.review_status = "pending"
+    delivery.loop_status = "passed"
+    for task in tasks:
+        delivery = _delivery.upsert_work_package(
+            delivery,
+            _delivery.WorkPackageSummary(
+                package_id=f"task-{task.index}",
+                milestone_id=milestone_id,
+                title=task.title,
+                status="passed",
+                summary="completed by renmark-execute",
+                owner="orchestrator",
+                updated_at=now_iso(),
+                artifact_ref=str(plan_path),
+            ),
+        )
+    _delivery.write_delivery_state(repo, delivery)
+    _lifecycle.write_lifecycle(repo, stage="created")
 
 
 def execute_plan(
@@ -512,10 +591,6 @@ def execute_plan(
     if dry_run:
         return _handle_dry_run(tasks, done, repo)
 
-    # Start anchor tag.
-    _git_tag(repo, f"renmark-run-{run_id}-start")
-    clear_pause(repo)
-
     deadline = time.monotonic() + (cfg.max_minutes_per_run * 60)
     tokens_used = 0
     passed: list[int] = []
@@ -534,6 +609,14 @@ def execute_plan(
     except ValueError as e:
         _print(f"ERROR: plan has invalid wave: {e}")
         return 2
+
+    # Persist the execution anchor only after the plan is fully validated, but
+    # before any tag, pause clearing, or task dispatch can make the run live.
+    _begin_run_state(repo, plan_path, waves, run_id)
+
+    # Start anchor tag.
+    _git_tag(repo, f"renmark-run-{run_id}-start")
+    clear_pause(repo)
 
     needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
 
@@ -648,12 +731,24 @@ def execute_plan(
             wave_result, runnable, tasks, repo, run_id, passed, needs_agent
         )
         tokens_used += tokens_delta
+        for task_index in passed:
+            write_pipeline_state(repo, add_completed_task=task_index)
+        if failed_task is not None:
+            write_pipeline_state(repo, add_failed_task=failed_task.index)
+        elif needs_agent:
+            # Do not advance past a host-agent handoff: pipeline_is_resumable
+            # requires this wave to remain pending, including when it is the
+            # final wave of the plan.
+            write_pipeline_state(repo, current_phase="paused", wave_index=wave_idx)
+            break
+        else:
+            write_pipeline_state(repo, wave_index=wave_idx + 1)
 
     # End-of-run summary.
     _print_run_summary(passed, failed_task, budget_kind, needs_agent, tasks, tokens_used, cfg, repo, skipped, waves)
 
     return _handle_run_exit(
-        failed_task, budget_kind, failure_kind, needs_agent, skipped, run_id, plan_path, repo
+        failed_task, budget_kind, failure_kind, needs_agent, skipped, run_id, plan_path, repo, tasks
     )
 
 

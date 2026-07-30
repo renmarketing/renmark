@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from renmark import state
+from renmark.cli import _engine
+from renmark.delivery_state import DeliveryState, read_delivery_state, write_delivery_state
+from renmark.parser import Task
 from renmark.state import pipeline as pipeline_state
+from renmark.state.pause import PauseState, read_pause, write_pause
 
 
 def test_pipeline_state_none_when_missing(tmp_path: Path) -> None:
@@ -275,3 +279,125 @@ def test_pipeline_delivery_runtime_task_lists_are_counted_and_bounded() -> None:
     assert runtime["runtime_last_updated"] == "2026-07-29T12:00:00Z"
     assert runtime["runtime_resumable"] is True
     assert runtime["runtime_summary"] == "orchestrate | wave 3/8 | done=7 | failed=6 | resumable=yes"
+
+
+def test_execute_plan_initializes_pipeline_and_records_wave_progress(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dispatch starts resumable state before work and advances it per wave."""
+    tasks = [
+        Task(1, "first", "edit", "one.py", executor="codex", parallel_group=1),
+        Task(2, "second", "edit", "two.py", executor="codex", parallel_group=2),
+    ]
+    plan = tmp_path / "m3.plan.md"
+    seen_before_dispatch: list[state.PipelineState] = []
+
+    monkeypatch.setattr(_engine, "parse_plan", lambda _path: tasks)
+
+    def succeed(**_kwargs: object) -> tuple[bool, str, int, str]:
+        current = state.read_pipeline_state(tmp_path)
+        assert current is not None
+        seen_before_dispatch.append(current)
+        return True, "PASS", 0, ""
+
+    monkeypatch.setattr(_engine, "_execute_task", succeed)
+
+    assert _engine.execute_plan(str(plan), repo=tmp_path, no_commit=True) == 0
+    assert seen_before_dispatch[0].current_phase == "orchestrate"
+    assert seen_before_dispatch[0].current_plan == str(plan)
+    assert seen_before_dispatch[0].wave_index == 0
+    assert seen_before_dispatch[0].wave_total == 2
+    assert seen_before_dispatch[1].completed_tasks == [1]
+    assert seen_before_dispatch[1].wave_index == 1
+    assert state.read_pipeline_state(tmp_path) is None
+
+
+def test_execute_plan_needs_agent_in_final_wave_keeps_pipeline_resumable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A final-wave host-agent handoff remains an outstanding resumable task."""
+    plan = tmp_path / "handoff.plan.md"
+    monkeypatch.setattr(
+        _engine,
+        "parse_plan",
+        lambda _path: [
+            Task(1, "local work", "edit", "local.py", executor="codex", parallel_group=1),
+            Task(2, "host work", "edit", "host.py", executor="sonnet", parallel_group=2),
+        ],
+    )
+    monkeypatch.setattr(
+        _engine,
+        "_execute_task",
+        lambda **_kwargs: (True, "PASS", 0, ""),
+    )
+
+    assert _engine.execute_plan(str(plan), repo=tmp_path, no_commit=True) == 0
+
+    pipeline = state.read_pipeline_state(tmp_path)
+    assert pipeline is not None
+    assert pipeline.current_phase == "paused"
+    assert pipeline.wave_index == 1
+    assert pipeline.wave_total == 2
+    assert pipeline.completed_tasks == [1]
+    assert pipeline.failed_tasks == []
+    assert 2 not in pipeline.completed_tasks
+    assert state.pipeline_is_resumable(tmp_path) is True
+    pause = read_pause(tmp_path)
+    assert pause is not None
+    assert pause.last_task_index == 2
+    assert pause.reason == "needs_agent"
+
+
+def test_execute_plan_success_clears_old_pause_and_pipeline_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clean new run must not leave an M2 pause or resume pointer behind."""
+    old_plan = ".renmark/plans/m2.plan.md"
+    state.write_pipeline_state(
+        tmp_path,
+        current_phase="paused",
+        current_plan=old_plan,
+        wave_index=1,
+        wave_total=2,
+        add_completed_task=1,
+    )
+    write_pause(
+        tmp_path,
+        PauseState(
+            run_id="m2-run",
+            plan_path=old_plan,
+            last_task_index=1,
+            reason="usage limit",
+            ts="2026-07-30T00:00:00Z",
+        ),
+    )
+    write_delivery_state(
+        tmp_path,
+        DeliveryState(
+            review_status="passed",
+            verification_status="passed",
+            loop_status="passed",
+        ),
+    )
+    plan = tmp_path / "m3.plan.md"
+    monkeypatch.setattr(
+        _engine,
+        "parse_plan",
+        lambda _path: [Task(1, "new work", "edit", "new.py", executor="codex")],
+    )
+    monkeypatch.setattr(
+        _engine,
+        "_execute_task",
+        lambda **_kwargs: (True, "PASS", 0, ""),
+    )
+
+    assert _engine.execute_plan(str(plan), repo=tmp_path, no_commit=True) == 0
+    assert state.read_pipeline_state(tmp_path) is None
+    assert read_pause(tmp_path) is None
+    delivery = read_delivery_state(tmp_path)
+    assert delivery.verification_status == "passed"
+    assert delivery.review_status == "pending"
+
+    from renmark.lifecycle import read_lifecycle
+
+    assert read_lifecycle(tmp_path).stage == "created"
