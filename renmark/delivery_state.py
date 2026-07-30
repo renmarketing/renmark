@@ -32,6 +32,7 @@ from typing import Any, Literal
 SCHEMA_VERSION = 1
 CONTRACT_VERSION = "delivery-state/v1"
 DELIVERY_JSON_REL = ".renmark/state/delivery.json"
+DELIVERY_ARCHIVE_REL = ".renmark/state/delivery-archive.json"
 DELIVERY_JSON_BYTE_BUDGET = 4096
 PROVENANCE_EVENT_CAP = 24
 WORK_PACKAGE_CAP = 32
@@ -164,6 +165,11 @@ def delivery_state_path(repo: str | Path) -> Path:
     return Path(repo) / DELIVERY_JSON_REL
 
 
+def delivery_archive_path(repo: str | Path) -> Path:
+    """Return the project-local immutable work-package archive location."""
+    return Path(repo) / DELIVERY_ARCHIVE_REL
+
+
 def default_delivery_state() -> DeliveryState:
     return DeliveryState()
 
@@ -254,12 +260,117 @@ def read_delivery_state_with_report(repo: str | Path) -> tuple[DeliveryState, De
 def write_delivery_state(repo: str | Path, state: DeliveryState) -> Path:
     normalized = _normalized_state(state)
     payload = normalized.to_json()
+    _validate_delivery_payload_size(payload)
+    path = delivery_state_path(repo)
+    _atomic_write_text(path, payload)
+    return path
+
+
+def archive_completed_work_packages(repo: str | Path, state: DeliveryState) -> DeliveryState:
+    """Atomically compact passed package summaries into the local archive.
+
+    Only successfully completed packages are eligible.  Pending, active,
+    blocked, and failed evidence deliberately remains in ``delivery.json``.
+    The delivery-state size guard is checked before archive IO so an over-budget
+    compaction cannot leave a partial archive behind.
+    """
+    normalized = _normalized_state(state)
+    completed = [item for item in normalized.work_packages if item.status == "passed"]
+    if not completed:
+        return normalized
+
+    retained = [item for item in normalized.work_packages if item.status != "passed"]
+    archive = _read_delivery_archive(repo)
+    entries = archive["work_packages"]
+    known_ids = {entry["package_id"] for entry in entries}
+    additions = [item for item in completed if item.package_id not in known_ids]
+    archive_ref = DELIVERY_ARCHIVE_REL
+    has_archive_provenance = any(
+        event.kind == "work_packages_archived" and event.ref == archive_ref
+        for event in normalized.provenance_events
+    )
+    candidate = _build_state(
+        schema_version=normalized.schema_version,
+        run_id=normalized.run_id,
+        delivery_mode=normalized.delivery_mode,
+        execution_policy=normalized.execution_policy,
+        active_milestone_id=normalized.active_milestone_id,
+        milestone_execution=normalized.milestone_execution,
+        work_packages=retained,
+        approval_status=normalized.approval_status,
+        review_status=normalized.review_status,
+        verification_status=normalized.verification_status,
+        loop_status=normalized.loop_status,
+        contract_version=normalized.contract_version,
+        source_sha=normalized.source_sha,
+        provenance_events=normalized.provenance_events,
+        legacy_refs=normalized.legacy_refs,
+    )
+    if not has_archive_provenance:
+        candidate = append_provenance_event(
+            candidate,
+            ts=completed[-1].updated_at,
+            kind="work_packages_archived",
+            detail=f"archived {len(completed)} passed work package summaries",
+            source="delivery_state",
+            ref=archive_ref,
+        )
+    candidate = _normalized_state(candidate)
+    _validate_delivery_payload_size(candidate.to_json())
+
+    if additions:
+        entries.extend(_archive_entry(normalized.run_id, item) for item in additions)
+        _write_delivery_archive(repo, archive)
+    write_delivery_state(repo, candidate)
+    return candidate
+
+
+def _validate_delivery_payload_size(payload: str) -> None:
     size = len(payload.encode("utf-8"))
     if size > DELIVERY_JSON_BYTE_BUDGET:
         raise DeliveryStateBloatError(
             f"delivery.json would be {size} bytes; budget {DELIVERY_JSON_BYTE_BUDGET}"
         )
-    path = delivery_state_path(repo)
+
+
+def _read_delivery_archive(repo: str | Path) -> dict[str, list[dict[str, object]]]:
+    path = delivery_archive_path(repo)
+    if not path.exists():
+        return {"work_packages": []}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(f"delivery archive is unreadable: {exc}") from exc
+    if not isinstance(payload, dict) or not isinstance(payload.get("work_packages"), list):
+        raise ValueError("delivery archive must be an object with a work_packages list")
+    entries: list[dict[str, object]] = []
+    for entry in payload["work_packages"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("package_id"), str):
+            raise ValueError("delivery archive entries must include a package_id")
+        entries.append(entry)
+    return {"work_packages": entries}
+
+
+def _archive_entry(run_id: str, package: WorkPackageSummary) -> dict[str, object]:
+    """Create the immutable archive representation for one passed package."""
+    return {
+        "package_id": package.package_id,
+        "milestone_id": package.milestone_id,
+        "run_id": run_id,
+        "artifact_ref": package.artifact_ref,
+        "updated_at": package.updated_at,
+        "summary": asdict(package),
+    }
+
+
+def _write_delivery_archive(repo: str | Path, archive: dict[str, list[dict[str, object]]]) -> Path:
+    path = delivery_archive_path(repo)
+    payload = json.dumps(archive, indent=2, sort_keys=True) + "\n"
+    _atomic_write_text(path, payload)
+    return path
+
+
+def _atomic_write_text(path: Path, payload: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".tmp.")
     os.close(fd)
@@ -271,7 +382,6 @@ def write_delivery_state(repo: str | Path, state: DeliveryState) -> Path:
         with contextlib.suppress(OSError):
             tmp.unlink()
         raise
-    return path
 
 
 def bounded_work_package_summaries(

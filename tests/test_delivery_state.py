@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -15,8 +16,10 @@ from renmark.delivery_state import (
     DeliveryStateBloatError,
     WorkPackageSummary,
     append_provenance_event,
+    archive_completed_work_packages,
     bounded_provenance_lines,
     bounded_work_package_summaries,
+    delivery_archive_path,
     read_delivery_state,
     read_delivery_state_with_report,
     stable_milestone_id,
@@ -243,3 +246,110 @@ def test_bounded_summary_helpers_return_capped_clean_output() -> None:
         "2026-07-29T10:00:00Z | created | Started cleanly",
         "2026-07-29T10:05:00Z | updated | Added work package",
     ]
+
+
+def test_archive_completed_packages_preserves_active_evidence_and_provenance(
+    tmp_path: Path,
+) -> None:
+    state = DeliveryState(
+        run_id="delivery-abc123def456",
+        work_packages=[
+            WorkPackageSummary(
+                milestone_id="M2",
+                title="Completed boundary",
+                status="passed",
+                summary="Immutable completion evidence",
+                artifact_ref=".renmark/reviews/m2.json",
+                updated_at="2026-07-30T12:00:00Z",
+            ),
+            *[
+                WorkPackageSummary(milestone_id="M3", title=status, status=status)
+                for status in ("pending", "in_progress", "failed", "blocked")
+            ],
+        ],
+    )
+
+    archived = archive_completed_work_packages(tmp_path, state)
+    archive_payload = json.loads(delivery_archive_path(tmp_path).read_text(encoding="utf-8"))
+
+    assert [package.status for package in archived.work_packages] == [
+        "pending",
+        "in_progress",
+        "failed",
+        "blocked",
+    ]
+    assert archive_payload["work_packages"] == [
+        {
+            "package_id": "m2--completed-boundary",
+            "milestone_id": "m2",
+            "run_id": "delivery-abc123def456",
+            "artifact_ref": ".renmark/reviews/m2.json",
+            "updated_at": "2026-07-30T12:00:00Z",
+            "summary": {
+                "package_id": "m2--completed-boundary",
+                "milestone_id": "m2",
+                "title": "Completed boundary",
+                "status": "passed",
+                "summary": "Immutable completion evidence",
+                "owner": "",
+                "updated_at": "2026-07-30T12:00:00Z",
+                "artifact_ref": ".renmark/reviews/m2.json",
+            },
+        }
+    ]
+    assert archived.provenance_events[-1].kind == "work_packages_archived"
+    assert archived.provenance_events[-1].ref == ".renmark/state/delivery-archive.json"
+
+
+def test_archive_is_idempotent_and_restores_capacity_for_fresh_m3_package(tmp_path: Path) -> None:
+    archived = archive_completed_work_packages(
+        tmp_path,
+        DeliveryState(
+            work_packages=[
+                WorkPackageSummary(milestone_id="M2", title="Passed", status="passed"),
+                WorkPackageSummary(milestone_id="M3", title="Active", status="in_progress"),
+            ]
+        ),
+    )
+    archive_path = delivery_archive_path(tmp_path)
+    first_archive = archive_path.read_text(encoding="utf-8")
+
+    repeated = archive_completed_work_packages(tmp_path, archived)
+    repeated_archive = archive_path.read_text(encoding="utf-8")
+    repeated.work_packages.append(
+        WorkPackageSummary(milestone_id="M3", title="Fresh pending package", status="pending")
+    )
+    state_path = write_delivery_state(tmp_path, repeated)
+
+    assert repeated_archive == first_archive
+    assert len(repeated.provenance_events) == 1
+    assert state_path.stat().st_size <= delivery_state.DELIVERY_JSON_BYTE_BUDGET
+    assert [item.status for item in read_delivery_state(tmp_path).work_packages] == [
+        "in_progress",
+        "pending",
+    ]
+
+
+def test_archive_rejects_oversize_without_partial_state_or_archive_write(tmp_path: Path) -> None:
+    baseline = DeliveryState(work_packages=[WorkPackageSummary(milestone_id="M3", title="Pending")])
+    state_path = write_delivery_state(tmp_path, baseline)
+    original_state = state_path.read_text(encoding="utf-8")
+    oversized = DeliveryState(
+        work_packages=[WorkPackageSummary(milestone_id="M2", title="Passed", status="passed")],
+        provenance_events=[
+            DeliveryProvenanceEvent(
+                ts=f"2026-07-30T12:{index:02d}:00Z",
+                kind="event" * 8,
+                detail="x" * 120,
+                source="source" * 8,
+                ref="ref" * 24,
+            )
+            for index in range(PROVENANCE_EVENT_CAP)
+        ],
+    )
+
+    with pytest.raises(DeliveryStateBloatError):
+        archive_completed_work_packages(tmp_path, oversized)
+
+    assert state_path.read_text(encoding="utf-8") == original_state
+    assert not delivery_archive_path(tmp_path).exists()

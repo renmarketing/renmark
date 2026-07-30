@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(delivery): complete M3-0 archival prerequisite
+
+**Request:** Dispatch M3 under milestone-sized package loops after approving the capacity amendment.
+**Built:** Added bounded project-local archival for completed package summaries, preserving live non-passing package evidence and provenance while protecting the 4 KB delivery-state contract.
+**Files changed:** `renmark/delivery_state.py`, `tests/test_delivery_state.py`, `.renmark/reviews/2026-07-30-m3-0-delivery-state-archival-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Never discard non-passed work-package evidence; archive only under `.renmark/`, guard state size before archive mutation, and preserve idempotent recovery.
+
 ## [2026-07-30] - plan: define M3 milestone planner work packages
 
 **Request:** Continue after M2 with M3 planning only.
