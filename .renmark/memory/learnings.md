@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-30, bug) **Nested Codex workspace-write sandbox unavailable in WSL** — Executable presence is not executor readiness: prove the actual sandbox before model spend, and never launch a runtime controlled by the target workspace.
+
 - (2026-07-30, run) **task 2 failed on codex** — repeated_issue_guard
 
 - (2026-07-30, review) model `codex-reviewer`: **Codex retry target rollback** — Every rejected executor attempt must restore its own target before retry; otherwise path-set deltas can hide a legitimate edit on the next attempt and produce a false unchanged-target failure.

@@ -16,7 +16,6 @@ from ..parser import Task
 from ..providers.codex import (
     CodexError,
     check_only_target_modified,
-    codex_available,
     run_codex_task,
 )
 from ..recurrence import IssueObservation, RecurrenceDecision, observe_issue, pre_attempt
@@ -484,19 +483,6 @@ def _execute_task_codex(
     the task ran without polluting NIM token totals.
     """
     start = time.monotonic()
-    if not codex_available():
-        _print(_format_status_line(task.index, total, task.title, "FAIL", 0.0, 0, "codex CLI not on PATH"))
-        _record_escalation(
-            repo, task, run_id, "codex",
-            base_prompt="(codex not available)",
-            response="",
-            verifier_log="codex CLI is not installed (npm i -g @openai/codex)",
-            retry_count=0,
-            prompt_tokens=0,
-            completion_tokens=0,
-        )
-        return False, "codex_unavailable", 0, ""
-
     retries_left = cfg.max_task_retries
     last_output_tail = ""
 

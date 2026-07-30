@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — Nested Codex workspace-write sandbox unavailable in WSL
+
+**Severity:** major
+**Symptom:** Codex implementation tasks exited zero without changing their targets, so completion and recurrence guards stopped M2.
+**Root cause:** Renmark invoked bare `codex`, WSL selected the WindowsApps executable, and that executable had no usable Bubblewrap helper for workspace-write.
+**Fix:** Installed system Bubblewrap and made the provider probe PATH candidates without a model call, launch the first passing absolute executable, reject workspace-owned runtimes, and fail safely without sandbox bypass.
+**Lesson:** Executable presence is not executor readiness: prove the actual sandbox before model spend, and never launch a runtime controlled by the target workspace.
+
+---
+
 ### 2026-07-30 — Codex executor accepted unchanged targets as PASS
 
 **Severity:** high

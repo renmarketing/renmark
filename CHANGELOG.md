@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - fix(codex): prove sandbox readiness before dispatch
+
+**Request:** Investigate and repair the M2 blocker where nested Codex subprocesses exited without writing their target files.
+**Built:** Confirmed WSL selected the WindowsApps Codex executable without a usable Bubblewrap helper; installed trusted system Bubblewrap; added a model-free workspace-sandbox probe that checks every PATH candidate and launches the first passing absolute executable; rejected workspace-owned runtimes; removed the duplicate runner availability check; fixed tests that could accidentally launch a real model; and resolved all four recurrence entries created by the blocker.
+**Files changed:** `renmark/providers/codex.py`, `renmark/cli/_codex_runner.py`, `tests/test_engine_budget_and_rollback.py`, `tests/test_engine_resume_crosscheck.py`, `tests/test_recurrence.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug and recurrence evidence under `.renmark/debug/20260730-130449-c190/` and `.renmark/state/`.
+**Do not change:** Keep implementation tasks on `workspace-write`; never execute a Codex runtime supplied by the target workspace; readiness must be proven before model spend; M2 stays paused until its already-approved staged run is explicitly resumed.
+
 ## [2026-07-30] — orchestrate: stop M2 on repeated Codex no-write
 
 **Request:** Continue the approved staged M2 Part 1 → Part 2 run under the existing combined cap and stop on any failed gate.

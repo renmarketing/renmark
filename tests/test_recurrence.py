@@ -222,7 +222,6 @@ def test_codex_runner_stops_before_a_third_equivalent_attempt(
             pre_changed_files=[],
         )
 
-    monkeypatch.setattr(codex_runner, "codex_available", lambda: True)
     monkeypatch.setattr(codex_runner, "run_codex_task", run_codex)
     monkeypatch.setattr(codex_runner, "append_usage", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(codex_runner, "_print", lambda *_args, **_kwargs: None)
