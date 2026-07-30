@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - fix(quality): restore Ruff baseline
+
+**Request:** Fix the six Ruff baseline violations across four files so the approved staged M2 run can resume.
+**Built:** Reproduced and traced the blocker to M1 additions that missed the repository-wide Ruff pass; applied only Ruff-canonical import/export ordering, line wrapping, and an equivalent conditional flattening; verified Ruff, strict typing, the affected test slice (`105 passed`), and the full regression suite (`1540 passed, 31 skipped`).
+**Files changed:** `renmark/program.py`, `renmark/schemas.py`, `tests/test_agency.py`, `tests/test_program.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug evidence under `.renmark/debug/20260730-043146-6c0d/`.
+**Do not change:** Keep this repair behavior-neutral; retain the validated M2 plans, recorded combined budget approval, staged Part 1 → Part 2 order, and stop-on-failed-gate policy.
+
 ## [2026-07-29] - preflight: stop M2 on red Ruff baseline
 
 **Request:** Execute validated M2 Part 1 then Part 2 within the approved combined cap, stopping at any failed gate.

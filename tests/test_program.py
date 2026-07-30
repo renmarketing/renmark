@@ -7,8 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from renmark import delivery_state
-from renmark import program
+from renmark import delivery_state, program
 
 
 @pytest.fixture

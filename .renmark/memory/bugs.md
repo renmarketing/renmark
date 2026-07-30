@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — Ruff baseline regressed after M1 delivery-state additions
+
+**Severity:** medium
+**Symptom:** Six Ruff findings across four files blocked the approved M2 preflight.
+**Root cause:** Recent M1 canonical-delivery-state additions inserted imports, exports, and validator branches without a final repository-wide Ruff normalization pass, leaving six mechanical style violations across four files while behavior remained green.
+**Fix:** Applied the exact Ruff-canonical mechanical normalization and re-ran focused plus repository-wide gates.
+**Lesson:** Run the repository-wide Ruff gate after milestone task commits and before the next milestone preflight; passing task-local verifiers alone does not prove cross-file style convergence.
+
+---
+
 ### 2026-07-29 — M1 canonical state had unstable identity and validator drift
 
 **Severity:** high

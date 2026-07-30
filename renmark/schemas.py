@@ -35,21 +35,25 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from renmark.delivery_state import (
+    CONTRACT_VERSION as DELIVERY_CONTRACT_VERSION,
+)
+from renmark.delivery_state import (
+    LEGACY_REF_CAP,
+    PROVENANCE_EVENT_CAP,
+    SUMMARY_TEXT_LIMIT,
+    WORK_PACKAGE_CAP,
+    stable_milestone_id,
+    stable_work_package_id,
+)
+from renmark.delivery_state import (
+    SCHEMA_VERSION as DELIVERY_SCHEMA_VERSION,
+)
 from renmark.dispatch import (
     SUBAGENT_OUTPUT_COMPLETION_STATES,
     SUBAGENT_OUTPUT_CONFIDENCE_VALUES,
     SUBAGENT_OUTPUT_FIELDS,
     SUBAGENT_OUTPUT_STATUS_VALUES,
-)
-from renmark.delivery_state import (
-    CONTRACT_VERSION as DELIVERY_CONTRACT_VERSION,
-    LEGACY_REF_CAP,
-    PROVENANCE_EVENT_CAP,
-    SCHEMA_VERSION as DELIVERY_SCHEMA_VERSION,
-    SUMMARY_TEXT_LIMIT,
-    WORK_PACKAGE_CAP,
-    stable_milestone_id,
-    stable_work_package_id,
 )
 from renmark.lifecycle import STAGES
 
@@ -180,7 +184,8 @@ def validate_delivery_state(data: Any) -> list[str]:
     schema_version = data.get("schema_version")
     if isinstance(schema_version, int) and schema_version != DELIVERY_SCHEMA_VERSION:
         issues.append(
-            f"delivery.schema_version={schema_version!r} does not match canonical schema_version {DELIVERY_SCHEMA_VERSION}"
+            f"delivery.schema_version={schema_version!r} does not match canonical schema_version "
+            f"{DELIVERY_SCHEMA_VERSION}"
         )
 
     contract_version = data.get("contract_version")
@@ -215,9 +220,12 @@ def validate_delivery_state(data: Any) -> list[str]:
     )
 
     active_milestone_id = data.get("active_milestone_id")
-    if isinstance(active_milestone_id, str):
-        if active_milestone_id and active_milestone_id != stable_milestone_id(active_milestone_id):
-            issues.append("delivery.active_milestone_id must already be in stable_milestone_id form")
+    if (
+        isinstance(active_milestone_id, str)
+        and active_milestone_id
+        and active_milestone_id != stable_milestone_id(active_milestone_id)
+    ):
+        issues.append("delivery.active_milestone_id must already be in stable_milestone_id form")
 
     for field in ("approval_status", "review_status", "verification_status", "loop_status"):
         _check_vocab(issues, f"delivery.{field}", data.get(field), DELIVERY_STATUS_VALUES)

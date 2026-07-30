@@ -840,7 +840,7 @@ __all__ = [
     "snapshot_stage_sha",
     "stable_milestone_id_for_stage",
     "stable_work_package_id_for_task",
-    "stage_work_package_summaries",
     "stage_digest",
+    "stage_work_package_summaries",
     "write_program",
 ]
