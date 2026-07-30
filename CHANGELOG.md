@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Implement semantic choices and bounded continuation
+
+**Request:** Make one host-neutral semantic decision render safely across Claude and Codex without truncating choices or persisting presentation state.
+**Built:** Added semantic decision/choice-set and continuation results for select, More, Back, Cancel/Reject, exact label/number/code, free text, invalid input, capability-aware native pages, and complete numbered fallback.
+**Files changed:** `renmark/interaction.py`, `CHANGELOG.md`.
+**Do not change:** The recommendation remains reachable first, every overflow path retains safe refusal and complete navigation, one-choice decisions use fallback, and pagination state is never persisted.
+
 ## [2026-07-30] - Prove surface-aware selector capabilities
 
 **Request:** Verify the selector-capability contract across Claude, Codex Plan, Codex Default, runtime overrides, and unknown hosts.
