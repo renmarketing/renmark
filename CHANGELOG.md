@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(delivery): complete WP-M4-3 review-to-fix safety
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added metadata-only capped review findings, semantic review/fix/re-review choices, and pointer-only scoped-fix artifacts. Two independent-review repair cycles closed forged Critical-severity bypasses in both writer and selector paths.
+**Files changed:** `renmark/cli/commands.py`, `tests/test_handoff_helpers.py`, `CHANGELOG.md`.
+**Do not change:** Critical/dangerous severity is derived at every safety boundary, never trusted from caller flags; fixes stay pointer-only with `auto_fix: false`, and dangerous flows retain cancel/refusal.
+
 ## [2026-07-30] - feat(delivery): complete WP-M4-2 repair decisions
 
 **Request:** Execute M4 under the approved bounded milestone policy.
