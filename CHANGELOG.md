@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - preflight: stop M2 on red Ruff baseline
+
+**Request:** Execute validated M2 Part 1 then Part 2 within the approved combined cap, stopping at any failed gate.
+**Built:** Recorded the explicit budget approval, created a clean pre-refactor checkpoint, proved plan lint/subagent/cost gates, ran a full baseline (`1540 passed, 31 skipped`; mypy clean), and stopped before all M2 executor calls because Ruff exposed six pre-existing violations outside the M2 target surface; preserved bounded recovery evidence and restored the user’s unrelated roadmap/audit work byte-for-byte.
+**Files changed:** `.renmark/reviews/2026-07-29-62e8fb4.m2-preflight.md`, `CHANGELOG.md`; approval state remains durable in `.renmark/state/lifecycle.json`.
+**Do not change:** Do not dispatch M2 until the repository Ruff baseline is green; repair this separately through `/renmark:debug`; retain the recorded M2 approval and do not make the user re-approve unless scope or budget changes.
+
 ## [2026-07-29] - plan: compile M2 two-mode routing and interaction
 
 **Request:** After accepting M1, plan M2 only: the Agency/Orchestrator public contract, canonical entry routing, host-adaptive decisions, and cross-host behavior proof.
