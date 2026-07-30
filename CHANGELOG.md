@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - fix(selector): close M2 task 7 verifier
+
+**Request:** Debug task 7’s `tests/test_interaction.py` verifier before resuming M2 orchestration.
+**Built:** Reproduced the two committed legacy-test failures and the rolled-back candidate’s incorrect `host=None` expectation; aligned the tests with bounded More/Back/fallback metadata and runtime host resolution; fixed hidden exact refusal codes/labels so they cancel from every page; resolved both recurrence entries.
+**Files changed:** `renmark/interaction.py`, `tests/test_interaction.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug evidence under `.renmark/debug/20260730-144120-0b43/`.
+**Do not change:** Preserve complete fallback and ephemeral pagination; `host=None` must use runtime resolution, and any refusal advertised in picker instructions must remain executable from every page.
+
 ## [2026-07-30] - orchestrate: pause M2 at selector compatibility verifier
 
 **Request:** Resume the approved staged M2 Part 1 then Part 2 run under the existing combined cap and stop on any failed gate.

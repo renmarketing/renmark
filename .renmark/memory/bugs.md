@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — M2 task 7 selector compatibility verifier
+
+**Severity:** medium
+**Symptom:** Task 7 verifier failed and its generated test changes were rolled back.
+**Root cause:** Task 7 mixed stale host-presentation expectations with an incorrect host=None assumption, while continue_selector also searched only current-page bindings despite advertising the hidden semantic refusal code/label on every page; the resulting contract mismatch made the generated focused verifier fail and roll back.
+**Fix:** Aligned interaction tests with bounded More/Back/fallback metadata and runtime host resolution, and made exact hidden refusal codes/labels resolve as cancel from every page.
+**Lesson:** Selector tests must assert semantic parity and runtime-resolved host identity, not freeze one host presentation or assume host=None means Codex.
+
+---
+
 ### 2026-07-30 — Nested Codex workspace-write sandbox unavailable in WSL
 
 **Severity:** major

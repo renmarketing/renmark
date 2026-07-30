@@ -268,6 +268,16 @@ def continue_selector(rendered: dict[str, Any], answer: str) -> ContinuationResu
             return ContinuationResult(kind="cancel", choice=semantic_refusal)
         return ContinuationResult(kind="cancel")
 
+    semantic_refusal = _refusal_choice(choices)
+    if semantic_refusal is not None:
+        refusal_value = value.removeprefix("[").removesuffix("]")
+        if refusal_value in {
+            semantic_refusal.code.casefold(),
+            semantic_refusal.label.casefold(),
+            semantic_refusal.display_label.casefold(),
+        }:
+            return ContinuationResult(kind="cancel", choice=semantic_refusal)
+
     if bindings:
         resolved = _resolve_binding(bindings, raw)
         if resolved is not None:

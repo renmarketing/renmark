@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from renmark.hosts import HostKind
+from renmark.hosts import HostKind, resolve_host
 from renmark.interaction import (
     Choice,
     ChoiceError,
     build_selector,
+    continue_selector,
     normalize_choices,
     render_numbered,
     resolve_selection,
@@ -62,23 +63,56 @@ def test_codex_selector_uses_three_options_and_keeps_full_fallback() -> None:
     options = result["arguments"]["questions"][0]["options"]
     assert len(options) == 3
     assert options[0]["label"] == "Dispatch (Recommended)"
-    assert options[-1]["label"] == "No"
+    assert options[-1]["label"] == "More"
     assert len(result["fallback"]) == 4
     assert result["overflow"] is True
+    assert continue_selector(result, "More").kind == "more"
+    refusal = continue_selector(result, "No")
+    assert refusal.kind == "cancel"
+    assert refusal.choice is not None
+    assert refusal.choice.code == "n"
+
+    second_page = build_selector(
+        "What next?", _choices(), host=HostKind.CODEX, page=1
+    )
+    assert tuple(
+        entry["label"] for entry in second_page["page"]["bindings"]
+    ) == ("Edit", "No", "Back")
+    assert continue_selector(second_page, "1").choice.code == "e"  # type: ignore[union-attr]
+    assert continue_selector(second_page, "2").kind == "cancel"
+    assert continue_selector(second_page, "Back").kind == "back"
 
 
 def test_missing_codex_selector_is_fallback_not_headless() -> None:
     result = build_selector(
         "What next?", _choices(), host=HostKind.CODEX, tool_available=False
     )
-    assert result == {
-        "mode": "fallback",
-        "host": "codex",
-        "question": "What next?",
-        "options": render_numbered(_choices()),
-        "reason": "selector_unavailable",
-    }
+    assert result["mode"] == "fallback"
+    assert result["host"] == "codex"
+    assert result["question"] == "What next?"
+    assert result["options"] == render_numbered(_choices())
+    assert result["reason"] == "selector_unavailable"
+    assert result["page"]["count"] == 1
+    assert result["semantic"]["decision_id"] == "renmark_choice"
+    assert "Reply with the exact number, code, or label." in result["instructions"]
     assert "headless" not in result
+
+
+@pytest.mark.parametrize("host", [None, HostKind.CLAUDE_CODE, HostKind.CODEX])
+def test_unavailable_selector_uses_runtime_resolved_host(
+    host: HostKind | None,
+) -> None:
+    result = build_selector(
+        "What next?",
+        _choices(),
+        host=host,
+        tool_available=False,
+        page=1,
+    )
+    assert result["mode"] == "fallback"
+    assert result["host"] == resolve_host(host).value
+    assert result["page"]["index"] == 0
+    assert result["options"] == render_numbered(_choices())
 
 
 def test_selection_accepts_reordered_number_and_code() -> None:
