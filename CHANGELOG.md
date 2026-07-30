@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(contract): complete WP-M5-2 safe refresh primitive
+
+**Request:** Execute M5 project contract propagation under the approved cap.
+**Built:** Made init the sole canonical contract writer with SHA freshness, semantic parity, byte-preserving CRLF handling, idempotent refresh, and CRLF-safe malformed-marker no-write protection.
+**Files changed:** `renmark/init.py`, `tests/test_init_pipeline.py`, `CHANGELOG.md`.
+**Do not change:** Never normalize or overwrite unmarked project prose; normalize line endings only for marker/freshness reads, and validate every managed target before writing either.
+
 ## [2026-07-30] - feat(contract): complete WP-M5-1 canonical delivery contract
 
 **Request:** Execute M5 project contract propagation under the approved cap.

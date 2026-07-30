@@ -87,6 +87,9 @@ LANG_BY_EXT = {
 
 STUB_BEGIN = "<!-- BEGIN:project-stub -->"
 STUB_END = "<!-- END:project-stub -->"
+PROJECT_DELIVERY_MARKER = "project-delivery-contract"
+PROJECT_DELIVERY_BEGIN = f"<!-- BEGIN:{PROJECT_DELIVERY_MARKER} -->"
+PROJECT_DELIVERY_END = f"<!-- END:{PROJECT_DELIVERY_MARKER} -->"
 
 # Cap how many symbols to list per file (most-significant first)
 SYMBOLS_PER_FILE_CAP = 6
@@ -688,6 +691,16 @@ def count_begin_markers(text: str, marker_name: str | None = None) -> int:
     return sum(1 for m in _BEGIN_RE.finditer(text) if m.group(1) == marker_name)
 
 
+def _marker_validation_text(text: str) -> str:
+    """Return the LF view used solely for managed-marker validation/detection.
+
+    The marker regexes are intentionally LF-anchored.  Keep writes and all
+    non-marker content on the original text, but make CRLF guidance files obey
+    the same corruption contract before any merge decides a block is absent.
+    """
+    return text.replace("\r\n", "\n")
+
+
 def _count_begin_markers(text: str) -> int:
     """Stub-specific corruption counter — substring count of ``STUB_BEGIN``.
 
@@ -700,7 +713,7 @@ def _count_begin_markers(text: str) -> int:
     return text.count(STUB_BEGIN)
 
 
-def merge_marked_block(text: str, marker_name: str, new_body: str) -> str:
+def merge_marked_block(text: str, marker_name: str, new_body: str, *, newline: str = "\n") -> str:
     """Replace the content between ``BEGIN:<marker_name>`` and ``END:<marker_name>``.
 
     General, reusable marker-merge primitive: returns a copy of ``text`` in
@@ -724,14 +737,19 @@ def merge_marked_block(text: str, marker_name: str, new_body: str) -> str:
     Byte-equality / idempotence is the caller's concern; this just returns the
     merged text.
     """
-    from .lint import _BEGIN_RE, _END_RE, validate_rule_markers
+    from .lint import validate_rule_markers
 
-    issues = validate_rule_markers(text)
+    # The lint regexes intentionally match LF-terminated Markdown. Normalize
+    # only for validation; all subsequent slicing uses the original text so
+    # bytes outside the managed block remain untouched.
+    issues = validate_rule_markers(_marker_validation_text(text))
     if issues:
         raise MarkerCorruptionError({"<text>": issues})
 
-    begin = next((m for m in _BEGIN_RE.finditer(text) if m.group(1) == marker_name), None)
-    end = next((m for m in _END_RE.finditer(text) if m.group(1) == marker_name), None)
+    begin_re = re.compile(rf"^<!-- BEGIN:{re.escape(marker_name)} -->\r?$", re.MULTILINE)
+    end_re = re.compile(rf"^<!-- END:{re.escape(marker_name)} -->\r?$", re.MULTILINE)
+    begin = begin_re.search(text)
+    end = end_re.search(text)
     if begin is None or end is None:
         raise MarkerNotFoundError(
             f"no `BEGIN:{marker_name}`…`END:{marker_name}` block found in text"
@@ -742,7 +760,7 @@ def merge_marked_block(text: str, marker_name: str, new_body: str) -> str:
     line_start = text.rfind("\n", 0, begin.start()) + 1
     nl = text.find("\n", end.end())
     line_end = len(text) if nl < 0 else nl + 1
-    trailing = "" if nl < 0 else "\n"
+    trailing = "" if nl < 0 else newline
 
     rebuilt = f"<!-- BEGIN:{marker_name} -->{new_body}<!-- END:{marker_name} -->{trailing}"
     return text[:line_start] + rebuilt + text[line_end:]
@@ -844,6 +862,126 @@ class MarkerCorruptionError(RuntimeError):
         )
 
 
+def project_delivery_contract_path() -> Path:
+    """Return the shipped canonical managed project-delivery contract."""
+    return Path(__file__).resolve().parents[1] / "plugin" / "skills" / ".shared" / "project-delivery-contract.md"
+
+
+def project_delivery_contract_freshness_marker(repo: Path | None = None) -> str:
+    """Return the deterministic source revision recorded in contract refreshes."""
+    sha = _git_short_sha(repo) if repo is not None else None
+    return sha or "no-git"
+
+
+def render_project_delivery_contract(repo: Path | None = None) -> str:
+    """Render the canonical contract body used by both root guidance files.
+
+    The source revision is a deterministic freshness marker. It changes after
+    a repository commit even when the contract prose itself is unchanged.
+    """
+    source = project_delivery_contract_path()
+    if not source.is_file():
+        raise RuntimeError(f"canonical project-delivery contract not found: {source}")
+    marker = project_delivery_contract_freshness_marker(repo)
+    return "\n" + f"<!-- Last refreshed: @ {marker} -->" + "\n" + source.read_text(encoding="utf-8").strip() + "\n"
+
+
+def _marked_block_body(text: str, marker_name: str) -> str | None:
+    """Return a well-formed managed block's body, or ``None`` if it is absent."""
+    begin_re = re.compile(rf"^<!-- BEGIN:{re.escape(marker_name)} -->\r?$", re.MULTILINE)
+    end_re = re.compile(rf"^<!-- END:{re.escape(marker_name)} -->\r?$", re.MULTILINE)
+    begin = begin_re.search(text)
+    end = end_re.search(text)
+    if begin is None or end is None:
+        return None
+    return text[begin.end() : end.start()]
+
+
+def _semantic_markdown(text: str) -> str:
+    """Stable, deliberately small semantic comparison for managed prose."""
+    return " ".join(text.casefold().split())
+
+
+def project_delivery_contract_is_fresh(text: str, repo: Path | None = None) -> bool:
+    """Whether ``text`` contains the current canonical contract body exactly."""
+    # Marker regexes use LF line anchors, so normalize solely for this
+    # read-only freshness comparison.  Writers retain original file bytes.
+    body = _marked_block_body(text.replace("\r\n", "\n"), PROJECT_DELIVERY_MARKER)
+    # The managed block may live in a CRLF guidance file even though the
+    # canonical renderer uses LF.  Freshness concerns the block's content, not
+    # its on-disk newline convention; writers still preserve that convention.
+    return body is not None and body == render_project_delivery_contract(repo)
+
+
+def project_delivery_contracts_are_semantically_equal(claude_text: str, agents_text: str) -> bool:
+    """Whether the two managed contract blocks express the same contract."""
+    claude_body = _marked_block_body(claude_text, PROJECT_DELIVERY_MARKER)
+    agents_body = _marked_block_body(agents_text, PROJECT_DELIVERY_MARKER)
+    return claude_body is not None and agents_body is not None and _semantic_markdown(claude_body) == _semantic_markdown(agents_body)
+
+
+# Short aliases keep deterministic callers from reimplementing freshness/parity.
+contract_is_fresh = project_delivery_contract_is_fresh
+contracts_are_semantically_equal = project_delivery_contracts_are_semantically_equal
+
+
+def merge_project_delivery_contract(repo: Path) -> dict[str, str]:
+    """Merge the canonical contract into root guidance via the one safe writer.
+
+    Only the named managed block is changed. Existing prose and unrelated
+    managed blocks remain byte-for-byte intact; malformed files are not written.
+    """
+    from .lint import validate_rule_markers
+
+    body = render_project_delivery_contract(repo)
+    originals: dict[str, str] = {}
+    corrupted: dict[str, list[str]] = {}
+    for fname in ("CLAUDE.md", "AGENTS.md"):
+        target = repo / fname
+        if not target.exists():
+            continue
+        original = target.read_bytes().decode("utf-8")
+        originals[fname] = original
+        issues = validate_rule_markers(_marker_validation_text(original))
+        if issues:
+            corrupted[fname] = issues
+    if corrupted:
+        raise MarkerCorruptionError(corrupted)
+
+    result: dict[str, str] = {}
+    for fname, original in originals.items():
+        target = repo / fname
+        if project_delivery_contract_is_fresh(original, repo):
+            result[fname] = "unchanged"
+            continue
+        try:
+            newline = "\r\n" if "\r\n" in original else "\n"
+            merged = merge_marked_block(
+                original,
+                PROJECT_DELIVERY_MARKER,
+                body.replace("\n", newline),
+                newline=newline,
+            )
+        except MarkerNotFoundError:
+            newline = "\r\n" if "\r\n" in original else "\n"
+            suffix = "" if original.endswith(("\n", "\r")) else newline
+            merged = (
+                original
+                + suffix
+                + newline
+                + PROJECT_DELIVERY_BEGIN
+                + body.replace("\n", newline)
+                + PROJECT_DELIVERY_END
+                + newline
+            )
+        if merged != original:
+            target.write_bytes(merged.encode("utf-8"))
+            result[fname] = "refreshed"
+        else:
+            result[fname] = "unchanged"
+    return result
+
+
 def _scaffold_missing(repo: Path) -> None:
     """Create CLAUDE.md/AGENTS.md/.gitignore/.renmark/ and CHANGELOG.md if absent.
 
@@ -933,17 +1071,18 @@ def merge_rule_blocks(repo: Path, *, template_dir: Path | None = None) -> dict[s
         # SAFETY GATE: never insert into a file whose markers are already
         # malformed/unbalanced — that risks turning a recoverable file into an
         # unrecoverable one. Skip it and signal corruption to run() (→ exit 2).
-        marker_issues = validate_rule_markers(original)
+        marker_view = _marker_validation_text(original)
+        marker_issues = validate_rule_markers(marker_view)
         if marker_issues:
             corrupted[fname] = marker_issues
             continue
 
         canonical = iter_rule_blocks(tmpl.read_text(encoding="utf-8"))
-        present = {name for name, _ in iter_rule_blocks(original)}
+        present = {name for name, _ in iter_rule_blocks(marker_view)}
         # Belt-and-suspenders: a name with any BEGIN marker is "present" so it
         # is never duplicated. (After the balance gate above, every BEGIN here
         # is part of a well-formed pair, but keep this for defensive clarity.)
-        present |= {m.group(1) for m in _BEGIN_RE.finditer(original)}
+        present |= {m.group(1) for m in _BEGIN_RE.finditer(marker_view)}
 
         missing = [(name, block) for name, block in canonical if name not in present]
         if not missing:
@@ -1039,6 +1178,16 @@ def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[
         return 1, f"FAIL  {exc}"
     n_blocks_added = sum(blocks_added.values())
 
+    # The delivery contract is deliberately merged only here, through the same
+    # guarded marker primitive used for all managed root guidance. Start and
+    # Feature may inspect freshness, but must never become competing writers.
+    try:
+        contract_status = merge_project_delivery_contract(repo)
+    except MarkerCorruptionError as exc:
+        return 2, f"FAIL  {exc}"
+    except RuntimeError as exc:
+        return 1, f"FAIL  {exc}"
+
     scan = scan_repo(repo, include_private=include_private)
     # Standards scan runs first so the stub can include the gates line
     scan.standards = scan_standards(repo, scan.files, deep=deep)
@@ -1058,9 +1207,14 @@ def run(repo: Path, include_private: bool = False, deep: bool = False) -> tuple[
     mod_gaps = scan.standards.modularity_gaps
     n_mod = len(mod_gaps)
     blocks_field = str(n_blocks_added) if n_blocks_added else "unchanged"
+    contract_field = (
+        "unchanged"
+        if contract_status and all(status == "unchanged" for status in contract_status.values())
+        else "refreshed"
+    )
     summary_lines = [
         f"OK  stub={stub_status} agents={agents_status} map={map_status} standards={standards_status} "
-        f"blocks={blocks_field} modules={len(scan.files)} commands={len(scan.commands)} "
+        f"blocks={blocks_field} contract={contract_field} modules={len(scan.files)} commands={len(scan.commands)} "
         f"langs={langs_summary} ref={scan.today}@{sha}"
     ]
     # Bounded HEALTH line: counts ONLY — never the per-gap detail. Modularity
