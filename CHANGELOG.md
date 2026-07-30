@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - plan: define M3 milestone planner work packages
+
+**Request:** Continue after M2 with M3 planning only.
+**Built:** Drafted a validated M3 execution plan for stable milestone/work-package schemas, a compatibility compiler, package-aware deterministic gates, and package cost previews; execution remains unapproved.
+**Files changed:** `.renmark/plans/2026-07-30-m3-milestone-planner-work-packages.plan.md`, `CHANGELOG.md`; the plan artifact is the current persisted planning boundary.
+**Do not change:** Keep the current Task parser as a backend, never resume by task index, preserve bounded artifact-only context, and require a fresh package-level cost approval before M3 dispatch. Do not overwrite an oversized delivery state; resolve its archival boundary explicitly.
+
 ## [2026-07-30] - test(delivery): complete WP-M2-C cross-host proof
 
 **Request:** Finish M2 through bounded milestone work packages with persisted verify/review boundaries.
