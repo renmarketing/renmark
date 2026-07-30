@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - approve: accept M1 and authorize M2 planning
+
+**Request:** Accept M1, acknowledge its recorded review-budget exception, and authorize M2 planning only.
+**Built:** Recorded durable owner signoff with the accepted 186,615-token review exception and an explicit boundary that permits M2 planning and deterministic validation but no M2 implementation dispatch or spend.
+**Files changed:** `.renmark/reviews/2026-07-29-d3269b6.milestone-signoff.md`, `CHANGELOG.md`; runtime approval state in `.renmark/state/lifecycle.json`.
+**Do not change:** M2 execution still requires a fresh explicit cost/dispatch approval; this signoff cannot be interpreted as authorization to run executors or implementation subagents.
+
 ## [2026-07-29] - demo: stage M1 owner checkpoint
 
 **Request:** Present M1’s owner-visible status and drift-repair behavior, then stop before M2 at the required signoff and budget-exception gate.
