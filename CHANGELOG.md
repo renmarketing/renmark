@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] — orchestrate: stop M2 on invalid Codex completions
+
+**Request:** Execute approved M2 Part 1 then Part 2 within the combined cap, stopping on any failed gate.
+**Built:** Committed Part 1 task 1, ran the Codex runtime lane, and rejected its eleven apparent PASS results because they produced no target changes, artifacts, or commits; halted before task 13 and all of Part 2, persisted the failure boundary, and removed inaccurate success telemetry.
+**Files changed:** `.renmark/reviews/2026-07-30-d81775a.m2-part1-runtime-blocker.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`; runtime pause evidence in `.renmark/state/`.
+**Do not change:** Preserve task 1’s accepted interaction contract; do not dispatch task 13 or M2 Part 2 until `/renmark:debug` makes implementation-task PASS contingent on valid target-change/artifact/commit evidence; never resume these plans through index-only CLI `--resume`.
+
 ## [2026-07-30] — Define the semantic decision interaction contract
 
 **Request:** Establish M2’s single host-neutral contract for decisions, approvals, selector capability, and bounded continuation.
