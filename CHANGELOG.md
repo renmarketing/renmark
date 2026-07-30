@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - review: close M1 canonical-state findings
+
+**Request:** Prove the full M1 review findings are resolved before moving to the milestone checkpoint.
+**Built:** Recorded high-confidence remediation evidence for stable legacy run identity and writer-validator convergence, with both original Major findings closed and all focused/static/full-suite gates green.
+**Files changed:** `.renmark/reviews/2026-07-29-402c3ed.review-remediation.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** Preserve the original review artifact as finding evidence; remediation does not erase review history; M1 cannot advance if either canonical identity or schema convergence regresses.
+
 ## [2026-07-29] - fix(delivery-state): resolve M1 review blockers
 
 **Request:** Fix every blocking finding from the full M1 code review before allowing milestone signoff or M2 planning.

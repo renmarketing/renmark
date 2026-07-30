@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-29, .renmark/reviews/2026-07-29-402c3ed.review-remediation.md) model `codereview-remediation`: **review-m1-canonical-delivery-state** — 2/2 blocking Major findings resolved; stable legacy identity and writer-validator convergence; full suite 1540 passed, 31 skipped
+
 - (2026-07-29, .renmark/debug/20260730-001342-658d/session.md) model `debug`: **debug-m1-canonical-identity-convergence** — Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
 
 - (2026-07-29, bug) **M1 canonical state had unstable identity and validator drift** — Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
