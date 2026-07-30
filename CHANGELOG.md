@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - plan(delivery): define M4 milestone execution and review loops
+
+**Request:** Plan the remaining delivery work, then dispatch when it is ready.
+**Built:** Reused the approved two-mode master program to define four bounded M4 work packages: stable loop identity, verifier/recurrence repair decisions, review-to-fix re-review, and signoff readiness. The validated execution plan retains direct implementation-plus-test pairing, a two-repair/three-review-cycle ceiling, and a `$0.87` cap.
+**Files changed:** `.renmark/plans/2026-07-30-m4-milestone-execution-review-loops.plan.md`, `CHANGELOG.md`.
+**Do not change:** M5 remains sequenced after M4 because project contracts must describe the final loop behavior; never resume by index, bypass independent review, expand scope from a repair loop, or overwrite user instructions.
+
 ## [2026-07-30] - feat(planning): complete WP-M3-4 cost previews
 
 **Request:** Continue M3 dispatch through bounded work packages.
