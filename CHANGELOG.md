@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] — orchestrate: stop M2 on repeated Codex no-write
+
+**Request:** Continue the approved staged M2 Part 1 → Part 2 run under the existing combined cap and stop on any failed gate.
+**Built:** Reconciled the repaired Part 1 recovery state, revalidated both plans and the unchanged approved budget, preserved completed task 1, and dispatched the first remaining Codex wave without index-only `--resume`; the repaired executor honestly rejected tasks 2 and 4 after they produced no target changes, persisted the failed wave, and stopped before every downstream task.
+**Files changed:** `.renmark/reviews/2026-07-30-64ae34d.m2-part1-codex-no-write-blocker.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`; runtime pause, recurrence, analytics, escalation, and wave evidence under `.renmark/state/`.
+**Do not change:** Preserve task 1 and the executor completion guard; do not dispatch later Part 1 waves or any Part 2 work; do not use index-only CLI `--resume` or retry tasks 2/4 without resolving the recurrence gate.
+
 ## [2026-07-30] - fix(executor): reject false Codex completion
 
 **Request:** Continue from M2’s failed executor-evidence gate and make Codex implementation tasks fail instead of reporting PASS when they produce no target change or commit.

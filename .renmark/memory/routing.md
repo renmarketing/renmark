@@ -35,6 +35,8 @@ Opus and Fable are escalation-only executors — never default them for finish, 
 
 ## Learned overrides
 
+- (2026-07-30) `target=*.py, complexity=hard, mode=B` → **codex** (failed, run=20260730-125320-10e8)
+
 - (2026-07-30) `M2 Part 1 executor completion postcondition (tasks 2/4)` → **codex** (failed: PASS without target change, artifact, or commit, run=20260730-054449-4865, role=code-implementer)
 
 - (2026-07-29) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260729-213121-b2aa)
