@@ -191,30 +191,27 @@ def test_fragment_registered_and_loadable() -> None:
     )
 
 
-# ── 6. Mode selection is independent of agency active/inactive (AC2) ──────────
+# ── 6. Legacy agency controls converge with canonical delivery mode ───────────
 
 
-def test_mode_selection_independent_of_agency(tmp_path: Path) -> None:
-    """Setting mode via renmark.mode must be unaffected by agency state, and
-    toggling agency must not alter mode state."""
+def test_canonical_delivery_mode_wins_over_legacy_agency_overlay(
+    tmp_path: Path,
+) -> None:
     _init_state_dir(tmp_path)
 
-    # Start: both inactive/unset.
     assert mode.read_mode(tmp_path) is None
     assert not agency.is_active(tmp_path)
 
-    # Set conductor mode, activate agency — mode must still be conductor.
-    mode.set_mode(tmp_path, "conductor")
     agency.activate(tmp_path, current_phase="gamma", current_milestone="M3")
-    assert mode.read_mode(tmp_path) == "conductor"
     assert agency.is_active(tmp_path)
 
-    # Deactivate agency — mode must still be conductor.
+    mode.set_mode(tmp_path, "orchestrator")
+    assert mode.read_mode(tmp_path) == "orchestrator"
+    assert agency.is_active(tmp_path)
+
     agency.deactivate(tmp_path)
-    assert mode.read_mode(tmp_path) == "conductor"
+    assert mode.read_mode(tmp_path) == "orchestrator"
     assert not agency.is_active(tmp_path)
 
-    # Clear mode — agency state must be unaffected.
     mode.clear_mode(tmp_path)
     assert mode.read_mode(tmp_path) is None
-    assert not agency.is_active(tmp_path)

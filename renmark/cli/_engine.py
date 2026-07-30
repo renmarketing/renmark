@@ -892,20 +892,26 @@ def _dispatch_proactive_mode_flags(
         print(f"renmark: headless mode {state_str} ({repo}/.renmark/config.json)")
         return 0
     if args.set_mode is not None:
+        from .. import delivery_state as _delivery_state
         from .. import mode as _mode
 
-        mode_path = _mode.mode_state_path(repo)
+        mode_path = _mode.delivery_state_path(repo)
         try:
             _mode.set_mode(repo, args.set_mode)
         except ValueError as exc:
             ap.error(str(exc))
-        except OSError as exc:
+        except (OSError, _delivery_state.DeliveryStateBloatError) as exc:
             print(
                 f"renmark: failed to persist operating mode to {mode_path}: {exc}",
                 file=sys.stderr,
             )
             return 1
-        print(f"renmark: operating mode set to {args.set_mode} ({mode_path})")
+        state = _mode.read_delivery_state(repo)
+        policy = state.interaction_mode if state is not None else "unknown"
+        print(
+            f"renmark: delivery mode set to {args.set_mode} "
+            f"(execution policy: {policy}; {mode_path})"
+        )
         return 0
     return None
 
@@ -925,11 +931,18 @@ def _dispatch_agency_flags(args: argparse.Namespace, repo: Path) -> int | None:
         return 0
     if args.activate_agency:
         from renmark import agency as _agency
+        from renmark import delivery_state as _delivery_state
+        from renmark import mode as _mode
 
         agency_path = _agency.agency_state_path(repo)
         try:
             _agency.activate(repo)
-        except (OSError, _agency.AgencyBloatError) as exc:
+            _mode.set_mode(repo, "agency")
+        except (
+            OSError,
+            _agency.AgencyBloatError,
+            _delivery_state.DeliveryStateBloatError,
+        ) as exc:
             print(
                 f"renmark: failed to activate Agency Mode at {agency_path}: {exc}",
                 file=sys.stderr,
@@ -939,11 +952,18 @@ def _dispatch_agency_flags(args: argparse.Namespace, repo: Path) -> int | None:
         return 0
     if args.deactivate_agency:
         from renmark import agency as _agency
+        from renmark import delivery_state as _delivery_state
+        from renmark import mode as _mode
 
         agency_path = _agency.agency_state_path(repo)
         try:
             _agency.deactivate(repo)
-        except (OSError, _agency.AgencyBloatError) as exc:
+            _mode.set_mode(repo, "orchestrator")
+        except (
+            OSError,
+            _agency.AgencyBloatError,
+            _delivery_state.DeliveryStateBloatError,
+        ) as exc:
             print(
                 f"renmark: failed to deactivate Agency Mode at {agency_path}: {exc}",
                 file=sys.stderr,
@@ -961,13 +981,16 @@ def _dispatch_mode_read_flags(
     if args.get_mode:
         from .. import mode as _mode
 
-        current = _mode.read_mode(repo)
-        print(current if current is not None else "unset")
+        state = _mode.read_delivery_state(repo)
+        if state is None:
+            print("unset")
+        else:
+            print(f"{state.delivery_mode} ({state.interaction_mode})")
         return 0
     if args.clear_mode:
         from .. import mode as _mode
 
-        mode_path = _mode.mode_state_path(repo)
+        mode_path = _mode.delivery_state_path(repo)
         try:
             _mode.clear_mode(repo)
         except OSError as exc:
@@ -976,7 +999,7 @@ def _dispatch_mode_read_flags(
                 file=sys.stderr,
             )
             return 1
-        print(f"renmark: operating mode cleared ({mode_path})")
+        print(f"renmark: delivery mode cleared ({mode_path})")
         return 0
     return None
 
@@ -1198,26 +1221,26 @@ def main(argv: list[str] | None = None) -> int:
             "'false' = restore interactive behavior). Default: false."
         ),
     )
-    # P8 harness — persisted operating-mode (conductor|orchestrator)
+    # Persisted public delivery mode (agency|orchestrator).
     ap.add_argument(
         "--set-mode",
-        choices=("conductor", "orchestrator"),
-        metavar="conductor|orchestrator",
+        choices=("agency", "orchestrator"),
+        metavar="agency|orchestrator",
         help=(
-            "persist the operating mode to .renmark/state/mode.json "
-            "('conductor' = high-touch interactive drive; "
-            "'orchestrator' = hands-off autonomous plan execution)."
+            "persist the delivery mode to .renmark/state/delivery.json "
+            "('agency' = owner-facing milestone delivery; "
+            "'orchestrator' = bounded work-package execution)."
         ),
     )
     ap.add_argument(
         "--get-mode",
         action="store_true",
-        help="print the persisted operating mode (or 'unset' if none), then exit",
+        help="print the persisted delivery mode and execution policy, then exit",
     )
     ap.add_argument(
         "--clear-mode",
         action="store_true",
-        help="clear the persisted operating mode from .renmark/state/mode.json, then exit",
+        help="clear canonical and legacy delivery-mode state, then exit",
     )
     # Context hygiene gates
     ap.add_argument(

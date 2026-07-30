@@ -711,81 +711,74 @@ def test_validate_artifact_refs_dotdot_escape_warns(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "out_of_tree"
 
 
-# ── Operating-mode preamble (Conductor vs Orchestrator) ───────────────────────
-
-_CONDUCTOR_DIRECTIVE = (
-    "Operating mode: Conductor — hands-on; prefer single-file scoped edits, "
-    "avoid subagents unless necessary, explain the next move before editing."
-)
-_ORCHESTRATOR_DIRECTIVE = (
-    "Operating mode: Orchestrator — goal-level; use narrow scoped subagents "
-    "where useful, load skills on demand, review outcomes not keystrokes."
-)
+# ── Delivery-mode preamble (Agency vs Orchestrator) ───────────────────────────
 
 
-def test_skill_preamble_mode_conductor_emits_conductor_directive(
+def test_skill_preamble_agency_emits_agency_directive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """mode=conductor → the conductor directive, never the orchestrator one."""
     from renmark import mode
 
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
-    mode.set_mode(tmp_path, "conductor")
+    mode.set_mode(tmp_path, "agency")
 
     hint = lifecycle.skill_preamble(tmp_path, "feature")
 
     assert hint is not None
-    assert "Operating mode: Conductor" in hint
-    assert _CONDUCTOR_DIRECTIVE in hint
-    assert _ORCHESTRATOR_DIRECTIVE not in hint
+    assert "Delivery mode: Agency" in hint
+    assert "Delivery mode: Orchestrator" not in hint
 
 
-def test_skill_preamble_mode_orchestrator_differs_from_conductor(
+def test_skill_preamble_orchestrator_uses_bounded_loop_contract(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC#3 by-mode diff: orchestrator directive differs from conductor output."""
     from renmark import mode
 
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
-
-    mode.set_mode(tmp_path, "conductor")
-    conductor_hint = lifecycle.skill_preamble(tmp_path, "feature")
-
     mode.set_mode(tmp_path, "orchestrator")
-    orchestrator_hint = lifecycle.skill_preamble(tmp_path, "feature")
+    hint = lifecycle.skill_preamble(tmp_path, "feature")
 
-    assert orchestrator_hint is not None
-    assert "Operating mode: Orchestrator" in orchestrator_hint
-    assert _ORCHESTRATOR_DIRECTIVE in orchestrator_hint
-    assert orchestrator_hint != conductor_hint
+    assert hint is not None
+    assert "Delivery mode: Orchestrator" in hint
+    assert "build → verify → review → fix" in hint
 
 
-def test_skill_preamble_mode_unset_entry_skill_prompts_choice(
+def test_skill_preamble_unset_start_prompts_two_mode_choice(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Unset mode + entry skill → prompt the user to pick Conductor vs Orchestrator."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    hint = lifecycle.skill_preamble(tmp_path, "start")
+
+    assert hint is not None
+    assert "Delivery mode: not yet set" in hint
+    assert "Agency vs Orchestrator" in hint
+
+
+def test_skill_preamble_feature_defaults_without_reasking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
 
     hint = lifecycle.skill_preamble(tmp_path, "feature")
 
-    assert hint is not None
-    assert "Operating mode: not yet set" in hint
-    assert "Conductor vs Orchestrator" in hint
+    assert "Delivery mode: Orchestrator" in (hint or "")
+    assert "not yet set" not in (hint or "")
 
 
-def test_skill_preamble_mode_unset_non_entry_skill_omits_mode_line(
+def test_skill_preamble_resume_never_reasks_when_unset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Unset mode + a non-entry skill emits NO operating-mode line at all."""
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
 
-    hint = lifecycle.skill_preamble(tmp_path, "help")
+    hint = lifecycle.skill_preamble(tmp_path, "resume")
 
-    assert "Operating mode" not in (hint or "")
+    assert "not yet set" not in (hint or "")
 
 
 def test_skill_preamble_mode_read_failure_degrades_gracefully(

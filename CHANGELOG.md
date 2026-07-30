@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(delivery): complete WP-M2-A canonical two-mode runtime
+
+**Request:** Execute the remaining M2 work as milestone-sized implementation-plus-test packages with a bounded build→verify→review→fix loop.
+**Built:** Unified public mode selection around Agency and Orchestrator in canonical `delivery.json`; preserved package/run provenance during mode updates; migrated legacy conductor reads to guided Orchestrator; aligned lifecycle preambles, CLI flags and Agency aliases; pointed handoff presentation to the shared interaction contract.
+**Files changed:** `renmark/mode.py`, `renmark/lifecycle.py`, `renmark/cli/_engine.py`, `plugin/skills/.shared/handoff-menu.md`, `tests/test_mode.py`, `tests/test_agency_behavior.py`, `tests/test_lifecycle.py`, `tests/test_mode_cli.py`, `.renmark/reviews/2026-07-30-wp-m2-a-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Keep `delivery.json` canonical and preserve its milestone/work-package/provenance fields; `mode.json` is read-only migration input, new public choices are Agency or Orchestrator, and resume must not re-ask or rely on task indices.
+
 ## [2026-07-30] - plan: repackage remaining M2 by milestone outcome
 
 **Request:** Treat remaining M2 work as milestone-sized implementation-plus-test packages with a bounded build→verify→review→fix loop.

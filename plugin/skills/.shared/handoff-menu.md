@@ -87,6 +87,15 @@ falling back to a printed numbered list (rule 7).
 
 ## Rendering rules
 
+Selector construction, option caps, recommendation ordering, pagination,
+More/Back navigation, exact label/code parsing, and numbered fallback behavior
+are defined only in
+[`interaction-contract.md`](interaction-contract.md). Calling skills MUST use
+`renmark.interaction` to implement that contract; they must not copy selector
+logic from this file. The rules below describe quality-gate filtering and
+Pause-Policy semantics. If any presentation example below drifts, the
+interaction contract and runtime implementation win.
+
 Each calling skill applies these filters before showing the menu — every gate
 should be reachable from every other gate, but the menu must stay short and
 contextual:

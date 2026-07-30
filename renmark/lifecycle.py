@@ -811,25 +811,27 @@ def skill_preamble(
     return _with_agency_note(repo, skill, _with_mode_note(repo, skill, _with_headless_note(repo, base)))
 
 
-# ── Operating-mode directive (Conductor vs Orchestrator) ──────────────────────
+# ── Delivery-mode directive (Agency vs Orchestrator) ──────────────────────────
 #
 # Set-mode directive lines (persisted mode → one hint line). Kept as module
 # constants so the behavior test (T14) and unit test (T12) can assert the exact
 # text without duplicating string literals.
 _MODE_DIRECTIVE: dict[str, str] = {
-    "conductor": (
-        "Operating mode: Conductor — hands-on; prefer single-file scoped edits, "
-        "avoid subagents unless necessary, explain the next move before editing."
+    "agency": (
+        "Delivery mode: Agency — owner-facing milestone delivery; discover and "
+        "agree outcomes, then delegate bounded milestone execution to Orchestrator."
     ),
     "orchestrator": (
-        "Operating mode: Orchestrator — goal-level; use narrow scoped subagents "
-        "where useful, load skills on demand, review outcomes not keystrokes."
+        "Delivery mode: Orchestrator — execute goal-level work packages through "
+        "bounded build → verify → review → fix loops and persist each boundary."
     ),
 }
 
-# Entry-point skills that must PROMPT for a mode when none is set yet.
-_MODE_ENTRY_SKILLS: frozenset[str] = frozenset(
-    {"start", "feature", "debug", "roadmap", "finish", "orchestrate"}
+# Only unresolved adoption/new-build entry points ask. Existing-project flows
+# use their deterministic default and resume never re-asks.
+_MODE_PROMPT_SKILLS: frozenset[str] = frozenset({"init", "start"})
+_MODE_DEFAULT_SKILLS: frozenset[str] = frozenset(
+    {"feature", "debug", "roadmap", "finish", "orchestrate"}
 )
 
 # Skills whose flows must not be blocked mid-stream by context gates.
@@ -840,14 +842,14 @@ _CONTEXT_BYPASS_SKILLS: frozenset[str] = frozenset({"finish", "approve", "resume
 def _choose_mode_hint(skill: str) -> str:
     """Choose-mode instruction emitted for an entry-point skill with no mode set.
 
-    Tells the orchestrator to ask the user Conductor vs Orchestrator via
+    Tells the orchestrator to ask the user Agency vs Orchestrator via
     AskUserQuestion, recommending the per-skill default, then persist the choice.
     """
     from . import mode as _mode
 
     recommended = _mode.default_mode_for_skill(skill)
     return (
-        "Operating mode: not yet set — ask the user Conductor vs Orchestrator via "
+        "Delivery mode: not yet set — ask the user Agency vs Orchestrator via "
         f"AskUserQuestion (recommend: {recommended}), then persist with "
         "renmark.mode.set_mode(repo, <choice>)."
     )
@@ -861,7 +863,7 @@ def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | Non
     exception in mode resolution falls back to ``hint`` unchanged, so mode is a
     pure enhancement and never a hard dependency of the preamble.
 
-    - Mode SET  → append the Conductor/Orchestrator directive line.
+    - Mode SET  → append the Agency/Orchestrator directive line.
     - Mode UNSET + entry-point skill → append a choose-mode instruction.
     - Mode UNSET + non-entry skill → no mode line (returns ``hint`` unchanged).
     """
@@ -869,11 +871,15 @@ def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | Non
         from . import mode as _mode
 
         current = _mode.read_mode(repo)
+        if current is None and skill in _MODE_DEFAULT_SKILLS:
+            resolved = _mode.default_delivery_state_for_skill(skill)
+            _mode.write_delivery_state(repo, resolved)
+            current = resolved.delivery_mode
         if current is not None:
             line = _MODE_DIRECTIVE.get(current)
             if line is None:  # unrecognised (read_mode shouldn't yield this)
                 return hint
-        elif skill in _MODE_ENTRY_SKILLS:
+        elif skill in _MODE_PROMPT_SKILLS:
             line = _choose_mode_hint(skill)
         else:
             return hint
@@ -923,7 +929,12 @@ def _with_agency_note(repo: Path | str, skill: str, hint: str | None) -> str | N
     try:
         from . import agency as _agency
         from . import context as _context
+        from . import mode as _mode
 
+        # Canonical delivery.json wins over the legacy agency overlay. This
+        # prevents split-brain hints after an explicit Orchestrator choice.
+        if _mode.read_mode(repo) == "orchestrator":
+            return hint
         if not _agency.is_active(repo):
             return hint
         state = _agency.read_agency(repo)

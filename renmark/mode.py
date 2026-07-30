@@ -5,8 +5,9 @@ The canonical public state is a two-axis delivery choice:
 - delivery mode: ``agency`` or ``orchestrator``
 - interaction mode: ``guided``, ``direct``, or ``async``
 
-The state lives at ``.renmark/state/mode.json`` for backwards compatibility
-with older callers that still know this module as ``renmark.mode``.
+Canonical state lives at ``.renmark/state/delivery.json``. The former
+``.renmark/state/mode.json`` remains a read-only migration source for callers
+that still know this module as ``renmark.mode``.
 
 Compatibility rules:
 - reads never raise and degrade to ``None`` on missing/corrupt/unreadable data
@@ -20,10 +21,11 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
+
+from . import delivery_state as _delivery
 
 Mode = Literal["conductor", "orchestrator"]
 DeliveryMode = Literal["agency", "orchestrator"]
@@ -59,7 +61,7 @@ _MODE_REL = MODE_REL
 
 _VALID_DELIVERY_MODES: frozenset[str] = frozenset({"agency", "orchestrator"})
 _VALID_INTERACTION_MODES: frozenset[str] = frozenset({"guided", "direct", "async"})
-_VALID_MODES: frozenset[str] = frozenset({"conductor", "orchestrator"})
+_VALID_MODES: frozenset[str] = frozenset({"agency", "orchestrator"})
 
 _PERSISTED_REPOS: set[Path] = set()
 
@@ -102,8 +104,13 @@ _DEFAULT_STATE_BY_SKILL: dict[str, DeliveryState] = {
 
 
 def mode_state_path(repo: str | Path) -> Path:
-    """Return the absolute path where delivery state is persisted."""
+    """Return the legacy compatibility path (read-only for new writes)."""
     return Path(repo) / MODE_REL
+
+
+def delivery_state_path(repo: str | Path) -> Path:
+    """Return the canonical persisted delivery-state path."""
+    return _delivery.delivery_state_path(repo)
 
 
 def _mode_path(repo: str | Path) -> Path:
@@ -121,7 +128,10 @@ def _state_from_parts(
         delivery_mode in _VALID_DELIVERY_MODES
         and interaction_mode in _VALID_INTERACTION_MODES
     ):
-        return DeliveryState(delivery_mode, interaction_mode)
+        return DeliveryState(
+            cast(DeliveryMode, delivery_mode),
+            cast(InteractionMode, interaction_mode),
+        )
     return None
 
 
@@ -164,9 +174,15 @@ def _state_from_legacy_mode(mode: str | None) -> DeliveryState | None:
 def read_delivery_state(repo: str | Path) -> DeliveryState | None:
     """Return the persisted canonical delivery state for *repo*.
 
-    Reads from the legacy ``mode.json`` path. Canonical fields win when present;
-    legacy payloads remain readable.
+    Canonical ``delivery.json`` wins. The legacy ``mode.json`` path remains a
+    read-only migration fallback, including conductor → orchestrator/guided.
     """
+    canonical, report = _delivery.read_delivery_state_with_report(repo)
+    if report.state == "loaded":
+        return _state_from_parts(
+            canonical.delivery_mode,
+            canonical.execution_policy,
+        )
     try:
         text = _mode_path(repo).read_text(encoding="utf-8")
         data = json.loads(text)
@@ -184,24 +200,23 @@ def read_delivery_state(repo: str | Path) -> DeliveryState | None:
 
 
 def write_delivery_state(repo: str | Path, state: DeliveryState) -> None:
-    """Persist canonical delivery state to the legacy-compatible path."""
-    p = _mode_path(repo)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(state.to_payload(), indent=2) + "\n"
-    tmp = p.with_name(p.name + f".tmp.{os.getpid()}")
-    try:
-        tmp.write_text(payload, encoding="utf-8")
-        os.replace(tmp, p)
-    except OSError:
-        with contextlib.suppress(OSError):
-            tmp.unlink()
-        raise
+    """Update the canonical aggregate without erasing milestone/run state."""
+    current, report = _delivery.read_delivery_state_with_report(repo)
+    if report.state != "loaded":
+        current = _delivery.default_delivery_state()
+    updated = replace(
+        current,
+        delivery_mode=state.delivery_mode,
+        execution_policy=state.interaction_mode,
+    )
+    _delivery.write_delivery_state(repo, updated)
 
 
 def clear_delivery_state(repo: str | Path) -> None:
-    """Remove the persisted delivery state for *repo*."""
-    with contextlib.suppress(FileNotFoundError):
-        _mode_path(repo).unlink()
+    """Remove canonical and legacy delivery-state selections for *repo*."""
+    for path in (delivery_state_path(repo), _mode_path(repo)):
+        with contextlib.suppress(FileNotFoundError):
+            path.unlink()
     _PERSISTED_REPOS.discard(_normalized_repo(repo))
 
 
@@ -245,38 +260,36 @@ def persist_delivery_state_once(
     entry: EntryClass = "unknown",
 ) -> DeliveryState:
     """Resolve and persist the current run's delivery state once per repo."""
-    state = resolve_delivery_state(owner_choice, intent=intent, entry=entry)
     repo_key = _normalized_repo(repo)
+    existing = read_delivery_state(repo)
+    if existing is not None:
+        _PERSISTED_REPOS.add(repo_key)
+        return existing
+    state = resolve_delivery_state(owner_choice, intent=intent, entry=entry)
     if repo_key not in _PERSISTED_REPOS:
         write_delivery_state(repo, state)
         _PERSISTED_REPOS.add(repo_key)
     return state
 
 
-def read_mode(repo: str | Path) -> Mode | None:
-    """Return the legacy single-axis mode view for *repo*.
-
-    Canonical delivery state reads as ``"orchestrator"``. A legacy
-    ``"conductor"`` payload is accepted on read but maps forward to
-    ``orchestrator/guided`` and therefore also returns ``"orchestrator"``.
-    """
+def read_mode(repo: str | Path) -> DeliveryMode | None:
+    """Return the public two-mode delivery choice for *repo*."""
     state = read_delivery_state(repo)
     if state is None:
         return None
-    return state.mode
+    return state.delivery_mode
 
 
 def set_mode(repo: str | Path, mode: str) -> None:
-    """Persist legacy mode requests through canonical delivery state.
-
-    ``"conductor"`` is accepted for compatibility but is mapped forward to
-    ``orchestrator/guided``. New writes never persist ``"conductor"``.
-    """
+    """Persist the public Agency/Orchestrator delivery choice."""
     if mode not in _VALID_MODES:
         raise ValueError(
-            f"invalid mode {mode!r}: expected 'conductor' or 'orchestrator'"
+            f"invalid mode {mode!r}: expected 'agency' or 'orchestrator'"
         )
-    write_delivery_state(repo, resolve_delivery_state(mode))
+    write_delivery_state(
+        repo,
+        resolve_delivery_state(cast(DeliveryMode, mode)),
+    )
     _PERSISTED_REPOS.add(_normalized_repo(repo))
 
 
@@ -287,9 +300,9 @@ def clear_mode(repo: str | Path) -> None:
 
 def default_delivery_state_for_skill(skill: str) -> DeliveryState:
     """Return the canonical default delivery state for *skill*."""
-    return resolve_delivery_state(entry=skill)
+    return resolve_delivery_state(entry=cast(EntryClass, skill))
 
 
-def default_mode_for_skill(skill: str) -> Mode:
-    """Return the legacy single-axis default mode for *skill*."""
-    return default_delivery_state_for_skill(skill).mode
+def default_mode_for_skill(skill: str) -> DeliveryMode:
+    """Return the public delivery-mode default for *skill*."""
+    return default_delivery_state_for_skill(skill).delivery_mode
