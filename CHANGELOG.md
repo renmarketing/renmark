@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Prove surface-aware selector capabilities
+
+**Request:** Verify the selector-capability contract across Claude, Codex Plan, Codex Default, runtime overrides, and unknown hosts.
+**Built:** Added a focused capability matrix covering native capacity bounds, complete fallback availability, host-only compatibility, and the separation between selector absence and headless operation.
+**Files changed:** `tests/test_hosts.py`, `CHANGELOG.md`.
+**Do not change:** Codex surfaces must not advertise unsupported clear, compact, or resume operations, and unknown hosts must remain conservative.
+
 ## [2026-07-30] - Prove canonical delivery-mode resolution
 
 **Request:** Replace obsolete public Conductor expectations with the approved Agency/Orchestrator routing and legacy-compatibility matrix.
