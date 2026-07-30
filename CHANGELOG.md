@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(planning): complete WP-M3-1 schemas and parser
+
+**Request:** Run M3 as bounded milestone-sized implementation-plus-test packages.
+**Built:** Added bounded milestone/work-package document validation and a separate package-plan parser with stable IDs, allowed surfaces, leak rejection, and index-only resume rejection; preserved legacy Task parsing as the backend.
+**Files changed:** `renmark/schemas.py`, `renmark/parser.py`, `tests/test_schemas.py`, `tests/test_parser.py`, `.renmark/reviews/2026-07-30-wp-m3-1-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Package planning must retain current Task backend compatibility, reject transcript/diff fields, and rely on stable package identity rather than task index.
+
 ## [2026-07-30] - feat(delivery): complete M3-0 archival prerequisite
 
 **Request:** Dispatch M3 under milestone-sized package loops after approving the capacity amendment.

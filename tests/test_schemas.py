@@ -116,6 +116,32 @@ def test_validate_pipeline_rejects_non_int_task_index():
     assert any("completed_tasks[1]" in i for i in issues)
 
 
+def test_validate_milestone_document_accepts_bounded_stable_package():
+    data = {
+        "milestones": [{
+            "id": "m3", "goal": "compile packages", "expected_outcome": "stable work", "work_packages": [{
+                "id": "m3--schema", "goal": "schemas", "expected_outcome": "typed input",
+                "acceptance_evidence": ["tests pass"], "dependencies": ["none"], "risks": ["format drift"],
+                "allowed_surfaces": ["implementation", "tests"], "cost_lane": "standard",
+                "demo_point": "pytest", "signoff_policy": "owner", "status": "pending",
+            }],
+        }],
+    }
+    assert schemas.validate_milestone_document(data) == []
+
+
+def test_validate_milestone_document_rejects_leaks_and_bad_surface():
+    data = {"milestones": [{"id": "m3", "goal": "g", "expected_outcome": "o", "work_packages": [{
+        "id": "m3--p", "goal": "g", "expected_outcome": "o", "acceptance_evidence": ["e"],
+        "dependencies": ["d"], "risks": ["r"], "allowed_surfaces": ["transcript"], "cost_lane": "c",
+        "demo_point": "d", "signoff_policy": "s", "status": "waiting", "transcript": "nope",
+    }]}]}
+    issues = schemas.validate_milestone_document(data)
+    assert any("forbidden transcript" in issue for issue in issues)
+    assert any("allowed_surfaces" in issue for issue in issues)
+    assert any("status" in issue for issue in issues)
+
+
 # ── delivery ────────────────────────────────────────────────────────────────
 
 

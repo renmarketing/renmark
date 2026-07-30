@@ -57,6 +57,109 @@ from renmark.dispatch import (
 )
 from renmark.lifecycle import STAGES
 
+# -- Milestone package plans -------------------------------------------------
+
+PACKAGE_TEXT_LIMIT = 500
+PACKAGE_LIST_CAP = 16
+WORK_PACKAGE_STATUS_VALUES = frozenset({"pending", "in_progress", "blocked", "passed", "failed"})
+PACKAGE_ALLOWED_SURFACES = frozenset({"implementation", "tests", "docs", "config"})
+
+
+def validate_milestone_document(data: Any) -> list[str]:
+    """Validate a bounded, portable milestone/work-package document.
+
+    This deliberately describes planning input, not ``delivery.json``.  The
+    latter stays a compact runtime aggregate and must never receive package
+    prose, diffs, or transcripts.
+    """
+    if not isinstance(data, dict):
+        return [f"milestone_document: expected object, got {type(data).__name__}"]
+    issues: list[str] = []
+    _reject_package_leaks(data, "milestone_document", issues)
+    milestones = data.get("milestones")
+    if not isinstance(milestones, list) or not milestones:
+        return [*issues, "milestone_document.milestones must be a non-empty list"]
+    if len(milestones) > PACKAGE_LIST_CAP:
+        issues.append(f"milestone_document.milestones has {len(milestones)} entries — cap is {PACKAGE_LIST_CAP}")
+    seen: set[str] = set()
+    for i, milestone in enumerate(milestones):
+        scope = f"milestone_document.milestones[{i}]"
+        if not isinstance(milestone, dict):
+            issues.append(f"{scope} expected object, got {type(milestone).__name__}")
+            continue
+        milestone_id = milestone.get("id")
+        if not isinstance(milestone_id, str) or not milestone_id.strip():
+            issues.append(f"{scope}.id must be a non-empty str")
+        elif milestone_id != stable_milestone_id(milestone_id):
+            issues.append(f"{scope}.id must already be in stable_milestone_id form")
+        elif milestone_id in seen:
+            issues.append(f"{scope}.id duplicates {milestone_id!r}")
+        else:
+            seen.add(milestone_id)
+        _bounded_text_field(milestone, "goal", scope, issues)
+        _bounded_text_field(milestone, "expected_outcome", scope, issues)
+        packages = milestone.get("work_packages")
+        if not isinstance(packages, list) or not packages:
+            issues.append(f"{scope}.work_packages must be a non-empty list")
+            continue
+        if len(packages) > PACKAGE_LIST_CAP:
+            issues.append(f"{scope}.work_packages has {len(packages)} entries — cap is {PACKAGE_LIST_CAP}")
+        for j, package in enumerate(packages):
+            _validate_work_package(
+                package,
+                milestone_id if isinstance(milestone_id, str) else "",
+                f"{scope}.work_packages[{j}]",
+                issues,
+            )
+    return issues
+
+
+def _validate_work_package(package: Any, milestone_id: str, scope: str, issues: list[str]) -> None:
+    if not isinstance(package, dict):
+        issues.append(f"{scope} expected object, got {type(package).__name__}")
+        return
+    _reject_package_leaks(package, scope, issues)
+    package_id = package.get("id")
+    expected_id = stable_work_package_id(milestone_id, package_id) if isinstance(package_id, str) else ""
+    if not isinstance(package_id, str) or not package_id.strip():
+        issues.append(f"{scope}.id must be a non-empty str")
+    elif package_id != expected_id:
+        issues.append(f"{scope}.id must already be in stable_work_package_id form")
+    for key in ("goal", "expected_outcome", "demo_point", "signoff_policy", "cost_lane"):
+        _bounded_text_field(package, key, scope, issues)
+    status = package.get("status")
+    if status not in WORK_PACKAGE_STATUS_VALUES:
+        issues.append(f"{scope}.status={status!r} not in {sorted(WORK_PACKAGE_STATUS_VALUES)}")
+    for key in ("acceptance_evidence", "dependencies", "risks", "allowed_surfaces"):
+        values = package.get(key)
+        if not isinstance(values, list) or not values:
+            issues.append(f"{scope}.{key} must be a non-empty list")
+            continue
+        if len(values) > PACKAGE_LIST_CAP:
+            issues.append(f"{scope}.{key} has {len(values)} entries — cap is {PACKAGE_LIST_CAP}")
+        for value in values:
+            if not isinstance(value, str) or not value.strip() or len(value) > PACKAGE_TEXT_LIMIT:
+                issues.append(f"{scope}.{key} entries must be non-empty strings <= {PACKAGE_TEXT_LIMIT} chars")
+        if key == "allowed_surfaces":
+            invalid = sorted(set(values) - PACKAGE_ALLOWED_SURFACES)
+            if invalid:
+                issues.append(f"{scope}.allowed_surfaces has invalid values {invalid}")
+
+
+def _bounded_text_field(data: dict[str, Any], key: str, scope: str, issues: list[str]) -> None:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        issues.append(f"{scope}.{key} must be a non-empty str")
+    elif len(value) > PACKAGE_TEXT_LIMIT:
+        issues.append(f"{scope}.{key} is {len(value)} chars — cap is {PACKAGE_TEXT_LIMIT}")
+
+
+def _reject_package_leaks(data: dict[str, Any], scope: str, issues: list[str]) -> None:
+    forbidden = {"transcript", "transcripts", "diff", "patch", "generated_code", "reasoning"}
+    leaked = sorted(forbidden & set(data))
+    if leaked:
+        issues.append(f"{scope} contains forbidden transcript/diff fields {leaked}")
+
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 
 LIFECYCLE_FIELDS = {

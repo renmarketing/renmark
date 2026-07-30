@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from renmark.parser import PlanError, parse_plan
+from renmark.parser import PlanError, parse_package_plan, parse_plan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -525,3 +525,18 @@ def test_well_formed_header_still_parses(tmp_path: Path) -> None:
     tasks = parse_plan(plan)
     assert len(tasks) == 1
     assert tasks[0].title == "correct header"
+
+
+def test_package_plan_parses_stable_ids_and_surfaces(tmp_path: Path) -> None:
+    plan = _write(tmp_path, "# Packages\n- **mode:** agency\n\n## Milestone M3: Compiler\n- **goal:** milestone goal\n- **expected_outcome:** compiled packages\n\n### Work Package WP-M3-1: Schema work\n- **goal:** typed schemas\n- **expected_outcome:** bounded input\n- **acceptance_evidence:** [pytest]\n- **dependencies:** [none]\n- **risks:** [format drift]\n- **allowed_surfaces:** [implementation, tests]\n- **cost_lane:** standard\n- **demo_point:** test run\n- **signoff_policy:** owner\n- **status:** pending\n")
+    parsed = parse_package_plan(plan)
+    assert parsed.mode == "agency"
+    assert parsed.milestones[0].id == "compiler"
+    assert parsed.milestones[0].work_packages[0].id == "compiler--schema-work"
+    assert parsed.milestones[0].work_packages[0].allowed_surfaces == ["implementation", "tests"]
+
+
+def test_package_plan_rejects_index_only_resume(tmp_path: Path) -> None:
+    plan = _write(tmp_path, "## Milestone: M3\n### Package: P\n- **resume_index:** 1\n")
+    with pytest.raises(PlanError, match="index-only resume"):
+        parse_package_plan(plan)
