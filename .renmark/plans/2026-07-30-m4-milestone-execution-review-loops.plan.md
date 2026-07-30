@@ -181,14 +181,14 @@ milestone boundary; resumption always uses stable milestone/package IDs.
 
 ### Task 6: Prove review-to-fix and interaction boundaries
 - **mode:** B
-- **target:** tests/test_cli_commands.py
+- **target:** tests/test_handoff_helpers.py
 - **complexity:** hard
 - **executor:** codex
 - **role:** test-writer
 - **parallel_group:** 6
 - **est_tokens:** 2400
 - **est_cost_usd:** 0.0720
-- **verifier:** .venv/bin/pytest -q tests/test_cli_commands.py tests/test_interaction.py
+- **verifier:** .venv/bin/pytest -q tests/test_handoff_helpers.py tests/test_interaction.py
 - **serves:** REQ-22, REQ-23
 - **spec:** Add fixtures for Critical/Major signoff blocking, bounded finding export, scoped-fix creation, cancellation/refusal reachability, and re-review readiness. Do not freeze a host-specific picker presentation.
 
