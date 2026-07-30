@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(contract): complete WP-M5-1 canonical delivery contract
+
+**Request:** Execute M5 project contract propagation under the approved cap.
+**Built:** Added one concise pointer-only canonical delivery contract describing two modes, milestone evidence, bounded loops/review, canonical state, gates, and selector-capable fallback semantics.
+**Files changed:** `plugin/skills/.shared/project-delivery-contract.md`, `tests/test_project_delivery_contract.py`, `CHANGELOG.md`.
+**Do not change:** Do not duplicate full skills or transcripts into project contracts; host-native clickability is optional while complete recommended-first fallback is mandatory.
+
 ## [2026-07-30] - feat(delivery): complete WP-M4-4 signoff integrity
 
 **Request:** Execute M4 under the approved bounded milestone policy.
