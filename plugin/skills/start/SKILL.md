@@ -1,6 +1,6 @@
 ---
 name: start
-description: "Use for the New Build pipeline (/renmark:start) when starting something new from scratch — plain requests like \"build X\", \"create X\", \"develop X\". The vibe-coder entry point when you don't know where to begin; for changes to an existing build use /renmark:feature instead."
+description: "Use for the New Build pipeline (/renmark:start) when starting something new from scratch — plain requests like \"build X\", \"create X\", \"develop X\", \"use Agency\", or \"use Orchestrator\". The vibe-coder entry point when you don't know where to begin; for changes to an existing build use /renmark:feature instead."
 ---
 
 # start
@@ -13,21 +13,23 @@ The **New Build pipeline** — the vibe-coder entry point for building something
 
 **Adaptive routing (Step 7) stays intact:** a clear single-purpose build → straight to `/renmark:plan`; a fuzzy or multi-part idea → `/renmark:brainstorm` first; a whole greenfield product → the staged program. A `PRD.md` is established before the first feature is built (Step 5a); a blueprint is offered only when the architecture is non-trivial (Step 5b).
 
-## Operating mode
+## Delivery mode
 
-`start` defaults to **Orchestrator** mode for goal-level build-out — it drives the whole pipeline to a working deliverable, not one edit at a time. The first meaningful workflow is where the mode is chosen: ask once, persist the choice, and don't re-ask. Either mode (Orchestrator or **Conductor**) is overridable at any time via `renmark-execute --set-mode`.
+Resolve the once-per-run `delivery_mode` through canonical DeliveryState. Reuse
+an existing choice without another gate; otherwise present the shared
+interaction-contract decision with **Agency (Recommended)** for a vague product
+idea and **Orchestrator (Recommended)** for a defined build. An explicit owner
+choice always wins. Agency owns discovery, PRD/roadmap governance, milestones,
+and owner checkpoints, then delegates every approved milestone's execution to
+Orchestrator. Orchestrator takes a defined outcome directly through its bounded
+build → verify → review → fix loop. Persist the choice in
+`.renmark/state/delivery.json`; selector/page state is presentation-only.
 
-## When Agency Mode is active
-
-`/renmark:start` is the **explicit opt-in entry** for Agency Mode — no auto-detect. When chosen, offer an Agency lane that frames the session as a discovery call: owner intent, users, problem, outcome, owner-level questions, and project classification (new app / feature / migration / automation / research-build). Agency Mode sits **above** Conductor/Orchestrator and does not replace them; existing `/renmark:start` behavior is unchanged when the Agency lane is not chosen. For the full contract, see `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`.
-
-**Seed the state on opt-in (required — this is what makes the loop enterable/resumable).** Once the owner opts in and you've established the first phase, activate agency state so `/renmark:resume` and every spine skill's preamble pick it up. Run exactly:
-
-```bash
-python3 -c "from renmark import agency; agency.activate('.', current_phase='discovery', current_milestone='<first milestone>', signoff_status='pending')"
-```
-
-This writes `.renmark/state/agency.json` (verify: `python3 -c "from renmark import agency; print(agency.is_active('.'))"` → `True`). Update `current_phase`/`current_milestone` as the delivery loop advances; call `renmark.agency.deactivate('.')` only at final signoff/release. Do NOT seed agency state unless the owner explicitly chose the Agency lane.
+The legacy `agency.json` may retain phase-detail compatibility, but it is not a
+third mode and never overrides canonical DeliveryState. Use
+`${CLAUDE_PLUGIN_ROOT}/skills/.shared/interaction-contract.md` for the decision
+surface and `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` for the
+Agency governance contract. Status remains ordinary prose.
 
 ## Steps
 

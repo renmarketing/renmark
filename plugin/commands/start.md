@@ -1,5 +1,5 @@
 ---
-description: "Use for the New Build pipeline (/renmark:start) when starting something new from scratch — plain requests like \"build X\", \"create X\", \"develop X\". The vibe-coder entry point when you don't know where to begin; for changes to an existing build use /renmark:feature instead."
+description: "Use for the New Build pipeline (/renmark:start) when starting something new from scratch — plain requests like \"build X\", \"create X\", \"develop X\", \"use Agency\", or \"use Orchestrator\". The vibe-coder entry point when you don't know where to begin; for changes to an existing build use /renmark:feature instead."
 argument-hint: '[free-text description of what you want to build]'
 ---
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - docs(delivery): complete WP-M2-B entry routing
+
+**Request:** Continue M2 as milestone-sized work packages and keep implementation with directly related tests.
+**Built:** Reframed Start around the once-per-run Agency/Orchestrator decision, made defined Feature and Debug flows resolve directly to async/guided Orchestrator policies, made Resume canonical-first without re-asking, and expanded exact trigger parity across skill and command surfaces.
+**Files changed:** `plugin/skills/start/SKILL.md`, `plugin/commands/start.md`, `plugin/skills/feature/SKILL.md`, `plugin/skills/debug/SKILL.md`, `plugin/skills/resume/SKILL.md`, `tests/test_skill_trigger_phrases.py`, `.renmark/reviews/2026-07-30-wp-m2-b-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Status text is not a decision gate; defined feature/debug work must not ask for a mode, and resume must use canonical delivery/work-package identity rather than selector state or task indices.
+
 ## [2026-07-30] - feat(delivery): complete WP-M2-A canonical two-mode runtime
 
 **Request:** Execute the remaining M2 work as milestone-sized implementation-plus-test packages with a bounded build→verify→review→fix loop.
