@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-30] — Define the semantic decision interaction contract
+
+**Request:** Establish M2’s single host-neutral contract for decisions, approvals, selector capability, and bounded continuation.
+**Built:** Created the semantic interaction contract with stable choice identifiers, one recommended-first action, dangerous-action refusal, Claude/Codex render-time limits, complete fallback, bounded navigation, and continuation semantics.
+**Files changed:**
+- `plugin/skills/.shared/interaction-contract.md` — canonical decision and choice-set contract.
+**Do not change:**
+- Presentation availability and pagination remain ephemeral; they must not persist or switch the host’s collaboration mode, truncate choices, or remove the explicit refusal path.
+
 ## [2026-07-30] - fix(quality): restore Ruff baseline
 
 **Request:** Fix the six Ruff baseline violations across four files so the approved staged M2 run can resume.
