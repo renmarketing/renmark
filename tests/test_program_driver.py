@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from renmark.program import Program, StageNode, TaskNode, read_program
 from renmark.program_driver import (
+    MilestoneDecision,
     StopReason,
     advance_on_success,
+    decide_milestone_execution,
     drift_warning,
     evaluate_stop,
     next_stage,
@@ -183,3 +185,118 @@ def test_next_stage_prioritizes_in_progress_over_earlier_pending() -> None:
         StageNode(id="build", status="in_progress"),
     )
     assert next_stage(program) == program.stages[1]
+
+
+# ── Milestone verifier / repair decisions (M4) ──────────────────────────────────────────────
+
+
+def milestone_program() -> Program:
+    return make_program(
+        StageNode(
+            id="build",
+            status="in_progress",
+            tasks=[TaskNode(id="implement-widget", title="Implement widget", status="done")],
+        )
+    )
+
+
+def fresh_verifier_metadata(**overrides: object) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "fresh": True,
+        "artifact_ref": ".renmark/reviews/build-verify.json",
+        "completion_state": "complete",
+        "validation_status": "validated",
+    }
+    metadata.update(overrides)
+    return metadata
+
+
+def test_decide_milestone_execution_advances_only_on_fresh_complete_validation(tmp_path) -> None:
+    decision = decide_milestone_execution(
+        milestone_program(), "build", fresh_verifier_metadata(), repo=str(tmp_path)
+    )
+
+    assert decision == MilestoneDecision("advance", True, None)
+
+
+def test_decide_milestone_execution_emits_pointer_only_scoped_repair(tmp_path) -> None:
+    raw_verifier_body = "FAIL: proprietary verifier details must never escape"
+    decision = decide_milestone_execution(
+        milestone_program(),
+        "build",
+        fresh_verifier_metadata(
+            completion_state="partial",
+            validation_status="failed",
+            verifier_output=raw_verifier_body,
+        ),
+        repo=str(tmp_path),
+        milestone_id="milestone-build",
+        work_package_id="implement-widget",
+    )
+
+    assert decision.action == "repair"
+    assert decision.advance_allowed is False
+    assert decision.reason is StopReason.VERIFY_FAILED
+    assert decision.repair_package is not None
+    assert decision.repair_package.milestone_id == "milestone-build"
+    assert decision.repair_package.work_package_id == "implement-widget"
+    assert decision.repair_package.artifact_ref == ".renmark/reviews/build-verify.json"
+    assert raw_verifier_body not in repr(decision)
+    assert not hasattr(decision.repair_package, "verifier_output")
+
+
+def test_decide_milestone_execution_stops_on_stale_evidence(tmp_path) -> None:
+    decision = decide_milestone_execution(
+        milestone_program(),
+        "build",
+        fresh_verifier_metadata(fresh=False, completion_state="partial", validation_status="failed"),
+        repo=str(tmp_path),
+    )
+
+    assert decision == MilestoneDecision("stop", False, StopReason.VERIFY_FAILED)
+
+
+def test_decide_milestone_execution_stops_for_budget_or_scope_drift(tmp_path) -> None:
+    program = milestone_program()
+
+    budget = decide_milestone_execution(
+        program, "build", fresh_verifier_metadata(budget_status="exhausted"), repo=str(tmp_path)
+    )
+    scope = decide_milestone_execution(
+        program, "build", fresh_verifier_metadata(scope_drift=True), repo=str(tmp_path)
+    )
+
+    assert budget == MilestoneDecision("stop", False, StopReason.PAUSED)
+    assert scope == MilestoneDecision("stop", False, StopReason.PRD_DRIFT)
+
+
+def test_decide_milestone_execution_does_not_repair_a_failed_verifier_when_budget_is_paused(
+    tmp_path,
+) -> None:
+    decision = decide_milestone_execution(
+        milestone_program(),
+        "build",
+        fresh_verifier_metadata(
+            completion_state="partial",
+            validation_status="failed",
+            budget_status="exhausted",
+        ),
+        repo=str(tmp_path),
+        milestone_id="milestone-build",
+        work_package_id="implement-widget",
+    )
+
+    assert decision == MilestoneDecision("stop", False, StopReason.PAUSED)
+    assert decision.repair_package is None
+
+
+def test_decide_milestone_execution_blocks_third_equivalent_repair(tmp_path) -> None:
+    program = milestone_program()
+    failed = fresh_verifier_metadata(completion_state="partial", validation_status="failed")
+
+    first = decide_milestone_execution(program, "build", failed, repo=str(tmp_path))
+    second = decide_milestone_execution(program, "build", failed, repo=str(tmp_path))
+    third = decide_milestone_execution(program, "build", failed, repo=str(tmp_path))
+
+    assert first.action == second.action == "repair"
+    assert third == MilestoneDecision("stop", False, StopReason.RETRY_EXHAUSTED)

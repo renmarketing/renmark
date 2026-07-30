@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(delivery): complete WP-M4-2 repair decisions
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added fresh-evidence milestone decisions with pointer-only scoped repairs, pre-emission recurrence stopping, and pause/scope/budget precedence. Independent review found and repaired one exhausted-budget ordering defect; re-review passed.
+**Files changed:** `renmark/program_driver.py`, `tests/test_program_driver.py`, `CHANGELOG.md`.
+**Do not change:** Repairs must never carry raw verifier output, must stop before a third equivalent attempt, and cannot be emitted from stale, paused, exhausted, or scope-drift evidence.
+
 ## [2026-07-30] - feat(delivery): complete WP-M4-1 loop identity boundary
 
 **Request:** Execute M4 under the approved bounded milestone policy.
