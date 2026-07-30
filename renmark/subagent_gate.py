@@ -101,6 +101,20 @@ def justify_task(task: Any) -> SubagentVerdict:
     ``executor`` / ``complexity`` / ``est_tokens`` / ``role`` / ``role_reason``.
     """
     try:
+        # A package can be marked as a deterministic work package before it is
+        # compiled into legacy task packets.  That work must not consume an
+        # agent dispatch simply because it has no legacy executor field yet.
+        cost_lane = str(cost._get(task, "cost_lane", "") or "").strip().lower()
+        if cost_lane in {"deterministic", "check", "script", "tool", "none"}:
+            return SubagentVerdict(
+                needs_subagent=False,
+                deterministic_eligible=True,
+                role="deterministic",
+                tier="none",
+                reason="deterministic package cost lane",
+                challenge="deterministic package work — resolve via a check/script, not a subagent",
+                challenge_code="deterministic",
+            )
         # Q1 + Q2 — a deterministic path exists → no subagent needed.
         if cost.is_deterministic_item(task):
             return SubagentVerdict(

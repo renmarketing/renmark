@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(planning): complete WP-M3-3 package gates
+
+**Request:** Continue M3 dispatch through bounded work packages.
+**Built:** Added package-aware lint and subagent-routing gates while retaining legacy task-plan behavior.
+**Files changed:** `renmark/plan_lint.py`, `renmark/subagent_gate.py`, `tests/test_plan_lint.py`, `tests/test_subagent_gate.py`, `.renmark/reviews/2026-07-30-wp-m3-3-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Package work must retain bounded surfaces, acceptance evidence, artifact-only dependencies, transcript leak rejection, and deterministic-first dispatch.
+
 ## [2026-07-30] - feat(planning): complete WP-M3-2 compiler compatibility
 
 **Request:** Debug the typed parser/compiler boundary, then resume WP-M3-2 by stable package ID.
