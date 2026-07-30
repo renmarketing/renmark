@@ -35,7 +35,9 @@ from .delivery_state import (
     WorkPackageSummary,
     append_provenance_event,
     default_delivery_state,
+    read_delivery_state_with_report,
     stable_delivery_run_id,
+    stable_milestone_id,
 )
 from .hosts import HostKind, capabilities_for
 from .mode import mode_state_path
@@ -524,6 +526,217 @@ class LegacyDeliverySummary:
             "delivery": self.delivery.to_dict(),
             "drift_repair_notes": list(self.drift_repair_notes),
         }
+
+
+@dataclass(frozen=True)
+class MilestoneReadiness:
+    """A bounded, read-only disposition for a milestone boundary.
+
+    This deliberately contains only booleans and short blockers. Verifier and
+    review bodies remain in their artifacts, rather than leaking into the
+    lifecycle file or owner-facing state.
+    """
+
+    ready: bool
+    verification_ready: bool
+    review_ready: bool
+    review_required: bool
+    blockers: tuple[str, ...] = ()
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "ready": self.ready,
+            "verification_ready": self.verification_ready,
+            "review_ready": self.review_ready,
+            "review_required": self.review_required,
+            "blockers": list(self.blockers),
+        }
+
+
+def milestone_signoff_readiness(
+    repo: Path | str,
+    *,
+    agency: bool | None = None,
+    require_review: bool | None = None,
+    milestone_id: str | None = None,
+) -> MilestoneReadiness:
+    """Return whether a milestone has the fresh evidence needed to advance.
+
+    Agency delivery always requires a fresh, clean verifier result and an
+    independently-produced clean review. Direct Orchestrator delivery still
+    requires fresh verification, while review is proportional unless explicitly
+    requested by its caller. The predicate is read-only: it cannot clear
+    approval gates or advance lifecycle state.
+    """
+    repo_path = Path(repo)
+    agency_state: AgencyState | None = None
+    try:
+        agency_state = read_agency(repo_path)
+    except Exception:
+        # A corrupt or unreadable Agency overlay must never create a boundary
+        # binding from guessed state.
+        agency_state = None
+    if agency is None:
+        agency = bool(agency_state and agency_state.active)
+    review_required = bool(agency) if require_review is None else bool(require_review)
+
+    # A persisted delivery loop is authoritative while it is active.  A loaded
+    # non-passing loop must finish before signoff; an unavailable loop defers
+    # to the active Agency boundary when one is persisted.
+    try:
+        delivery, delivery_report = read_delivery_state_with_report(repo_path)
+    except Exception:
+        delivery = None
+        delivery_report = None
+
+    # Evidence must be tied to the actual boundary when one is known.  The
+    # optional argument supports callers that are signing off a named milestone;
+    # otherwise the active persisted delivery milestone is authoritative.  An
+    # unscoped legacy flow deliberately retains its existing HEAD-only behavior.
+    active_milestone = _signoff_milestone_id(milestone_id)
+    if not active_milestone and delivery is not None:
+        active_milestone = _signoff_milestone_id(delivery.active_milestone_id)
+    if not active_milestone and agency and agency_state is not None and agency_state.active:
+        # A missing, corrupt, unreadable, or unscoped delivery loop cannot be
+        # allowed to unbind an active Agency boundary. Preserve explicit caller
+        # and usable delivery-loop precedence above, then use the persisted
+        # Agency milestone so only evidence for that boundary can satisfy
+        # signoff.
+        active_milestone = _signoff_milestone_id(agency_state.current_milestone)
+
+    head = _current_head_sha(repo_path)
+    verification_ready = _has_fresh_milestone_evidence(
+        repo_path,
+        head,
+        pattern="*.qa.md",
+        verifier=True,
+        milestone_id=active_milestone,
+    )
+    review_ready = _has_fresh_milestone_evidence(
+        repo_path,
+        head,
+        pattern="*.review.md",
+        verifier=False,
+        milestone_id=active_milestone,
+    )
+
+    blockers: list[str] = []
+    if not head:
+        blockers.append("current revision is unavailable; freshness cannot be proven")
+    if not verification_ready:
+        blockers.append("fresh verified milestone evidence is required")
+    if review_required and not review_ready:
+        blockers.append("fresh clean independent review evidence is required")
+    if (
+        delivery_report is not None
+        and delivery_report.state == "loaded"
+        and delivery is not None
+        and delivery.loop_status != "passed"
+    ):
+        blockers.append(f"delivery loop is unresolved ({delivery.loop_status})")
+
+    return MilestoneReadiness(
+        ready=not blockers,
+        verification_ready=verification_ready,
+        review_ready=review_ready,
+        review_required=review_required,
+        blockers=tuple(blockers),
+    )
+
+
+def milestone_signoff_ready(repo: Path | str) -> bool:
+    """True only when Agency may offer owner milestone signoff."""
+    return milestone_signoff_readiness(repo, agency=True).ready
+
+
+def milestone_release_ready(repo: Path | str) -> bool:
+    """True only when release readiness has fresh verification and review."""
+    return milestone_signoff_readiness(repo, require_review=True).ready
+
+
+def _current_head_sha(repo: Path) -> str:
+    """Return HEAD for evidence comparison, degrading safely outside git."""
+    try:
+        from .summary import git_head_sha
+
+        head = git_head_sha(repo)
+        return head if isinstance(head, str) else ""
+    except Exception:
+        return ""
+
+
+def _has_fresh_milestone_evidence(
+    repo: Path,
+    head: str,
+    *,
+    pattern: str,
+    verifier: bool,
+    milestone_id: str = "",
+) -> bool:
+    """Whether one clean, complete evidence artifact proves the current HEAD.
+
+    ``*.qa.md`` is accepted only from the verification generator with a
+    validated result. Reviews use an explicitly allowed independent-review
+    generator and a validated result, which prevents a failed verifier or
+    arbitrary artifact from self-certifying readiness.
+    """
+    if not head:
+        return False
+    reviews = repo / ".renmark" / "reviews"
+    if not reviews.is_dir():
+        return False
+    for artifact in reviews.glob(pattern):
+        try:
+            metadata = read_metadata(artifact)
+            stale = is_stale(artifact)
+        except Exception:
+            continue
+        if stale or metadata.get("source_sha") != head:
+            continue
+        artifact_milestone = _signoff_milestone_id(metadata.get("milestone_id"))
+        if milestone_id and artifact_milestone != milestone_id:
+            continue
+        if metadata.get("completion_state") != "complete":
+            continue
+        generator = metadata.get("generator")
+        if verifier:
+            if generator != "verify-qa" or metadata.get("validation_status") != "validated":
+                continue
+        elif (
+            generator not in _INDEPENDENT_REVIEW_GENERATORS
+            or metadata.get("validation_status") != "validated"
+        ):
+            continue
+        if _evidence_has_failure(metadata):
+            continue
+        return True
+    return False
+
+
+# A signoff review must come from a dedicated reviewer, not merely any artifact
+# writer that happens to use the ``.review.md`` suffix.
+_INDEPENDENT_REVIEW_GENERATORS: frozenset[str] = frozenset({"codereview"})
+
+
+def _signoff_milestone_id(value: object) -> str:
+    """Return a stable signoff milestone token, or empty when unscoped."""
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or not any(character.isalnum() for character in value)
+    ):
+        return ""
+    return stable_milestone_id(value)
+
+
+def _evidence_has_failure(metadata: dict[str, object]) -> bool:
+    """Recognize the compact negative verdict tokens used by evidence writers."""
+    failed = {"fail", "failed", "block", "blocked", "blocking", "changes_requested"}
+    for key in ("verdict", "status", "review_status"):
+        value = metadata.get(key)
+        if isinstance(value, str) and value.strip().lower().replace(" ", "_") in failed:
+            return True
+    return False
 
 
 def next_steps(repo: Path | str, skill: object) -> NextSteps:

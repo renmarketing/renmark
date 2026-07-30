@@ -10,12 +10,67 @@ from types import SimpleNamespace
 import pytest
 
 from renmark import lifecycle
+from renmark.delivery_state import DeliveryState, write_delivery_state
 from renmark.lifecycle import NEXT_BY_STAGE, LifecycleBloatError, LifecycleState
 from renmark.summary import write_artifact
 
 
 def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "init", str(path)], check=True, capture_output=True)
+
+
+def _init_git_repo_with_head(path: Path) -> str:
+    _init_git_repo(path)
+    (path / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(path), "add", "tracked.txt"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "-c",
+            "user.name=Test User",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "test baseline",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _write_milestone_evidence(
+    repo: Path,
+    name: str,
+    *,
+    source_sha: str,
+    generator: str,
+    **metadata: object,
+) -> None:
+    validation_status = str(metadata.pop("validation_status", "validated"))
+    artifact = write_artifact(
+        repo / ".renmark" / "reviews" / name,
+        artifact_type="verification" if generator == "verify-qa" else "review",
+        body="evidence",
+        summary_lines=["clean"],
+        source_sha=source_sha,
+        generator=generator,
+        validation_status=validation_status,
+    )
+    if metadata:
+        frontmatter = "".join(f"{key}: {value}\n" for key, value in metadata.items())
+        artifact.write_text(
+            artifact.read_text(encoding="utf-8").replace("---\n", f"---\n{frontmatter}", 1),
+            encoding="utf-8",
+        )
 
 
 def test_read_lifecycle_none_when_missing(tmp_path: Path) -> None:
@@ -891,6 +946,268 @@ def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
         "out_of_tree",
         "stale_artifact",
     ]
+
+
+# ── Milestone signoff readiness ──────────────────────────────────────────────
+
+
+def test_agency_milestone_signoff_requires_fresh_clean_verification_and_review(tmp_path: Path) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "milestone.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness == lifecycle.MilestoneReadiness(
+        ready=True,
+        verification_ready=True,
+        review_ready=True,
+        review_required=True,
+    )
+    assert lifecycle.milestone_signoff_ready(tmp_path) is True
+    assert lifecycle.milestone_release_ready(tmp_path) is True
+
+
+@pytest.mark.parametrize("artifact_name", ["milestone.qa.md", "milestone.review.md"])
+def test_agency_milestone_signoff_rejects_stale_evidence(tmp_path: Path, artifact_name: str) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.qa.md",
+        source_sha="stale-revision" if artifact_name == "milestone.qa.md" else head,
+        generator="verify-qa",
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.review.md",
+        source_sha="stale-revision" if artifact_name == "milestone.review.md" else head,
+        generator="codereview",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is (artifact_name != "milestone.qa.md")
+    assert readiness.review_ready is (artifact_name != "milestone.review.md")
+
+
+@pytest.mark.parametrize("artifact_name", ["milestone.qa.md", "milestone.review.md"])
+def test_agency_milestone_signoff_rejects_failed_evidence(tmp_path: Path, artifact_name: str) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.qa.md",
+        source_sha=head,
+        generator="verify-qa",
+        validation_status="failed" if artifact_name == "milestone.qa.md" else "validated",
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.review.md",
+        source_sha=head,
+        generator="codereview",
+        validation_status="failed" if artifact_name == "milestone.review.md" else "validated",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is (artifact_name != "milestone.qa.md")
+    assert readiness.review_ready is (artifact_name != "milestone.review.md")
+
+
+def test_active_milestone_rejects_same_head_evidence_from_another_milestone(tmp_path: Path) -> None:
+    """Evidence from another milestone must not unlock the active boundary."""
+    head = _init_git_repo_with_head(tmp_path)
+    write_delivery_state(tmp_path, DeliveryState(active_milestone_id="M1", loop_status="passed"))
+    _write_milestone_evidence(
+        tmp_path,
+        "other.qa.md",
+        source_sha=head,
+        generator="verify-qa",
+        milestone_id="M2",
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "other.review.md",
+        source_sha=head,
+        generator="codereview",
+        milestone_id="M2",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True, milestone_id="M1")
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is False
+    assert readiness.review_ready is False
+
+
+@pytest.mark.parametrize(
+    ("generator", "validation_status"),
+    [("arbitrary-writer", "validated"), ("codereview", "unvalidated")],
+)
+def test_milestone_signoff_rejects_nonindependent_or_unvalidated_review_evidence(
+    tmp_path: Path, generator: str, validation_status: str
+) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.review.md",
+        source_sha=head,
+        generator=generator,
+        validation_status=validation_status,
+        milestone_id="M1",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True, milestone_id="M1")
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is True
+    assert readiness.review_ready is False
+
+
+def test_milestone_readiness_blocks_an_unresolved_persisted_delivery_loop(tmp_path: Path) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "milestone.review.md", source_sha=head, generator="codereview")
+    write_delivery_state(tmp_path, DeliveryState(loop_status="blocked"))
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness.ready is False
+    assert "delivery loop" in " ".join(readiness.blockers)
+
+
+def test_direct_readiness_is_proportional_unless_review_is_requested(tmp_path: Path) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+
+    proportional = lifecycle.milestone_signoff_readiness(tmp_path, agency=False)
+    requested_review = lifecycle.milestone_signoff_readiness(
+        tmp_path, agency=False, require_review=True
+    )
+
+    assert proportional.ready is True
+    assert proportional.review_required is False
+    assert proportional.review_ready is False
+    assert requested_review.ready is False
+    assert requested_review.review_required is True
+
+
+def test_persisted_agency_boundary_recovery_restores_signoff_readiness(tmp_path: Path) -> None:
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "milestone.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    # A fresh lifecycle reader after the boundary sees persisted agency state and evidence.
+    assert lifecycle.read_agency(tmp_path).active is True
+    assert lifecycle.milestone_signoff_readiness(tmp_path).ready is True
+    assert lifecycle.milestone_signoff_ready(tmp_path) is True
+
+
+def test_delivery_missing_active_agency_milestone_requires_matching_evidence(tmp_path: Path) -> None:
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "milestone.review.md", source_sha=head, generator="codereview")
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is False
+    assert readiness.review_ready is False
+
+
+@pytest.mark.parametrize("delivery_milestone_id", ["", "!!!"])
+def test_invalid_delivery_milestone_id_keeps_agency_evidence_bound_to_m1(
+    tmp_path: Path, delivery_milestone_id: str
+) -> None:
+    """An empty or punctuation-only delivery ID cannot unbind active Agency evidence."""
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    write_delivery_state(
+        tmp_path,
+        DeliveryState(active_milestone_id=delivery_milestone_id, loop_status="passed"),
+    )
+    _write_milestone_evidence(tmp_path, "unbound.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "unbound.review.md", source_sha=head, generator="codereview")
+
+    unbound = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert unbound.ready is False
+    assert unbound.verification_ready is False
+    assert unbound.review_ready is False
+
+    _write_milestone_evidence(
+        tmp_path, "bound.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "bound.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    bound = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert bound.ready is True
+    assert bound.verification_ready is True
+    assert bound.review_ready is True
+
+
+def test_corrupt_delivery_state_rejects_unbound_active_agency_evidence(tmp_path: Path) -> None:
+    """A delivery read error must not let unbound evidence cross an Agency boundary."""
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    delivery_path = tmp_path / ".renmark" / "state" / "delivery.json"
+    delivery_path.write_text("{not valid json", encoding="utf-8")
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "milestone.review.md", source_sha=head, generator="codereview")
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is False
+    assert readiness.review_ready is False
+
+
+def test_corrupt_delivery_state_accepts_matching_active_agency_evidence(tmp_path: Path) -> None:
+    """Agency state remains an authoritative milestone binding after delivery read failure."""
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    delivery_path = tmp_path / ".renmark" / "state" / "delivery.json"
+    delivery_path.write_text("{not valid json", encoding="utf-8")
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "milestone.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert readiness.ready is True
+    assert readiness.verification_ready is True
+    assert readiness.review_ready is True
 
 
 def test_agency_hint_inactive_is_passthrough(tmp_path):

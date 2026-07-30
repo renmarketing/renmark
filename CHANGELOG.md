@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(delivery): complete WP-M4-4 signoff integrity
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added bounded milestone readiness predicates requiring fresh, milestone-bound verified evidence, validated independent review, and a passed loop. Agency evidence remains bound through loaded, missing, corrupt, empty, and punctuation-only delivery-state cases; direct Orchestrator remains proportional.
+**Files changed:** `renmark/lifecycle.py`, `tests/test_lifecycle.py`, `CHANGELOG.md`.
+**Do not change:** Never infer Agency signoff from unbound same-HEAD evidence; failed/stale QA, arbitrary reviewers, unresolved loops, corrupt state, and unusable delivery IDs must fail closed.
+
 ## [2026-07-30] - feat(delivery): complete WP-M4-3 review-to-fix safety
 
 **Request:** Execute M4 under the approved bounded milestone policy.
