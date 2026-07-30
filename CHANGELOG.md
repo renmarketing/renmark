@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - demo: stage M1 owner checkpoint
+
+**Request:** Present M1’s owner-visible status and drift-repair behavior, then stop before M2 at the required signoff and budget-exception gate.
+**Built:** Captured bounded live `delivery_state` output, demonstrated stable legacy run identity plus Agency/Conductor drift repair, linked verification/review/remediation evidence, and staged the lifecycle approval gate.
+**Files changed:** `.renmark/reviews/2026-07-29-d865cc4.milestone-demo.md`, `CHANGELOG.md`; runtime approval state in `.renmark/state/lifecycle.json`.
+**Do not change:** M2 cannot begin before explicit M1 owner signoff; approving this checkpoint authorizes M2 planning only, not M2 execution spend; retain the independent review’s 186,615-token budget overrun in the handoff.
+
 ## [2026-07-29] - review: close M1 canonical-state findings
 
 **Request:** Prove the full M1 review findings are resolved before moving to the milestone checkpoint.
