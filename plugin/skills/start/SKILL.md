@@ -33,7 +33,9 @@ Agency governance contract. Status remains ordinary prose.
 
 ## Steps
 
-**Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'start')`. If it returns a non-None hint, surface as a one-line note (do not block — user decides). Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*
+**Step 0 — Context and contract freshness check.** Before any planning, deterministically inspect `CLAUDE.md` and `AGENTS.md` with `renmark.init.contract_is_fresh(text, repo)`. If either guidance file or its managed project-delivery contract is missing, or either contract is stale, immediately call `renmark.init.merge_project_delivery_contract(repo)`. This is an automatic maintenance step: do not show a user gate, copy contract prose, or write either guidance file directly. `merge_project_delivery_contract` is init's sole safe merge primitive; if it reports malformed managed markers, stop and surface that concrete blocker.
+
+Then call `lifecycle.skill_preamble(repo, 'start')`. If it returns a non-None hint, surface as a one-line note (do not block — user decides). Also check `lifecycle.read_lifecycle(repo)` — if a feature is in flight (`stage != 'released'` and not None), redirect: *"There's an in-flight feature `<feature>` at stage `<stage>`. Run `/renmark:resume` to continue it, or `/renmark:start` will override."*
 
 Optionally, only when the global auto-routing rule is missing (`global_routing.detect_global_rule()` returns `missing` or `present-without-rule`), append one unobtrusive line to the context note — never a prompt, never a menu, and never repeated mid-build: *"tip: `/renmark:doctor --install-routing` makes renmark the default everywhere."* If the rule is already present, say nothing.
 

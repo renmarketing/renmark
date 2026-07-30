@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - docs(contract): complete M5 entry freshness routing
+
+**Request:** Execute M5 project contract propagation under the approved cap.
+**Built:** Start and Feature now perform deterministic contract freshness routing through init's sole safe merge primitive without adding a mode gate, writer, or contract copy.
+**Files changed:** `plugin/skills/start/SKILL.md`, `plugin/skills/feature/SKILL.md`, `CHANGELOG.md`.
+**Do not change:** Defined Feature remains direct Orchestrator and Start preserves its M2 Agency/Orchestrator decision; neither entry point may own contract text or writes.
+
 ## [2026-07-30] - feat(contract): complete WP-M5-2 safe refresh primitive
 
 **Request:** Execute M5 project contract propagation under the approved cap.

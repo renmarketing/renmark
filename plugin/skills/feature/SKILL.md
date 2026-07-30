@@ -58,6 +58,14 @@ gate; it never silently expands this feature's scope.
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'feature')`. If it returns a non-None hint, surface as a one-line note.
 
+**Contract freshness (deterministic, before feature planning).** Before creating or
+resuming the feature branch, inspect the root guidance with
+`renmark.init.contract_is_fresh`. If either managed project-delivery contract is
+missing or stale, invoke `renmark.init.merge_project_delivery_contract(repo)`, the
+sole safe writer, then continue automatically. This Feature entry point only routes
+the refresh: it never copies contract prose, writes guidance files, or introduces a
+user gate; malformed markers retain init's fail-safe stop.
+
 **Router contract reminder:** `/renmark:feature` is a **workflow router**, not a reasoning agent. It must NOT plan, code, test, review, or document. Its only actions are: read `lifecycle.json` → determine next stage → dispatch the right stage skill → receive a bounded summary → update `lifecycle.json` → recommend next action. See the plan's Section 3 ("/renmark:feature is a router, not an engineer") for the MUST/MUST NOT list.
 
 ### 1. Create branch
