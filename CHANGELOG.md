@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - plan: repackage remaining M2 by milestone outcome
+
+**Request:** Treat remaining M2 work as milestone-sized implementation-plus-test packages with a bounded build→verify→review→fix loop.
+**Built:** Replaced task-index continuation with three stable work packages for runtime/lifecycle/CLI, entry-skill routing, and cross-host behavior; retained the Part 1→Part 2 dependency, three-iteration ceiling, approved scope, and remaining `72,100`-token / `$0.5365` envelope.
+**Files changed:** `.renmark/plans/2026-07-30-m2-milestone-work-packages.md`, `CHANGELOG.md`; canonical package progress in `.renmark/state/delivery.json`.
+**Do not change:** Never resume by task index; persist every package boundary and stop on unresolved verification/review findings, security/destructive gates, or any budget/scope expansion.
+
 ## [2026-07-30] - fix(selector): close M2 task 7 verifier
 
 **Request:** Debug task 7’s `tests/test_interaction.py` verifier before resuming M2 orchestration.
