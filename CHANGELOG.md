@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Make selector capabilities surface-aware
+
+**Request:** Resolve selector behavior from the active host surface so Claude and Codex present the same semantic decision without claiming unsupported UI.
+**Built:** Added render-time surface and selector capability resolution for Claude, Codex Plan, Codex Default, explicit runtime overrides, and conservative unknown-host fallback.
+**Files changed:** `renmark/hosts.py`, `CHANGELOG.md`.
+**Do not change:** Codex must never advertise unsupported clear/compact/resume commands; selector absence is not headless mode, and capability resolution must not persist or switch the host collaboration mode.
+
 ## [2026-07-30] - Add canonical public delivery-mode resolver
 
 **Request:** Resolve public delivery behavior through the approved Agency or Orchestrator contract while retaining safe compatibility with legacy mode state.
