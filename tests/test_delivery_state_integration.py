@@ -3,10 +3,12 @@ from pathlib import Path
 
 from renmark import agency as agency_mod
 from renmark import lifecycle as lifecycle_mod
-from renmark.delivery_state import CONTRACT_VERSION
+from renmark.delivery_state import (
+    CONTRACT_VERSION,
+    DeliveryProvenanceEvent,
+    WorkPackageSummary,
+)
 from renmark.delivery_state import DeliveryState as CanonicalDeliveryState
-from renmark.delivery_state import DeliveryProvenanceEvent
-from renmark.delivery_state import WorkPackageSummary
 from renmark.lifecycle import read_legacy_delivery_summary
 from renmark.mode import mode_state_path
 from renmark.program import program_json_path
@@ -126,11 +128,13 @@ def test_legacy_delivery_summary_projects_one_canonical_run(
     _write_json(mode_state_path(tmp_path), {"mode": "conductor"})
 
     summary = read_legacy_delivery_summary(tmp_path)
+    repeated = read_legacy_delivery_summary(tmp_path)
     delivery = summary.canonical_delivery
     payload = summary.as_dict()
 
     assert delivery.delivery_mode == "agency"
     assert delivery.delivery_mode != "conductor"
+    assert repeated.delivery.run_id == delivery.run_id
     assert delivery.execution_policy == "guided"
     assert delivery.active_milestone_id == "go-live-wave-1"
     assert delivery.work_packages[0].milestone_id == "go-live-wave-1"

@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-29, .renmark/debug/20260730-001342-658d/session.md) model `debug`: **debug-m1-canonical-identity-convergence** — Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
+
+- (2026-07-29, bug) **M1 canonical state had unstable identity and validator drift** — Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
+
 - (2026-07-29, .renmark/reviews/2026-07-29-4702acb.verification.md) model `verify`: **verify-m1-canonical-delivery-state** — 4/4 behaviors verified; failed: none; regressions: repository suite
 
 - (2026-07-29, .renmark/debug/20260729-220633-3642/session.md) model `debug`: **debug-m1-delivery-state-normalization** — Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.

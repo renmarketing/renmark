@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from renmark import delivery_state
+from renmark import delivery_state, schemas
 from renmark.delivery_state import (
     PROVENANCE_EVENT_CAP,
     DeliveryProvenanceEvent,
@@ -84,14 +84,14 @@ def test_missing_state_returns_default_and_missing_report(tmp_path: Path) -> Non
     assert fresh.run_id.startswith("delivery-")
 
 
-def test_write_read_round_trip_preserves_schema_version(tmp_path: Path) -> None:
+def test_write_read_round_trip_canonicalizes_schema_metadata(tmp_path: Path) -> None:
     state = _sample_state()
 
     path = write_delivery_state(tmp_path, state)
     loaded, report = read_delivery_state_with_report(tmp_path)
 
     assert path == delivery_state.delivery_state_path(tmp_path)
-    assert loaded.schema_version == 7
+    assert loaded.schema_version == delivery_state.SCHEMA_VERSION
     assert loaded.run_id == state.run_id
     assert loaded.delivery_mode == "agency"
     assert loaded.execution_policy == "async"
@@ -100,7 +100,7 @@ def test_write_read_round_trip_preserves_schema_version(tmp_path: Path) -> None:
     assert loaded.review_status == "approved"
     assert loaded.verification_status == "passed"
     assert loaded.loop_status == "blocked"
-    assert loaded.contract_version == "delivery-state/v7"
+    assert loaded.contract_version == delivery_state.CONTRACT_VERSION
     assert loaded.source_sha == "abc123"
     assert loaded.legacy_refs == ["legacy/ref-1"]
     assert len(loaded.work_packages) == 1
@@ -108,6 +108,20 @@ def test_write_read_round_trip_preserves_schema_version(tmp_path: Path) -> None:
     assert loaded.provenance_events[0].kind == "created"
     assert report.state == "loaded"
     assert report.path == str(path)
+
+
+def test_delivery_state_output_satisfies_canonical_validator() -> None:
+    state = DeliveryState(
+        schema_version=7,
+        contract_version="delivery-state/v7",
+        run_id="delivery-abc123",
+    )
+
+    assert state.schema_version == delivery_state.SCHEMA_VERSION
+    assert state.contract_version == delivery_state.CONTRACT_VERSION
+    assert state.run_id.startswith("delivery-")
+    assert len(state.run_id) == len("delivery-") + 12
+    assert schemas.validate_delivery_state(state.to_dict()) == []
 
 
 def test_invalid_public_modes_repair_to_supported_values() -> None:

@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-29 — M1 canonical state had unstable identity and validator drift
+
+**Severity:** high
+**Symptom:** Repeated legacy reads changed run_id and DeliveryState serialized metadata rejected by validate_delivery_state.
+**Root cause:** M1 omitted deterministic legacy run-identity derivation and treated canonical schema, contract, and run-ID metadata as caller-owned during normalization even though the validator defines those fields as fixed invariants.
+**Fix:** Derive legacy run IDs from persisted Program/Lifecycle/Agency identity fields; normalize schema_version, contract_version, and malformed run IDs to canonical values; add stability and writer-validator convergence regressions.
+**Lesson:** Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
+
+---
+
 ### 2026-07-29 — M1 delivery-state CLI crashed on legacy work packages
 
 **Severity:** medium

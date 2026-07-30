@@ -35,6 +35,7 @@ from .delivery_state import (
     WorkPackageSummary,
     append_provenance_event,
     default_delivery_state,
+    stable_delivery_run_id,
 )
 from .hosts import HostKind, capabilities_for
 from .mode import mode_state_path
@@ -1218,6 +1219,15 @@ def read_legacy_delivery_summary(repo: Path | str) -> LegacyDeliverySummary:
         if agency_state.active
         else _project_workflow_delivery(lifecycle_state, program_state, pipeline_state)
     )
+    delivery = replace(
+        delivery,
+        run_id=_legacy_delivery_run_id(
+            repo_path,
+            lifecycle_state=lifecycle_state,
+            agency_state=agency_state,
+            program_state=program_state,
+        ),
+    )
 
     raw_mode_token = _read_raw_mode_token(repo_path)
     mode_note, execution_policy = _normalize_mode_note(raw_mode_token)
@@ -1258,6 +1268,28 @@ def _safe_read_program(repo: Path, notes: list[str]) -> Program | None:
     except ProgramStateError as exc:
         notes.append(f"program state unreadable; ignored legacy program drift ({str(exc).splitlines()[0][:72]})")
         return None
+
+
+def _legacy_delivery_run_id(
+    repo: Path,
+    *,
+    lifecycle_state: LifecycleState | None,
+    agency_state: AgencyState,
+    program_state: Program | None,
+) -> str:
+    lifecycle_artifacts = lifecycle_state.artifacts if lifecycle_state is not None else {}
+    return stable_delivery_run_id(
+        "legacy",
+        getattr(program_state, "created_at", ""),
+        getattr(program_state, "source_sha", ""),
+        getattr(program_state, "feature", ""),
+        lifecycle_state.feature if lifecycle_state is not None else "",
+        lifecycle_state.branch if lifecycle_state is not None else "",
+        lifecycle_state.github_issue if lifecycle_state is not None else "",
+        lifecycle_artifacts.get("plan", ""),
+        getattr(agency_state, "roadmap_ref", ""),
+        repo.name,
+    )
 
 
 def _project_workflow_delivery(

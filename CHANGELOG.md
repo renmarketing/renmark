@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-29] - fix(delivery-state): resolve M1 review blockers
+
+**Request:** Fix every blocking finding from the full M1 code review before allowing milestone signoff or M2 planning.
+**Built:** Derived stable legacy run IDs from persisted Program/Lifecycle/Agency identity, normalized schema/contract/run metadata to the canonical validator contract, and added repeat-read plus writer-validator convergence regressions; the affected matrix and full suite pass.
+**Files changed:** `renmark/delivery_state.py`, `renmark/lifecycle.py`, `tests/test_delivery_state.py`, `tests/test_delivery_state_integration.py`, `tests/test_cli_delivery_state.py`, `.renmark/reviews/2026-07-29-d185b66.review.md`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; runtime debug evidence under `.renmark/debug/20260730-001342-658d/`.
+**Do not change:** Legacy projection must return the same run ID for unchanged persisted workflow identity; every serialized `DeliveryState` must satisfy `schemas.validate_delivery_state`; canonical version fields are writer-owned invariants, not caller-owned passthrough.
+
 ## [2026-07-29] - verify: M1 canonical delivery state
 
 **Request:** Re-verify M1 after repairing the live delivery-state inspection path, and do not advance to milestone review until the complete state flow is green.

@@ -74,7 +74,7 @@ def test_delivery_state_cli_reports_loaded_clean_state(
         "delivery_mode=agency "
         "execution_policy=async "
         "active_milestone=milestone-alpha "
-        "contract_version=delivery-state/v9 "
+        "contract_version=delivery-state/v1 "
         "freshness=loaded "
         "drift_count=0"
     )

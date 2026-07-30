@@ -20,6 +20,7 @@ legacy compatibility rules:
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import tempfile
@@ -192,6 +193,16 @@ def stable_work_package_id(milestone_id: str, value: str) -> str:
 
 def new_run_id() -> str:
     return f"delivery-{uuid.uuid4().hex[:12]}"
+
+
+def stable_delivery_run_id(*identity_parts: object) -> str:
+    """Derive a host-independent run ID from persisted legacy identity fields."""
+    normalized = "\x1f".join(
+        " ".join(str(part).split()) if part is not None else ""
+        for part in identity_parts
+    )
+    digest = hashlib.sha256((normalized or "legacy-delivery-run").encode("utf-8")).hexdigest()
+    return f"delivery-{digest[:12]}"
 
 
 def read_delivery_state(repo: str | Path) -> DeliveryState:
@@ -425,8 +436,8 @@ def _normalized_state(state: DeliveryState) -> DeliveryState:
                 break
 
     return _build_state(
-        schema_version=state.schema_version if isinstance(state.schema_version, int) else SCHEMA_VERSION,
-        run_id=_clean_text(state.run_id, 48) or new_run_id(),
+        schema_version=SCHEMA_VERSION,
+        run_id=_normalize_run_id(state.run_id),
         delivery_mode=delivery_mode,
         execution_policy=execution_policy,
         active_milestone_id=active_milestone_id if active_milestone_id != "milestone" else "",
@@ -436,7 +447,7 @@ def _normalized_state(state: DeliveryState) -> DeliveryState:
         review_status=_normalize_status(state.review_status),
         verification_status=_normalize_status(state.verification_status),
         loop_status=_normalize_status(state.loop_status),
-        contract_version=_clean_text(state.contract_version, 40) or CONTRACT_VERSION,
+        contract_version=CONTRACT_VERSION,
         source_sha=_clean_text(state.source_sha, 64),
         provenance_events=[
             item.normalized() for item in state.provenance_events[-PROVENANCE_EVENT_CAP:]
@@ -487,6 +498,15 @@ def _normalize_status(value: str) -> str:
     if cleaned not in _VALID_STATUSES:
         return "unknown"
     return cleaned
+
+
+def _normalize_run_id(value: str) -> str:
+    cleaned = _clean_text(value, 48).lower()
+    prefix = "delivery-"
+    suffix = cleaned[len(prefix) :] if cleaned.startswith(prefix) else ""
+    if len(suffix) == 12 and all(ch in "0123456789abcdef" for ch in suffix):
+        return f"{prefix}{suffix}"
+    return new_run_id()
 
 
 def _expect_str(data: dict[str, Any], key: str, default: str = "") -> str:
