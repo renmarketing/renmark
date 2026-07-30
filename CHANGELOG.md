@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(planning): complete WP-M3-2 compiler compatibility
+
+**Request:** Debug the typed parser/compiler boundary, then resume WP-M3-2 by stable package ID.
+**Built:** Added the package-to-legacy Task compiler with bounded sidecar metadata and corrected the nullable parser target plus untyped kwargs boundary that blocked mypy.
+**Files changed:** `renmark/parser.py`, `renmark/work_packages.py`, `tests/test_work_packages.py`, `.renmark/debug/20260730-153736-57ff/`, `.renmark/reviews/2026-07-30-wp-m3-2-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Keep package provenance outside Task's wire shape, require artifact-pointer dependencies, and use explicit typed forwarding at package compiler boundaries.
+
 ## [2026-07-30] - feat(planning): complete WP-M3-1 schemas and parser
 
 **Request:** Run M3 as bounded milestone-sized implementation-plus-test packages.

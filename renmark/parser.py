@@ -234,9 +234,14 @@ def parse_package_plan(path: str | Path) -> PackagePlan:
         if key == "mode":
             mode = value.strip().lower()
             continue
-        if current_package is None and current_milestone is None:
+        if current_package is not None:
+            if current_milestone is None:
+                raise PlanError(f"work package at line {line_no} has no milestone")
+            target: dict[str, Any] = current_package
+        elif current_milestone is not None:
+            target = current_milestone
+        else:
             continue
-        target = current_package if current_package is not None else current_milestone
         if key == "id":
             if current_package is not None:
                 target[key] = stable_work_package_id(current_milestone["id"], value)
