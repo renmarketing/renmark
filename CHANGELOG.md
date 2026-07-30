@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(contract): complete M5 project contract propagation
+
+**Request:** Execute the approved M5 delivery-contract milestone.
+**Built:** Propagated the canonical two-mode, selector-capable managed contract through root guidance and templates; proved init/new-existing plus stale Start/Feature converge, preserve custom CRLF bytes on first refresh, remain idempotent, and fail safely on malformed markers.
+**Files changed:** `CLAUDE.md`, `AGENTS.md`, `plugin/templates/CLAUDE.md.template`, `plugin/templates/AGENTS.md.template`, `tests/test_contract_propagation.py`, `CHANGELOG.md`.
+**Do not change:** Init is the only writer; refresh never changes unmarked instructions, including their line endings/spacing; Start and Feature only route freshness through init.
+
 ## [2026-07-30] - docs(contract): complete M5 entry freshness routing
 
 **Request:** Execute M5 project contract propagation under the approved cap.

@@ -83,17 +83,51 @@ See `CLAUDE.md` § `deterministic-first-routing` + `plugin/skills/.shared/determ
 
 **Executor dispatch.** `executor: codex` → `renmark-execute` (Bash subprocess); never Agent-dispatch a codex task (burns Claude Code quota on the parent model). `executor: haiku / sonnet / opus` → Agent calls, no model override. `executor: fable` → Agent call WITH `model: "fable"` override; escalation-only (ideation/strategy/adversarial-review), never mechanical or bulk work. Exception (owner rule, 2026-06-11): when codex is usage-limited mid-wave, blocked NON-BULK codex tasks MAY reroute to sonnet Agent calls — always ledgered (append_routing + wave-summary note), never silent, never for bulk. See `CLAUDE.md` § `executor-dispatch-rule`.
 
-<!-- BEGIN:operating-modes-rule -->
-## Operating modes (Conductor / Orchestrator)
-Renmark runs in one of two modes that shape how the agent behaves. **Conductor** = hands-on, small-step: single-file/tight scope, avoid subagents unless necessary, explain the next move before editing — best for exploration, debugging, small fixes, and learning. **Orchestrator** = async/goal-level: dispatch parallel scoped subagents with narrow missions, load skills dynamically, offload bounded tasks to Codex, and review outcomes rather than keystrokes — best for features, migrations, QA, docs, and deploy prep.
-**Selection:** asked once at the first meaningful workflow of a session and persisted (survives `/clear`). Smart per-skill default: `debug`/`brainstorm` → Conductor; `start`/`feature`/`orchestrate`/`finish` → Orchestrator. Override anytime via `renmark-execute --set-mode conductor|orchestrator` (also `--get-mode`, `--clear-mode`).
-**Guardrails:** the mode ask MUST stay ask-once — never a per-entry gate that would break the auto-routing default. Conductor guides via prose/preamble and NEVER programmatically blocks subagent dispatch.
-*Mirrored in `CLAUDE.md`.*
-<!-- END:operating-modes-rule -->
+<!-- BEGIN:project-delivery-contract -->
+<!-- Last refreshed: @ 3b3cee9 -->
+# Managed Project Delivery Contract
 
-## Agency Mode (third delivery modality)
-Agency Mode is an OPTIONAL higher-level project-delivery workflow that sits ABOVE Conductor and Orchestrator and does NOT replace them — it drives Orchestrator internally. Explicit opt-in via `/renmark:start` (never auto-detected). It runs the owner-facing delivery loop: discovery → PRD agreement → tech-stack recommendation → roadmap/milestones → build → demo/feedback → verification → signoff → release, pausing at milestone checkpoints for owner signoff. Lightweight resumable state lives in `.renmark/state/agency.json` (`renmark/agency.py`); the agency contract loads on demand from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` (never eager). Reuses — never re-implements — cost-control / finish-lanes / deterministic-first infra.
-*Mirrored in `CLAUDE.md`.*
+This concise fragment is the canonical source for managed `CLAUDE.md` and
+`AGENTS.md` blocks. It defines two owner paths: **Agency** governs an
+owner-facing project engagement (discovery, agreement, milestones, signoff),
+while **Orchestrator** executes a defined, approved milestone through scoped
+work. Neither path replaces the other; Agency drives Orchestrator when build
+work is ready.
+
+## Milestone delivery
+
+- Express each milestone as a demonstrable owner outcome with acceptance
+  criteria, not a list of activities. Plan only bounded work packages needed
+  for that outcome; preserve the approved scope and surface drift as a human
+  decision.
+- Separate roles: the planner defines packages and evidence, executors make
+  scoped changes, and an independent reviewer assesses the result. The
+  coordinator consumes bounded package summaries and pointers, never full
+  skill bodies, transcripts, or accumulated implementation context.
+- Verify with deterministic, fresh evidence first. Each package has a focused
+  verifier; the milestone also requires its stated acceptance evidence. See
+  `deterministic-first.md`, `workflow-fanout.md`, and `subagent-profiles.md`.
+- Keep build, review, and repair loops milestone-local. A failed verifier or
+  review may receive only bounded, scoped repair attempts, followed by
+  re-verification and independent re-review. Stop rather than expand scope,
+  repeat an equivalent failure, or treat status prose as proof.
+
+## State and human decisions
+
+Canonical progress, package status, evidence pointers, and gates live in
+`.renmark/state/` and the relevant plan/review artifacts, not conversation
+history. Stop for unclear intent, scope or risk changes, failed bounded
+repair, required owner demo, approval/signoff, merge, release, or another
+human-review gate. Passing tests alone never clear an owner gate. See
+`handoff-menu.md`, `context-taxonomy.md`, and `agency-delivery.md`.
+
+## Decision presentation
+
+When the active host supports a native picker, present selector-capable
+decisions with that picker. Otherwise present the same choices as a numbered
+fallback, with the recommended safe option first; do not make the fallback a
+different decision or an automatic approval. See `interaction-contract.md`.
+<!-- END:project-delivery-contract -->
 
 ## Tooling — renmark workflow
 
