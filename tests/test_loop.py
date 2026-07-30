@@ -602,3 +602,94 @@ def test_usage_by_run_id_garbage_token_field_counts_zero(tmp_path: Path) -> None
         encoding="utf-8",
     )
     assert usage_by_run_id(tmp_path, "run-g") == 0
+
+
+# ── M4: milestone execution loop state ─────────────────────────────────────
+
+
+def test_loop_state_persists_stable_milestone_and_work_package_identity(tmp_path: Path) -> None:
+    """A resumable loop keeps canonical package identity, not display labels."""
+    lid = "loop-m4-identity"
+    write_loop(
+        tmp_path,
+        lid,
+        LoopState(
+            goal="complete package",
+            milestone_id="M4 Execution Review",
+            work_package_id="Repair Loop State",
+        ),
+    )
+
+    resumed = read_loop(tmp_path, lid)
+    assert resumed is not None
+    assert resumed.milestone_id == "m4-execution-review"
+    assert resumed.work_package_id == "m4-execution-review--repair-loop-state"
+
+
+def test_loop_state_resume_preserves_terminal_package_handoff(tmp_path: Path) -> None:
+    """Only a verified completed loop permits scope advancement on resume."""
+    lid = "loop-m4-done"
+    write_loop(
+        tmp_path,
+        lid,
+        LoopState(
+            milestone_id="m4",
+            work_package_id="m4--package-a",
+            status="done",
+            verified_success=True,
+        ),
+    )
+
+    resumed = read_loop(tmp_path, lid)
+    assert resumed is not None
+    assert resumed.stop_reason == "done"
+    assert resumed.scope_advance_allowed is True
+
+
+def test_loop_state_done_without_verified_success_denies_scope_advancement() -> None:
+    """A done status alone is insufficient to advance the work-package scope."""
+    state = LoopState(
+        milestone_id="m4",
+        work_package_id="m4--package-a",
+        status="done",
+    )
+
+    assert state.scope_advance_allowed is False
+
+
+def test_build_decision_requires_fresh_verifier_evidence_before_repair() -> None:
+    """No actionable verifier evidence is a no-progress signal, never a retry."""
+    decision = build_decision(
+        {"completion_state": "partial", "validation_status": "failed"},
+        spent_delta=0,
+    )
+
+    assert decision["goal_reached"] is False
+    assert decision["evidence"] == []
+    assert decision["next_action"] == ""
+    state = LoopState(status="stalled")
+    assert stop_reason(state) == "stalled"
+    assert state.stop_reason == "stalled"
+    assert state.scope_advance_allowed is False
+
+
+def test_loop_stops_after_at_most_two_repair_iterations() -> None:
+    """A work package cannot enter a third repair dispatch."""
+    state = LoopState(iteration=2, max_iterations=2)
+
+    assert stop_reason(state) == "max-iter"
+    assert state.stop_reason == "max-iter"
+    assert state.scope_advance_allowed is False
+
+
+def test_loop_approval_boundary_stops_without_scope_advancement() -> None:
+    """REQ-12 approval work remains a terminal boundary for the package."""
+    state = LoopState(
+        milestone_id="m4",
+        work_package_id="m4--release",
+        pending_step="release package",
+    )
+
+    assert stop_reason(state) == "awaiting-approval"
+    assert state.stop_reason == "awaiting-approval"
+    assert state.scope_advance_allowed is False

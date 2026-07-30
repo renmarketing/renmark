@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(delivery): complete WP-M4-1 loop identity boundary
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added stable milestone/work-package loop identity, bounded terminal stop metadata, and deny-by-default scope advancement. Independent review required explicit verified-success before a terminal loop can advance scope; the scoped repair and re-review passed.
+**Files changed:** `renmark/loop.py`, `tests/test_loop.py`, `CHANGELOG.md`.
+**Do not change:** A `done` status alone is never signoff or scope-advance evidence; legacy loop state remains readable but denies advancement without explicit verified success.
+
 ## [2026-07-30] - plan(delivery): define M4 milestone execution and review loops
 
 **Request:** Plan the remaining delivery work, then dispatch when it is ready.

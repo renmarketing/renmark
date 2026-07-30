@@ -34,10 +34,11 @@ from __future__ import annotations
 import json
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Literal
 
+from .delivery_state import stable_milestone_id, stable_work_package_id
 from .state import RENMARK_DIR_NAME, usage_by_run_id
 
 # ── Tunable constants ──────────────────────────────────────────────────────────
@@ -88,6 +89,10 @@ _COMPLETE_STATE: str = "complete"
 #: machine-readable PASS signal and require ``completion_state == complete``.
 _PASS_VALIDATION: frozenset[str] = frozenset({"validated"})
 
+#: Keep stop metadata useful in the small runtime state without allowing an
+#: unbounded message to turn ``loop.json`` into a log sink.
+STOP_REASON_MAX_CHARS: int = 128
+
 
 # ── Loop state ──────────────────────────────────────────────────────────────
 
@@ -112,6 +117,16 @@ class LoopState:
     iteration: int = 0
     status: str = "running"  # one of LoopStatus
     pending_step: str = ""  # the REQ-12 gate awaiting approval, if any
+    # Additive identity + handoff fields.  Empty identities preserve legacy
+    # standalone loops which predate milestone work packages.
+    milestone_id: str = ""
+    work_package_id: str = ""
+    stop_reason: str = ""
+    # Set only when the loop driver has received a complete, validated verifier
+    # decision. ``done`` alone remains readable for legacy state, but cannot
+    # authorize work-package scope advancement.
+    verified_success: bool = False
+    scope_advance_allowed: bool = False
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, sort_keys=False)
@@ -245,6 +260,12 @@ def _coerce_loop_state(data: dict[str, object]) -> LoopState:
         state.run_id = _coerce_str(data["run_id"])
     if "pending_step" in data:
         state.pending_step = _coerce_str(data["pending_step"])
+    if "milestone_id" in data:
+        state.milestone_id = _coerce_str(data["milestone_id"])
+    if "work_package_id" in data:
+        state.work_package_id = _coerce_str(data["work_package_id"])
+    if "stop_reason" in data:
+        state.stop_reason = _bounded_stop_reason(data["stop_reason"])
     if "budget_tokens" in data:
         state.budget_tokens = _coerce_int(data["budget_tokens"], _INT_DEFAULTS["budget_tokens"])
     if "spent_tokens" in data:
@@ -255,7 +276,59 @@ def _coerce_loop_state(data: dict[str, object]) -> LoopState:
         state.iteration = _coerce_int(data["iteration"], _INT_DEFAULTS["iteration"])
     if "status" in data:
         state.status = _coerce_status(data)
-    return state
+    if "scope_advance_allowed" in data:
+        # Only a literal JSON boolean is trusted.  Strings such as "true" are
+        # deliberately not privilege-escalating migration input.
+        state.scope_advance_allowed = data["scope_advance_allowed"] is True
+    if "verified_success" in data:
+        # Like the handoff flag, only a JSON boolean is accepted; legacy loop
+        # files simply retain the deny-by-default value.
+        state.verified_success = data["verified_success"] is True
+    return _normalise_loop_state(state)
+
+
+def _bounded_stop_reason(value: object) -> str:
+    """Return bounded stop metadata; malformed values degrade to blank."""
+    return _coerce_str(value).strip()[:STOP_REASON_MAX_CHARS]
+
+
+def _normalise_loop_state(state: LoopState) -> LoopState:
+    """Return a JSON-safe state with canonical identity and terminal metadata.
+
+    This is intentionally additive: loops without work-package identity remain
+    valid.  Once either ID is supplied, both are made stable using the delivery
+    state's canonical helpers.  Scope advancement is deny-by-default and is
+    granted only when a ``done`` terminal status is paired with the explicit
+    verified-success marker set by the loop driver after a verified decision.
+    """
+    milestone_raw = _coerce_str(getattr(state, "milestone_id", "")).strip()
+    package_raw = _coerce_str(getattr(state, "work_package_id", "")).strip()
+    # A package always has a milestone namespace, even when a legacy caller
+    # supplied only the package token.
+    milestone_id = stable_milestone_id(milestone_raw) if (milestone_raw or package_raw) else ""
+    work_package_id = (
+        stable_work_package_id(milestone_id, package_raw) if package_raw else ""
+    )
+
+    status = _coerce_status({"status": getattr(state, "status", "running")})
+    if status in TERMINAL_STATUSES:
+        # Status remains the backward-compatible authority.  The new field is
+        # bounded, deterministic metadata for consumers that need an explicit
+        # stop cause instead of inferring it from status.
+        stop = status
+        scope_advance_allowed = status == "done" and state.verified_success is True
+    else:
+        stop = ""
+        scope_advance_allowed = False
+
+    return replace(
+        state,
+        milestone_id=milestone_id,
+        work_package_id=work_package_id,
+        status=status,
+        stop_reason=stop,
+        scope_advance_allowed=scope_advance_allowed,
+    )
 
 
 def write_loop(repo: str | Path, loop_id_value: str, state: LoopState) -> Path | None:
@@ -275,7 +348,7 @@ def write_loop(repo: str | Path, loop_id_value: str, state: LoopState) -> Path |
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(state.to_json(), encoding="utf-8")
+        tmp.write_text(_normalise_loop_state(state).to_json(), encoding="utf-8")
         tmp.replace(path)  # atomic on the same filesystem
     except OSError:
         try:
@@ -555,6 +628,7 @@ def stop_reason(state: LoopState) -> str | None:
     try:
         status = getattr(state, "status", "") or ""
         if status in TERMINAL_STATUSES:
+            _record_stop_metadata(state, status)
             return status
 
         spent = int(getattr(state, "spent_tokens", 0) or 0)
@@ -566,15 +640,29 @@ def stop_reason(state: LoopState) -> str | None:
 
         # Budget ceiling is checked first — never exceed the approved spend.
         if budget > 0 and spent >= budget:
+            _record_stop_metadata(state, "budget-hit")
             return "budget-hit"
         if max_iter > 0 and iteration >= max_iter:
+            _record_stop_metadata(state, "max-iter")
             return "max-iter"
         if pending:
+            _record_stop_metadata(state, "awaiting-approval")
             return "awaiting-approval"
         return None
     except (TypeError, ValueError, AttributeError):
         # A malformed state must stop the loop, not run it unbounded.
+        _record_stop_metadata(state, "stalled")
         return "stalled"
+
+
+def _record_stop_metadata(state: LoopState, reason: str) -> None:
+    """Persist bounded terminal metadata without changing legacy ``status``.
+
+    The driver still owns status transitions.  This helper only records why a
+    stop was selected and makes scope advancement explicit for handoff code.
+    """
+    state.stop_reason = _bounded_stop_reason(reason)
+    state.scope_advance_allowed = reason == "done" and state.verified_success is True
 
 
 # ── Budget gate ───────────────────────────────────────────────────────────────
@@ -639,6 +727,7 @@ __all__ = [
     "DEFAULT_MAX_ITERATIONS",
     "LOOPS_SUBDIR",
     "LOOP_JSON",
+    "STOP_REASON_MAX_CHARS",
     "TERMINAL_STATUSES",
     "LoopState",
     "LoopStatus",
