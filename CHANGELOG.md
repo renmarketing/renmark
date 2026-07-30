@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - feat(planning): complete WP-M3-4 cost previews
+
+**Request:** Continue M3 dispatch through bounded work packages.
+**Built:** Added deterministic package/milestone cost aggregation while retaining legacy cost APIs.
+**Files changed:** `renmark/cost.py`, `tests/test_cost.py`, `.renmark/reviews/2026-07-30-wp-m3-4-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Cost previews must expose package totals, deterministic-only work, escalation, and cheaper alternatives without hidden spend.
+
 ## [2026-07-30] - feat(planning): complete WP-M3-3 package gates
 
 **Request:** Continue M3 dispatch through bounded work packages.

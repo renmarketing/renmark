@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from renmark.cost import cost_band, estimate_cost, requires_escalation
+from renmark.cost import cost_band, estimate_cost, estimate_package_plan_cost, requires_escalation
 
 
 def test_estimate_cost_sums_tokens_overhead_and_prices_per_tier() -> None:
@@ -167,3 +167,49 @@ def test_estimate_cost_back_compat_fields_still_populated() -> None:
     assert isinstance(preview.model_driven_count, int)
     assert isinstance(preview.deterministic_tokens, int)
     assert isinstance(preview.model_driven_tokens, int)
+
+
+def test_package_plan_cost_keeps_package_totals_and_milestone_aggregation_visible() -> None:
+    preview = estimate_package_plan_cost(
+        {
+            "milestones": [
+                {
+                    "id": "m3",
+                    "work_packages": [
+                        {"id": "m3--schema-check", "cost_lane": "check", "est_tokens": 50},
+                        {"id": "m3--compiler", "cost_lane": "opus", "est_tokens": 1000, "complexity": "hard"},
+                    ],
+                },
+                {
+                    "id": "m4",
+                    "work_packages": [
+                        {"id": "m4--review", "cost_lane": "fable", "est_tokens": 200, "complexity": "medium"},
+                    ],
+                },
+            ]
+        }
+    )
+
+    assert [milestone.milestone_id for milestone in preview.milestones] == ["m3", "m4"]
+    assert [package.package_id for package in preview.milestones[0].packages] == [
+        "m3--schema-check", "m3--compiler"
+    ]
+    assert preview.milestones[0].packages[0].preview.est_cost_usd == 0.0
+    assert preview.milestones[0].preview.est_tokens == 11_050
+    assert preview.milestones[1].preview.requires_expensive_model is True
+    assert preview.preview.est_cost_usd == 0.471
+    assert preview.preview.cost_band == "medium"
+    assert preview.preview.cheaper_alternative is not None
+
+
+def test_package_plan_cost_deterministic_only_package_stays_zero_cost_low_band() -> None:
+    preview = estimate_package_plan_cost(
+        [{"id": "m3", "work_packages": [{"id": "m3--lint", "cost_lane": "script", "est_tokens": 250}]}]
+    )
+
+    package = preview.milestones[0].packages[0]
+    assert package.executor == "script"
+    assert package.preview.deterministic_count == 1
+    assert package.preview.model_driven_count == 0
+    assert preview.preview.est_cost_usd == 0.0
+    assert preview.preview.cost_band == "low"
