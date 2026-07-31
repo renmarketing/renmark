@@ -885,6 +885,17 @@ def _judge_est_cost() -> float:
     return JUDGE_EST_COST_USD
 
 
+_DELIVERY_STATE_MILESTONE_DISPLAY_LIMIT = 48
+
+
+def _bounded_delivery_state_display(value: object, limit: int) -> str:
+    """Bound a resume-facing value without changing its persisted identity."""
+    rendered = str(value)
+    if len(rendered) <= limit:
+        return rendered
+    return f"{rendered[: limit - 3]}..."
+
+
 def _delivery_state_line(repo: Path) -> str:
     """Return a bounded read-only current-state summary for deterministic inspection."""
     from ..delivery_state import read_delivery_state_with_report
@@ -905,7 +916,10 @@ def _delivery_state_line(repo: Path) -> str:
         drift_count = len(legacy.drift_repair_notes)
         freshness = "loaded"
 
-    milestone = state.active_milestone_id or "(none)"
+    milestone = _bounded_delivery_state_display(
+        state.active_milestone_id or "(none)",
+        _DELIVERY_STATE_MILESTONE_DISPLAY_LIMIT,
+    )
     contract = state.contract_version or "(unknown)"
     return (
         "delivery_state "
