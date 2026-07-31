@@ -685,6 +685,264 @@ def _render_selector_codex(repo: Path, case: Case) -> str:
     )
 
 
+def _selector_choices() -> tuple[object, ...]:
+    """Return one recommended-first semantic choice set with overflow."""
+    from .interaction import Choice
+
+    return (
+        Choice("r", "Review", "read the plan"),
+        Choice("d", "Dispatch", "execute the plan", recommended=True),
+        Choice("e", "Edit", "change the plan"),
+        Choice("w", "Wait", "pause without dispatching"),
+        Choice("n", "No", "stop here"),
+    )
+
+
+def _continuation_choice_id(result: object) -> str | None:
+    choice = getattr(result, "choice", None)
+    return None if choice is None else getattr(choice, "code", None)
+
+
+def _selector_trajectory_payload(repo: Path, case: Case) -> dict[str, object]:
+    """Return the bounded cross-host selector trajectory contract as data."""
+    from .interaction import build_selector, continue_selector
+
+    choices = _selector_choices()
+    claude = build_selector(case.prompt, choices, host="claude")
+    claude_page2 = build_selector(case.prompt, choices, host="claude", page=1)
+    codex_plan = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        render_surface="codex-plan",
+    )
+    codex_plan_page2 = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        render_surface="codex-plan",
+        page=1,
+    )
+    codex_plan_page3 = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        render_surface="codex-plan",
+        page=2,
+    )
+    codex_default = build_selector(
+        case.prompt,
+        choices,
+        host="codex",
+        tool_available=False,
+    )
+
+    claude_semantic = claude["semantic"]
+    codex_plan_semantic = codex_plan["semantic"]
+    codex_default_semantic = codex_default["semantic"]
+    claude_recommended = continue_selector(claude, "1")
+    claude_more = continue_selector(claude, "more")
+    claude_cancel = continue_selector(claude_page2, "2")
+    claude_back = continue_selector(claude_page2, "back")
+    codex_plan_recommended = continue_selector(codex_plan, "1")
+    codex_plan_more = continue_selector(codex_plan, "more")
+    codex_plan_more_page2 = continue_selector(codex_plan_page2, "more")
+    codex_plan_cancel = continue_selector(codex_plan_page3, "2")
+    codex_plan_back = continue_selector(codex_plan_page3, "back")
+    codex_default_recommended = continue_selector(codex_default, "1")
+    codex_default_cancel = continue_selector(codex_default, "No")
+    codex_default_invalid = continue_selector(codex_default, "explain this first")
+    recommended_choice_id = claude_semantic["choices"][0]["code"]  # type: ignore[index]
+    refusal_choice_id = claude_semantic["choices"][-1]["code"]  # type: ignore[index]
+
+    return {
+        "claude": claude,
+        "codex_plan": codex_plan,
+        "codex_default": codex_default,
+        "semantic_choice_ids": [
+            choice["choice_id"]
+            for choice in claude_semantic["choices"]  # type: ignore[index]
+        ],
+        "semantic_equivalent": (
+            claude_semantic == codex_plan_semantic == codex_default_semantic
+        ),
+        "recommended_choice_id": recommended_choice_id,
+        "refusal_choice_id": refusal_choice_id,
+        "claude_recommended_choice_id": _continuation_choice_id(claude_recommended),
+        "claude_more_kind": claude_more.kind,
+        "claude_cancel_choice_id": _continuation_choice_id(claude_cancel),
+        "claude_back_kind": claude_back.kind,
+        "codex_plan_recommended_choice_id": _continuation_choice_id(codex_plan_recommended),
+        "codex_plan_more_kind": codex_plan_more.kind,
+        "codex_plan_more_page2_kind": codex_plan_more_page2.kind,
+        "codex_plan_cancel_choice_id": _continuation_choice_id(codex_plan_cancel),
+        "codex_plan_back_kind": codex_plan_back.kind,
+        "codex_default_recommended_choice_id": _continuation_choice_id(
+            codex_default_recommended
+        ),
+        "codex_default_cancel_choice_id": _continuation_choice_id(codex_default_cancel),
+        "codex_default_invalid_kind": codex_default_invalid.kind,
+        "overflow_semantics": {
+            "claude": {"overflow": claude["overflow"], "page_count": claude["page"]["count"]},
+            "codex_plan": {
+                "overflow": codex_plan["overflow"],
+                "page_count": codex_plan["page"]["count"],
+            },
+            "codex_default": {
+                "fallback_only": codex_default["mode"] == "fallback",
+                "page_count": codex_default["page"]["count"],
+            },
+        },
+        "recommended_first_semantics": {
+            "claude": _continuation_choice_id(claude_recommended) == recommended_choice_id,
+            "codex_plan": _continuation_choice_id(codex_plan_recommended)
+            == recommended_choice_id,
+            "codex_default": _continuation_choice_id(codex_default_recommended)
+            == recommended_choice_id,
+        },
+        "cancel_semantics": {
+            "claude": _continuation_choice_id(claude_cancel) == refusal_choice_id,
+            "codex_plan": _continuation_choice_id(codex_plan_cancel) == refusal_choice_id,
+            "codex_default": _continuation_choice_id(codex_default_cancel) == refusal_choice_id,
+        },
+        "continuation_semantics": {
+            "claude_more": claude_more.kind == "more",
+            "claude_back": claude_back.kind == "back",
+            "codex_plan_more": codex_plan_more.kind == "more",
+            "codex_plan_more_page2": codex_plan_more_page2.kind == "more",
+            "codex_plan_back": codex_plan_back.kind == "back",
+            "codex_default_invalid": codex_default_invalid.kind == "invalid",
+        },
+        "codex_native_clickability_claim": False,
+        "loop_resume": _loop_resume_cross_host_trajectory(repo),
+    }
+
+
+def _loop_resume_one_host(repo: Path, host: str) -> dict[str, object]:
+    """Return one bounded simulated loop pause/resume outcome for ``host``."""
+    from . import dispatch, loop
+    from .parser import Task
+
+    loop_id = loop.loop_id("2026-07-31", "selector parity")
+    before = loop.LoopState(
+        goal="all checks green",
+        verify_cmd="python -c \"assert True\"",
+        budget_tokens=10_000,
+        budget_usd_estimate="$0.10",
+        spent_tokens=400,
+        run_id="selector-parity-loop",
+        max_iterations=3,
+        iteration=1,
+        status="running",
+        pending_step="",
+    )
+    created_path = loop.write_loop(repo, loop_id, before)
+    assert created_path is not None
+
+    reread_created = loop.read_loop(repo, loop_id)
+    assert reread_created is not None
+    failed_decision = loop.build_decision(
+        {
+            "completion_state": "partial",
+            "validation_status": "failed",
+            "summary_lines": ["failed: parity verifier"],
+        },
+        spent_delta=200,
+    )
+    resumed = loop.read_loop(repo, loop_id)
+    assert resumed is not None
+    resumed.iteration += 1
+    resumed.spent_tokens += 200
+    resumed_path = loop.write_loop(repo, loop_id, resumed)
+    assert resumed_path is not None
+    reread_resumed = loop.read_loop(repo, loop_id)
+    assert reread_resumed is not None
+
+    transport = dispatch.build_host_dispatch_plan(
+        [
+            Task(
+                index=1,
+                title="Selector parity",
+                mode="B",
+                target="renmark/behavior.py",
+                executor="sonnet",
+                spec="Prove host-neutral selector resume semantics.",
+                verifier="true",
+            )
+        ],
+        host=host,
+    )
+    final_decision = loop.build_decision(
+        {
+            "completion_state": "complete",
+            "validation_status": "validated",
+            "summary_lines": ["all checks green"],
+        },
+        spent_delta=100,
+    )
+    reread_after_resume_matches = (
+        reread_resumed.iteration == 2
+        and reread_resumed.spent_tokens == 600
+        and reread_resumed.status == "running"
+    )
+    reread_resumed.status = "done" if final_decision["goal_reached"] else "stalled"
+    assert loop.write_loop(repo, loop_id, reread_resumed) is not None
+    final = loop.read_loop(repo, loop_id)
+    assert final is not None
+    return {
+        "loop_id": loop_id,
+        "persisted_path": str(created_path),
+        "created_record": {
+            "iteration": reread_created.iteration,
+            "spent_tokens": reread_created.spent_tokens,
+            "status": reread_created.status,
+        },
+        "resumed": {
+            "iteration": reread_resumed.iteration,
+            "spent_tokens": reread_resumed.spent_tokens,
+            "status": reread_resumed.status,
+        },
+        "reread_after_create_matches": before == reread_created,
+        "reread_after_resume_matches": reread_after_resume_matches,
+        "failed_next_action": failed_decision["next_action"],
+        "final_goal_reached": final_decision["goal_reached"],
+        "stop_reason": loop.stop_reason(final),
+        "task_packets": transport.task_packets,
+    }
+
+
+def _loop_resume_cross_host_trajectory(repo: Path) -> dict[str, object]:
+    """Return the bounded pause/resume parity payload for Claude and Codex."""
+    import shutil
+
+    tmp = repo / ".renmark" / "state" / "_behavior-selector-loop-resume"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        claude = _loop_resume_one_host(tmp / "claude", "claude")
+        codex = _loop_resume_one_host(tmp / "codex", "codex")
+        # The path proves that each host persisted and reread its own record,
+        # but it is transport-specific rather than part of the loop semantics.
+        claude_semantic = {
+            key: value for key, value in claude.items() if key != "persisted_path"
+        }
+        codex_semantic = {
+            key: value for key, value in codex.items() if key != "persisted_path"
+        }
+        return {
+            "claude": claude,
+            "codex": codex,
+            "semantic_equivalent": claude_semantic == codex_semantic,
+        }
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _render_selector_cross_host_trajectory(repo: Path, case: Case) -> str:
+    """Render the combined selector and loop/resume host trajectory as JSON."""
+    return json.dumps(_selector_trajectory_payload(repo, case), sort_keys=True)
+
+
 # call key -> adapter(repo, case) -> rendered current output text.
 # EXPLICIT allow-list: an unresolved key is a FAIL (see _run_deterministic),
 # never an import-time surprise or a silent pass.
@@ -697,6 +955,7 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "lifecycle.agency_delivery_trajectory": _render_agency_delivery_trajectory,
     "interaction.selector_claude": _render_selector_claude,
     "interaction.selector_codex": _render_selector_codex,
+    "interaction.selector_cross_host_trajectory": _render_selector_cross_host_trajectory,
     "plan_lint": _render_plan_lint,
 }
 
