@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — Persist approved Agency handoff
+
+**Severity:** major
+**Symptom:** Approved Agency milestone was not persisted to canonical delivery state through production lifecycle.
+**Root cause:** The production lifecycle path projected approved Agency state read-only and never invoked the canonical approval handoff that writes the active milestone into delivery state.
+**Fix:** Route explicit approved Agency activation through the preserving canonical handoff and add regression coverage.
+**Lesson:** Keep approval transitions as explicit writers; compatibility projections and summary readers must stay read-only.
+
+---
+
 ### 2026-07-30 — Fix M3 package parser/compiler typing
 
 **Severity:** medium

@@ -507,6 +507,65 @@ def _render_delivery_mode_matrix(repo: Path, case: Case) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _render_agency_delivery_trajectory(repo: Path, case: Case) -> str:
+    """Render the two host-neutral entry trajectories to live state text.
+
+    Agency owns a milestone and requires its explicit approval before the
+    canonical delivery aggregate delegates execution to Orchestrator.  A
+    defined-goal Orchestrator entry, by contrast, persists its own mode without
+    activating Agency discovery.  This is a deterministic state-contract guard,
+    not a claim that a live agent completed either trajectory.
+    """
+    import shutil
+
+    from . import agency, delivery_state, mode
+
+    _ = case
+    tmp = repo / ".renmark" / "state" / "_behavior-agency-trajectory"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        agency_repo = tmp / "agency"
+        agency.activate(
+            agency_repo,
+            current_phase="milestone approved",
+            current_milestone="approved milestone",
+            signoff_status="approved",
+        )
+        agency.approve_milestone_for_orchestrator(agency_repo)
+        approved = delivery_state.read_delivery_state(agency_repo)
+
+        direct_repo = tmp / "orchestrator"
+        mode.write_delivery_state(
+            direct_repo,
+            mode.resolve_delivery_state(
+                ("orchestrator", "direct"),
+                intent="defined-feature",
+                entry="orchestrate",
+            ),
+        )
+        direct = delivery_state.read_delivery_state(direct_repo)
+        direct = delivery_state.update_active_milestone(direct, "defined goal")
+        delivery_state.write_delivery_state(direct_repo, direct)
+        direct = delivery_state.read_delivery_state(direct_repo)
+        payload = {
+            "agency_approved_milestone": {
+                "approval_status": approved.approval_status,
+                "active_milestone_id": approved.active_milestone_id,
+                "milestone_execution": approved.milestone_execution,
+            },
+            "direct_orchestrator": {
+                "delivery_mode": direct.delivery_mode,
+                "execution_policy": direct.execution_policy,
+                "active_milestone_id": direct.active_milestone_id,
+                "agency_discovery_active": agency.is_active(direct_repo),
+            },
+        }
+        return json.dumps(payload, sort_keys=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _render_plan_lint(repo: Path, case: Case) -> str:
     """Render a NARROW, declared-policy read-only check to text (scaffolding tier).
 
@@ -635,6 +694,7 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "lifecycle.skill_preamble_fresh": _render_skill_preamble_fresh,
     "lifecycle.skill_preamble_agency_active": _render_skill_preamble_agency_active,
     "lifecycle.delivery_mode_matrix": _render_delivery_mode_matrix,
+    "lifecycle.agency_delivery_trajectory": _render_agency_delivery_trajectory,
     "interaction.selector_claude": _render_selector_claude,
     "interaction.selector_codex": _render_selector_codex,
     "plan_lint": _render_plan_lint,

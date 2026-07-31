@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-31] - feat(delivery): complete M6 Agency trajectories
+
+**Request:** Prove Agency-approved and direct-Orchestrator entry trajectories for M6.
+**Built:** Added host-neutral deterministic trajectories that use the canonical persisted Agency handoff and direct defined-goal Orchestrator state.
+**Files changed:** `renmark/behavior.py`, `tests/behavioral/agency.behavior.json`, `CHANGELOG.md`.
+**Do not change:** Agency handoff must be real persisted state; direct Orchestrator must not activate Agency discovery.
+
 ## [2026-07-30] - fix(recovery): persist executor lifecycle transitions
 
 **Request:** Debug stale lifecycle/delivery/pipeline recovery before M6.

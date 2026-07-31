@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-30, bug) **Persist approved Agency handoff** — Keep approval transitions as explicit writers; compatibility projections and summary readers must stay read-only.
+
 - (2026-07-30, bug) **Fix M3 package parser/compiler typing** — New package adapters need explicit typed boundaries instead of nullable ternary targets or untyped forwarding.
 
 - (2026-07-30, bug) **M2 task 7 selector compatibility verifier** — Selector tests must assert semantic parity and runtime-resolved host identity, not freeze one host presentation or assume host=None means Codex.
