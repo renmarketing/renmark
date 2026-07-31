@@ -25,13 +25,16 @@ blind override): `--full` always escalates to full, but `--lite` only narrows a
 full signals (lite must never skip the full review on a risky change).
 **plan validation and goal-backward verify (REQ-7) run on every tier, no exceptions.**
 
-## Operating mode
+## Delivery mode
 
-`feature` defaults to **Orchestrator** mode: execute at the goal level, dispatching narrow scoped subagents where useful. In **Conductor** mode, keep each change single-file/tight and explain the next move before editing. The mode is selected once (ask-once) and persisted; override it durably via `renmark-execute --set-mode`.
-
-## When Agency Mode is active
-
-In Agency Mode, **feature selects the next milestone/feature from the roadmap** rather than treating each feature request as an isolated change. The PRD-alignment check (Step 2) runs against the selected milestone, and scope drift is surfaced immediately — feedback that changes scope updates the roadmap and PRD rather than silently expanding the feature. See `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` for the full delivery contract.
+A directly requested, defined feature resolves to
+`delivery_mode=orchestrator` with `execution_policy=async` without asking a mode
+question. Honor an explicit or already persisted canonical choice. When
+DeliveryState says Agency, this feature is an approved roadmap milestone whose
+implementation is delegated to Orchestrator—not another delivery modality.
+Run its bounded build → verify → review → fix loop and persist the milestone
+boundary. PRD drift changes the Agency roadmap/PRD through its existing human
+gate; it never silently expands this feature's scope.
 
 ## When to Use
 
@@ -54,6 +57,14 @@ In Agency Mode, **feature selects the next milestone/feature from the roadmap** 
 ## Steps
 
 **Step 0 — Context check.** Call `lifecycle.skill_preamble(repo, 'feature')`. If it returns a non-None hint, surface as a one-line note.
+
+**Contract freshness (deterministic, before feature planning).** Before creating or
+resuming the feature branch, inspect the root guidance with
+`renmark.init.contract_is_fresh`. If either managed project-delivery contract is
+missing or stale, invoke `renmark.init.merge_project_delivery_contract(repo)`, the
+sole safe writer, then continue automatically. This Feature entry point only routes
+the refresh: it never copies contract prose, writes guidance files, or introduces a
+user gate; malformed markers retain init's fail-safe stop.
 
 **Router contract reminder:** `/renmark:feature` is a **workflow router**, not a reasoning agent. It must NOT plan, code, test, review, or document. Its only actions are: read `lifecycle.json` → determine next stage → dispatch the right stage skill → receive a bounded summary → update `lifecycle.json` → recommend next action. See the plan's Section 3 ("/renmark:feature is a router, not an engineer") for the MUST/MUST NOT list.
 

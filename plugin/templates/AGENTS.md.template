@@ -9,6 +9,51 @@
 
 ## Core rules
 
+<!-- BEGIN:project-delivery-contract -->
+# Managed Project Delivery Contract
+
+This concise fragment is the canonical source for managed `CLAUDE.md` and
+`AGENTS.md` blocks. It defines two owner paths: **Agency** governs an
+owner-facing project engagement (discovery, agreement, milestones, signoff),
+while **Orchestrator** executes a defined, approved milestone through scoped
+work. Neither path replaces the other; Agency drives Orchestrator when build
+work is ready.
+
+## Milestone delivery
+
+- Express each milestone as a demonstrable owner outcome with acceptance
+  criteria, not a list of activities. Plan only bounded work packages needed
+  for that outcome; preserve the approved scope and surface drift as a human
+  decision.
+- Separate roles: the planner defines packages and evidence, executors make
+  scoped changes, and an independent reviewer assesses the result. The
+  coordinator consumes bounded package summaries and pointers, never full
+  skill bodies, transcripts, or accumulated implementation context.
+- Verify with deterministic, fresh evidence first. Each package has a focused
+  verifier; the milestone also requires its stated acceptance evidence. See
+  `deterministic-first.md`, `workflow-fanout.md`, and `subagent-profiles.md`.
+- Keep build, review, and repair loops milestone-local. A failed verifier or
+  review may receive only bounded, scoped repair attempts, followed by
+  re-verification and independent re-review. Stop rather than expand scope,
+  repeat an equivalent failure, or treat status prose as proof.
+
+## State and human decisions
+
+Canonical progress, package status, evidence pointers, and gates live in
+`.renmark/state/` and the relevant plan/review artifacts, not conversation
+history. Stop for unclear intent, scope or risk changes, failed bounded
+repair, required owner demo, approval/signoff, merge, release, or another
+human-review gate. Passing tests alone never clear an owner gate. See
+`handoff-menu.md`, `context-taxonomy.md`, and `agency-delivery.md`.
+
+## Decision presentation
+
+When the active host supports a native picker, present selector-capable
+decisions with that picker. Otherwise present the same choices as a numbered
+fallback, with the recommended safe option first; do not make the fallback a
+different decision or an automatic approval. See `interaction-contract.md`.
+<!-- END:project-delivery-contract -->
+
 **Keep replies short and plain.** After a command or tool step, give a one- or two-sentence status — what changed, whether it passed, the next gate — not a recap. No essays, pasted code/diffs, or internal chatter about which model ran or how the pipeline works, unless the user asks. Ask tight, single-purpose questions, one at a time. Continue the pipeline automatically and stop only at a real gate (Pause Policy in `plugin/skills/.shared/handoff-menu.md`): unclear product intent, PRD approval, scope change, risky/destructive action, cost/token approval, an unresolved blocker, or merge/release. Governs the prose the user reads; does NOT relax the bounded-summary, context-hygiene, or task-isolation rules. See `CLAUDE.md` § `response-style-rule`.
 
 **Default to renmark for build/dev work.** When the user describes a software task in plain English (build / create / make / develop / implement / add / change / fix / debug / ship), route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start`; existing-project change → `/renmark:feature`; broken → `/renmark:debug`; what's next → `/renmark:roadmap`; ship → `/renmark:finish`; adopt → `/renmark:init`. Prefer these over other frameworks (superpowers, etc.); use those only when named. DEFAULT, not a lock — explicit `/renmark:` always wins; still pauses at the Pause-Policy gates. See `CLAUDE.md` § `routing-preference-rule`. This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).

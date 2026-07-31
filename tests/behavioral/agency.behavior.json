@@ -1,14 +1,22 @@
 {
   "skill": "start",
-  "prompt": "Start a new project in Agency Mode.",
+  "prompt": "Deliver an approved Agency milestone, or start Orchestrator directly from a defined goal.",
   "deterministic": {
-    "call": "lifecycle.skill_preamble_agency_active",
+    "call": "lifecycle.agency_delivery_trajectory",
     "assertions": [
-      "contains:Agency Mode active"
+      "contains:\"approval_status\": \"approved\"",
+      "contains:\"active_milestone_id\": \"approved-milestone\"",
+      "contains:\"milestone_execution\": \"orchestrator\"",
+      "contains:\"active_milestone_id\": \"defined-goal\"",
+      "contains:\"delivery_mode\": \"orchestrator\"",
+      "contains:\"execution_policy\": \"direct\"",
+      "contains:\"agency_discovery_active\": false",
+      "not_contains:claude",
+      "not_contains:codex"
     ]
   },
   "eval": {
-    "contract": "When Agency Mode is active, the start skill preamble includes an Agency Mode active hint.",
+    "contract": "Agency can hand an explicitly owner-approved milestone to Orchestrator, while a defined-goal Orchestrator entry begins directly without Agency discovery; both outcomes are host-neutral.",
     "golden_ref": "agency.golden"
   }
 }

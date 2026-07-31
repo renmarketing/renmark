@@ -6,16 +6,20 @@ must ever leak through (REQ-5 / no-diffs-in-orchestrator rule).
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from renmark.cli import (
-    cmd_review_package,
-    cmd_task_brief,
-    main,
+from renmark.cli import cmd_review_package, cmd_task_brief, main
+from renmark.cli.commands import (
+    ReviewFindingSummary,
+    bounded_review_findings,
+    build_review_fix_selector,
+    write_scoped_fix_package,
 )
+from renmark.interaction import continue_selector
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -48,6 +52,27 @@ def plan_file(tmp_path: Path) -> Path:
     p = tmp_path / "2026-06-25-demo.plan.md"
     p.write_text(MINIMAL_PLAN, encoding="utf-8")
     return p
+
+
+@pytest.fixture()
+def review_findings() -> list[dict[str, object]]:
+    """Structured review inputs, including more entries than the handoff cap."""
+    return [
+        {"id": "critical-auth", "severity": "Critical", "file": "auth.py", "summary": "leaks token"},
+        {"id": "major-cache", "severity": "Major", "file": "cache.py", "summary": "uses stale state"},
+        {"id": "minor-style", "severity": "Minor", "file": "style.py", "summary": "needs cleanup"},
+        {"id": "nit-docs", "severity": "Nit", "file": "docs.py", "summary": "spelling"},
+        {"id": "unknown", "severity": "Unranked", "file": "other.py", "summary": "needs triage"},
+        {"id": "omitted", "severity": "Minor", "file": "later.py", "summary": "must be capped"},
+    ]
+
+
+@pytest.fixture()
+def safe_review_findings() -> list[dict[str, object]]:
+    return [
+        {"id": "major-cache", "severity": "major", "file": "cache.py", "summary": "uses stale state"},
+        {"id": "minor-style", "severity": "minor", "file": "style.py", "summary": "needs cleanup"},
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +174,108 @@ def test_task_brief_non_numeric_index_returns_error(tmp_path: Path, plan_file: P
     rc = cmd_task_brief(str(plan_file), "abc", repo=tmp_path)  # type: ignore[arg-type]
     assert rc == 2
     assert capsys.readouterr().out.strip() == ""
+
+
+# ---------------------------------------------------------------------------
+# M4 review / fix / re-review handoff helpers
+# ---------------------------------------------------------------------------
+
+
+def test_bounded_review_findings_caps_and_normalizes(review_findings: list[dict[str, object]]) -> None:
+    """Only bounded metadata crosses the review handoff boundary."""
+    findings = bounded_review_findings(review_findings)
+    assert len(findings) == 5
+    assert [item.finding_id for item in findings] == [
+        "critical-auth", "major-cache", "minor-style", "nit-docs", "unknown",
+    ]
+    assert findings[-1].severity == "unknown"
+    assert all(len(item.summary) <= 240 for item in findings)
+
+
+def test_critical_and_major_findings_block_signoff(review_findings: list[dict[str, object]]) -> None:
+    """Critical and Major findings remain explicit signoff blockers."""
+    by_id = {item.finding_id: item for item in bounded_review_findings(review_findings)}
+    assert by_id["critical-auth"].blocks_signoff is True
+    assert by_id["major-cache"].blocks_signoff is True
+    assert by_id["minor-style"].blocks_signoff is False
+
+
+def test_safe_scoped_fix_package_is_pointer_only(
+    tmp_path: Path, safe_review_findings: list[dict[str, object]]
+) -> None:
+    """A non-dangerous finding set may create a scoped, non-executing artifact."""
+    reference = ".renmark/state/handoffs/review-base-head.pkg.md"
+    artifact = write_scoped_fix_package(reference, safe_review_findings, repo=tmp_path)
+    assert artifact is not None and artifact.exists()
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    assert payload["artifact_type"] == "scoped_fix_package"
+    assert payload["review_package_ref"] == reference
+    assert payload["auto_fix"] is False
+    assert payload["requires_fresh_verification"] is True
+    assert payload["requires_rereview"] is True
+    assert payload["finding_count"] == 2
+
+
+def test_dangerous_finding_recommends_cancel_and_refuses_fix(
+    tmp_path: Path, review_findings: list[dict[str, object]]
+) -> None:
+    """Dangerous review work stops at an explicit refusal boundary."""
+    dangerous = review_findings[:1]
+    selector = build_review_fix_selector(dangerous, tool_available=False)
+    semantic = selector["semantic"]
+    assert semantic["decision_id"] == "review_fix_rereview"
+    assert semantic["dangerous"] is True
+    assert [choice["code"] for choice in semantic["choices"]] == ["cancel", "fix", "rereview"]
+    assert semantic["choices"][0]["recommended"] is True
+    assert continue_selector(selector, "cancel").kind == "cancel"
+    assert write_scoped_fix_package("review.pkg.md", dangerous, repo=tmp_path) is None
+
+
+def test_forged_critical_summary_is_refused_by_scoped_fix_writer(tmp_path: Path) -> None:
+    """Critical severity cannot be bypassed by a forged dangerous=False flag."""
+    forged = ReviewFindingSummary(
+        finding_id="critical-auth",
+        severity="critical",
+        target="auth.py",
+        summary="leaks token",
+        blocks_signoff=True,
+        dangerous=False,
+    )
+    assert write_scoped_fix_package("review.pkg.md", (forged,), repo=tmp_path) is None
+
+
+def test_forged_critical_summary_recommends_safe_selector_path() -> None:
+    """A forged safe flag must not make fixing a critical finding recommended."""
+    forged = ReviewFindingSummary(
+        finding_id="critical-auth",
+        severity="critical",
+        target="auth.py",
+        summary="leaks token",
+        blocks_signoff=True,
+        dangerous=False,
+    )
+    semantic = build_review_fix_selector((forged,), tool_available=False)["semantic"]
+    choices = {choice["code"]: choice for choice in semantic["choices"]}
+
+    assert semantic["dangerous"] is True
+    assert choices["cancel"]["recommended"] is True
+    assert choices["fix"]["recommended"] is False
+
+
+def test_bounded_review_findings_clamps_requested_limit(review_findings: list[dict[str, object]]) -> None:
+    """Callers cannot expand the review handoff past its five-finding cap."""
+    findings = bounded_review_findings(review_findings, limit=99)
+    assert len(findings) == 5
+
+
+def test_clean_review_is_ready_for_rereview_without_host_rendering() -> None:
+    """A clean result exposes the host-neutral re-review semantic decision."""
+    selector = build_review_fix_selector((), tool_available=False)
+    semantic = selector["semantic"]
+    assert semantic["decision_id"] == "review_fix_rereview"
+    assert semantic["dangerous"] is False
+    assert [choice["code"] for choice in semantic["choices"]] == ["rereview", "cancel"]
+    assert semantic["choices"][0]["recommended"] is True
 
 
 # ---------------------------------------------------------------------------

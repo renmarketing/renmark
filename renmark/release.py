@@ -609,6 +609,138 @@ def drift_report(repo: Path | str = ".") -> list[str]:
     return issues
 
 
+# ── Read-only release readiness ─────────────────────────────────────────────
+
+_PLUGIN_MANIFESTS: tuple[tuple[str, str], ...] = (
+    ("Claude Code", "plugin/.claude-plugin/plugin.json"),
+    ("Codex", "plugin/.codex-plugin/plugin.json"),
+)
+
+
+def _read_manifest(path: Path) -> dict[str, object] | None:
+    """Return a plugin manifest object, or None when it is unreadable."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _plugin_identity_issues(repo: Path) -> list[str]:
+    """Check that all public plugin manifests identify the same plugin."""
+    manifests = [(host, rel, _read_manifest(repo / rel)) for host, rel in _PLUGIN_MANIFESTS]
+    issues: list[str] = []
+    names: dict[str, str] = {}
+    for host, rel, data in manifests:
+        name = data.get("name") if data else None
+        if not isinstance(name, str) or not name:
+            issues.append(f"plugin identity: {rel} has no usable name")
+        else:
+            names[host] = name
+    if len(set(names.values())) > 1:
+        pairs = ", ".join(f"{host}={name!r}" for host, name in sorted(names.items()))
+        issues.append(f"plugin identity: host manifest names disagree ({pairs})")
+
+    marketplace = _read_manifest(repo / ".claude-plugin/marketplace.json")
+    plugins = marketplace.get("plugins") if marketplace else None
+    first_plugin = plugins[0] if isinstance(plugins, list) and plugins else None
+    plugin_name = first_plugin.get("name") if isinstance(first_plugin, dict) else None
+    expected = next(iter(names.values()), None)
+    if expected and plugin_name != expected:
+        issues.append(
+            "plugin identity: marketplace plugins[0].name "
+            f"is {plugin_name!r}, expected {expected!r}"
+        )
+    return issues
+
+
+def _package_content_issues(repo: Path) -> list[str]:
+    """Validate the package input set without building an archive."""
+    issues: list[str] = []
+    required = ("VERSION", "pyproject.toml", "renmark/__init__.py", *[rel for _, rel in _PLUGIN_MANIFESTS])
+    for rel in required:
+        path = repo / rel
+        if not path.is_file() or path.is_symlink() or _is_excluded(Path(rel).parts):
+            issues.append(f"package contents: required file is not packageable: {rel}")
+
+    codex = _read_manifest(repo / "plugin/.codex-plugin/plugin.json")
+    skills = codex.get("skills") if codex else None
+    if isinstance(skills, str) and skills:
+        # Codex manifest paths are rooted at the plugin package, not at its
+        # metadata directory (``plugin/.codex-plugin``).
+        skills_path = repo / "plugin" / skills
+        if not skills_path.is_dir() or skills_path.is_symlink():
+            issues.append(
+                "package contents: Codex skills path is not packageable: "
+                f"{skills_path.relative_to(repo)}"
+            )
+    else:
+        issues.append("package contents: Codex manifest has no usable skills path")
+    return issues
+
+
+def _installed_manifest_paths(installed_root: Path) -> tuple[tuple[str, Path], ...]:
+    """Find supported installed-manifest layouts without scanning outside the root."""
+    if installed_root.name == "plugin.json":
+        return (("installed", installed_root),)
+    return tuple(
+        (host, candidate)
+        for host, rel in _PLUGIN_MANIFESTS
+        for candidate in (installed_root / rel, installed_root / rel.removeprefix("plugin/"))
+        if candidate.is_file()
+    )
+
+
+def _installed_contract_issues(repo: Path, installed_root: Path | str | None) -> list[str]:
+    """Compare supplied installed manifests with source manifests; never installs or updates."""
+    if installed_root is None:
+        return []
+    root = Path(installed_root)
+    installed = _installed_manifest_paths(root)
+    if not installed:
+        return [f"installed contract parity: no installed plugin manifest found under {root}"]
+    issues: list[str] = []
+    for host, path in installed:
+        source_rel = next(
+            (rel for source_host, rel in _PLUGIN_MANIFESTS if source_host == host),
+            "plugin/.codex-plugin/plugin.json",
+        )
+        source = _read_manifest(repo / source_rel)
+        actual = _read_manifest(path)
+        if source is None or actual is None:
+            issues.append(f"installed contract parity: unreadable {host} manifest")
+        elif source != actual:
+            issues.append(f"installed contract parity: {host} manifest differs from {source_rel}")
+    return issues
+
+
+def release_readiness_report(
+    repo: Path | str = ".", *, installed_root: Path | str | None = None
+) -> dict[str, object]:
+    """Return deterministic release blockers without creating, tagging, or installing anything."""
+    root = Path(repo)
+    try:
+        version_issues = drift_report(root)
+    except OSError as exc:
+        version_issues = [f"version drift: unable to read canonical VERSION: {exc}"]
+    identity_issues = _plugin_identity_issues(root)
+    package_issues = _package_content_issues(root)
+    installed_issues = _installed_contract_issues(root, installed_root)
+    checks = {
+        "version_drift": version_issues,
+        "plugin_identity": identity_issues,
+        "package_contents": package_issues,
+        "installed_contract_parity": installed_issues,
+    }
+    blockers = [issue for issues in checks.values() for issue in issues]
+    return {"ready": not blockers, "blockers": blockers, "checks": checks}
+
+
+# Friendly API name for callers that treat checks as an action, while retaining
+# the report-first API above.
+check_release_readiness = release_readiness_report
+
+
 # ── CLI sub-command handlers ──────────────────────────────────────────────────
 
 
@@ -711,6 +843,28 @@ def _cmd_scan(argv: list[str]) -> int:
     return 0
 
 
+def _cmd_readiness(argv: list[str]) -> int:
+    """Print a machine-readable, report-only readiness result."""
+    rest = argv[1:]
+    installed_root: str | None = None
+    positional: list[str] = []
+    index = 0
+    while index < len(rest):
+        if rest[index] == "--installed-root" and index + 1 < len(rest):
+            installed_root = rest[index + 1]
+            index += 2
+        else:
+            positional.append(rest[index])
+            index += 1
+    if any(value == "--installed-root" for value in positional) or len(positional) > 1:
+        sys.stderr.write("usage: python -m renmark.release readiness [repo-path] [--installed-root PATH]\n")
+        return 2
+    repo = Path(positional[0]) if positional else Path(".")
+    report = release_readiness_report(repo, installed_root=installed_root)
+    sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    return 0 if report["ready"] else 1
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 _COMMANDS: dict[str, Callable[[list[str]], int]] = {
@@ -719,13 +873,17 @@ _COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "snapshot": _cmd_snapshot,
     "check": _cmd_check,
     "scan": _cmd_scan,
+    "readiness": _cmd_readiness,
 }
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
-        sys.stderr.write("usage: python -m renmark.release {check|current|scan PATH|package [PATH]|snapshot [PATH]}\n")
+        sys.stderr.write(
+            "usage: python -m renmark.release "
+            "{check|current|scan PATH|package [PATH]|snapshot [PATH]|readiness [PATH] [--installed-root PATH]}\n"
+        )
         return 2
 
     cmd = argv[0]

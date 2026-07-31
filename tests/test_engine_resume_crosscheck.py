@@ -24,8 +24,9 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from renmark.cli import _engine
+from renmark.cli import _codex_runner, _engine
 from renmark.parser import Task
+from renmark.providers.codex import CodexError
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,10 @@ def test_resume_warns_on_orphaned_skip_entry(tmp_path, monkeypatch, capsys):
     plan = _write_plan(tmp_path, 3)
 
     # Make codex unavailable so tasks fail fast without running anything real.
-    monkeypatch.setattr(_engine, "codex_available", lambda: False)
+    def unavailable(*_args, **_kwargs):
+        raise CodexError("codex unavailable in test")
+
+    monkeypatch.setattr(_codex_runner, "run_codex_task", unavailable)
 
     rc = _engine.execute_plan(str(plan), repo=tmp_path, resume=True)
 
@@ -195,7 +199,10 @@ def test_resume_skips_genuinely_completed_tasks(tmp_path, monkeypatch, capsys):
     plan = _write_plan(tmp_path, 3)
 
     # codex unavailable → task 3 will fail, but tasks 1+2 must be logged DONE.
-    monkeypatch.setattr(_engine, "codex_available", lambda: False)
+    def unavailable(*_args, **_kwargs):
+        raise CodexError("codex unavailable in test")
+
+    monkeypatch.setattr(_codex_runner, "run_codex_task", unavailable)
 
     _engine.execute_plan(str(plan), repo=tmp_path, resume=True)
 

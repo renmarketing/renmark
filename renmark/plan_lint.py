@@ -43,7 +43,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from renmark.parser import PlanError, Task, parse_plan
+from renmark.parser import PackagePlan, PlanError, Task, parse_package_plan, parse_plan
+from renmark.schemas import PACKAGE_ALLOWED_SURFACES, PACKAGE_LIST_CAP
 
 # ---------------------------------------------------------------------------
 # Public types
@@ -111,6 +112,9 @@ _BOUND_CAPS = re.compile(r"\|\s*(head|tail|grep|wc|awk\s+['\"]NR|tee)\b|>\s*/dev
 # test -f only: matches verifier that is purely "test -f <path>" (possibly with
 # an alias like "[ -f ... ]") with nothing else meaningful after.
 _TEST_F_ONLY_RE = re.compile(r"^\s*(?:test\s+-[fF]\s+\S+|\[\s+-[fF]\s+\S+\s*\])\s*$")
+_PACKAGE_HEADING_RE = re.compile(r"^#{2,4}\s+(?:Work[- ]?Package|Package)\b", re.IGNORECASE)
+_PACKAGE_FIELD_RE = re.compile(r"^-\s+\*\*([a-z_]+):\*\*\s*(.*?)\s*$")
+_PACKAGE_LEAK_RE = re.compile(r"\b(?:transcript|transcripts|diff|patch|generated_code|reasoning)\b", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +386,70 @@ def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
     return issues
 
 
+def _is_package_plan(path: str | Path) -> bool:
+    """Identify package markdown without changing legacy task-plan parsing."""
+    try:
+        return any(_PACKAGE_HEADING_RE.match(line) for line in Path(path).read_text(encoding="utf-8").splitlines())
+    except OSError:
+        return False
+
+
+def _package_blocks(path: str | Path) -> list[dict[str, str]]:
+    """Return raw package fields so lint can require explicitly-written evidence."""
+    packages: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        if _PACKAGE_HEADING_RE.match(raw):
+            current = {"_heading": raw}
+            packages.append(current)
+            continue
+        if current is not None:
+            field = _PACKAGE_FIELD_RE.match(raw)
+            if field:
+                current[field.group(1)] = field.group(2).strip()
+    return packages
+
+
+def _check_package_plan(path: str | Path, plan: PackagePlan) -> list[tuple[str, str]]:
+    """Package-only G11/boundary checks; legacy task-plan checks stay unchanged."""
+    issues: list[tuple[str, str]] = []
+    raw_packages = _package_blocks(path)
+    if not raw_packages:
+        return [("BLOCK", "Package plan contains no work-package headings.")]
+    for position, fields in enumerate(raw_packages, 1):
+        label = f"Work package {position}"
+        package_id = fields.get("id", "")
+        if not package_id:
+            issues.append(("BLOCK", f"{label}: stable `id` is required for resume."))
+        elif not re.fullmatch(r"[a-z0-9]+(?:--[a-z0-9]+)*", package_id):
+            issues.append(("BLOCK", f"{label}: id `{package_id}` is not a stable normalized package ID."))
+        evidence = fields.get("acceptance_evidence", "")
+        if not evidence or evidence == "[]":
+            issues.append(("BLOCK", f"{label}: `acceptance_evidence` is required and cannot be empty."))
+        surfaces = [s.strip() for s in fields.get("allowed_surfaces", "").strip("[]").split(",") if s.strip()]
+        if not surfaces:
+            issues.append(("BLOCK", f"{label}: `allowed_surfaces` is required and cannot be empty."))
+        elif len(surfaces) > PACKAGE_LIST_CAP or set(surfaces) - PACKAGE_ALLOWED_SURFACES:
+            issues.append(("BLOCK", f"{label}: allowed surfaces must be bounded registered surfaces."))
+        dependencies = [d.strip() for d in fields.get("dependencies", "").strip("[]").split(",") if d.strip()]
+        for dependency in dependencies:
+            if dependency != "none" and not dependency.startswith(".renmark/"):
+                issues.append(
+                    (
+                        "BLOCK",
+                        f"{label}: dependency `{dependency}` must be a .renmark artifact pointer (or `none`).",
+                    )
+                )
+        for value in fields.values():
+            if _PACKAGE_LEAK_RE.search(value):
+                issues.append(("BLOCK", f"{label}: transcript/diff payload language is forbidden in package plans."))
+                break
+    # Keep this argument intentionally consumed: parser/schema validation is the
+    # authoritative shape check before the raw-source requirements above.
+    _ = plan
+    return issues
+
+
 def _derive_verdict(raw_issues: list[tuple[str, str]]) -> Verdict:
     """Derive overall verdict from (severity, message) pairs."""
     severities = {sev for sev, _ in raw_issues}
@@ -412,6 +480,21 @@ def lint_plan(path: str | Path) -> PlanLintReport:
     plan files.
     """
     repo_root = Path.cwd()
+
+    # Package plans are linted through their dedicated parser; task-plan results
+    # intentionally retain their established parser/check sequence below.
+    if _is_package_plan(path):
+        try:
+            package_plan = parse_package_plan(path)
+        except PlanError as exc:
+            return PlanLintReport("BLOCK", [f"BLOCK: package plan parse error — {exc}"])
+        package_issues = _check_package_plan(path, package_plan)
+        return PlanLintReport(
+            verdict=_derive_verdict(package_issues),
+            issues=[f"{sev}: {message}" for sev, message in package_issues],
+            task_count=sum(len(m.work_packages) for m in package_plan.milestones),
+            executor_counts={},
+        )
 
     # Parse — any PlanError → one graceful BLOCK issue.
     try:

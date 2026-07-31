@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from renmark.delivery_state import stable_milestone_id, stable_work_package_id
+
 
 class PlanError(ValueError):
     """Raised when a plan file is malformed."""
@@ -52,6 +54,37 @@ class Task:
     role_reason: str = ""
 
 
+@dataclass(frozen=True)
+class WorkPackage:
+    """A bounded milestone work package; separate from legacy ``Task``."""
+
+    id: str
+    goal: str
+    expected_outcome: str
+    acceptance_evidence: list[str]
+    dependencies: list[str]
+    risks: list[str]
+    allowed_surfaces: list[str]
+    cost_lane: str
+    demo_point: str
+    signoff_policy: str
+    status: str = "pending"
+
+
+@dataclass(frozen=True)
+class Milestone:
+    id: str
+    goal: str
+    expected_outcome: str
+    work_packages: list[WorkPackage]
+
+
+@dataclass(frozen=True)
+class PackagePlan:
+    mode: str
+    milestones: list[Milestone]
+
+
 _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
 # Loose pattern: a "### Task <digits>" heading that does NOT match the strict
 # _HEADER_RE is a malformed numbered header and must raise. The digit is
@@ -61,6 +94,8 @@ _HEADER_RE = re.compile(r"^###\s+Task\s+(\d+)\s*:\s*(.+?)\s*$")
 _LOOSE_TASK_RE = re.compile(r"^###\s*Task\s*\d", re.IGNORECASE)
 _FIELD_RE = re.compile(r"^-\s+\*\*([a-z_]+):\*\*\s*(.*?)\s*$")
 _LIST_RE = re.compile(r"^\[(.*)\]$")
+_MILESTONE_RE = re.compile(r"^#{1,3}\s+Milestone(?:\s+[^:]*)?\s*:\s*(.+?)\s*$", re.IGNORECASE)
+_PACKAGE_RE = re.compile(r"^#{2,4}\s+(?:Work[- ]?Package|Package)(?:\s+[^:]*)?\s*:\s*(.+?)\s*$", re.IGNORECASE)
 
 
 def parse_plan(path: str | Path) -> list[Task]:
@@ -144,6 +179,98 @@ def parse_plan(path: str | Path) -> list[Task]:
 
     _validate_indices(tasks)
     return tasks
+
+
+def parse_package_plan(path: str | Path) -> PackagePlan:
+    """Parse a milestone package plan without changing the legacy Task parser.
+
+    Each milestone and package heading supplies a human title.  ``id`` fields
+    are optional and normalize deterministically from those titles; callers
+    therefore resume by stable IDs rather than transient task indices.
+    """
+    p = Path(path)
+    if not p.is_file():
+        raise PlanError(f"plan file not found: {path}")
+    mode = "orchestrator"
+    milestones: list[dict[str, Any]] = []
+    current_milestone: dict[str, Any] | None = None
+    current_package: dict[str, Any] | None = None
+    for line_no, raw in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        if re.match(r"^-\s+\*\*(?:resume_)?index:\*\*", raw, re.IGNORECASE):
+            raise PlanError(
+                f"index-only resume metadata is forbidden at line {line_no}; "
+                "use stable milestone/package IDs"
+            )
+        milestone_match = _MILESTONE_RE.match(raw)
+        package_match = _PACKAGE_RE.match(raw)
+        if milestone_match:
+            title = milestone_match.group(1)
+            current_milestone = {
+                "id": stable_milestone_id(title),
+                "goal": title,
+                "expected_outcome": title,
+                "work_packages": [],
+            }
+            milestones.append(current_milestone)
+            current_package = None
+            continue
+        if package_match:
+            if current_milestone is None:
+                raise PlanError(f"work package at line {line_no} has no milestone")
+            title = package_match.group(1)
+            current_package = {
+                "id": stable_work_package_id(current_milestone["id"], title),
+                "goal": title, "expected_outcome": title,
+                "acceptance_evidence": ["defined"], "dependencies": ["none"], "risks": ["none"],
+                "allowed_surfaces": ["implementation"], "cost_lane": "standard",
+                "demo_point": "verification", "signoff_policy": "owner", "status": "pending",
+            }
+            current_milestone["work_packages"].append(current_package)
+            continue
+        field = _FIELD_RE.match(raw)
+        if not field:
+            continue
+        key, value = field.group(1), field.group(2)
+        if key == "mode":
+            mode = value.strip().lower()
+            continue
+        if current_package is not None:
+            if current_milestone is None:
+                raise PlanError(f"work package at line {line_no} has no milestone")
+            target: dict[str, Any] = current_package
+        elif current_milestone is not None:
+            target = current_milestone
+        else:
+            continue
+        if key == "id":
+            if current_package is not None:
+                target[key] = stable_work_package_id(current_milestone["id"], value)
+            else:
+                target[key] = stable_milestone_id(value)
+        elif key in {"acceptance_evidence", "dependencies", "risks", "allowed_surfaces"}:
+            target[key] = _parse_list(value)
+        else:
+            target[key] = value.strip()
+    # Imported here to preserve the existing schemas -> dispatch -> parser
+    # dependency direction used by the legacy Task backend.
+    from renmark.schemas import validate_milestone_document
+
+    raw_document = {"milestones": milestones}
+    issues = validate_milestone_document(raw_document)
+    if issues:
+        raise PlanError("invalid package plan: " + "; ".join(issues))
+    parsed = [
+        Milestone(
+            id=m["id"],
+            goal=m["goal"],
+            expected_outcome=m["expected_outcome"],
+            work_packages=[WorkPackage(**wp) for wp in m["work_packages"]],
+        )
+        for m in milestones
+    ]
+    if mode not in {"agency", "orchestrator"}:
+        raise PlanError("package plan mode must be agency or orchestrator")
+    return PackagePlan(mode=mode, milestones=parsed)
 
 
 _PLAN_INT_FIELDS: frozenset[str] = frozenset({"verifier_timeout_s", "parallel_group", "est_tokens"})

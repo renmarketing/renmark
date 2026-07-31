@@ -661,6 +661,55 @@ def test_lint_plan_never_raises_on_nonexistent_file() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 18b. Package plans — raw package requirements supplement schema validation
+# ---------------------------------------------------------------------------
+
+
+def _package_plan(**fields: str) -> str:
+    package_fields = {
+        "id": "m3--lint",
+        "goal": "lint packages",
+        "expected_outcome": "bounded package lint",
+        "acceptance_evidence": "[pytest -q tests/test_plan_lint.py]",
+        "dependencies": "[none]",
+        "risks": "[format drift]",
+        "allowed_surfaces": "[implementation, tests]",
+        "cost_lane": "standard",
+        "demo_point": "pytest",
+        "signoff_policy": "owner",
+        "status": "pending",
+    }
+    package_fields.update(fields)
+    rendered = "\n".join(f"- **{key}:** {value}" for key, value in package_fields.items() if value is not None)
+    return "# Packages\n- **mode:** orchestrator\n\n## Milestone: m3\n- **id:** m3\n- **goal:** compiler\n- **expected_outcome:** packages\n\n### Work Package: lint\n" + rendered + "\n"
+
+
+def test_valid_package_plan_passes(tmp_path: Path) -> None:
+    report = lint_plan(_write(tmp_path, _package_plan()))
+    assert report.verdict == "PASS"
+    assert report.task_count == 1
+
+
+@pytest.mark.parametrize("field", ["id", "acceptance_evidence", "allowed_surfaces"])
+def test_package_plan_requires_raw_boundary_fields(tmp_path: Path, field: str) -> None:
+    report = lint_plan(_write(tmp_path, _package_plan(**{field: ""})))
+    assert report.verdict == "BLOCK"
+    assert any(field in issue for issue in report.issues)
+
+
+def test_package_plan_rejects_non_artifact_dependencies(tmp_path: Path) -> None:
+    report = lint_plan(_write(tmp_path, _package_plan(dependencies="[task 1 output]")))
+    assert report.verdict == "BLOCK"
+    assert any("artifact pointer" in issue for issue in report.issues)
+
+
+def test_package_plan_rejects_transcript_language(tmp_path: Path) -> None:
+    report = lint_plan(_write(tmp_path, _package_plan(goal="paste transcript")))
+    assert report.verdict == "BLOCK"
+    assert any("transcript/diff" in issue for issue in report.issues)
+
+
+# ---------------------------------------------------------------------------
 # 19. Single-source-of-truth pin — both skill files must reference the engine
 #
 # NOTE: plugin/skills/orchestrate/SKILL.md is being added by a PARALLEL task

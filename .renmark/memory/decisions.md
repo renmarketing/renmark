@@ -1,5 +1,43 @@
 # Decisions (ADRs)
 
+## ADR-045 — Public Agency and Orchestrator paths; internal Conductor policy
+
+**Date:** 2026-07-30
+**Status:** Accepted — supersedes ADR-039
+
+**Context.** ADR-039 recorded a completed harness-operating-modes feature but
+does not express the product boundary needed for the managed delivery model.
+The product needs two stable public paths: **Agency** for owner-facing
+engagement, discovery, agreement, milestones, and signoff; and
+**Orchestrator** for executing a defined, approved milestone through scoped
+packages. Internal routing and guided behavior must not become a third public
+workflow or invalidate existing operating-mode integrations.
+
+**Decision.** Expose Agency and Orchestrator as the only public paths. Agency
+governs owner decisions and hands an approved milestone to Orchestrator;
+Orchestrator performs the bounded delivery work, verification, review, and
+returns evidence for the applicable owner gate. **Conductor** is an internal
+guided-policy layer only: it may select, sequence, and explain the appropriate
+public path, but has no independent public contract, lifecycle, or approval
+authority.
+
+**Migration and rollback.** Existing operating-mode names, commands, persisted
+state, and integrations remain compatibility projections during migration;
+they must map deterministically to Agency or Orchestrator without changing
+approval, review, merge, or release gates. Migration is additive and
+reversible: retain readable legacy state and adapters until consumers have
+migrated, avoid destructive renames or state rewrites, and permit rollback by
+disabling the new routing/projection while preserving canonical lifecycle and
+delivery evidence. A rollback must never reinterpret approval or silently
+advance a milestone.
+
+**Consequences.** Public documentation and entrypoints describe two paths;
+Conductor remains implementation detail. Compatibility code may be removed
+only after consumers and persisted artifacts are safely migrated and a
+documented rollback is no longer required.
+
+---
+
 ## ADR-044 — Finished feature context-hygiene-gates
 
 **Date:** 2026-07-06

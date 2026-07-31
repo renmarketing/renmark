@@ -35,6 +35,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from renmark.delivery_state import (
+    CONTRACT_VERSION as DELIVERY_CONTRACT_VERSION,
+)
+from renmark.delivery_state import (
+    LEGACY_REF_CAP,
+    PROVENANCE_EVENT_CAP,
+    SUMMARY_TEXT_LIMIT,
+    WORK_PACKAGE_CAP,
+    stable_milestone_id,
+    stable_work_package_id,
+)
+from renmark.delivery_state import (
+    SCHEMA_VERSION as DELIVERY_SCHEMA_VERSION,
+)
 from renmark.dispatch import (
     SUBAGENT_OUTPUT_COMPLETION_STATES,
     SUBAGENT_OUTPUT_CONFIDENCE_VALUES,
@@ -42,6 +56,109 @@ from renmark.dispatch import (
     SUBAGENT_OUTPUT_STATUS_VALUES,
 )
 from renmark.lifecycle import STAGES
+
+# -- Milestone package plans -------------------------------------------------
+
+PACKAGE_TEXT_LIMIT = 500
+PACKAGE_LIST_CAP = 16
+WORK_PACKAGE_STATUS_VALUES = frozenset({"pending", "in_progress", "blocked", "passed", "failed"})
+PACKAGE_ALLOWED_SURFACES = frozenset({"implementation", "tests", "docs", "config"})
+
+
+def validate_milestone_document(data: Any) -> list[str]:
+    """Validate a bounded, portable milestone/work-package document.
+
+    This deliberately describes planning input, not ``delivery.json``.  The
+    latter stays a compact runtime aggregate and must never receive package
+    prose, diffs, or transcripts.
+    """
+    if not isinstance(data, dict):
+        return [f"milestone_document: expected object, got {type(data).__name__}"]
+    issues: list[str] = []
+    _reject_package_leaks(data, "milestone_document", issues)
+    milestones = data.get("milestones")
+    if not isinstance(milestones, list) or not milestones:
+        return [*issues, "milestone_document.milestones must be a non-empty list"]
+    if len(milestones) > PACKAGE_LIST_CAP:
+        issues.append(f"milestone_document.milestones has {len(milestones)} entries — cap is {PACKAGE_LIST_CAP}")
+    seen: set[str] = set()
+    for i, milestone in enumerate(milestones):
+        scope = f"milestone_document.milestones[{i}]"
+        if not isinstance(milestone, dict):
+            issues.append(f"{scope} expected object, got {type(milestone).__name__}")
+            continue
+        milestone_id = milestone.get("id")
+        if not isinstance(milestone_id, str) or not milestone_id.strip():
+            issues.append(f"{scope}.id must be a non-empty str")
+        elif milestone_id != stable_milestone_id(milestone_id):
+            issues.append(f"{scope}.id must already be in stable_milestone_id form")
+        elif milestone_id in seen:
+            issues.append(f"{scope}.id duplicates {milestone_id!r}")
+        else:
+            seen.add(milestone_id)
+        _bounded_text_field(milestone, "goal", scope, issues)
+        _bounded_text_field(milestone, "expected_outcome", scope, issues)
+        packages = milestone.get("work_packages")
+        if not isinstance(packages, list) or not packages:
+            issues.append(f"{scope}.work_packages must be a non-empty list")
+            continue
+        if len(packages) > PACKAGE_LIST_CAP:
+            issues.append(f"{scope}.work_packages has {len(packages)} entries — cap is {PACKAGE_LIST_CAP}")
+        for j, package in enumerate(packages):
+            _validate_work_package(
+                package,
+                milestone_id if isinstance(milestone_id, str) else "",
+                f"{scope}.work_packages[{j}]",
+                issues,
+            )
+    return issues
+
+
+def _validate_work_package(package: Any, milestone_id: str, scope: str, issues: list[str]) -> None:
+    if not isinstance(package, dict):
+        issues.append(f"{scope} expected object, got {type(package).__name__}")
+        return
+    _reject_package_leaks(package, scope, issues)
+    package_id = package.get("id")
+    expected_id = stable_work_package_id(milestone_id, package_id) if isinstance(package_id, str) else ""
+    if not isinstance(package_id, str) or not package_id.strip():
+        issues.append(f"{scope}.id must be a non-empty str")
+    elif package_id != expected_id:
+        issues.append(f"{scope}.id must already be in stable_work_package_id form")
+    for key in ("goal", "expected_outcome", "demo_point", "signoff_policy", "cost_lane"):
+        _bounded_text_field(package, key, scope, issues)
+    status = package.get("status")
+    if status not in WORK_PACKAGE_STATUS_VALUES:
+        issues.append(f"{scope}.status={status!r} not in {sorted(WORK_PACKAGE_STATUS_VALUES)}")
+    for key in ("acceptance_evidence", "dependencies", "risks", "allowed_surfaces"):
+        values = package.get(key)
+        if not isinstance(values, list) or not values:
+            issues.append(f"{scope}.{key} must be a non-empty list")
+            continue
+        if len(values) > PACKAGE_LIST_CAP:
+            issues.append(f"{scope}.{key} has {len(values)} entries — cap is {PACKAGE_LIST_CAP}")
+        for value in values:
+            if not isinstance(value, str) or not value.strip() or len(value) > PACKAGE_TEXT_LIMIT:
+                issues.append(f"{scope}.{key} entries must be non-empty strings <= {PACKAGE_TEXT_LIMIT} chars")
+        if key == "allowed_surfaces":
+            invalid = sorted(set(values) - PACKAGE_ALLOWED_SURFACES)
+            if invalid:
+                issues.append(f"{scope}.allowed_surfaces has invalid values {invalid}")
+
+
+def _bounded_text_field(data: dict[str, Any], key: str, scope: str, issues: list[str]) -> None:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        issues.append(f"{scope}.{key} must be a non-empty str")
+    elif len(value) > PACKAGE_TEXT_LIMIT:
+        issues.append(f"{scope}.{key} is {len(value)} chars — cap is {PACKAGE_TEXT_LIMIT}")
+
+
+def _reject_package_leaks(data: dict[str, Any], scope: str, issues: list[str]) -> None:
+    forbidden = {"transcript", "transcripts", "diff", "patch", "generated_code", "reasoning"}
+    leaked = sorted(forbidden & set(data))
+    if leaked:
+        issues.append(f"{scope} contains forbidden transcript/diff fields {leaked}")
 
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -129,6 +246,126 @@ def validate_pipeline(data: Any) -> list[str]:
             for i, v in enumerate(seq):
                 if not isinstance(v, int):
                     issues.append(f"pipeline.{key}[{i}] expected int, got {type(v).__name__}")
+
+    return issues
+
+
+# ── Delivery state ────────────────────────────────────────────────────────────
+
+DELIVERY_STATE_FIELDS = {
+    "schema_version": (int, True),
+    "run_id": (str, True),
+    "delivery_mode": (str, True),
+    "execution_policy": (str, True),
+    "active_milestone_id": (str, True),
+    "milestone_execution": (str, True),
+    "work_packages": (list, True),
+    "approval_status": (str, True),
+    "review_status": (str, True),
+    "verification_status": (str, True),
+    "loop_status": (str, True),
+    "contract_version": (str, True),
+    "source_sha": (str, True),
+    "provenance_events": (list, True),
+    "legacy_refs": (list, True),
+}
+
+DELIVERY_MODE_VALUES = frozenset({"agency", "orchestrator"})
+DELIVERY_EXECUTION_POLICY_VALUES = frozenset({"guided", "direct", "async"})
+DELIVERY_STATUS_VALUES = frozenset({"unknown", "pending", "in_progress", "approved", "passed", "blocked", "failed"})
+DELIVERY_MILESTONE_EXECUTION_VALUES = frozenset({"orchestrator"})
+DELIVERY_RUN_ID_PREFIX = "delivery-"
+
+
+def validate_delivery_state(data: Any) -> list[str]:
+    issues: list[str] = []
+    if not isinstance(data, dict):
+        return [f"delivery: expected object, got {type(data).__name__}"]
+
+    issues.extend(_check_fields(data, DELIVERY_STATE_FIELDS, "delivery"))
+
+    schema_version = data.get("schema_version")
+    if isinstance(schema_version, int) and schema_version != DELIVERY_SCHEMA_VERSION:
+        issues.append(
+            f"delivery.schema_version={schema_version!r} does not match canonical schema_version "
+            f"{DELIVERY_SCHEMA_VERSION}"
+        )
+
+    contract_version = data.get("contract_version")
+    if isinstance(contract_version, str) and contract_version != DELIVERY_CONTRACT_VERSION:
+        issues.append(
+            "delivery.contract_version="
+            f"{contract_version!r} does not match canonical contract_version {DELIVERY_CONTRACT_VERSION!r}"
+        )
+
+    run_id = data.get("run_id")
+    if isinstance(run_id, str):
+        if not run_id:
+            issues.append("delivery.run_id is empty")
+        elif not _is_stable_delivery_run_id(run_id):
+            issues.append(
+                "delivery.run_id must match the stable delivery id shape "
+                f"({DELIVERY_RUN_ID_PREFIX}<12 lowercase hex chars>)"
+            )
+
+    _check_vocab(issues, "delivery.delivery_mode", data.get("delivery_mode"), DELIVERY_MODE_VALUES)
+    _check_vocab(
+        issues,
+        "delivery.execution_policy",
+        data.get("execution_policy"),
+        DELIVERY_EXECUTION_POLICY_VALUES,
+    )
+    _check_vocab(
+        issues,
+        "delivery.milestone_execution",
+        data.get("milestone_execution"),
+        DELIVERY_MILESTONE_EXECUTION_VALUES,
+    )
+
+    active_milestone_id = data.get("active_milestone_id")
+    if (
+        isinstance(active_milestone_id, str)
+        and active_milestone_id
+        and active_milestone_id != stable_milestone_id(active_milestone_id)
+    ):
+        issues.append("delivery.active_milestone_id must already be in stable_milestone_id form")
+
+    for field in ("approval_status", "review_status", "verification_status", "loop_status"):
+        _check_vocab(issues, f"delivery.{field}", data.get(field), DELIVERY_STATUS_VALUES)
+
+    work_packages = data.get("work_packages")
+    if isinstance(work_packages, list):
+        if len(work_packages) > WORK_PACKAGE_CAP:
+            issues.append(f"delivery.work_packages has {len(work_packages)} entries — cap is {WORK_PACKAGE_CAP}")
+        for i, package in enumerate(work_packages):
+            scope = f"delivery.work_packages[{i}]"
+            if not isinstance(package, dict):
+                issues.append(f"{scope} expected object, got {type(package).__name__}")
+                continue
+            issues.extend(_validate_delivery_work_package(package, scope))
+
+    provenance_events = data.get("provenance_events")
+    if isinstance(provenance_events, list):
+        if len(provenance_events) > PROVENANCE_EVENT_CAP:
+            issues.append(
+                f"delivery.provenance_events has {len(provenance_events)} entries — cap is {PROVENANCE_EVENT_CAP}"
+            )
+        for i, event in enumerate(provenance_events):
+            scope = f"delivery.provenance_events[{i}]"
+            if not isinstance(event, dict):
+                issues.append(f"{scope} expected object, got {type(event).__name__}")
+                continue
+            issues.extend(_validate_delivery_provenance_event(event, scope))
+
+    legacy_refs = data.get("legacy_refs")
+    if isinstance(legacy_refs, list):
+        if len(legacy_refs) > LEGACY_REF_CAP:
+            issues.append(f"delivery.legacy_refs has {len(legacy_refs)} entries — cap is {LEGACY_REF_CAP}")
+        for i, value in enumerate(legacy_refs):
+            if not isinstance(value, str):
+                issues.append(f"delivery.legacy_refs[{i}] expected str, got {type(value).__name__}")
+            elif not value.strip():
+                issues.append(f"delivery.legacy_refs[{i}] is empty")
 
     return issues
 
@@ -414,6 +651,85 @@ def _check_fields(data: dict[str, Any], spec: dict[str, tuple[Any, ...]], scope:
     return issues
 
 
+def _check_vocab(issues: list[str], scope: str, value: Any, allowed: frozenset[str]) -> None:
+    if isinstance(value, str) and value not in allowed:
+        issues.append(f"{scope}={value!r} not in {sorted(allowed)}")
+
+
+def _validate_delivery_work_package(data: dict[str, Any], scope: str) -> list[str]:
+    issues: list[str] = []
+    spec = {
+        "package_id": str,
+        "milestone_id": str,
+        "title": str,
+        "status": str,
+        "summary": str,
+        "owner": str,
+        "updated_at": str,
+        "artifact_ref": str,
+    }
+    for field, expected_type in spec.items():
+        if field not in data:
+            issues.append(f"{scope}: required field {field!r} missing")
+            continue
+        if not _isinstance(data[field], expected_type):
+            issues.append(f"{scope}.{field} expected {_typename(expected_type)}, got {type(data[field]).__name__}")
+
+    milestone_id = data.get("milestone_id")
+    if isinstance(milestone_id, str):
+        if not milestone_id:
+            issues.append(f"{scope}.milestone_id is empty")
+        elif milestone_id != stable_milestone_id(milestone_id):
+            issues.append(f"{scope}.milestone_id must already be in stable_milestone_id form")
+
+    package_id = data.get("package_id")
+    if isinstance(package_id, str):
+        if not package_id:
+            issues.append(f"{scope}.package_id is empty")
+        elif isinstance(milestone_id, str) and milestone_id:
+            expected_id = stable_work_package_id(milestone_id, package_id)
+            if package_id != expected_id:
+                issues.append(
+                    f"{scope}.package_id must already be in stable_work_package_id form for milestone {milestone_id!r}"
+                )
+
+    _check_vocab(issues, f"{scope}.status", data.get("status"), DELIVERY_STATUS_VALUES)
+
+    summary = data.get("summary")
+    if isinstance(summary, str) and len(summary) > SUMMARY_TEXT_LIMIT:
+        issues.append(f"{scope}.summary is {len(summary)} chars — cap is {SUMMARY_TEXT_LIMIT}")
+
+    return issues
+
+
+def _validate_delivery_provenance_event(data: dict[str, Any], scope: str) -> list[str]:
+    issues: list[str] = []
+    spec = {
+        "ts": str,
+        "kind": str,
+        "detail": str,
+        "source": str,
+        "ref": str,
+    }
+    for field, expected_type in spec.items():
+        if field not in data:
+            issues.append(f"{scope}: required field {field!r} missing")
+            continue
+        if not _isinstance(data[field], expected_type):
+            issues.append(f"{scope}.{field} expected {_typename(expected_type)}, got {type(data[field]).__name__}")
+            continue
+        if isinstance(data[field], str) and not data[field].strip():
+            issues.append(f"{scope}.{field} is empty")
+    return issues
+
+
+def _is_stable_delivery_run_id(value: str) -> bool:
+    if not value.startswith(DELIVERY_RUN_ID_PREFIX):
+        return False
+    suffix = value[len(DELIVERY_RUN_ID_PREFIX) :]
+    return len(suffix) == 12 and all(ch in "0123456789abcdef" for ch in suffix)
+
+
 def _isinstance(value: Any, expected: Any) -> bool:
     # bool is a subclass of int — exclude it when expecting int.
     if expected is int and isinstance(value, bool):
@@ -437,6 +753,7 @@ def _typename(expected: Any) -> str:
 VALIDATORS: dict[str, Callable[[Any], list[str]]] = {
     "lifecycle": validate_lifecycle,
     "pipeline": validate_pipeline,
+    "delivery": validate_delivery_state,
     "subagent": validate_subagent_output,
     "artifact": validate_artifact_metadata,
     "limits": validate_limits,
@@ -452,7 +769,7 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) != 2 or argv[0] not in VALIDATORS:
         sys.stderr.write(
             "usage: python -m renmark.schemas "
-            "{lifecycle|pipeline|subagent|artifact|limits|analytics|report|pause|event} <path>\n"
+            "{lifecycle|pipeline|delivery|subagent|artifact|limits|analytics|report|pause|event} <path>\n"
         )
         return 2
 

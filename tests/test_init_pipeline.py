@@ -21,6 +21,7 @@ the tmp repo.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -401,3 +402,179 @@ def test_stub_corruption_counts_inline_begin_substring() -> None:
     assert init._count_begin_markers(inline) == 1
     # Public canonical counter: own-line only → not counted.
     assert init.count_begin_markers(inline, "project-stub") == 0
+
+
+# M5 project-delivery contract propagation.
+
+
+def _write_existing_guidance(repo: Path, prose: str = "# Existing guidance\n") -> None:
+    """Create an existing repository with user-owned root guidance prose."""
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        (repo / name).write_text(prose, encoding="utf-8")
+
+
+def test_project_delivery_contract_converges_existing_repository(tmp_path: Path) -> None:
+    """Existing root guidance receives the canonical contract in both files."""
+    _write_existing_guidance(tmp_path)
+
+    result = init.merge_project_delivery_contract(tmp_path)
+
+    assert result == {"CLAUDE.md": "refreshed", "AGENTS.md": "refreshed"}
+    claude = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
+    agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+    assert init.contract_is_fresh(claude)
+    assert init.contract_is_fresh(agents)
+    assert init.contracts_are_semantically_equal(claude, agents)
+
+
+def test_project_delivery_contract_second_run_is_byte_identical(tmp_path: Path) -> None:
+    """Once converged, a second propagation run writes no guidance changes."""
+    _write_existing_guidance(tmp_path)
+    init.merge_project_delivery_contract(tmp_path)
+    before = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+
+    result = init.merge_project_delivery_contract(tmp_path)
+
+    assert result == {"CLAUDE.md": "unchanged", "AGENTS.md": "unchanged"}
+    assert {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")} == before
+
+
+def test_project_delivery_contract_advances_freshness_when_body_is_semantically_unchanged(tmp_path: Path) -> None:
+    """A new repository SHA refreshes only the marker, retaining CRLF user prose."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    commit = [
+        "git",
+        "-C",
+        str(tmp_path),
+        "-c",
+        "user.name=Test User",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-qm",
+    ]
+    subprocess.run([*commit, "initial"], check=True)
+
+    prose = "# Team guide\r\n\r\nKeep this wording  exactly.\r\n"
+    _write_existing_guidance(tmp_path, prose)
+    init.merge_project_delivery_contract(tmp_path)
+    first_marker = init.project_delivery_contract_freshness_marker(tmp_path)
+
+    subprocess.run([*commit, "next revision"], check=True)
+    second_marker = init.project_delivery_contract_freshness_marker(tmp_path)
+    assert second_marker != first_marker
+
+    result = init.merge_project_delivery_contract(tmp_path)
+
+    assert result == {"CLAUDE.md": "refreshed", "AGENTS.md": "refreshed"}
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        after = (tmp_path / name).read_bytes()
+        assert after.startswith(prose.encode("utf-8"))
+        assert f"<!-- Last refreshed: @ {second_marker} -->".encode() in after
+        assert init.contract_is_fresh(after.decode("utf-8"), tmp_path)
+
+
+def test_project_delivery_contract_preserves_unmarked_prose_bytes(tmp_path: Path) -> None:
+    """Only the managed contract is touched; unmarked user prose stays exact."""
+    prose = "# Team guide\r\n\r\nKeep this wording  exactly.\r\n"
+    _write_existing_guidance(tmp_path, prose)
+
+    init.merge_project_delivery_contract(tmp_path)
+
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        assert (tmp_path / name).read_bytes().startswith(prose.encode("utf-8"))
+
+
+def test_project_delivery_contract_malformed_marker_never_writes(tmp_path: Path) -> None:
+    """A malformed managed block is rejected before either guidance file changes."""
+    malformed = (
+        "# Existing\n\n"
+        f"{init.PROJECT_DELIVERY_BEGIN}\n"
+        "Half-written contract with no closing marker.\n"
+    )
+    _write_existing_guidance(tmp_path)
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_text(malformed, encoding="utf-8")
+    before = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+
+    with pytest.raises(init.MarkerCorruptionError):
+        init.merge_project_delivery_contract(tmp_path)
+
+    assert {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")} == before
+
+
+def test_project_delivery_contract_crlf_orphan_end_never_writes(tmp_path: Path) -> None:
+    """A CRLF orphan END is rejected without appending a replacement block."""
+    malformed = (
+        "# Existing\r\n\r\n"
+        f"{init.PROJECT_DELIVERY_END}\r\n"
+        "User-owned guidance.\r\n"
+    )
+    _write_existing_guidance(tmp_path)
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_bytes(malformed.encode("utf-8"))
+    before = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+
+    with pytest.raises(init.MarkerCorruptionError):
+        init.merge_project_delivery_contract(tmp_path)
+
+    after = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+    assert after == before
+    assert after["CLAUDE.md"].count(init.PROJECT_DELIVERY_BEGIN.encode()) == 0
+    assert after["CLAUDE.md"].count(init.PROJECT_DELIVERY_END.encode()) == 1
+
+
+def test_project_delivery_contract_crlf_duplicate_blocks_never_writes(tmp_path: Path) -> None:
+    """Duplicate CRLF managed blocks are corruption, never a trigger to append again."""
+    managed_block = (
+        f"{init.PROJECT_DELIVERY_BEGIN}\r\n"
+        "Old managed contract.\r\n"
+        f"{init.PROJECT_DELIVERY_END}\r\n"
+    )
+    malformed = f"# Existing\r\n\r\n{managed_block}\r\n{managed_block}"
+    _write_existing_guidance(tmp_path)
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_bytes(malformed.encode("utf-8"))
+    before = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+
+    with pytest.raises(init.MarkerCorruptionError):
+        init.merge_project_delivery_contract(tmp_path)
+
+    after = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+    assert after == before
+    assert after["CLAUDE.md"].count(init.PROJECT_DELIVERY_BEGIN.encode()) == 2
+    assert after["CLAUDE.md"].count(init.PROJECT_DELIVERY_END.encode()) == 2
+
+
+def test_project_delivery_contract_crlf_out_of_order_markers_never_writes(tmp_path: Path) -> None:
+    """Balanced-but-reversed CRLF markers are rejected before either file changes."""
+    malformed = (
+        "# Existing\r\n\r\n"
+        f"{init.PROJECT_DELIVERY_END}\r\n"
+        "User-owned guidance.\r\n"
+        f"{init.PROJECT_DELIVERY_BEGIN}\r\n"
+    )
+    _write_existing_guidance(tmp_path)
+    claude = tmp_path / "CLAUDE.md"
+    claude.write_bytes(malformed.encode("utf-8"))
+    before = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+
+    with pytest.raises(init.MarkerCorruptionError):
+        init.merge_project_delivery_contract(tmp_path)
+
+    after = {name: (tmp_path / name).read_bytes() for name in ("CLAUDE.md", "AGENTS.md")}
+    assert after == before
+    assert after["CLAUDE.md"].count(init.PROJECT_DELIVERY_BEGIN.encode()) == 1
+    assert after["CLAUDE.md"].count(init.PROJECT_DELIVERY_END.encode()) == 1
+
+
+def test_project_delivery_contract_semantic_mirror_parity(tmp_path: Path) -> None:
+    """Converged guidance files compare as semantic contract mirrors."""
+    _write_existing_guidance(tmp_path)
+    init.merge_project_delivery_contract(tmp_path)
+    claude = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
+    agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+
+    assert init.project_delivery_contracts_are_semantically_equal(claude, agents)
+    assert init.contracts_are_semantically_equal(claude, agents)

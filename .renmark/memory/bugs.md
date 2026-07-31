@@ -50,6 +50,86 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-07-30 — Persist approved Agency handoff
+
+**Severity:** major
+**Symptom:** Approved Agency milestone was not persisted to canonical delivery state through production lifecycle.
+**Root cause:** The production lifecycle path projected approved Agency state read-only and never invoked the canonical approval handoff that writes the active milestone into delivery state.
+**Fix:** Route explicit approved Agency activation through the preserving canonical handoff and add regression coverage.
+**Lesson:** Keep approval transitions as explicit writers; compatibility projections and summary readers must stay read-only.
+
+---
+
+### 2026-07-30 — Fix M3 package parser/compiler typing
+
+**Severity:** medium
+**Symptom:** mypy rejected M3 package parser/compiler boundary
+**Root cause:** The parser selected a nullable milestone/package dictionary through a ternary without narrowing it, while the compiler forwarded string metadata through kwargs into a boolean parameter.
+**Fix:** Explicit narrowing and typed forwarding restored mypy compatibility.
+**Lesson:** New package adapters need explicit typed boundaries instead of nullable ternary targets or untyped forwarding.
+
+---
+
+### 2026-07-30 — M2 task 7 selector compatibility verifier
+
+**Severity:** medium
+**Symptom:** Task 7 verifier failed and its generated test changes were rolled back.
+**Root cause:** Task 7 mixed stale host-presentation expectations with an incorrect host=None assumption, while continue_selector also searched only current-page bindings despite advertising the hidden semantic refusal code/label on every page; the resulting contract mismatch made the generated focused verifier fail and roll back.
+**Fix:** Aligned interaction tests with bounded More/Back/fallback metadata and runtime host resolution, and made exact hidden refusal codes/labels resolve as cancel from every page.
+**Lesson:** Selector tests must assert semantic parity and runtime-resolved host identity, not freeze one host presentation or assume host=None means Codex.
+
+---
+
+### 2026-07-30 — Nested Codex workspace-write sandbox unavailable in WSL
+
+**Severity:** major
+**Symptom:** Codex implementation tasks exited zero without changing their targets, so completion and recurrence guards stopped M2.
+**Root cause:** Renmark invoked bare `codex`, WSL selected the WindowsApps executable, and that executable had no usable Bubblewrap helper for workspace-write.
+**Fix:** Installed system Bubblewrap and made the provider probe PATH candidates without a model call, launch the first passing absolute executable, reject workspace-owned runtimes, and fail safely without sandbox bypass.
+**Lesson:** Executable presence is not executor readiness: prove the actual sandbox before model spend, and never launch a runtime controlled by the target workspace.
+
+---
+
+### 2026-07-30 — Codex executor accepted unchanged targets as PASS
+
+**Severity:** high
+**Symptom:** M2 tasks 2–12 reported PASS while producing no target changes, artifacts, or commits.
+**Root cause:** The Codex runner enforces only that no out-of-lane files changed and then treats a green verifier as completion, so an empty target delta and empty commit SHA are mislabeled as PASS instead of failed evidence.
+**Fix:** Require the target in the executor delta before verification and require a real commit SHA or the explicit no-commit sentinel after verification.
+**Lesson:** An agent exit plus a green verifier is not implementation completion; require attributable target change and durable commit evidence, or an explicit validated batching sentinel.
+
+---
+
+### 2026-07-30 — Ruff baseline regressed after M1 delivery-state additions
+
+**Severity:** medium
+**Symptom:** Six Ruff findings across four files blocked the approved M2 preflight.
+**Root cause:** Recent M1 canonical-delivery-state additions inserted imports, exports, and validator branches without a final repository-wide Ruff normalization pass, leaving six mechanical style violations across four files while behavior remained green.
+**Fix:** Applied the exact Ruff-canonical mechanical normalization and re-ran focused plus repository-wide gates.
+**Lesson:** Run the repository-wide Ruff gate after milestone task commits and before the next milestone preflight; passing task-local verifiers alone does not prove cross-file style convergence.
+
+---
+
+### 2026-07-29 — M1 canonical state had unstable identity and validator drift
+
+**Severity:** high
+**Symptom:** Repeated legacy reads changed run_id and DeliveryState serialized metadata rejected by validate_delivery_state.
+**Root cause:** M1 omitted deterministic legacy run-identity derivation and treated canonical schema, contract, and run-ID metadata as caller-owned during normalization even though the validator defines those fields as fixed invariants.
+**Fix:** Derive legacy run IDs from persisted Program/Lifecycle/Agency identity fields; normalize schema_version, contract_version, and malformed run IDs to canonical values; add stability and writer-validator convergence regressions.
+**Lesson:** Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
+
+---
+
+### 2026-07-29 — M1 delivery-state CLI crashed on legacy work packages
+
+**Severity:** medium
+**Symptom:** ./bin/renmark-execute --delivery-state raised AttributeError on dict.normalized()
+**Root cause:** The live CLI projection both round-trips DeliveryState through asdict, which erases nested types, and re-normalizes already-qualified work-package IDs as raw tokens, so reconstruction either crashes on dictionaries or silently drifts stable IDs.
+**Fix:** Use dataclasses.replace for typed lifecycle cloning, make stable_work_package_id idempotent for already-qualified IDs, add live CLI and exact round-trip regressions, and clear M1 lint/type defects.
+**Lesson:** Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.
+
+---
+
 ### 2026-07-17 - Recurrence guard discarded the actionable verifier failure
 
 **Severity:** medium

@@ -66,19 +66,21 @@ on :func:`evaluate_stop_for_stage` which derives it from the program directly.
 
 Severity ordering (FIRST MATCH WINS) for :func:`evaluate_stop`
 --------------------------------------------------------------
-Hard stops are evaluated most-blocking first:
+Hard stops are evaluated most-blocking first, except that resumable
+dispositions take precedence over verifier failure:
 
     1. RETRY_EXHAUSTED      — circuit-break; a task hit the retry ceiling
                               (a persistent BLOCKER, not a transient failure)
     2. PLAN_BLOCK           — check-plan returned BLOCK (cannot safely execute)
     3. PRD_DRIFT            — work drifted from the PRD source of truth
     4. CODEREVIEW_CRITICAL  — a critical-severity review finding
-    5. VERIFY_FAILED        — verify did not reach complete + validated
+    5. AWAITING_APPROVAL    — a REQ-12 gate (merge/release/destructive) is pending
+    6. PAUSED               — budget / max-iter / usage-limit (resumable, NO approval)
+    7. VERIFY_FAILED        — verify did not reach complete + validated
 
-Non-hard dispositions are evaluated ONLY after no hard stop fires:
-
-    6. AWAITING_APPROVAL    — a REQ-12 gate (merge/release/destructive) is pending
-    7. PAUSED               — budget / max-iter / usage-limit (resumable, NO approval)
+An approval or pause disposition is an immediate no-progress outcome: it must
+not be converted into a verifier-repair package merely because the verifier
+metadata also reports a failure.
 
 :func:`is_hard_stop` and :data:`HARD_STOPS` treat 1-5 as hard stops;
 ``AWAITING_APPROVAL`` and ``PAUSED`` are NOT hard stops (the roadmap is
@@ -88,10 +90,12 @@ limits clear).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 
 from renmark import program as _program
 from renmark.program import Program, StageNode
+from renmark.recurrence import IssueObservation, observe_issue, pre_attempt
 from renmark.summary import git_head_sha
 
 # ── Tunable constants ──────────────────────────────────────────────────────────
@@ -104,6 +108,41 @@ MAX_TASK_RETRIES: int = 3
 #: ``renmark.loop._COMPLETE_STATE`` / ``_PASS_VALIDATION``).
 _COMPLETE_STATE: str = "complete"
 _PASS_VALIDATION: str = "validated"
+
+#: Recurrence identity for scoped verifier-repair attempts.  Keep this separate
+#: from executor retry rules: a repair package is a milestone-level decision,
+#: not a request to re-run an executor task.
+_REPAIR_RECURRENCE_CHECK = "milestone-repair"
+_REPAIR_RECURRENCE_RULE = "verifier-failure"
+
+
+@dataclass(frozen=True, slots=True)
+class RepairPackagePointer:
+    """The only repair hand-off emitted by the milestone driver.
+
+    This deliberately carries stable identities plus an artifact pointer only.
+    In particular, verifier output, review prose, diffs, and generated repair
+    instructions are not part of canonical milestone state.
+    """
+
+    milestone_id: str
+    work_package_id: str
+    artifact_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class MilestoneDecision:
+    """Bounded deterministic disposition for one milestone verifier result.
+
+    ``advance_allowed`` is permission to call :func:`advance_on_success`; this
+    helper intentionally does not mutate the program.  A caller must therefore
+    have a fresh, explicit pass before state can move forward.
+    """
+
+    action: str
+    advance_allowed: bool
+    reason: StopReason | None
+    repair_package: RepairPackagePointer | None = None
 
 
 # ── Stop reasons ───────────────────────────────────────────────────────────────
@@ -232,7 +271,24 @@ def evaluate_stop(stage_result: dict[str, object]) -> StopReason | None:
     if (critical_count is not None and critical_count > 0) or severity == "critical":
         return StopReason.CODEREVIEW_CRITICAL
 
-    # 5. VERIFY_FAILED — verify must reach complete + validated. We only judge
+    # 5. AWAITING_APPROVAL — a REQ-12 gate is pending. This disposition takes
+    #    precedence over verifier failure so it cannot create repair work before
+    #    the required human decision.
+    if _truthy(sr.get("awaiting_approval")) or _truthy(sr.get("gate")):
+        return StopReason.AWAITING_APPROVAL
+
+    # 6. PAUSED — budget / max-iter / usage-limit / explicit pause (resumable).
+    #    A pause is no-progress, even when the same metadata contains failed
+    #    verification evidence; callers must not emit a repair package here.
+    if (
+        _as_str(sr.get("budget_status")).lower() == "exhausted"
+        or _truthy(sr.get("max_iter_hit"))
+        or _truthy(sr.get("usage_limited"))
+        or _truthy(sr.get("paused"))
+    ):
+        return StopReason.PAUSED
+
+    # 7. VERIFY_FAILED — verify must reach complete + validated. We only judge
     #    verify when at least one verify signal is PRESENT (absent == this phase
     #    did not run this stage_result; do NOT fabricate a failure from silence).
     completion = _as_str(sr.get("completion_state"))
@@ -241,20 +297,6 @@ def evaluate_stop(stage_result: dict[str, object]) -> StopReason | None:
         completion != _COMPLETE_STATE or validation != _PASS_VALIDATION
     ):
         return StopReason.VERIFY_FAILED
-
-    # ── Non-hard dispositions (only after no hard stop fired) ────────────────
-    # 6. AWAITING_APPROVAL — a REQ-12 gate is pending.
-    if _truthy(sr.get("awaiting_approval")) or _truthy(sr.get("gate")):
-        return StopReason.AWAITING_APPROVAL
-
-    # 7. PAUSED — budget / max-iter / usage-limit / explicit pause (resumable).
-    if (
-        _as_str(sr.get("budget_status")).lower() == "exhausted"
-        or _truthy(sr.get("max_iter_hit"))
-        or _truthy(sr.get("usage_limited"))
-        or _truthy(sr.get("paused"))
-    ):
-        return StopReason.PAUSED
 
     return None
 
@@ -282,6 +324,148 @@ def evaluate_stop_for_stage(
     # Only inject when the caller did not already supply one (caller wins).
     merged.setdefault("max_retry_count", max_retry)
     return evaluate_stop(merged)
+
+
+# ── Milestone verifier / repair decisions ─────────────────────────────────────
+
+
+def decide_milestone_execution(
+    program: Program,
+    stage_id: str,
+    verifier_metadata: dict[str, object],
+    *,
+    repo: str,
+    milestone_id: str | None = None,
+    work_package_id: str | None = None,
+) -> MilestoneDecision:
+    """Turn fresh verifier metadata into a bounded milestone disposition.
+
+    A passing verifier permits advancement but does not mutate the program; the
+    caller still invokes :func:`advance_on_success` at its normal persistence
+    boundary.  Failed or incomplete evidence can emit a repair pointer only
+    when it is fresh and remains within the supplied milestone/work-package.
+    Stale, scope-drifting, paused, or recurrence-blocked results never emit a
+    repair and never permit advancement.
+
+    ``verifier_metadata`` is intentionally metadata-only.  It requires an
+    explicit freshness sentinel (``fresh``/``is_fresh`` or
+    ``freshness == 'fresh'``) and an artifact reference; verifier text is
+    neither consumed nor returned.  Existing callers may choose either
+    ``artifact_ref`` or ``artifact_path`` for that reference.
+    """
+    metadata = verifier_metadata if isinstance(verifier_metadata, dict) else {}
+    stage = _stage_by_id(program, stage_id)
+    if stage is None:
+        return MilestoneDecision("stop", False, StopReason.PLAN_BLOCK)
+
+    resolved_milestone = _as_str(milestone_id) or _as_str(stage.id)
+    resolved_package = _as_str(work_package_id) or _default_work_package_id(stage)
+    artifact_ref = _artifact_reference(metadata)
+    if not (
+        _is_stable_identifier(resolved_milestone)
+        and _is_stable_identifier(resolved_package)
+        and _is_scoped_work_package(stage, resolved_package)
+        and artifact_ref
+    ):
+        return MilestoneDecision("stop", False, StopReason.PLAN_BLOCK)
+
+    if not _fresh_verifier_metadata(metadata):
+        # No fresh, addressable evidence is no-progress, never a retry.
+        return MilestoneDecision("stop", False, StopReason.VERIFY_FAILED)
+
+    if _truthy(metadata.get("scope_drift")) or metadata.get("scope_matches") is False:
+        return MilestoneDecision("stop", False, StopReason.PRD_DRIFT)
+
+    reason = evaluate_stop_for_stage(program, stage_id, metadata)
+    if reason is None:
+        # A fresh verifier pass is the sole affirmative advance condition.
+        completion = _as_str(metadata.get("completion_state"))
+        validation = _as_str(metadata.get("validation_status"))
+        if completion == _COMPLETE_STATE and validation == _PASS_VALIDATION:
+            return MilestoneDecision("advance", True, None)
+        return MilestoneDecision("stop", False, StopReason.VERIFY_FAILED)
+    if reason is not StopReason.VERIFY_FAILED:
+        return MilestoneDecision("stop", False, reason)
+
+    # The guard runs before a repair package is emitted.  Two equivalent
+    # observed failures may produce two scoped repairs; after that the next
+    # equivalent repair is blocked unless the recurrence ledger is explicitly
+    # acknowledged through its existing public API.
+    guarded = pre_attempt(
+        repo,
+        check=_REPAIR_RECURRENCE_CHECK,
+        rule_id=_REPAIR_RECURRENCE_RULE,
+        target=resolved_package,
+    )
+    if guarded is not None and guarded.retry_blocked:
+        return MilestoneDecision("stop", False, StopReason.RETRY_EXHAUSTED)
+
+    observe_issue(
+        repo,
+        IssueObservation(
+            check=_REPAIR_RECURRENCE_CHECK,
+            rule_id=_REPAIR_RECURRENCE_RULE,
+            target=resolved_package,
+            title="Milestone verifier failure",
+            # This is bounded structured metadata, never verifier output.
+            summary_text=(
+                f"milestone={resolved_milestone}; package={resolved_package}; "
+                f"artifact={artifact_ref}; completion={_as_str(metadata.get('completion_state'))}; "
+                f"validation={_as_str(metadata.get('validation_status'))}"
+            )[:600],
+            source="renmark.program_driver",
+            run_id=_as_str(metadata.get("run_id")),
+        ),
+    )
+    return MilestoneDecision(
+        "repair",
+        False,
+        StopReason.VERIFY_FAILED,
+        RepairPackagePointer(resolved_milestone, resolved_package, artifact_ref),
+    )
+
+
+def _stage_by_id(program: Program, stage_id: str) -> StageNode | None:
+    """Return the named stage without accepting index-based continuation."""
+    for stage in program.stages:
+        if stage.id == stage_id:
+            return stage
+    return None
+
+
+def _default_work_package_id(stage: StageNode) -> str:
+    """Use the sole task's stable ID when an explicit package ID is omitted."""
+    return stage.tasks[0].id if len(stage.tasks) == 1 else ""
+
+
+def _is_scoped_work_package(stage: StageNode, work_package_id: str) -> bool:
+    """Reject a repair request that names work outside the current stage."""
+    return any(task.id == work_package_id for task in stage.tasks)
+
+
+def _artifact_reference(metadata: dict[str, object]) -> str:
+    """Return a bounded artifact pointer, never a verifier body."""
+    reference = _as_str(metadata.get("artifact_ref")) or _as_str(metadata.get("artifact_path"))
+    if not reference or any(character.isspace() for character in reference):
+        return ""
+    return reference[:512]
+
+
+def _fresh_verifier_metadata(metadata: dict[str, object]) -> bool:
+    """Require an explicit structured freshness claim; absence is stale."""
+    fresh = (
+        _truthy(metadata.get("fresh"))
+        or _truthy(metadata.get("is_fresh"))
+        or _as_str(metadata.get("freshness")).lower() == "fresh"
+    )
+    return fresh and bool(_artifact_reference(metadata))
+
+
+def _is_stable_identifier(value: str) -> bool:
+    """Accept compact stable IDs, rejecting prose and path-like scope labels."""
+    if not value or len(value) > 160:
+        return False
+    return all(character.islower() or character.isdigit() or character in "._-" for character in value)
 
 
 # ── Advance on success (write-state-before-return) ───────────────────────────────
@@ -401,8 +585,11 @@ def driver_status(program: Program) -> str:
 __all__ = [
     "HARD_STOPS",
     "MAX_TASK_RETRIES",
+    "MilestoneDecision",
+    "RepairPackagePointer",
     "StopReason",
     "advance_on_success",
+    "decide_milestone_execution",
     "drift_warning",
     "driver_status",
     "evaluate_stop",

@@ -14,6 +14,40 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-07-30, bug) **Persist approved Agency handoff** — Keep approval transitions as explicit writers; compatibility projections and summary readers must stay read-only.
+
+- (2026-07-30, bug) **Fix M3 package parser/compiler typing** — New package adapters need explicit typed boundaries instead of nullable ternary targets or untyped forwarding.
+
+- (2026-07-30, bug) **M2 task 7 selector compatibility verifier** — Selector tests must assert semantic parity and runtime-resolved host identity, not freeze one host presentation or assume host=None means Codex.
+
+- (2026-07-30, run) **task 7 failed on codex** — codex_verifier_failed
+
+- (2026-07-30, bug) **Nested Codex workspace-write sandbox unavailable in WSL** — Executable presence is not executor readiness: prove the actual sandbox before model spend, and never launch a runtime controlled by the target workspace.
+
+- (2026-07-30, run) **task 2 failed on codex** — repeated_issue_guard
+
+- (2026-07-30, review) model `codex-reviewer`: **Codex retry target rollback** — Every rejected executor attempt must restore its own target before retry; otherwise path-set deltas can hide a legitimate edit on the next attempt and produce a false unchanged-target failure.
+
+- (2026-07-30, bug) **Codex executor accepted unchanged targets as PASS** — An agent exit plus a green verifier is not implementation completion; require attributable target change and durable commit evidence, or an explicit validated batching sentinel.
+
+- (2026-07-30, bug) **Ruff baseline regressed after M1 delivery-state additions** — Run the repository-wide Ruff gate after milestone task commits and before the next milestone preflight; passing task-local verifiers alone does not prove cross-file style convergence.
+
+- (2026-07-29, .renmark/reviews/2026-07-29-402c3ed.review-remediation.md) model `codereview-remediation`: **review-m1-canonical-delivery-state** — 2/2 blocking Major findings resolved; stable legacy identity and writer-validator convergence; full suite 1540 passed, 31 skipped
+
+- (2026-07-29, .renmark/debug/20260730-001342-658d/session.md) model `debug`: **debug-m1-canonical-identity-convergence** — Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
+
+- (2026-07-29, bug) **M1 canonical state had unstable identity and validator drift** — Canonical metadata must be normalized by the writer and legacy projections need identity derived from stable persisted fields, never a fresh UUID per read.
+
+- (2026-07-29, .renmark/reviews/2026-07-29-4702acb.verification.md) model `verify`: **verify-m1-canonical-delivery-state** — 4/4 behaviors verified; failed: none; regressions: repository suite
+
+- (2026-07-29, .renmark/debug/20260729-220633-3642/session.md) model `debug`: **debug-m1-delivery-state-normalization** — Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.
+
+- (2026-07-29, bug) **M1 delivery-state CLI crashed on legacy work packages** — Never clone nested dataclasses with asdict plus a top-level constructor; typed clones and normalization functions must preserve nested types and be idempotent.
+
+- (2026-07-29, .renmark/reviews/2026-07-29-3a35610.verification.md) model `verify`: **verify-m1-canonical-delivery-state** — 3/4 behaviors verified; failed: bounded current-state CLI; regressions: repository suite
+
+- (2026-07-29, run) **task 1 failed on codex** — repeated_issue_guard
+
 - (2026-07-17, .renmark/reviews/2026-07-17-f87b955.verification.md) model `verify`: **verify-proactive-repeated-issue-monitor** — 4/4 behaviors verified; failed: none; regressions: 0
 
 - (2026-07-17, bug) **Recurrence guard discarded the actionable verifier failure** - A retry guard must preserve the failure evidence needed to repair the issue it stops.

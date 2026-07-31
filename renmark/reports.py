@@ -57,6 +57,8 @@ FEATURE_REPORT_KEYS: tuple[str, ...] = (
     "shipped",
     "deferred",
     "next_backlog",
+    "delivery_milestone_id",
+    "delivery_work_package_id",
     "task_id",
     "backlog_item_id",
     "loop_id",
@@ -125,6 +127,8 @@ def build_feature_report(
     shipped: list[str] | None = None,
     deferred: list[str] | None = None,
     next_backlog: list[str] | None = None,
+    delivery_milestone_id: str = "",
+    delivery_work_package_id: str = "",
     task_id: str = "",
     backlog_item_id: str = "",
     loop_id: str = "",
@@ -134,7 +138,9 @@ def build_feature_report(
 
     None lists are normalized to ``[]``; ``token_cost`` None becomes ``{}``.
     ``release_link`` is resolved best-effort from ``version_path`` or a single
-    existing version dir under ``.renmark/version/``.
+    existing version dir under ``.renmark/version/``. Delivery IDs are passed
+    through verbatim: report generation never derives durable identity from a
+    task index or transcript. ``task_id`` remains for one-release compatibility.
     """
     return {
         "feature": feature,
@@ -152,6 +158,8 @@ def build_feature_report(
         "shipped": list(shipped) if shipped is not None else [],
         "deferred": list(deferred) if deferred is not None else [],
         "next_backlog": list(next_backlog) if next_backlog is not None else [],
+        "delivery_milestone_id": delivery_milestone_id,
+        "delivery_work_package_id": delivery_work_package_id,
         "task_id": task_id,
         "backlog_item_id": backlog_item_id,
         "loop_id": loop_id,
@@ -180,6 +188,17 @@ def render_report_md(report: dict[str, object]) -> str:
         lines.append("")
 
     lines.append("## Identity")
+    lines.append(
+        f"- delivery_milestone_id: "
+        f"{report.get('delivery_milestone_id', '') or '(none)'}"
+    )
+    lines.append(
+        f"- delivery_work_package_id: "
+        f"{report.get('delivery_work_package_id', '') or '(none)'}"
+    )
+    # Kept temporarily for consumers that have not yet migrated to the
+    # delivery work-package identity.
+    lines.append(f"- task_id: {report.get('task_id', '') or '(none)'}")
     lines.append(f"- branch: {report.get('branch', '') or '(none)'}")
     lines.append(f"- sha: {report.get('sha', '') or '(none)'}")
     version = report.get("version_path", "") or report.get("release_link", "")

@@ -1,37 +1,8 @@
-"""
----
-artifact_type: task_output
-schema_version: 1
-created_at: 2026-07-01T00:00:00-04:00
-source_sha: ecd28f1
-related_plan: null
-generator: codex
-completion_state: complete
-confidence: high
-validation_status: unvalidated
-retry_count: 0
-parser_success: true
-schema_compliance: true
-dependency_refs:
-  - renmark/cli/_engine.py
-  - renmark/mode.py
----
-Pytest CLI coverage for the persisted operating-mode flags on ``python -m
-renmark``. The tests invoke the public CLI with ``--repo <tmp_path>`` and
-assert on exit codes, stdout/stderr, and the mode state file written under the
-temporary repo root.
-
-## Summary
-- Verifies ``--set-mode conductor`` persists state and ``--get-mode`` returns it.
-- Verifies ``--set-mode orchestrator`` persists state and ``--get-mode`` returns it.
-- Confirms ``--clear-mode`` removes persisted state and subsequent reads return ``unset``.
-- Covers ``--get-mode`` when nothing is set yet.
-- Asserts invalid ``--set-mode bogus`` exits via argparse with code ``2`` and preserves state.
-"""
+"""CLI coverage for canonical Agency/Orchestrator delivery modes."""
 
 from __future__ import annotations
 
-import os
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -39,8 +10,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _mode_path(repo: Path) -> Path:
-    return repo / ".renmark" / "state" / "mode.json"
+def _delivery_path(repo: Path) -> Path:
+    return repo / ".renmark" / "state" / "delivery.json"
 
 
 def _run_cli(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -52,114 +23,77 @@ def _run_cli(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _expected_path_fragment(repo: Path) -> str:
-    return os.path.join(".renmark", "state", "mode.json")
-
-
-def test_set_mode_success_prints_real_state_path(tmp_path: Path) -> None:
-    result = _run_cli(tmp_path, "--set-mode", "conductor")
+def test_set_and_get_agency_mode(tmp_path: Path) -> None:
+    result = _run_cli(tmp_path, "--set-mode", "agency")
     assert result.returncode == 0
-    # The printed path must be the real write location, not ".renmark/mode.json".
-    assert _expected_path_fragment(tmp_path) in result.stdout
-    assert ".renmark/mode.json)" not in result.stdout
+    assert "delivery mode set to agency" in result.stdout
+    assert "execution policy: guided" in result.stdout
+    assert ".renmark/state/delivery.json" in result.stdout.replace("\\", "/")
+
+    get_result = _run_cli(tmp_path, "--get-mode")
+    assert get_result.returncode == 0
+    assert get_result.stdout.strip() == "agency (guided)"
 
 
-def test_clear_mode_success_prints_real_state_path(tmp_path: Path) -> None:
-    assert _run_cli(tmp_path, "--set-mode", "conductor").returncode == 0
-    result = _run_cli(tmp_path, "--clear-mode")
+def test_set_and_get_orchestrator_mode(tmp_path: Path) -> None:
+    result = _run_cli(tmp_path, "--set-mode", "orchestrator")
     assert result.returncode == 0
-    assert _expected_path_fragment(tmp_path) in result.stdout
-    assert ".renmark/mode.json)" not in result.stdout
+    assert "execution policy: async" in result.stdout
+    assert _delivery_path(tmp_path).exists()
+    assert _run_cli(tmp_path, "--get-mode").stdout.strip() == (
+        "orchestrator (async)"
+    )
 
 
-def test_set_mode_write_failure_exits_nonzero_no_success(tmp_path: Path) -> None:
-    """Simulate a write failure: pre-create mode.json as a directory so the
-    atomic os.replace() cannot land the file. The CLI must exit non-zero, emit
-    an error to stderr, and NOT print a success message."""
-    state_dir = tmp_path / ".renmark" / "state"
-    state_dir.mkdir(parents=True)
-    (state_dir / "mode.json").mkdir()  # occupy the target with a directory
+def test_clear_mode_is_idempotent_and_removes_legacy_state(tmp_path: Path) -> None:
+    assert _run_cli(tmp_path, "--set-mode", "agency").returncode == 0
+    legacy = tmp_path / ".renmark" / "state" / "mode.json"
+    legacy.write_text(json.dumps({"mode": "conductor"}), encoding="utf-8")
 
-    result = _run_cli(tmp_path, "--set-mode", "conductor")
-    assert result.returncode != 0
-    assert "operating mode set to" not in result.stdout
-    assert "failed to persist operating mode" in result.stderr
-    assert _expected_path_fragment(tmp_path) in result.stderr
-    # The occupying directory is untouched (no valid mode was written).
-    assert (state_dir / "mode.json").is_dir()
+    first = _run_cli(tmp_path, "--clear-mode")
+    second = _run_cli(tmp_path, "--clear-mode")
 
-    # And the persisted state is still unset from renmark's point of view.
-    get_result = _run_cli(tmp_path, "--get-mode")
-    assert get_result.returncode == 0
-    assert get_result.stdout.strip() == "unset"
+    assert first.returncode == second.returncode == 0
+    assert "delivery mode cleared" in first.stdout
+    assert _run_cli(tmp_path, "--get-mode").stdout.strip() == "unset"
+    assert not _delivery_path(tmp_path).exists()
+    assert not legacy.exists()
 
 
-def test_set_mode_conductor_then_get_mode(tmp_path: Path) -> None:
-    set_result = _run_cli(tmp_path, "--set-mode", "conductor")
-    assert set_result.returncode == 0
-    assert "operating mode set to conductor" in set_result.stdout
+def test_get_mode_reads_legacy_conductor_as_guided_orchestrator(
+    tmp_path: Path,
+) -> None:
+    legacy = tmp_path / ".renmark" / "state" / "mode.json"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text(json.dumps({"mode": "conductor"}), encoding="utf-8")
 
-    get_result = _run_cli(tmp_path, "--get-mode")
-    assert get_result.returncode == 0
-    assert get_result.stdout.strip() == "conductor"
-    assert _mode_path(tmp_path).exists()
-
-
-def test_set_mode_orchestrator_then_get_mode(tmp_path: Path) -> None:
-    set_result = _run_cli(tmp_path, "--set-mode", "orchestrator")
-    assert set_result.returncode == 0
-    assert "operating mode set to orchestrator" in set_result.stdout
-
-    get_result = _run_cli(tmp_path, "--get-mode")
-    assert get_result.returncode == 0
-    assert get_result.stdout.strip() == "orchestrator"
-    assert _mode_path(tmp_path).exists()
-
-
-def test_clear_mode_then_get_mode_returns_unset(tmp_path: Path) -> None:
-    seed_result = _run_cli(tmp_path, "--set-mode", "conductor")
-    assert seed_result.returncode == 0
-    assert _mode_path(tmp_path).exists()
-
-    clear_result = _run_cli(tmp_path, "--clear-mode")
-    assert clear_result.returncode == 0
-    assert "operating mode cleared" in clear_result.stdout
-
-    get_result = _run_cli(tmp_path, "--get-mode")
-    assert get_result.returncode == 0
-    assert get_result.stdout.strip() == "unset"
-
-
-def test_get_mode_with_nothing_set_returns_unset(tmp_path: Path) -> None:
     result = _run_cli(tmp_path, "--get-mode")
+
     assert result.returncode == 0
-    assert result.stdout.strip() == "unset"
-    assert not _mode_path(tmp_path).exists()
+    assert result.stdout.strip() == "orchestrator (guided)"
 
 
-def test_set_mode_bogus_exits_2_and_writes_no_state(tmp_path: Path) -> None:
-    result = _run_cli(tmp_path, "--set-mode", "bogus")
-    assert result.returncode == 2
-    assert "invalid choice" in result.stderr
+def test_conductor_and_bogus_are_rejected_without_overwriting_state(
+    tmp_path: Path,
+) -> None:
+    assert _run_cli(tmp_path, "--set-mode", "agency").returncode == 0
+    before = _delivery_path(tmp_path).read_text(encoding="utf-8")
 
-    get_result = _run_cli(tmp_path, "--get-mode")
-    assert get_result.returncode == 0
-    assert get_result.stdout.strip() == "unset"
-    assert not _mode_path(tmp_path).exists()
+    for invalid in ("conductor", "bogus"):
+        result = _run_cli(tmp_path, "--set-mode", invalid)
+        assert result.returncode == 2
+        assert "invalid choice" in result.stderr
+
+    assert _delivery_path(tmp_path).read_text(encoding="utf-8") == before
 
 
-def test_set_mode_bogus_preserves_prior_value(tmp_path: Path) -> None:
-    seed_result = _run_cli(tmp_path, "--set-mode", "conductor")
-    assert seed_result.returncode == 0
-    before = _mode_path(tmp_path).read_text(encoding="utf-8")
+def test_agency_activation_alias_converges_canonical_mode(tmp_path: Path) -> None:
+    activated = _run_cli(tmp_path, "--activate-agency")
+    assert activated.returncode == 0
+    assert _run_cli(tmp_path, "--get-mode").stdout.strip() == "agency (guided)"
 
-    result = _run_cli(tmp_path, "--set-mode", "bogus")
-    assert result.returncode == 2
-    assert "invalid choice" in result.stderr
-
-    after = _mode_path(tmp_path).read_text(encoding="utf-8")
-    assert after == before
-
-    get_result = _run_cli(tmp_path, "--get-mode")
-    assert get_result.returncode == 0
-    assert get_result.stdout.strip() == "conductor"
+    deactivated = _run_cli(tmp_path, "--deactivate-agency")
+    assert deactivated.returncode == 0
+    assert _run_cli(tmp_path, "--get-mode").stdout.strip() == (
+        "orchestrator (async)"
+    )

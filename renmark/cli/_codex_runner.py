@@ -16,7 +16,6 @@ from ..parser import Task
 from ..providers.codex import (
     CodexError,
     check_only_target_modified,
-    codex_available,
     run_codex_task,
 )
 from ..recurrence import IssueObservation, RecurrenceDecision, observe_issue, pre_attempt
@@ -224,7 +223,9 @@ _CODEX_RECURRENCE_CHECK = "codex-retry"
 _CODEX_RECURRENCE_RULES = (
     "nonzero-executor-exit",
     "lane-violation",
+    "no-target-change",
     "verifier-failure",
+    "missing-commit",
 )
 _RECURRENCE_SIGNAL_LIMIT = 1_200
 
@@ -287,6 +288,16 @@ def _recurrence_status_note(decision: RecurrenceDecision) -> str:
     if detail:
         note = f"{note}; {detail}"
     return note[:320]
+
+
+def _target_was_modified(changed_files: list[str], target: str) -> bool:
+    """Return whether this task's post-minus-pre delta contains its target."""
+    normalized_target = target[2:] if target.startswith("./") else target
+    return any(
+        (path[2:] if path.startswith("./") else path) == normalized_target
+        for path in changed_files
+    )
+
 
 def _codex_fail_after_retries(
     task: Task,
@@ -374,10 +385,42 @@ def _codex_verify_and_commit(
             message=f"[renmark] task {task.index}: {task.title}",
             trailer="Co-Authored-By: Codex-CLI <noreply@openai.com>",
         )
+        if not sha:
+            recurrence = _observe_codex_failure(
+                repo,
+                task,
+                run_id,
+                rule_id="missing-commit",
+                signal="verifier passed but git commit returned no SHA",
+            )
+            if recurrence.retry_blocked:
+                return _codex_fail_recurrence_guard(
+                    task,
+                    total,
+                    repo,
+                    run_id,
+                    cfg,
+                    retries_left,
+                    start,
+                    recurrence,
+                    verifier_log=last_output_tail,
+                )
+            return _codex_fail_after_retries(
+                task,
+                total,
+                repo,
+                run_id,
+                cfg,
+                retries_left,
+                start,
+                "codex verifier passed but commit produced no SHA",
+                last_output_tail or "verifier passed but commit produced no SHA",
+                "codex_commit_missing",
+            )
         _print(
             _format_status_line(
                 task.index, total, task.title, "PASS", time.monotonic() - start, 0,
-                f"→ {sha or '(no-commit)'} (codex)",
+                f"→ {sha} (codex)",
             )
         )
         return True, "", 0, sha
@@ -440,19 +483,6 @@ def _execute_task_codex(
     the task ran without polluting NIM token totals.
     """
     start = time.monotonic()
-    if not codex_available():
-        _print(_format_status_line(task.index, total, task.title, "FAIL", 0.0, 0, "codex CLI not on PATH"))
-        _record_escalation(
-            repo, task, run_id, "codex",
-            base_prompt="(codex not available)",
-            response="",
-            verifier_log="codex CLI is not installed (npm i -g @openai/codex)",
-            retry_count=0,
-            prompt_tokens=0,
-            completion_tokens=0,
-        )
-        return False, "codex_unavailable", 0, ""
-
     retries_left = cfg.max_task_retries
     last_output_tail = ""
 
@@ -494,6 +524,10 @@ def _execute_task_codex(
         last_output_tail = result.output_tail
 
         if result.exit_code != 0:
+            # A failed executor may still have edited its target. Restore it
+            # before recurrence handling or retry so the next attempt measures
+            # its delta against the committed baseline.
+            _classify_and_rollback(repo, [task.target])
             recurrence = _observe_codex_failure(
                 repo,
                 task,
@@ -538,6 +572,9 @@ def _execute_task_codex(
             sibling_targets=sibling_targets,
         )
         if not ok:
+            # Lane rollback intentionally preserves the task's own target.
+            # Reject that partial edit too before retrying the task.
+            _classify_and_rollback(repo, [task.target])
             recurrence = _observe_codex_failure(
                 repo,
                 task,
@@ -565,6 +602,42 @@ def _execute_task_codex(
                 f"codex out of lane: {reason[:40]}",
                 f"{reason}\n\n{result.output_tail}",
                 "codex_out_of_lane",
+            )
+
+        if not _target_was_modified(result.changed_files, task.target):
+            recurrence = _observe_codex_failure(
+                repo,
+                task,
+                run_id,
+                rule_id="no-target-change",
+                signal="codex exited successfully but the target was absent from the task delta",
+            )
+            if recurrence.retry_blocked:
+                return _codex_fail_recurrence_guard(
+                    task,
+                    total,
+                    repo,
+                    run_id,
+                    cfg,
+                    retries_left,
+                    start,
+                    recurrence,
+                    verifier_log=result.output_tail,
+                )
+            if retries_left > 0:
+                retries_left -= 1
+                continue
+            return _codex_fail_after_retries(
+                task,
+                total,
+                repo,
+                run_id,
+                cfg,
+                retries_left,
+                start,
+                "codex target unchanged after retries",
+                result.output_tail or "codex exited successfully without changing its target",
+                "codex_no_target_change",
             )
 
         # Run verifier.

@@ -317,3 +317,35 @@ def test_load_cases_rejects_empty_assertions(tmp_path: Path) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(behavior.BehaviorConfigError, match="non-empty"):
         behavior.load_cases(str(tmp_path))
+
+
+def test_two_mode_and_cross_host_fixtures_execute_without_model_calls() -> None:
+    behavioral_dir = Path(__file__).parent / "behavioral"
+    wanted = {
+        "mode.behavior.json",
+        "selector_claude.behavior.json",
+        "selector_codex.behavior.json",
+    }
+    cases = [
+        case
+        for case in behavior.load_cases(behavioral_dir)
+        if case.source is not None and case.source.name in wanted
+    ]
+
+    assert {case.source.name for case in cases if case.source is not None} == wanted
+    mode_case = next(case for case in cases if case.source.name == "mode.behavior.json")
+    assert "Conductor vs Orchestrator" not in mode_case.eval.contract
+
+    def would_raise_runner(_: str) -> str:
+        raise AssertionError("deterministic behavior must not call a model")
+
+    with patch("renmark.judge.judge_behavior", autospec=True) as judge_behavior:
+        results = behavior.run(
+            cases=cases,
+            judge=False,
+            subagent_runner=would_raise_runner,
+        )
+
+    assert [result.status for result in results] == ["PASS", "PASS", "PASS"]
+    assert all(result.judge_verdict is None for result in results)
+    judge_behavior.assert_not_called()

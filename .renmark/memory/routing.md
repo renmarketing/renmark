@@ -35,6 +35,38 @@ Opus and Fable are escalation-only executors — never default them for finish, 
 
 ## Learned overrides
 
+- (2026-07-30) `target=tests/**, complexity=hard, mode=A` → **codex** (passed, run=20260730-143128-8136)
+
+- (2026-07-30) `target=tests/**, complexity=hard, mode=A` → **codex** (failed, run=20260730-143128-8136)
+
+- (2026-07-30) `target=*.py, complexity=hard, mode=B` → **codex** (passed, run=20260730-142705-fe9e)
+
+- (2026-07-30) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260730-142351-8ec9)
+
+- (2026-07-30) `target=tests/**, complexity=hard, mode=A` → **codex** (passed, run=20260730-142351-8ec9)
+
+- (2026-07-30) `target=*.py, complexity=medium, mode=A` → **codex** (passed, run=20260730-141943-cfc2)
+
+- (2026-07-30) `target=*.py, complexity=hard, mode=B` → **codex** (passed, run=20260730-141943-cfc2)
+
+- (2026-07-30) `target=*.py, complexity=hard, mode=B` → **codex** (failed, run=20260730-125320-10e8)
+
+- (2026-07-30) `M2 Part 1 executor completion postcondition (tasks 2/4)` → **codex** (failed: PASS without target change, artifact, or commit, run=20260730-054449-4865, role=code-implementer)
+
+- (2026-07-29) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260729-213121-b2aa)
+
+- (2026-07-29) `target=*.py, complexity=hard, mode=B` → **codex** (passed, run=20260729-213121-b2aa)
+
+- (2026-07-29) `target=tests/**, complexity=medium, mode=B` → **codex** (passed, run=20260729-213121-b2aa)
+
+- (2026-07-29) `target=*.py, complexity=medium, mode=B` → **codex** (passed, run=20260729-213121-b2aa)
+
+- (2026-07-29) `target=tests/**, complexity=hard, mode=A` → **codex** (passed, run=20260729-213121-b2aa)
+
+- (2026-07-29) `target=*.py, complexity=hard, mode=A` → **codex** (passed, run=20260729-213121-b2aa)
+
+- (2026-07-29) `target=*.py, complexity=hard, mode=A` → **codex** (failed, run=20260729-210858-b621)
+
 - (2026-07-17) `target=tests/**, complexity=medium, mode=A` → **codex** (failed, run=20260717-201012-cd1f)
 
 - (2026-07-17) `target=*.py, complexity=medium, mode=B` → **codex** (failed, run=20260717-200327-79ab)

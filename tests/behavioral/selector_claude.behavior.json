@@ -7,11 +7,14 @@
       "contains:AskUserQuestion",
       "contains:Dispatch (Recommended)",
       "not_contains:request_user_input",
-      "contains:\"overflow\": false"
+      "contains:\"overflow\": false",
+      "contains:\"semantic\":",
+      "contains:1. [d] Dispatch (Recommended)",
+      "not_contains:status:"
     ]
   },
   "eval": {
-    "contract": "Claude Code renders a real selector whose first option is the sole recommendation.",
+    "contract": "Claude Code renders a native selector within its four-option capacity, keeps the sole recommendation first, retains the complete fallback, and does not turn status prose into a decision.",
     "golden_ref": "selector-claude.golden"
   }
 }

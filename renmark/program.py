@@ -97,6 +97,39 @@ _STATUS_GLYPH: dict[str, str] = {
 ARTIFACT_TYPE = "program"
 SCHEMA_VERSION = 1
 
+# Compatibility adapter: program stage/task status stays in the program
+# vocabulary; delivery-facing callers can opt into this external mapping.
+_DELIVERY_STATE_BY_STATUS: dict[str, str] = {
+    "pending": "pending",
+    "in_progress": "in_progress",
+    "done": "passed",
+    "partial": "blocked",
+    "needed": "blocked",
+    "blocked": "blocked",
+}
+
+# Stable milestone aliases for stage ids that already describe a delivery
+# milestone. Unknown ids fall back to the shared slugging logic below.
+_STAGE_MILESTONE_ID_ALIASES: dict[str, str] = {
+    "brainstorm": "discovery",
+    "discovery": "discovery",
+    "prd": "prd",
+    "requirements": "prd",
+    "plan": "plan",
+    "planning": "plan",
+    "build": "build",
+    "implement": "build",
+    "implementation": "build",
+    "verify": "verify",
+    "verification": "verify",
+    "qa": "verify",
+    "review": "review",
+    "docs": "documented",
+    "documented": "documented",
+    "release": "release",
+    "ship": "release",
+}
+
 # ── Canonical paths ────────────────────────────────────────────────────────────
 
 #: Runtime state (gitignored) — the canonical source of truth.
@@ -579,6 +612,86 @@ def stage_digest(program: Program, stage_id: str) -> str:
     return "\n".join(lines[:5])
 
 
+# ── Delivery compatibility adapter (pure, additive) ───────────────────────────
+
+
+def delivery_state_for_program_status(status: str) -> str:
+    """Map a program status into the delivery-state vocabulary.
+
+    Program persistence keeps its existing status words. This adapter is
+    delivery-facing only and never writes back into ``Program``.
+    """
+    return _DELIVERY_STATE_BY_STATUS.get(status, "unknown")
+
+
+def stable_milestone_id_for_stage(stage: StageNode) -> str:
+    """Project a :class:`StageNode` into a stable delivery milestone id."""
+    for candidate in (stage.id, stage.serves, stage.title):
+        token = _milestone_alias(candidate)
+        if token:
+            return token
+    return "milestone"
+
+
+def stable_work_package_id_for_task(stage: StageNode, task: TaskNode) -> str:
+    """Project a task into a stable delivery work-package id."""
+    milestone_id = stable_milestone_id_for_stage(stage)
+    token = _stable_slug(task.id) or _stable_slug(task.title)
+    return f"{milestone_id}--{token or 'work-package'}"
+
+
+def program_delivery_milestones(program: Program) -> list[dict[str, Any]]:
+    """Return delivery-facing milestone summaries projected from ``program``.
+
+    The projection is bounded, pure, and additive: it does not affect program
+    JSON, markdown rendering, or mutator behavior.
+    """
+    milestones: list[dict[str, Any]] = []
+    for index, stage in enumerate(program.stages, start=1):
+        milestone_id = stable_milestone_id_for_stage(stage)
+        work_packages = stage_work_package_summaries(stage)
+        milestones.append(
+            {
+                "milestone_id": milestone_id,
+                "stage_id": stage.id,
+                "title": stage.title or stage.id or "(untitled stage)",
+                "serves": stage.serves,
+                "status": stage.status,
+                "delivery_state": delivery_state_for_program_status(stage.status),
+                "current": bool(stage.id and stage.id == program.current_stage_id),
+                "index": index,
+                "task_count": len(stage.tasks),
+                "completed_task_count": sum(1 for task in stage.tasks if task.status == "done"),
+                "pipeline_phases": list(stage.pipeline_phases),
+                "completion_sha": program.stage_completion_sha.get(stage.id, ""),
+                "work_packages": work_packages,
+            }
+        )
+    return milestones
+
+
+def stage_work_package_summaries(stage: StageNode) -> list[dict[str, Any]]:
+    """Return delivery-facing work-package summaries for one stage."""
+    milestone_id = stable_milestone_id_for_stage(stage)
+    packages: list[dict[str, Any]] = []
+    for task in stage.tasks:
+        packages.append(
+            {
+                "package_id": stable_work_package_id_for_task(stage, task),
+                "milestone_id": milestone_id,
+                "stage_id": stage.id,
+                "task_id": task.id,
+                "title": task.title or task.id or "(untitled task)",
+                "status": task.status,
+                "delivery_state": delivery_state_for_program_status(task.status),
+                "summary": " ".join(task.summary.split()) if task.summary else "",
+                "retry_count": task.retry_count,
+                "pipeline_phases": list(task.pipeline_phases),
+            }
+        )
+    return packages
+
+
 # ── Mutators (pure transforms — caller persists) ────────────────────────────────
 
 
@@ -679,6 +792,27 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _milestone_alias(value: str) -> str:
+    token = _stable_slug(value)
+    if not token:
+        return ""
+    return _STAGE_MILESTONE_ID_ALIASES.get(token, token)
+
+
+def _stable_slug(value: str) -> str:
+    chars: list[str] = []
+    previous_dash = False
+    for ch in value.lower():
+        if ch.isalnum():
+            chars.append(ch)
+            previous_dash = False
+            continue
+        if chars and not previous_dash:
+            chars.append("-")
+            previous_dash = True
+    return "".join(chars).strip("-")[:48]
+
+
 __all__ = [
     "ARTIFACT_TYPE",
     "MODES",
@@ -694,14 +828,19 @@ __all__ = [
     "TaskNode",
     "TaskStatus",
     "bump_retry",
+    "delivery_state_for_program_status",
     "mark_stage",
     "mark_task",
     "position",
+    "program_delivery_milestones",
     "program_json_path",
     "program_md_path",
     "read_program",
     "render_markdown",
     "snapshot_stage_sha",
+    "stable_milestone_id_for_stage",
+    "stable_work_package_id_for_task",
     "stage_digest",
+    "stage_work_package_summaries",
     "write_program",
 ]

@@ -7,8 +7,10 @@ executor invokes the CLI and verifies what it produced.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -31,8 +33,124 @@ class CodexResult:
     pre_changed_files: list[str] = field(default_factory=list)
 
 
-def codex_available() -> bool:
-    return shutil.which("codex") is not None
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _codex_candidates(repo: Path) -> list[str]:
+    """Return executable Codex candidates in deterministic preference order.
+
+    Every PATH entry is considered because under WSL the desktop-app binary can
+    appear before a usable Linux installation. Target-repository files are
+    never executable candidates: a sandboxed task could replace them before a
+    later dispatch.
+    """
+    candidates: list[str] = []
+    seen: set[str] = set()
+    workspace_path = repo.absolute()
+    workspace_real_path = repo.resolve()
+
+    def add(candidate: str | Path | None) -> None:
+        if candidate is None:
+            return
+        path = Path(candidate).expanduser()
+        if not path.is_file() or not os.access(path, os.X_OK):
+            return
+        absolute_path = path.absolute()
+        real_path = Path(os.path.realpath(absolute_path))
+        if _path_is_within(absolute_path, workspace_path) or _path_is_within(
+            real_path, workspace_real_path
+        ):
+            return
+        absolute = str(absolute_path)
+        identity = str(real_path)
+        if identity not in seen:
+            seen.add(identity)
+            candidates.append(absolute)
+
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if directory:
+            add(shutil.which("codex", path=directory))
+    add(shutil.which("codex"))
+    return candidates
+
+
+def _sandbox_probe(executable: str, repo: Path) -> tuple[bool, str]:
+    """Prove that *executable* can launch Codex's workspace sandbox.
+
+    This invokes no model. The built-in ``:workspace`` permission profile runs
+    a no-op inside the same platform sandbox used by ``codex exec``.
+    """
+    if os.name == "nt":
+        probe_command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "exit", "0"]
+    else:
+        probe_command = [shutil.which("true") or "/bin/true"]
+
+    try:
+        proc = subprocess.run(
+            [
+                executable,
+                "sandbox",
+                "--permission-profile",
+                ":workspace",
+                "--cd",
+                str(repo),
+                "--",
+                *probe_command,
+            ],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "sandbox readiness probe timed out"
+    except OSError as exc:
+        return False, f"sandbox readiness probe could not start: {exc}"
+
+    if proc.returncode == 0:
+        return True, ""
+    combined = (proc.stderr or "") + (proc.stdout or "")
+    detail = " ".join(combined.split())[-500:] or f"exit {proc.returncode}"
+    return False, detail
+
+
+def _resolve_codex_executable(repo: Path) -> str:
+    """Select a sandbox-capable Codex executable before any model spend."""
+    rejected: list[str] = []
+    for executable in _codex_candidates(repo):
+        ready, detail = _sandbox_probe(executable, repo)
+        if ready:
+            return executable
+        rejected.append(f"{executable}: {detail}")
+
+    evidence = "; ".join(rejected[-3:]) if rejected else "no executable candidates found"
+    if os.name == "nt":
+        remedy = "Install or repair the native Windows Codex CLI sandbox."
+    elif sys.platform == "darwin":
+        remedy = "Install or repair a macOS Codex CLI with working Seatbelt support."
+    else:
+        remedy = (
+            "Install the Linux Codex CLI with bundled sandbox resources or install Bubblewrap "
+            "(Ubuntu/Debian: sudo apt install bubblewrap)."
+        )
+    raise CodexError(
+        f"No sandbox-capable Codex CLI is available. {remedy} "
+        "Renmark will not disable workspace-write. "
+        f"Checked: {evidence}"
+    )
+
+
+def codex_available(repo: Path | None = None) -> bool:
+    try:
+        _resolve_codex_executable(repo or Path.cwd())
+    except CodexError:
+        return False
+    return True
 
 
 def _git_status_porcelain(repo: Path) -> list[str]:
@@ -140,10 +258,7 @@ def run_codex_task(
     Returns CodexResult with exit code, output tail, and changed-files
     detected via git status before/after.
     """
-    if not codex_available():
-        raise CodexError(
-            "codex CLI not on PATH. Install it (npm i -g @openai/codex) or switch the task back to executor: nim."
-        )
+    codex_executable = _resolve_codex_executable(repo)
 
     prompt = build_codex_prompt(task, repo)
 
@@ -154,7 +269,7 @@ def run_codex_task(
     pre = _git_status_porcelain(repo)
 
     cmd = [
-        "codex",
+        codex_executable,
         "exec",
         "--sandbox",
         sandbox,

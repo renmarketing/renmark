@@ -114,6 +114,33 @@ class CostPreview:
     model_driven_tokens: int = 0
 
 
+@dataclass(frozen=True)
+class PackageCostPreview:
+    """Visible deterministic estimate for one bounded work package."""
+
+    milestone_id: str
+    package_id: str
+    executor: str
+    preview: CostPreview
+
+
+@dataclass(frozen=True)
+class MilestoneCostPreview:
+    """Visible aggregate estimate for a milestone and its work packages."""
+
+    milestone_id: str
+    packages: tuple[PackageCostPreview, ...]
+    preview: CostPreview
+
+
+@dataclass(frozen=True)
+class PackagePlanCostPreview:
+    """Visible aggregate estimate for all milestones in a package plan."""
+
+    milestones: tuple[MilestoneCostPreview, ...]
+    preview: CostPreview
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
@@ -166,7 +193,7 @@ def estimate_cost(items: list[Any]) -> CostPreview:
             try:
                 raw_exec = _get(item, "executor", None)
                 executor = raw_exec.strip().lower() if isinstance(raw_exec, str) and raw_exec.strip() else "sonnet"
-                if executor not in PRICE_PER_KTOK:
+                if executor not in PRICE_PER_KTOK and executor not in _DETERMINISTIC_EXECUTORS:
                     executor = "sonnet"
 
                 raw_tokens = _get(item, "est_tokens", None)
@@ -181,7 +208,7 @@ def estimate_cost(items: list[Any]) -> CostPreview:
                 overhead = AGENT_OVERHEAD_TOKENS if executor in _AGENT_EXECUTORS else 0
                 item_tokens = base_tokens + overhead
 
-                price = PRICE_PER_KTOK[executor]
+                price = PRICE_PER_KTOK.get(executor, 0.0)
                 item_cost = item_tokens / 1000.0 * price
 
                 total_tokens += item_tokens
@@ -237,6 +264,87 @@ def estimate_cost(items: list[Any]) -> CostPreview:
             requires_expensive_model=False,
             cheaper_alternative=None,
         )
+
+
+def estimate_package_plan_cost(plan: object) -> PackagePlanCostPreview:
+    """Aggregate deterministic, visible totals for a package plan.
+
+    ``plan`` may be a parsed ``PackagePlan``, a milestone iterable, or a
+    mapping-shaped fixture.  A package's ``cost_lane`` is its executor unless
+    an explicit ``executor`` is supplied.  No transcript or generated body is
+    consulted: only bounded package metadata is priced.
+    """
+    raw_milestones = _get(plan, "milestones", plan)
+    if not isinstance(raw_milestones, (list, tuple)):
+        raw_milestones = ()
+
+    milestones: list[MilestoneCostPreview] = []
+    for raw_milestone in raw_milestones:
+        milestone_id = _string_field(raw_milestone, "id", "milestone")
+        raw_packages = _get(raw_milestone, "work_packages", ())
+        if not isinstance(raw_packages, (list, tuple)):
+            raw_packages = ()
+
+        packages: list[PackageCostPreview] = []
+        for raw_package in raw_packages:
+            packages.append(estimate_work_package_cost(raw_package, milestone_id=milestone_id))
+
+        milestones.append(
+            MilestoneCostPreview(
+                milestone_id=milestone_id,
+                packages=tuple(packages),
+                preview=_combine_previews([package.preview for package in packages]),
+            )
+        )
+
+    return PackagePlanCostPreview(
+        milestones=tuple(milestones),
+        preview=_combine_previews([milestone.preview for milestone in milestones]),
+    )
+
+
+def estimate_milestone_cost(milestone: object) -> MilestoneCostPreview:
+    """Price one milestone while retaining each package's visible total."""
+    milestone_id = _string_field(milestone, "id", "milestone")
+    raw_packages = _get(milestone, "work_packages", ())
+    if not isinstance(raw_packages, (list, tuple)):
+        raw_packages = ()
+    packages = tuple(estimate_work_package_cost(package, milestone_id=milestone_id) for package in raw_packages)
+    return MilestoneCostPreview(
+        milestone_id=milestone_id,
+        packages=packages,
+        preview=_combine_previews([package.preview for package in packages]),
+    )
+
+
+def estimate_work_package_cost(package: object, *, milestone_id: str = "") -> PackageCostPreview:
+    """Price one bounded package from its lane and explicit bounded estimate."""
+    package_id = _string_field(package, "id", "work-package")
+    raw_executor = _get(package, "executor", None)
+    executor = (
+        raw_executor
+        if isinstance(raw_executor, str) and raw_executor.strip()
+        else _get(package, "cost_lane", None)
+    )
+    normalized_executor = _normalized_executor(executor)
+    package_item = {
+        "executor": normalized_executor,
+        "est_tokens": _get(package, "est_tokens", 0),
+        "complexity": _get(package, "complexity", None),
+        "mode": _get(package, "mode", None),
+        "role": _get(package, "role", None),
+    }
+    return PackageCostPreview(
+        milestone_id=milestone_id,
+        package_id=package_id,
+        executor=normalized_executor,
+        preview=estimate_cost([package_item]),
+    )
+
+
+# Clear aliases for package-plan callers.
+estimate_milestone_costs = estimate_package_plan_cost
+estimate_package_costs = estimate_package_plan_cost
 
 
 def requires_escalation(*, complexity: str | None = None, kind: str | None = None) -> bool:
@@ -304,3 +412,37 @@ def _get(item: object, key: str, default: object) -> object:
         return getattr(item, key, default)
     except Exception:
         return default
+
+
+def _normalized_executor(value: object) -> str:
+    """Return a known executor, retaining deterministic lanes as zero-cost."""
+    if isinstance(value, str) and value.strip():
+        candidate = value.strip().lower()
+        if candidate in PRICE_PER_KTOK or candidate in _DETERMINISTIC_EXECUTORS:
+            return candidate
+    return "sonnet"
+
+
+def _string_field(item: object, key: str, fallback: str) -> str:
+    value = _get(item, key, None)
+    return value.strip() if isinstance(value, str) and value.strip() else fallback
+
+
+def _combine_previews(previews: list[CostPreview]) -> CostPreview:
+    """Combine preview fields without re-pricing or obscuring package totals."""
+    total_cost = sum(preview.est_cost_usd for preview in previews)
+    return CostPreview(
+        est_tokens=sum(preview.est_tokens for preview in previews),
+        est_cost_usd=round(total_cost, 4),
+        cost_band=cost_band(total_cost),
+        uses_subagents=any(preview.uses_subagents for preview in previews),
+        requires_expensive_model=any(preview.requires_expensive_model for preview in previews),
+        cheaper_alternative=next(
+            (preview.cheaper_alternative for preview in previews if preview.cheaper_alternative), None
+        ),
+        roles=tuple(sorted({role for preview in previews for role in preview.roles})),
+        deterministic_count=sum(preview.deterministic_count for preview in previews),
+        model_driven_count=sum(preview.model_driven_count for preview in previews),
+        deterministic_tokens=sum(preview.deterministic_tokens for preview in previews),
+        model_driven_tokens=sum(preview.model_driven_tokens for preview in previews),
+    )

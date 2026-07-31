@@ -5,16 +5,72 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from renmark import lifecycle
+from renmark.delivery_state import DeliveryState, write_delivery_state
 from renmark.lifecycle import NEXT_BY_STAGE, LifecycleBloatError, LifecycleState
 from renmark.summary import write_artifact
 
 
 def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "init", str(path)], check=True, capture_output=True)
+
+
+def _init_git_repo_with_head(path: Path) -> str:
+    _init_git_repo(path)
+    (path / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(path), "add", "tracked.txt"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "-c",
+            "user.name=Test User",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "test baseline",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _write_milestone_evidence(
+    repo: Path,
+    name: str,
+    *,
+    source_sha: str,
+    generator: str,
+    **metadata: object,
+) -> None:
+    validation_status = str(metadata.pop("validation_status", "validated"))
+    artifact = write_artifact(
+        repo / ".renmark" / "reviews" / name,
+        artifact_type="verification" if generator == "verify-qa" else "review",
+        body="evidence",
+        summary_lines=["clean"],
+        source_sha=source_sha,
+        generator=generator,
+        validation_status=validation_status,
+    )
+    if metadata:
+        frontmatter = "".join(f"{key}: {value}\n" for key, value in metadata.items())
+        artifact.write_text(
+            artifact.read_text(encoding="utf-8").replace("---\n", f"---\n{frontmatter}", 1),
+            encoding="utf-8",
+        )
 
 
 def test_read_lifecycle_none_when_missing(tmp_path: Path) -> None:
@@ -710,81 +766,74 @@ def test_validate_artifact_refs_dotdot_escape_warns(tmp_path: Path) -> None:
     assert issues[0]["kind"] == "out_of_tree"
 
 
-# ── Operating-mode preamble (Conductor vs Orchestrator) ───────────────────────
-
-_CONDUCTOR_DIRECTIVE = (
-    "Operating mode: Conductor — hands-on; prefer single-file scoped edits, "
-    "avoid subagents unless necessary, explain the next move before editing."
-)
-_ORCHESTRATOR_DIRECTIVE = (
-    "Operating mode: Orchestrator — goal-level; use narrow scoped subagents "
-    "where useful, load skills on demand, review outcomes not keystrokes."
-)
+# ── Delivery-mode preamble (Agency vs Orchestrator) ───────────────────────────
 
 
-def test_skill_preamble_mode_conductor_emits_conductor_directive(
+def test_skill_preamble_agency_emits_agency_directive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """mode=conductor → the conductor directive, never the orchestrator one."""
     from renmark import mode
 
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
-    mode.set_mode(tmp_path, "conductor")
+    mode.set_mode(tmp_path, "agency")
 
     hint = lifecycle.skill_preamble(tmp_path, "feature")
 
     assert hint is not None
-    assert "Operating mode: Conductor" in hint
-    assert _CONDUCTOR_DIRECTIVE in hint
-    assert _ORCHESTRATOR_DIRECTIVE not in hint
+    assert "Delivery mode: Agency" in hint
+    assert "Delivery mode: Orchestrator" not in hint
 
 
-def test_skill_preamble_mode_orchestrator_differs_from_conductor(
+def test_skill_preamble_orchestrator_uses_bounded_loop_contract(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC#3 by-mode diff: orchestrator directive differs from conductor output."""
     from renmark import mode
 
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
-
-    mode.set_mode(tmp_path, "conductor")
-    conductor_hint = lifecycle.skill_preamble(tmp_path, "feature")
-
     mode.set_mode(tmp_path, "orchestrator")
-    orchestrator_hint = lifecycle.skill_preamble(tmp_path, "feature")
+    hint = lifecycle.skill_preamble(tmp_path, "feature")
 
-    assert orchestrator_hint is not None
-    assert "Operating mode: Orchestrator" in orchestrator_hint
-    assert _ORCHESTRATOR_DIRECTIVE in orchestrator_hint
-    assert orchestrator_hint != conductor_hint
+    assert hint is not None
+    assert "Delivery mode: Orchestrator" in hint
+    assert "build → verify → review → fix" in hint
 
 
-def test_skill_preamble_mode_unset_entry_skill_prompts_choice(
+def test_skill_preamble_unset_start_prompts_two_mode_choice(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Unset mode + entry skill → prompt the user to pick Conductor vs Orchestrator."""
+    monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
+    monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
+
+    hint = lifecycle.skill_preamble(tmp_path, "start")
+
+    assert hint is not None
+    assert "Delivery mode: not yet set" in hint
+    assert "Agency vs Orchestrator" in hint
+
+
+def test_skill_preamble_feature_defaults_without_reasking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
 
     hint = lifecycle.skill_preamble(tmp_path, "feature")
 
-    assert hint is not None
-    assert "Operating mode: not yet set" in hint
-    assert "Conductor vs Orchestrator" in hint
+    assert "Delivery mode: Orchestrator" in (hint or "")
+    assert "not yet set" not in (hint or "")
 
 
-def test_skill_preamble_mode_unset_non_entry_skill_omits_mode_line(
+def test_skill_preamble_resume_never_reasks_when_unset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Unset mode + a non-entry skill emits NO operating-mode line at all."""
     monkeypatch.delenv("RENMARK_TOP_TIER", raising=False)
     monkeypatch.delenv("RENMARK_HEADLESS", raising=False)
 
-    hint = lifecycle.skill_preamble(tmp_path, "help")
+    hint = lifecycle.skill_preamble(tmp_path, "resume")
 
-    assert "Operating mode" not in (hint or "")
+    assert "not yet set" not in (hint or "")
 
 
 def test_skill_preamble_mode_read_failure_degrades_gracefully(
@@ -899,6 +948,268 @@ def test_validate_artifact_refs_order_block_first(tmp_path: Path) -> None:
     ]
 
 
+# ── Milestone signoff readiness ──────────────────────────────────────────────
+
+
+def test_agency_milestone_signoff_requires_fresh_clean_verification_and_review(tmp_path: Path) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "milestone.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness == lifecycle.MilestoneReadiness(
+        ready=True,
+        verification_ready=True,
+        review_ready=True,
+        review_required=True,
+    )
+    assert lifecycle.milestone_signoff_ready(tmp_path) is True
+    assert lifecycle.milestone_release_ready(tmp_path) is True
+
+
+@pytest.mark.parametrize("artifact_name", ["milestone.qa.md", "milestone.review.md"])
+def test_agency_milestone_signoff_rejects_stale_evidence(tmp_path: Path, artifact_name: str) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.qa.md",
+        source_sha="stale-revision" if artifact_name == "milestone.qa.md" else head,
+        generator="verify-qa",
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.review.md",
+        source_sha="stale-revision" if artifact_name == "milestone.review.md" else head,
+        generator="codereview",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is (artifact_name != "milestone.qa.md")
+    assert readiness.review_ready is (artifact_name != "milestone.review.md")
+
+
+@pytest.mark.parametrize("artifact_name", ["milestone.qa.md", "milestone.review.md"])
+def test_agency_milestone_signoff_rejects_failed_evidence(tmp_path: Path, artifact_name: str) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.qa.md",
+        source_sha=head,
+        generator="verify-qa",
+        validation_status="failed" if artifact_name == "milestone.qa.md" else "validated",
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.review.md",
+        source_sha=head,
+        generator="codereview",
+        validation_status="failed" if artifact_name == "milestone.review.md" else "validated",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is (artifact_name != "milestone.qa.md")
+    assert readiness.review_ready is (artifact_name != "milestone.review.md")
+
+
+def test_active_milestone_rejects_same_head_evidence_from_another_milestone(tmp_path: Path) -> None:
+    """Evidence from another milestone must not unlock the active boundary."""
+    head = _init_git_repo_with_head(tmp_path)
+    write_delivery_state(tmp_path, DeliveryState(active_milestone_id="M1", loop_status="passed"))
+    _write_milestone_evidence(
+        tmp_path,
+        "other.qa.md",
+        source_sha=head,
+        generator="verify-qa",
+        milestone_id="M2",
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "other.review.md",
+        source_sha=head,
+        generator="codereview",
+        milestone_id="M2",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True, milestone_id="M1")
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is False
+    assert readiness.review_ready is False
+
+
+@pytest.mark.parametrize(
+    ("generator", "validation_status"),
+    [("arbitrary-writer", "validated"), ("codereview", "unvalidated")],
+)
+def test_milestone_signoff_rejects_nonindependent_or_unvalidated_review_evidence(
+    tmp_path: Path, generator: str, validation_status: str
+) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path,
+        "milestone.review.md",
+        source_sha=head,
+        generator=generator,
+        validation_status=validation_status,
+        milestone_id="M1",
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True, milestone_id="M1")
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is True
+    assert readiness.review_ready is False
+
+
+def test_milestone_readiness_blocks_an_unresolved_persisted_delivery_loop(tmp_path: Path) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "milestone.review.md", source_sha=head, generator="codereview")
+    write_delivery_state(tmp_path, DeliveryState(loop_status="blocked"))
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path, agency=True)
+
+    assert readiness.ready is False
+    assert "delivery loop" in " ".join(readiness.blockers)
+
+
+def test_direct_readiness_is_proportional_unless_review_is_requested(tmp_path: Path) -> None:
+    head = _init_git_repo_with_head(tmp_path)
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+
+    proportional = lifecycle.milestone_signoff_readiness(tmp_path, agency=False)
+    requested_review = lifecycle.milestone_signoff_readiness(
+        tmp_path, agency=False, require_review=True
+    )
+
+    assert proportional.ready is True
+    assert proportional.review_required is False
+    assert proportional.review_ready is False
+    assert requested_review.ready is False
+    assert requested_review.review_required is True
+
+
+def test_persisted_agency_boundary_recovery_restores_signoff_readiness(tmp_path: Path) -> None:
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "milestone.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    # A fresh lifecycle reader after the boundary sees persisted agency state and evidence.
+    assert lifecycle.read_agency(tmp_path).active is True
+    assert lifecycle.milestone_signoff_readiness(tmp_path).ready is True
+    assert lifecycle.milestone_signoff_ready(tmp_path) is True
+
+
+def test_delivery_missing_active_agency_milestone_requires_matching_evidence(tmp_path: Path) -> None:
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "milestone.review.md", source_sha=head, generator="codereview")
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is False
+    assert readiness.review_ready is False
+
+
+@pytest.mark.parametrize("delivery_milestone_id", ["", "!!!"])
+def test_invalid_delivery_milestone_id_keeps_agency_evidence_bound_to_m1(
+    tmp_path: Path, delivery_milestone_id: str
+) -> None:
+    """An empty or punctuation-only delivery ID cannot unbind active Agency evidence."""
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    write_delivery_state(
+        tmp_path,
+        DeliveryState(active_milestone_id=delivery_milestone_id, loop_status="passed"),
+    )
+    _write_milestone_evidence(tmp_path, "unbound.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "unbound.review.md", source_sha=head, generator="codereview")
+
+    unbound = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert unbound.ready is False
+    assert unbound.verification_ready is False
+    assert unbound.review_ready is False
+
+    _write_milestone_evidence(
+        tmp_path, "bound.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "bound.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    bound = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert bound.ready is True
+    assert bound.verification_ready is True
+    assert bound.review_ready is True
+
+
+def test_corrupt_delivery_state_rejects_unbound_active_agency_evidence(tmp_path: Path) -> None:
+    """A delivery read error must not let unbound evidence cross an Agency boundary."""
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    delivery_path = tmp_path / ".renmark" / "state" / "delivery.json"
+    delivery_path.write_text("{not valid json", encoding="utf-8")
+    _write_milestone_evidence(tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa")
+    _write_milestone_evidence(tmp_path, "milestone.review.md", source_sha=head, generator="codereview")
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert readiness.ready is False
+    assert readiness.verification_ready is False
+    assert readiness.review_ready is False
+
+
+def test_corrupt_delivery_state_accepts_matching_active_agency_evidence(tmp_path: Path) -> None:
+    """Agency state remains an authoritative milestone binding after delivery read failure."""
+    from renmark import agency
+
+    head = _init_git_repo_with_head(tmp_path)
+    agency.activate(tmp_path, current_phase="verification", current_milestone="M1")
+    delivery_path = tmp_path / ".renmark" / "state" / "delivery.json"
+    delivery_path.write_text("{not valid json", encoding="utf-8")
+    _write_milestone_evidence(
+        tmp_path, "milestone.qa.md", source_sha=head, generator="verify-qa", milestone_id="M1"
+    )
+    _write_milestone_evidence(
+        tmp_path, "milestone.review.md", source_sha=head, generator="codereview", milestone_id="M1"
+    )
+
+    readiness = lifecycle.milestone_signoff_readiness(tmp_path)
+
+    assert readiness.ready is True
+    assert readiness.verification_ready is True
+    assert readiness.review_ready is True
+
+
 def test_agency_hint_inactive_is_passthrough(tmp_path):
     from renmark import lifecycle
     result = lifecycle._with_agency_note(tmp_path, "start", "some hint")
@@ -924,3 +1235,109 @@ def test_agency_hint_non_aware_skill_is_passthrough(tmp_path):
     agency.activate(tmp_path)
     result = lifecycle._with_agency_note(tmp_path, "help", "original")
     assert result == "original"
+
+
+def test_read_legacy_delivery_summary_projects_clean_lifecycle_state(tmp_path: Path) -> None:
+    lifecycle.write_lifecycle(tmp_path, stage="verified", feature="x")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.drift_repair_notes == []
+    assert summary.delivery.delivery_mode == "orchestrator"
+    assert summary.delivery.execution_policy == "guided"
+    assert summary.delivery.active_milestone_id == "verify"
+    assert summary.delivery.verification_status == "passed"
+    assert summary.delivery.review_status == "unknown"
+    assert summary.delivery.approval_status == "unknown"
+    assert summary.delivery.provenance_events == []
+
+
+def test_read_legacy_delivery_summary_reports_contradictory_lifecycle_program_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lifecycle, "read_lifecycle", lambda repo: lifecycle.LifecycleState(stage="verified"))
+    monkeypatch.setattr(
+        lifecycle,
+        "read_agency",
+        lambda repo: SimpleNamespace(active=False, current_phase="", current_milestone=""),
+    )
+    monkeypatch.setattr(lifecycle, "read_pipeline_state", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "_safe_read_program", lambda repo, notes: object())
+    monkeypatch.setattr(lifecycle, "_project_workflow_delivery", lambda *args, **kwargs: lifecycle.default_delivery_state())
+    monkeypatch.setattr(lifecycle, "_program_milestone", lambda program_state: "build")
+    monkeypatch.setattr(
+        lifecycle,
+        "_current_program_stage",
+        lambda program_state: SimpleNamespace(id="build-stage"),
+    )
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert any("contradictory active states" in note for note in summary.drift_repair_notes)
+    assert any("lifecycle/program drift" in note for note in summary.drift_repair_notes)
+
+
+def test_read_legacy_delivery_summary_maps_legacy_conductor_mode_to_guided_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "conductor")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.delivery.execution_policy == "guided"
+    assert all("mode" not in note for note in summary.drift_repair_notes)
+
+
+def test_read_legacy_delivery_summary_notes_empty_active_agency_phase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agency_state = SimpleNamespace(active=True, current_phase="   ", current_milestone="Launch Prep")
+    monkeypatch.setattr(lifecycle, "read_lifecycle", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "read_agency", lambda repo: agency_state)
+    monkeypatch.setattr(lifecycle, "read_pipeline_state", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "_safe_read_program", lambda repo, notes: None)
+    monkeypatch.setattr(
+        lifecycle,
+        "project_agency_state",
+        lambda state: lifecycle.DeliveryState(delivery_mode="agency", active_milestone_id="launch-prep"),
+    )
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "")
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.delivery.delivery_mode == "agency"
+    assert any("agency repair: active agency had empty current_phase" in note for note in summary.drift_repair_notes)
+    assert any("projected 'Launch Prep' as phase" in note for note in summary.drift_repair_notes)
+
+
+def test_read_legacy_delivery_summary_bounds_notes_and_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lifecycle, "read_lifecycle", lambda repo: None)
+    monkeypatch.setattr(
+        lifecycle,
+        "read_agency",
+        lambda repo: SimpleNamespace(active=False, current_phase="", current_milestone=""),
+    )
+    monkeypatch.setattr(lifecycle, "read_pipeline_state", lambda repo: None)
+    monkeypatch.setattr(lifecycle, "_safe_read_program", lambda repo, notes: None)
+    monkeypatch.setattr(lifecycle, "_project_workflow_delivery", lambda *args, **kwargs: lifecycle.default_delivery_state())
+    monkeypatch.setattr(lifecycle, "_read_raw_mode_token", lambda repo: "direct")
+    monkeypatch.setattr(
+        lifecycle,
+        "_workflow_drift_notes",
+        lambda **kwargs: [f"note-{index}" for index in range(1, 7)],
+    )
+
+    summary = lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert summary.drift_repair_notes == [
+        "mode repair: legacy mode token 'direct' treated as execution_policy 'direct'",
+        "note-1",
+        "note-2",
+        "note-3",
+        "note-4",
+    ]
+    assert len(summary.delivery.provenance_events) == 3
+    assert [event.detail for event in summary.delivery.provenance_events] == summary.drift_repair_notes[:3]

@@ -1,5 +1,343 @@
 # Changelog
 
+## [2026-07-31] - feat(delivery): complete M6 Agency trajectories
+
+**Request:** Prove Agency-approved and direct-Orchestrator entry trajectories for M6.
+**Built:** Added host-neutral deterministic trajectories that use the canonical persisted Agency handoff and direct defined-goal Orchestrator state.
+**Files changed:** `renmark/behavior.py`, `tests/behavioral/agency.behavior.json`, `CHANGELOG.md`.
+**Do not change:** Agency handoff must be real persisted state; direct Orchestrator must not activate Agency discovery.
+
+## [2026-07-30] - fix(recovery): persist executor lifecycle transitions
+
+**Request:** Debug stale lifecycle/delivery/pipeline recovery before M6.
+**Built:** Centralized runner start, wave, handoff, completion, and pause transitions so resume cannot retain a completed prior M2 run; added regression coverage for clean replacement, truthful delivery state, and resumable host-agent handoff.
+**Files changed:** `renmark/cli/_engine.py`, `tests/test_state_pipeline.py`, `CHANGELOG.md`.
+**Do not change:** A clean run clears only its runtime state and sets review pending; needs-agent/failure paths remain paused and resumable, never silently complete.
+
+## [2026-07-30] - feat(contract): complete M5 project contract propagation
+
+**Request:** Execute the approved M5 delivery-contract milestone.
+**Built:** Propagated the canonical two-mode, selector-capable managed contract through root guidance and templates; proved init/new-existing plus stale Start/Feature converge, preserve custom CRLF bytes on first refresh, remain idempotent, and fail safely on malformed markers.
+**Files changed:** `CLAUDE.md`, `AGENTS.md`, `plugin/templates/CLAUDE.md.template`, `plugin/templates/AGENTS.md.template`, `tests/test_contract_propagation.py`, `CHANGELOG.md`.
+**Do not change:** Init is the only writer; refresh never changes unmarked instructions, including their line endings/spacing; Start and Feature only route freshness through init.
+
+## [2026-07-30] - docs(contract): complete M5 entry freshness routing
+
+**Request:** Execute M5 project contract propagation under the approved cap.
+**Built:** Start and Feature now perform deterministic contract freshness routing through init's sole safe merge primitive without adding a mode gate, writer, or contract copy.
+**Files changed:** `plugin/skills/start/SKILL.md`, `plugin/skills/feature/SKILL.md`, `CHANGELOG.md`.
+**Do not change:** Defined Feature remains direct Orchestrator and Start preserves its M2 Agency/Orchestrator decision; neither entry point may own contract text or writes.
+
+## [2026-07-30] - feat(contract): complete WP-M5-2 safe refresh primitive
+
+**Request:** Execute M5 project contract propagation under the approved cap.
+**Built:** Made init the sole canonical contract writer with SHA freshness, semantic parity, byte-preserving CRLF handling, idempotent refresh, and CRLF-safe malformed-marker no-write protection.
+**Files changed:** `renmark/init.py`, `tests/test_init_pipeline.py`, `CHANGELOG.md`.
+**Do not change:** Never normalize or overwrite unmarked project prose; normalize line endings only for marker/freshness reads, and validate every managed target before writing either.
+
+## [2026-07-30] - feat(contract): complete WP-M5-1 canonical delivery contract
+
+**Request:** Execute M5 project contract propagation under the approved cap.
+**Built:** Added one concise pointer-only canonical delivery contract describing two modes, milestone evidence, bounded loops/review, canonical state, gates, and selector-capable fallback semantics.
+**Files changed:** `plugin/skills/.shared/project-delivery-contract.md`, `tests/test_project_delivery_contract.py`, `CHANGELOG.md`.
+**Do not change:** Do not duplicate full skills or transcripts into project contracts; host-native clickability is optional while complete recommended-first fallback is mandatory.
+
+## [2026-07-30] - feat(delivery): complete WP-M4-4 signoff integrity
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added bounded milestone readiness predicates requiring fresh, milestone-bound verified evidence, validated independent review, and a passed loop. Agency evidence remains bound through loaded, missing, corrupt, empty, and punctuation-only delivery-state cases; direct Orchestrator remains proportional.
+**Files changed:** `renmark/lifecycle.py`, `tests/test_lifecycle.py`, `CHANGELOG.md`.
+**Do not change:** Never infer Agency signoff from unbound same-HEAD evidence; failed/stale QA, arbitrary reviewers, unresolved loops, corrupt state, and unusable delivery IDs must fail closed.
+
+## [2026-07-30] - feat(delivery): complete WP-M4-3 review-to-fix safety
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added metadata-only capped review findings, semantic review/fix/re-review choices, and pointer-only scoped-fix artifacts. Two independent-review repair cycles closed forged Critical-severity bypasses in both writer and selector paths.
+**Files changed:** `renmark/cli/commands.py`, `tests/test_handoff_helpers.py`, `CHANGELOG.md`.
+**Do not change:** Critical/dangerous severity is derived at every safety boundary, never trusted from caller flags; fixes stay pointer-only with `auto_fix: false`, and dangerous flows retain cancel/refusal.
+
+## [2026-07-30] - feat(delivery): complete WP-M4-2 repair decisions
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added fresh-evidence milestone decisions with pointer-only scoped repairs, pre-emission recurrence stopping, and pause/scope/budget precedence. Independent review found and repaired one exhausted-budget ordering defect; re-review passed.
+**Files changed:** `renmark/program_driver.py`, `tests/test_program_driver.py`, `CHANGELOG.md`.
+**Do not change:** Repairs must never carry raw verifier output, must stop before a third equivalent attempt, and cannot be emitted from stale, paused, exhausted, or scope-drift evidence.
+
+## [2026-07-30] - feat(delivery): complete WP-M4-1 loop identity boundary
+
+**Request:** Execute M4 under the approved bounded milestone policy.
+**Built:** Added stable milestone/work-package loop identity, bounded terminal stop metadata, and deny-by-default scope advancement. Independent review required explicit verified-success before a terminal loop can advance scope; the scoped repair and re-review passed.
+**Files changed:** `renmark/loop.py`, `tests/test_loop.py`, `CHANGELOG.md`.
+**Do not change:** A `done` status alone is never signoff or scope-advance evidence; legacy loop state remains readable but denies advancement without explicit verified success.
+
+## [2026-07-30] - plan(delivery): define M4 milestone execution and review loops
+
+**Request:** Plan the remaining delivery work, then dispatch when it is ready.
+**Built:** Reused the approved two-mode master program to define four bounded M4 work packages: stable loop identity, verifier/recurrence repair decisions, review-to-fix re-review, and signoff readiness. The validated execution plan retains direct implementation-plus-test pairing, a two-repair/three-review-cycle ceiling, and a `$0.87` cap.
+**Files changed:** `.renmark/plans/2026-07-30-m4-milestone-execution-review-loops.plan.md`, `CHANGELOG.md`.
+**Do not change:** M5 remains sequenced after M4 because project contracts must describe the final loop behavior; never resume by index, bypass independent review, expand scope from a repair loop, or overwrite user instructions.
+
+## [2026-07-30] - feat(planning): complete WP-M3-4 cost previews
+
+**Request:** Continue M3 dispatch through bounded work packages.
+**Built:** Added deterministic package/milestone cost aggregation while retaining legacy cost APIs.
+**Files changed:** `renmark/cost.py`, `tests/test_cost.py`, `.renmark/reviews/2026-07-30-wp-m3-4-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Cost previews must expose package totals, deterministic-only work, escalation, and cheaper alternatives without hidden spend.
+
+## [2026-07-30] - feat(planning): complete WP-M3-3 package gates
+
+**Request:** Continue M3 dispatch through bounded work packages.
+**Built:** Added package-aware lint and subagent-routing gates while retaining legacy task-plan behavior.
+**Files changed:** `renmark/plan_lint.py`, `renmark/subagent_gate.py`, `tests/test_plan_lint.py`, `tests/test_subagent_gate.py`, `.renmark/reviews/2026-07-30-wp-m3-3-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Package work must retain bounded surfaces, acceptance evidence, artifact-only dependencies, transcript leak rejection, and deterministic-first dispatch.
+
+## [2026-07-30] - feat(planning): complete WP-M3-2 compiler compatibility
+
+**Request:** Debug the typed parser/compiler boundary, then resume WP-M3-2 by stable package ID.
+**Built:** Added the package-to-legacy Task compiler with bounded sidecar metadata and corrected the nullable parser target plus untyped kwargs boundary that blocked mypy.
+**Files changed:** `renmark/parser.py`, `renmark/work_packages.py`, `tests/test_work_packages.py`, `.renmark/debug/20260730-153736-57ff/`, `.renmark/reviews/2026-07-30-wp-m3-2-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Keep package provenance outside Task's wire shape, require artifact-pointer dependencies, and use explicit typed forwarding at package compiler boundaries.
+
+## [2026-07-30] - feat(planning): complete WP-M3-1 schemas and parser
+
+**Request:** Run M3 as bounded milestone-sized implementation-plus-test packages.
+**Built:** Added bounded milestone/work-package document validation and a separate package-plan parser with stable IDs, allowed surfaces, leak rejection, and index-only resume rejection; preserved legacy Task parsing as the backend.
+**Files changed:** `renmark/schemas.py`, `renmark/parser.py`, `tests/test_schemas.py`, `tests/test_parser.py`, `.renmark/reviews/2026-07-30-wp-m3-1-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Package planning must retain current Task backend compatibility, reject transcript/diff fields, and rely on stable package identity rather than task index.
+
+## [2026-07-30] - feat(delivery): complete M3-0 archival prerequisite
+
+**Request:** Dispatch M3 under milestone-sized package loops after approving the capacity amendment.
+**Built:** Added bounded project-local archival for completed package summaries, preserving live non-passing package evidence and provenance while protecting the 4 KB delivery-state contract.
+**Files changed:** `renmark/delivery_state.py`, `tests/test_delivery_state.py`, `.renmark/reviews/2026-07-30-m3-0-delivery-state-archival-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Never discard non-passed work-package evidence; archive only under `.renmark/`, guard state size before archive mutation, and preserve idempotent recovery.
+
+## [2026-07-30] - plan: define M3 milestone planner work packages
+
+**Request:** Continue after M2 with M3 planning only.
+**Built:** Drafted a validated M3 execution plan for stable milestone/work-package schemas, a compatibility compiler, package-aware deterministic gates, and package cost previews; execution remains unapproved.
+**Files changed:** `.renmark/plans/2026-07-30-m3-milestone-planner-work-packages.plan.md`, `CHANGELOG.md`; the plan artifact is the current persisted planning boundary.
+**Do not change:** Keep the current Task parser as a backend, never resume by task index, preserve bounded artifact-only context, and require a fresh package-level cost approval before M3 dispatch. Do not overwrite an oversized delivery state; resolve its archival boundary explicitly.
+
+## [2026-07-30] - test(delivery): complete WP-M2-C cross-host proof
+
+**Request:** Finish M2 through bounded milestone work packages with persisted verify/review boundaries.
+**Built:** Replaced the obsolete public-mode fixture with a live two-mode resolution matrix; expanded Claude and Codex behavior adapters across native Plan and numbered Default surfaces; proved recommendation order, complete fallback, More/Back/Cancel, invalid continuation, resume stability, legacy migration, and zero-model deterministic execution.
+**Files changed:** `renmark/behavior.py`, `tests/behavioral/mode.behavior.json`, `tests/behavioral/selector_claude.behavior.json`, `tests/behavioral/selector_codex.behavior.json`, `tests/test_behavior.py`, `.renmark/reviews/2026-07-30-wp-m2-c-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Deterministic behavior must remain network/token free, Codex Default must retain the complete fallback, Codex Plan overflow must keep More/Back/Cancel reachable, and live judge/eval spend stays explicit opt-in.
+
+## [2026-07-30] - docs(delivery): complete WP-M2-B entry routing
+
+**Request:** Continue M2 as milestone-sized work packages and keep implementation with directly related tests.
+**Built:** Reframed Start around the once-per-run Agency/Orchestrator decision, made defined Feature and Debug flows resolve directly to async/guided Orchestrator policies, made Resume canonical-first without re-asking, and expanded exact trigger parity across skill and command surfaces.
+**Files changed:** `plugin/skills/start/SKILL.md`, `plugin/commands/start.md`, `plugin/skills/feature/SKILL.md`, `plugin/skills/debug/SKILL.md`, `plugin/skills/resume/SKILL.md`, `tests/test_skill_trigger_phrases.py`, `.renmark/reviews/2026-07-30-wp-m2-b-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Status text is not a decision gate; defined feature/debug work must not ask for a mode, and resume must use canonical delivery/work-package identity rather than selector state or task indices.
+
+## [2026-07-30] - feat(delivery): complete WP-M2-A canonical two-mode runtime
+
+**Request:** Execute the remaining M2 work as milestone-sized implementation-plus-test packages with a bounded build→verify→review→fix loop.
+**Built:** Unified public mode selection around Agency and Orchestrator in canonical `delivery.json`; preserved package/run provenance during mode updates; migrated legacy conductor reads to guided Orchestrator; aligned lifecycle preambles, CLI flags and Agency aliases; pointed handoff presentation to the shared interaction contract.
+**Files changed:** `renmark/mode.py`, `renmark/lifecycle.py`, `renmark/cli/_engine.py`, `plugin/skills/.shared/handoff-menu.md`, `tests/test_mode.py`, `tests/test_agency_behavior.py`, `tests/test_lifecycle.py`, `tests/test_mode_cli.py`, `.renmark/reviews/2026-07-30-wp-m2-a-boundary.md`, `CHANGELOG.md`.
+**Do not change:** Keep `delivery.json` canonical and preserve its milestone/work-package/provenance fields; `mode.json` is read-only migration input, new public choices are Agency or Orchestrator, and resume must not re-ask or rely on task indices.
+
+## [2026-07-30] - plan: repackage remaining M2 by milestone outcome
+
+**Request:** Treat remaining M2 work as milestone-sized implementation-plus-test packages with a bounded build→verify→review→fix loop.
+**Built:** Replaced task-index continuation with three stable work packages for runtime/lifecycle/CLI, entry-skill routing, and cross-host behavior; retained the Part 1→Part 2 dependency, three-iteration ceiling, approved scope, and remaining `72,100`-token / `$0.5365` envelope.
+**Files changed:** `.renmark/plans/2026-07-30-m2-milestone-work-packages.md`, `CHANGELOG.md`; canonical package progress in `.renmark/state/delivery.json`.
+**Do not change:** Never resume by task index; persist every package boundary and stop on unresolved verification/review findings, security/destructive gates, or any budget/scope expansion.
+
+## [2026-07-30] - fix(selector): close M2 task 7 verifier
+
+**Request:** Debug task 7’s `tests/test_interaction.py` verifier before resuming M2 orchestration.
+**Built:** Reproduced the two committed legacy-test failures and the rolled-back candidate’s incorrect `host=None` expectation; aligned the tests with bounded More/Back/fallback metadata and runtime host resolution; fixed hidden exact refusal codes/labels so they cancel from every page; resolved both recurrence entries.
+**Files changed:** `renmark/interaction.py`, `tests/test_interaction.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug evidence under `.renmark/debug/20260730-144120-0b43/`.
+**Do not change:** Preserve complete fallback and ephemeral pagination; `host=None` must use runtime resolution, and any refusal advertised in picker instructions must remain executable from every page.
+
+## [2026-07-30] - orchestrate: pause M2 at selector compatibility verifier
+
+**Request:** Resume the approved staged M2 Part 1 then Part 2 run under the existing combined cap and stop on any failed gate.
+**Built:** Revalidated the repaired Codex sandbox, resumed from the canonical Part 1 wave graph, committed tasks 2, 4, 3, 5, 6, and 8 with independent target verifiers, and stopped at task 7 when its focused interaction test verifier failed; persisted the exact recovery boundary without dispatching tasks 9–13 or Part 2.
+**Files changed:** `.renmark/reviews/2026-07-30-eada2af.m2-part1-wave5-verifier-blocker.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`; runtime failure evidence under `.renmark/state/`.
+**Do not change:** Preserve committed Part 1 tasks and task 8’s passing parity fixtures; do not dispatch any downstream task or M2 Part 2 until `/renmark:debug` makes task 7’s focused verifier green.
+
+## [2026-07-30] - Add cross-surface selector parity fixtures
+
+**Request:** Prove that one semantic decision renders consistently across Claude, Codex Plan, Codex Default, overflow navigation, and explicit runtime capability overrides.
+**Built:** Added focused parity fixtures for recommended-first ordering, native capacity bounds, complete numbered fallback, More/Back/Cancel navigation, and non-persistence of presentation state.
+**Files changed:** `tests/test_selector_contract.py`, `CHANGELOG.md`.
+**Do not change:** Host surfaces may vary presentation only; they must preserve semantic choices, safe refusal, and complete reachable options without changing the collaboration mode.
+
+## [2026-07-30] - Implement semantic choices and bounded continuation
+
+**Request:** Make one host-neutral semantic decision render safely across Claude and Codex without truncating choices or persisting presentation state.
+**Built:** Added semantic decision/choice-set and continuation results for select, More, Back, Cancel/Reject, exact label/number/code, free text, invalid input, capability-aware native pages, and complete numbered fallback.
+**Files changed:** `renmark/interaction.py`, `CHANGELOG.md`.
+**Do not change:** The recommendation remains reachable first, every overflow path retains safe refusal and complete navigation, one-choice decisions use fallback, and pagination state is never persisted.
+
+## [2026-07-30] - Prove surface-aware selector capabilities
+
+**Request:** Verify the selector-capability contract across Claude, Codex Plan, Codex Default, runtime overrides, and unknown hosts.
+**Built:** Added a focused capability matrix covering native capacity bounds, complete fallback availability, host-only compatibility, and the separation between selector absence and headless operation.
+**Files changed:** `tests/test_hosts.py`, `CHANGELOG.md`.
+**Do not change:** Codex surfaces must not advertise unsupported clear, compact, or resume operations, and unknown hosts must remain conservative.
+
+## [2026-07-30] - Prove canonical delivery-mode resolution
+
+**Request:** Replace obsolete public Conductor expectations with the approved Agency/Orchestrator routing and legacy-compatibility matrix.
+**Built:** Added focused coverage for start/feature/fix/debug routing, explicit-choice precedence, once-per-run persistence, resume stability, corruption/atomicity behavior, and legacy Conductor projection.
+**Files changed:** `tests/test_mode.py`, `CHANGELOG.md`.
+**Do not change:** New state must use canonical DeliveryState values, while legacy state remains readable and resolves effectively to Orchestrator/guided.
+
+## [2026-07-30] - Make selector capabilities surface-aware
+
+**Request:** Resolve selector behavior from the active host surface so Claude and Codex present the same semantic decision without claiming unsupported UI.
+**Built:** Added render-time surface and selector capability resolution for Claude, Codex Plan, Codex Default, explicit runtime overrides, and conservative unknown-host fallback.
+**Files changed:** `renmark/hosts.py`, `CHANGELOG.md`.
+**Do not change:** Codex must never advertise unsupported clear/compact/resume commands; selector absence is not headless mode, and capability resolution must not persist or switch the host collaboration mode.
+
+## [2026-07-30] - Add canonical public delivery-mode resolver
+
+**Request:** Resolve public delivery behavior through the approved Agency or Orchestrator contract while retaining safe compatibility with legacy mode state.
+**Built:** Added canonical Agency/Orchestrator delivery resolution with guided/direct/async execution policy, explicit-choice precedence, bounded entry-intent defaults, and once-per-run DeliveryState persistence.
+**Files changed:** `renmark/mode.py`, `CHANGELOG.md`.
+**Do not change:** Preserve the legacy mode path/read/clear surface, map legacy Conductor state to Orchestrator/guided, and never create a new public Conductor value.
+
+## [2026-07-30] - fix(codex): prove sandbox readiness before dispatch
+
+**Request:** Investigate and repair the M2 blocker where nested Codex subprocesses exited without writing their target files.
+**Built:** Confirmed WSL selected the WindowsApps Codex executable without a usable Bubblewrap helper; installed trusted system Bubblewrap; added a model-free workspace-sandbox probe that checks every PATH candidate and launches the first passing absolute executable; rejected workspace-owned runtimes; removed the duplicate runner availability check; fixed tests that could accidentally launch a real model; and resolved all four recurrence entries created by the blocker.
+**Files changed:** `renmark/providers/codex.py`, `renmark/cli/_codex_runner.py`, `tests/test_engine_budget_and_rollback.py`, `tests/test_engine_resume_crosscheck.py`, `tests/test_recurrence.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug and recurrence evidence under `.renmark/debug/20260730-130449-c190/` and `.renmark/state/`.
+**Do not change:** Keep implementation tasks on `workspace-write`; never execute a Codex runtime supplied by the target workspace; readiness must be proven before model spend; M2 stays paused until its already-approved staged run is explicitly resumed.
+
+## [2026-07-30] — orchestrate: stop M2 on repeated Codex no-write
+
+**Request:** Continue the approved staged M2 Part 1 → Part 2 run under the existing combined cap and stop on any failed gate.
+**Built:** Reconciled the repaired Part 1 recovery state, revalidated both plans and the unchanged approved budget, preserved completed task 1, and dispatched the first remaining Codex wave without index-only `--resume`; the repaired executor honestly rejected tasks 2 and 4 after they produced no target changes, persisted the failed wave, and stopped before every downstream task.
+**Files changed:** `.renmark/reviews/2026-07-30-64ae34d.m2-part1-codex-no-write-blocker.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`; runtime pause, recurrence, analytics, escalation, and wave evidence under `.renmark/state/`.
+**Do not change:** Preserve task 1 and the executor completion guard; do not dispatch later Part 1 waves or any Part 2 work; do not use index-only CLI `--resume` or retry tasks 2/4 without resolving the recurrence gate.
+
+## [2026-07-30] - fix(executor): reject false Codex completion
+
+**Request:** Continue from M2’s failed executor-evidence gate and make Codex implementation tasks fail instead of reporting PASS when they produce no target change or commit.
+**Built:** Added a pre-verifier target-delta requirement with bounded recurrence handling and an independent post-verifier commit-evidence requirement; restored partial target edits before nonzero-exit and lane-violation retries; preserved real commit SHAs and the explicit `--no-commit` batching sentinel; added regressions for unchanged targets, clean retries, empty commit results, and both valid completion paths; cleared the independent remediation review.
+**Files changed:** `renmark/cli/_codex_runner.py`, `tests/test_engine_budget_and_rollback.py`, `.renmark/reviews/2026-07-30-executor-completion-guard.review.json`, `.renmark/reviews/2026-07-30-executor-completion-guard-remediation.review.json`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug evidence under `.renmark/debug/20260730-110909-96c0/`.
+**Do not change:** Keep out-of-lane rollback and sibling isolation intact; a green verifier alone is never completion; M2 remains paused at Part 1 task 2 and must not use index-only CLI `--resume`.
+
+## [2026-07-30] — orchestrate: stop M2 on invalid Codex completions
+
+**Request:** Execute approved M2 Part 1 then Part 2 within the combined cap, stopping on any failed gate.
+**Built:** Committed Part 1 task 1, ran the Codex runtime lane, and rejected its eleven apparent PASS results because they produced no target changes, artifacts, or commits; halted before task 13 and all of Part 2, persisted the failure boundary, and removed inaccurate success telemetry.
+**Files changed:** `.renmark/reviews/2026-07-30-d81775a.m2-part1-runtime-blocker.md`, `.renmark/memory/routing.md`, `CHANGELOG.md`; runtime pause evidence in `.renmark/state/`.
+**Do not change:** Preserve task 1’s accepted interaction contract; do not dispatch task 13 or M2 Part 2 until `/renmark:debug` makes implementation-task PASS contingent on valid target-change/artifact/commit evidence; never resume these plans through index-only CLI `--resume`.
+
+## [2026-07-30] — Define the semantic decision interaction contract
+
+**Request:** Establish M2’s single host-neutral contract for decisions, approvals, selector capability, and bounded continuation.
+**Built:** Created the semantic interaction contract with stable choice identifiers, one recommended-first action, dangerous-action refusal, Claude/Codex render-time limits, complete fallback, bounded navigation, and continuation semantics.
+**Files changed:**
+- `plugin/skills/.shared/interaction-contract.md` — canonical decision and choice-set contract.
+**Do not change:**
+- Presentation availability and pagination remain ephemeral; they must not persist or switch the host’s collaboration mode, truncate choices, or remove the explicit refusal path.
+
+## [2026-07-30] - fix(quality): restore Ruff baseline
+
+**Request:** Fix the six Ruff baseline violations across four files so the approved staged M2 run can resume.
+**Built:** Reproduced and traced the blocker to M1 additions that missed the repository-wide Ruff pass; applied only Ruff-canonical import/export ordering, line wrapping, and an equivalent conditional flattening; verified Ruff, strict typing, the affected test slice (`105 passed`), and the full regression suite (`1540 passed, 31 skipped`).
+**Files changed:** `renmark/program.py`, `renmark/schemas.py`, `tests/test_agency.py`, `tests/test_program.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; debug evidence under `.renmark/debug/20260730-043146-6c0d/`.
+**Do not change:** Keep this repair behavior-neutral; retain the validated M2 plans, recorded combined budget approval, staged Part 1 → Part 2 order, and stop-on-failed-gate policy.
+
+## [2026-07-29] - preflight: stop M2 on red Ruff baseline
+
+**Request:** Execute validated M2 Part 1 then Part 2 within the approved combined cap, stopping at any failed gate.
+**Built:** Recorded the explicit budget approval, created a clean pre-refactor checkpoint, proved plan lint/subagent/cost gates, ran a full baseline (`1540 passed, 31 skipped`; mypy clean), and stopped before all M2 executor calls because Ruff exposed six pre-existing violations outside the M2 target surface; preserved bounded recovery evidence and restored the user’s unrelated roadmap/audit work byte-for-byte.
+**Files changed:** `.renmark/reviews/2026-07-29-62e8fb4.m2-preflight.md`, `CHANGELOG.md`; approval state remains durable in `.renmark/state/lifecycle.json`.
+**Do not change:** Do not dispatch M2 until the repository Ruff baseline is green; repair this separately through `/renmark:debug`; retain the recorded M2 approval and do not make the user re-approve unless scope or budget changes.
+
+## [2026-07-29] - plan: compile M2 two-mode routing and interaction
+
+**Request:** After accepting M1, plan M2 only: the Agency/Orchestrator public contract, canonical entry routing, host-adaptive decisions, and cross-host behavior proof.
+**Built:** Reused the approved M2 master milestone and split its current-format implementation at the 15-task ceiling into a 13-task runtime/interaction plan followed by a 9-task entry-skill/behavior plan; encoded build and review loop bounds, compatibility guards, execution order, and an honest combined preview of 101,700 tokens including Agent overhead at USD 1.0955, with no Opus/Fable and no dispatch.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m2-part1-runtime.plan.md`, `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m2-part2-entry-contract.plan.md`, `CHANGELOG.md`; runtime lifecycle state in `.renmark/state/lifecycle.json`.
+**Do not change:** M2 Part 2 cannot execute before Part 1 is green and committed; M2 execution still requires a fresh explicit high-band cost/dispatch approval; REQ-25 propagation stays in M5; the current one-target packets are a temporary backend that M3 replaces with bounded multi-file work packages.
+
+## [2026-07-29] - approve: accept M1 and authorize M2 planning
+
+**Request:** Accept M1, acknowledge its recorded review-budget exception, and authorize M2 planning only.
+**Built:** Recorded durable owner signoff with the accepted 186,615-token review exception and an explicit boundary that permits M2 planning and deterministic validation but no M2 implementation dispatch or spend.
+**Files changed:** `.renmark/reviews/2026-07-29-d3269b6.milestone-signoff.md`, `CHANGELOG.md`; runtime approval state in `.renmark/state/lifecycle.json`.
+**Do not change:** M2 execution still requires a fresh explicit cost/dispatch approval; this signoff cannot be interpreted as authorization to run executors or implementation subagents.
+
+## [2026-07-29] - demo: stage M1 owner checkpoint
+
+**Request:** Present M1’s owner-visible status and drift-repair behavior, then stop before M2 at the required signoff and budget-exception gate.
+**Built:** Captured bounded live `delivery_state` output, demonstrated stable legacy run identity plus Agency/Conductor drift repair, linked verification/review/remediation evidence, and staged the lifecycle approval gate.
+**Files changed:** `.renmark/reviews/2026-07-29-d865cc4.milestone-demo.md`, `CHANGELOG.md`; runtime approval state in `.renmark/state/lifecycle.json`.
+**Do not change:** M2 cannot begin before explicit M1 owner signoff; approving this checkpoint authorizes M2 planning only, not M2 execution spend; retain the independent review’s 186,615-token budget overrun in the handoff.
+
+## [2026-07-29] - review: close M1 canonical-state findings
+
+**Request:** Prove the full M1 review findings are resolved before moving to the milestone checkpoint.
+**Built:** Recorded high-confidence remediation evidence for stable legacy run identity and writer-validator convergence, with both original Major findings closed and all focused/static/full-suite gates green.
+**Files changed:** `.renmark/reviews/2026-07-29-402c3ed.review-remediation.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** Preserve the original review artifact as finding evidence; remediation does not erase review history; M1 cannot advance if either canonical identity or schema convergence regresses.
+
+## [2026-07-29] - fix(delivery-state): resolve M1 review blockers
+
+**Request:** Fix every blocking finding from the full M1 code review before allowing milestone signoff or M2 planning.
+**Built:** Derived stable legacy run IDs from persisted Program/Lifecycle/Agency identity, normalized schema/contract/run metadata to the canonical validator contract, and added repeat-read plus writer-validator convergence regressions; the affected matrix and full suite pass.
+**Files changed:** `renmark/delivery_state.py`, `renmark/lifecycle.py`, `tests/test_delivery_state.py`, `tests/test_delivery_state_integration.py`, `tests/test_cli_delivery_state.py`, `.renmark/reviews/2026-07-29-d185b66.review.md`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`; runtime debug evidence under `.renmark/debug/20260730-001342-658d/`.
+**Do not change:** Legacy projection must return the same run ID for unchanged persisted workflow identity; every serialized `DeliveryState` must satisfy `schemas.validate_delivery_state`; canonical version fields are writer-owned invariants, not caller-owned passthrough.
+
+## [2026-07-29] - verify: M1 canonical delivery state
+
+**Request:** Re-verify M1 after repairing the live delivery-state inspection path, and do not advance to milestone review until the complete state flow is green.
+**Built:** Verified the bounded read-only CLI, canonical legacy projection, Agency/Program/Lifecycle/Pipeline compatibility, all 15 task verifiers, lint, strict typing, and the repository-wide regression suite (`1539 passed, 31 skipped`).
+**Files changed:** `.renmark/reviews/2026-07-29-4702acb.verification.md`, `.renmark/memory/learnings.md`, `CHANGELOG.md`.
+**Do not change:** Deterministic smoke remains required before milestone review; task-level PASS results alone are not milestone acceptance; browser QA is not applicable to this CLI/library milestone.
+
+## [2026-07-29] - fix(delivery-state): preserve typed legacy projections
+
+**Request:** Complete M1 verification by fixing the live `--delivery-state` crash and any related quality-gate findings before milestone review.
+**Built:** Replaced lossy `asdict()` lifecycle cloning with typed dataclass replacement, made stable work-package ID normalization idempotent, added live legacy-program CLI and exact persistence round-trip regressions, and cleared the affected lint/type defects.
+**Files changed:** `renmark/delivery_state.py`, `renmark/agency.py`, `renmark/lifecycle.py`, `tests/test_delivery_state.py`, `tests/test_cli_delivery_state.py`, `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md`, `.renmark/memory/routing.md`, `.renmark/reviews/2026-07-29-3a35610.verification.md`, `CHANGELOG.md`; runtime debug evidence under `.renmark/debug/20260729-220633-3642/`.
+**Do not change:** Delivery-state cloning must preserve nested dataclass types; stable milestone/work-package IDs must remain unchanged across repeated normalization and write/read cycles; `--delivery-state` stays bounded and read-only.
+
+## [2026-07-29] - debug(plan): make M1 dispatch WSL-safe
+
+**Request:** Resume M1 after the first task repeated without landing and fix the verified dispatch blocker rather than spending a third blind attempt.
+**Built:** Confirmed the Windows-app Codex binary lacks WSL's `bubblewrap` helper, installed the matching Linux Codex CLI in ignored project runtime state for this run, changed every M1 verifier to use `.venv`, removed forward references from Tasks 1 and 13 to tests created in later waves, and bumped the plan retry provenance.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m1.plan.md`, `.renmark/debug/20260729-212046-79d2/session.md`, `CHANGELOG.md`; runtime-only tool cache under `.renmark/state/tool-cache/codex-linux/`.
+**Do not change:** Keep Codex on `workspace-write`; do not bypass sandboxing; use project-local virtual-environment executables in plan verifiers; source-task verification cannot depend on a later test-task target.
+
+## [2026-07-29] - plan: integrate adaptive decision interaction
+
+**Request:** Incorporate Claude/Codex selector capability, Codex Plan-versus-Default behavior, overflow navigation, and decision-only menus into the approved two-mode milestone roadmap.
+**Built:** Updated the master program so M2 owns surface-aware host capabilities and semantic choice sets, M4 consumes them for loop/review/signoff decisions, M5 propagates the concise rule, and M6 proves cross-surface golden trajectories; refreshed M1 provenance to the approved PRD SHA without changing its 15 tasks, scope, or cost.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery.plan.md`, `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m1.plan.md`, `CHANGELOG.md`.
+**Do not change:** M1 remains the canonical-state bootstrap only; native picker availability and pagination are presentation details resolved in M2; numbered fallback is fully functional; informational status does not create a gate; no host collaboration mode is switched programmatically.
+
+## [2026-07-29] - prd: clarify surface-adaptive decisions
+
+**Request:** Make Renmark selector-capable across Claude Code and Codex while acknowledging that native clickability depends on the active host surface.
+**Built:** Amended REQ-23 with decision-only menus, runtime picker capability, recommended-first fallback, bounded overflow navigation, continuation/resume semantics, and Codex Plan-versus-Default behavior; amended REQ-25 and success metrics so the concise contract propagates and is proven across hosts.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Renmark never promises or creates host UI that is unavailable; informational status stays prose; every real decision has exactly one recommended-first action and a complete fallback; dangerous gates retain an explicit refusal path and never default-forward.
+
+## [2026-07-29] - plan: stage two-mode delivery migration
+
+**Request:** Proceed from the approved two-mode PRD into milestone planning for the cohesive Agency / Orchestrator redesign.
+**Built:** Created a six-milestone master program and a validated 15-task M1 bootstrap plan for canonical delivery state; corrected plan pricing against `renmark.cost` to 28,900 tokens and $0.867.
+**Files changed:** `.renmark/plans/2026-07-29-two-mode-milestone-delivery.plan.md`, `.renmark/plans/2026-07-29-two-mode-milestone-delivery-m1.plan.md`, `CHANGELOG.md`.
+**Do not change:** M1 uses one-file task packets only as a temporary current-engine bridge; later milestones introduce bounded multi-file work packages. Agency delegates milestone execution to Orchestrator, and every milestone retains verify, independent review, bounded repair, demo/signoff, and rollback gates.
+
+## [2026-07-29] - prd: define two-mode milestone delivery
+
+**Request:** Make Renmark a cohesive vibe-coding solution with Agency and Orchestrator as its two modes, place bounded loops inside milestones, and propagate a concise mirrored project contract through `init`, `start`, and `feature`.
+**Built:** Amended REQ-22 with the two-mode hierarchy and milestone-local build/review loops; added REQ-25 for non-destructive `CLAUDE.md` / `AGENTS.md` contract propagation; added parity, preservation, idempotency, and two-mode success criteria.
+**Files changed:** `PRD.md`, `CHANGELOG.md`.
+**Do not change:** Agency owns product governance and delegates milestone execution to Orchestrator; Conductor is internal policy only; loops cannot change scope or bypass signoff; `init` remains the single managed-contract writer and `start` / `feature` route through it.
+
 ## [2026-07-17] - release: proactive repeated-issue prevention v0.38.2
 
 **Request:** Deploy the completed proactive repeated-issue prevention feature as a new Codex release and distribution zip.
@@ -3425,6 +3763,16 @@ The eight `.renmark/memory/` files now have proper documentation-grade templates
 - Additional native providers (Ollama, OpenRouter, OpenAI-compat) — Phase 4
 - ~~LiteLLM plug-in slot — Phase 5~~ (dropped — native providers cover the realistic use cases) (optional)
 
+## [2026-07-31] — Add cross-host selector loop trajectory coverage
+
+**Request:** Add deterministic selector/loop/resume cross-host trajectory coverage for Claude native, Codex Plan, and Codex Default outcomes, including persisted bounded loop rereads.
+**Built:** Extended `renmark/behavior.py` to emit dynamic semantic parity, continuation, cancel, overflow, and persisted loop reread proof fields; tightened the related selector behavioral fixture to assert those live outcomes.
+**Files changed:**
+- `renmark/behavior.py` — add explicit cross-host semantic parity and persisted loop reread payload fields.
+- `tests/behavioral/selector_codex.behavior.json` — assert the new dynamic selector and loop/resume proof fields.
+**Do not change:**
+- Codex still does not claim native clickable selectors; the proof must continue to come from live selector/continuation behavior and persisted loop rereads, not static metadata alone.
+
 ## v0.0.3 — 2026-05-12 (Phase 1, +memory + help)
 
 **Persistent memory module + `/renmark:help` skill.**
@@ -3466,6 +3814,16 @@ Not yet wired (still Phase 1):
 - Empty-folder bootstrap code (skill docs reference it but the brainstorm skill currently does it by hand)
 
 The skills are visible and `/renmark:brainstorm` + `/renmark:plan` are workable today (they're Opus-driven conversations). `/renmark:orchestrate` runs the same single-task path the v0.0.1 baseline supports.
+
+## [2026-07-31] — Persist approved Agency handoff
+
+**Request:** Repair the canonical Agency approval-to-Orchestrator lifecycle handoff.
+**Built:** Explicit approved Agency activation now persists the preserving delivery handoff; regression coverage protects gate separation and reader purity.
+**Files changed:**
+- `renmark/agency.py` — persist the approved Agency handoff without overwriting delivery state.
+- `tests/test_agency.py` — cover persistence, preservation, rejection, and read-only summaries.
+**Do not change:**
+- Compatibility projections and lifecycle summaries remain read-only; owner approval does not complete independent review.
 
 ## v0.0.1 — 2026-05-12 (Phase 0)
 

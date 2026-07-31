@@ -17,9 +17,13 @@ The **Debug pipeline** — fix what's broken without expanding scope. Modeled af
 
 State lives in `.renmark/debug/<session-id>/`. A debug session survives `/clear`.
 
-## Operating mode
+## Delivery mode
 
-**Conductor is debug's default** — hands-on, small-step, minimal context, explain the reasoning before editing. Keep the surface tight and the feedback loop short. **Orchestrator** mode may fan out scoped, read-only investigation subagents when the failure spans a large surface (many files/modules) — each subagent gets one hypothesis and a narrow file scope, and returns findings only.
+A defined failure resolves without a mode question to
+`delivery_mode=orchestrator` and `execution_policy=guided`. Guided execution
+keeps the feedback loop tight and root-cause-first; broad failures may still
+use narrowly scoped, read-only investigators. A legacy Conductor value is
+accepted only as migration input and maps internally to this guided policy.
 
 ## When to Use
 

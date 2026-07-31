@@ -70,6 +70,21 @@ def test_general_purpose_with_reason_clears_challenge() -> None:
     assert v.needs_subagent is True
 
 
+def test_deterministic_package_is_not_dispatched() -> None:
+    v = g.justify_task({"cost_lane": "deterministic", "goal": "run checks"})
+    assert v.deterministic_eligible is True
+    assert v.needs_subagent is False
+    assert v.challenge_code == "deterministic"
+
+
+def test_general_purpose_package_without_reason_is_challenged() -> None:
+    v = g.justify_task(
+        {"cost_lane": "standard", "complexity": "medium", "target": "notes.txt"}
+    )
+    assert v.role == "general-purpose"
+    assert v.challenge_code == "missing_role_reason"
+
+
 # ── plan-level challenge ──────────────────────────────────────────────────────
 
 

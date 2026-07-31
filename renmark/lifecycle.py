@@ -21,14 +21,37 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import subprocess
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from . import skillmeta
+from .agency import AgencyState, project_agency_state, read_agency
+from .delivery_state import (
+    DeliveryState,
+    WorkPackageSummary,
+    append_provenance_event,
+    default_delivery_state,
+    read_delivery_state_with_report,
+    stable_delivery_run_id,
+    stable_milestone_id,
+)
 from .hosts import HostKind, capabilities_for
+from .mode import mode_state_path
+from .program import (
+    Program,
+    ProgramStateError,
+    StageNode,
+    delivery_state_for_program_status,
+    program_delivery_milestones,
+    read_program,
+    stable_milestone_id_for_stage,
+    stable_work_package_id_for_task,
+)
+from .state.pipeline import PipelineState, read_pipeline_state
 from .summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
@@ -477,6 +500,245 @@ class NextSteps:
         return asdict(self)
 
 
+@dataclass
+class LegacyDeliverySummary:
+    """Canonical delivery summary projected from legacy workflow state.
+
+    ``delivery`` is the normalized delivery-facing summary. ``drift_repair_notes``
+    is a bounded list of concise compatibility/drift findings derived from the
+    legacy state readers; callers can surface it directly without scanning the
+    full underlying state files.
+    """
+
+    delivery: DeliveryState
+    drift_repair_notes: list[str] = field(default_factory=list)
+
+    @property
+    def canonical_delivery(self) -> DeliveryState:
+        return self.delivery
+
+    @property
+    def notes(self) -> list[str]:
+        return self.drift_repair_notes
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "delivery": self.delivery.to_dict(),
+            "drift_repair_notes": list(self.drift_repair_notes),
+        }
+
+
+@dataclass(frozen=True)
+class MilestoneReadiness:
+    """A bounded, read-only disposition for a milestone boundary.
+
+    This deliberately contains only booleans and short blockers. Verifier and
+    review bodies remain in their artifacts, rather than leaking into the
+    lifecycle file or owner-facing state.
+    """
+
+    ready: bool
+    verification_ready: bool
+    review_ready: bool
+    review_required: bool
+    blockers: tuple[str, ...] = ()
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "ready": self.ready,
+            "verification_ready": self.verification_ready,
+            "review_ready": self.review_ready,
+            "review_required": self.review_required,
+            "blockers": list(self.blockers),
+        }
+
+
+def milestone_signoff_readiness(
+    repo: Path | str,
+    *,
+    agency: bool | None = None,
+    require_review: bool | None = None,
+    milestone_id: str | None = None,
+) -> MilestoneReadiness:
+    """Return whether a milestone has the fresh evidence needed to advance.
+
+    Agency delivery always requires a fresh, clean verifier result and an
+    independently-produced clean review. Direct Orchestrator delivery still
+    requires fresh verification, while review is proportional unless explicitly
+    requested by its caller. The predicate is read-only: it cannot clear
+    approval gates or advance lifecycle state.
+    """
+    repo_path = Path(repo)
+    agency_state: AgencyState | None = None
+    try:
+        agency_state = read_agency(repo_path)
+    except Exception:
+        # A corrupt or unreadable Agency overlay must never create a boundary
+        # binding from guessed state.
+        agency_state = None
+    if agency is None:
+        agency = bool(agency_state and agency_state.active)
+    review_required = bool(agency) if require_review is None else bool(require_review)
+
+    # A persisted delivery loop is authoritative while it is active.  A loaded
+    # non-passing loop must finish before signoff; an unavailable loop defers
+    # to the active Agency boundary when one is persisted.
+    try:
+        delivery, delivery_report = read_delivery_state_with_report(repo_path)
+    except Exception:
+        delivery = None
+        delivery_report = None
+
+    # Evidence must be tied to the actual boundary when one is known.  The
+    # optional argument supports callers that are signing off a named milestone;
+    # otherwise the active persisted delivery milestone is authoritative.  An
+    # unscoped legacy flow deliberately retains its existing HEAD-only behavior.
+    active_milestone = _signoff_milestone_id(milestone_id)
+    if not active_milestone and delivery is not None:
+        active_milestone = _signoff_milestone_id(delivery.active_milestone_id)
+    if not active_milestone and agency and agency_state is not None and agency_state.active:
+        # A missing, corrupt, unreadable, or unscoped delivery loop cannot be
+        # allowed to unbind an active Agency boundary. Preserve explicit caller
+        # and usable delivery-loop precedence above, then use the persisted
+        # Agency milestone so only evidence for that boundary can satisfy
+        # signoff.
+        active_milestone = _signoff_milestone_id(agency_state.current_milestone)
+
+    head = _current_head_sha(repo_path)
+    verification_ready = _has_fresh_milestone_evidence(
+        repo_path,
+        head,
+        pattern="*.qa.md",
+        verifier=True,
+        milestone_id=active_milestone,
+    )
+    review_ready = _has_fresh_milestone_evidence(
+        repo_path,
+        head,
+        pattern="*.review.md",
+        verifier=False,
+        milestone_id=active_milestone,
+    )
+
+    blockers: list[str] = []
+    if not head:
+        blockers.append("current revision is unavailable; freshness cannot be proven")
+    if not verification_ready:
+        blockers.append("fresh verified milestone evidence is required")
+    if review_required and not review_ready:
+        blockers.append("fresh clean independent review evidence is required")
+    if (
+        delivery_report is not None
+        and delivery_report.state == "loaded"
+        and delivery is not None
+        and delivery.loop_status != "passed"
+    ):
+        blockers.append(f"delivery loop is unresolved ({delivery.loop_status})")
+
+    return MilestoneReadiness(
+        ready=not blockers,
+        verification_ready=verification_ready,
+        review_ready=review_ready,
+        review_required=review_required,
+        blockers=tuple(blockers),
+    )
+
+
+def milestone_signoff_ready(repo: Path | str) -> bool:
+    """True only when Agency may offer owner milestone signoff."""
+    return milestone_signoff_readiness(repo, agency=True).ready
+
+
+def milestone_release_ready(repo: Path | str) -> bool:
+    """True only when release readiness has fresh verification and review."""
+    return milestone_signoff_readiness(repo, require_review=True).ready
+
+
+def _current_head_sha(repo: Path) -> str:
+    """Return HEAD for evidence comparison, degrading safely outside git."""
+    try:
+        from .summary import git_head_sha
+
+        head = git_head_sha(repo)
+        return head if isinstance(head, str) else ""
+    except Exception:
+        return ""
+
+
+def _has_fresh_milestone_evidence(
+    repo: Path,
+    head: str,
+    *,
+    pattern: str,
+    verifier: bool,
+    milestone_id: str = "",
+) -> bool:
+    """Whether one clean, complete evidence artifact proves the current HEAD.
+
+    ``*.qa.md`` is accepted only from the verification generator with a
+    validated result. Reviews use an explicitly allowed independent-review
+    generator and a validated result, which prevents a failed verifier or
+    arbitrary artifact from self-certifying readiness.
+    """
+    if not head:
+        return False
+    reviews = repo / ".renmark" / "reviews"
+    if not reviews.is_dir():
+        return False
+    for artifact in reviews.glob(pattern):
+        try:
+            metadata = read_metadata(artifact)
+            stale = is_stale(artifact)
+        except Exception:
+            continue
+        if stale or metadata.get("source_sha") != head:
+            continue
+        artifact_milestone = _signoff_milestone_id(metadata.get("milestone_id"))
+        if milestone_id and artifact_milestone != milestone_id:
+            continue
+        if metadata.get("completion_state") != "complete":
+            continue
+        generator = metadata.get("generator")
+        if verifier:
+            if generator != "verify-qa" or metadata.get("validation_status") != "validated":
+                continue
+        elif (
+            generator not in _INDEPENDENT_REVIEW_GENERATORS
+            or metadata.get("validation_status") != "validated"
+        ):
+            continue
+        if _evidence_has_failure(metadata):
+            continue
+        return True
+    return False
+
+
+# A signoff review must come from a dedicated reviewer, not merely any artifact
+# writer that happens to use the ``.review.md`` suffix.
+_INDEPENDENT_REVIEW_GENERATORS: frozenset[str] = frozenset({"codereview"})
+
+
+def _signoff_milestone_id(value: object) -> str:
+    """Return a stable signoff milestone token, or empty when unscoped."""
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or not any(character.isalnum() for character in value)
+    ):
+        return ""
+    return stable_milestone_id(value)
+
+
+def _evidence_has_failure(metadata: dict[str, object]) -> bool:
+    """Recognize the compact negative verdict tokens used by evidence writers."""
+    failed = {"fail", "failed", "block", "blocked", "blocking", "changes_requested"}
+    for key in ("verdict", "status", "review_status"):
+        value = metadata.get(key)
+        if isinstance(value, str) and value.strip().lower().replace(" ", "_") in failed:
+            return True
+    return False
+
+
 def next_steps(repo: Path | str, skill: object) -> NextSteps:
     """Compute the structured next-step set for ``skill`` (next-steps.md contract).
 
@@ -619,7 +881,7 @@ def persist_compact_checkpoint(
     from . import state as _state  # lazy — avoid circular import at module load
 
     try:
-        host_capabilities = capabilities_for(host)
+        host_capabilities = capabilities_for(_lifecycle_host(host))
         state_path = _state.state_dir(repo) / "compact_checkpoint.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
         state_path.write_text(
@@ -675,7 +937,7 @@ def skill_preamble(
 
     domain = domain_of(skill)
     tier = preamble_tier(skill)
-    host_capabilities = capabilities_for(host)
+    host_capabilities = capabilities_for(_lifecycle_host(host))
 
     if tier == "minimal":
         # INVARIANT: record_skill_invocation runs for ALL tiers so that the next
@@ -762,25 +1024,27 @@ def skill_preamble(
     return _with_agency_note(repo, skill, _with_mode_note(repo, skill, _with_headless_note(repo, base)))
 
 
-# ── Operating-mode directive (Conductor vs Orchestrator) ──────────────────────
+# ── Delivery-mode directive (Agency vs Orchestrator) ──────────────────────────
 #
 # Set-mode directive lines (persisted mode → one hint line). Kept as module
 # constants so the behavior test (T14) and unit test (T12) can assert the exact
 # text without duplicating string literals.
 _MODE_DIRECTIVE: dict[str, str] = {
-    "conductor": (
-        "Operating mode: Conductor — hands-on; prefer single-file scoped edits, "
-        "avoid subagents unless necessary, explain the next move before editing."
+    "agency": (
+        "Delivery mode: Agency — owner-facing milestone delivery; discover and "
+        "agree outcomes, then delegate bounded milestone execution to Orchestrator."
     ),
     "orchestrator": (
-        "Operating mode: Orchestrator — goal-level; use narrow scoped subagents "
-        "where useful, load skills on demand, review outcomes not keystrokes."
+        "Delivery mode: Orchestrator — execute goal-level work packages through "
+        "bounded build → verify → review → fix loops and persist each boundary."
     ),
 }
 
-# Entry-point skills that must PROMPT for a mode when none is set yet.
-_MODE_ENTRY_SKILLS: frozenset[str] = frozenset(
-    {"start", "feature", "debug", "roadmap", "finish", "orchestrate"}
+# Only unresolved adoption/new-build entry points ask. Existing-project flows
+# use their deterministic default and resume never re-asks.
+_MODE_PROMPT_SKILLS: frozenset[str] = frozenset({"init", "start"})
+_MODE_DEFAULT_SKILLS: frozenset[str] = frozenset(
+    {"feature", "debug", "roadmap", "finish", "orchestrate"}
 )
 
 # Skills whose flows must not be blocked mid-stream by context gates.
@@ -791,14 +1055,14 @@ _CONTEXT_BYPASS_SKILLS: frozenset[str] = frozenset({"finish", "approve", "resume
 def _choose_mode_hint(skill: str) -> str:
     """Choose-mode instruction emitted for an entry-point skill with no mode set.
 
-    Tells the orchestrator to ask the user Conductor vs Orchestrator via
+    Tells the orchestrator to ask the user Agency vs Orchestrator via
     AskUserQuestion, recommending the per-skill default, then persist the choice.
     """
     from . import mode as _mode
 
     recommended = _mode.default_mode_for_skill(skill)
     return (
-        "Operating mode: not yet set — ask the user Conductor vs Orchestrator via "
+        "Delivery mode: not yet set — ask the user Agency vs Orchestrator via "
         f"AskUserQuestion (recommend: {recommended}), then persist with "
         "renmark.mode.set_mode(repo, <choice>)."
     )
@@ -812,7 +1076,7 @@ def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | Non
     exception in mode resolution falls back to ``hint`` unchanged, so mode is a
     pure enhancement and never a hard dependency of the preamble.
 
-    - Mode SET  → append the Conductor/Orchestrator directive line.
+    - Mode SET  → append the Agency/Orchestrator directive line.
     - Mode UNSET + entry-point skill → append a choose-mode instruction.
     - Mode UNSET + non-entry skill → no mode line (returns ``hint`` unchanged).
     """
@@ -820,11 +1084,15 @@ def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | Non
         from . import mode as _mode
 
         current = _mode.read_mode(repo)
+        if current is None and skill in _MODE_DEFAULT_SKILLS:
+            resolved = _mode.default_delivery_state_for_skill(skill)
+            _mode.write_delivery_state(repo, resolved)
+            current = resolved.delivery_mode
         if current is not None:
             line = _MODE_DIRECTIVE.get(current)
             if line is None:  # unrecognised (read_mode shouldn't yield this)
                 return hint
-        elif skill in _MODE_ENTRY_SKILLS:
+        elif skill in _MODE_PROMPT_SKILLS:
             line = _choose_mode_hint(skill)
         else:
             return hint
@@ -874,7 +1142,12 @@ def _with_agency_note(repo: Path | str, skill: str, hint: str | None) -> str | N
     try:
         from . import agency as _agency
         from . import context as _context
+        from . import mode as _mode
 
+        # Canonical delivery.json wins over the legacy agency overlay. This
+        # prevents split-brain hints after an explicit Orchestrator choice.
+        if _mode.read_mode(repo) == "orchestrator":
+            return hint
         if not _agency.is_active(repo):
             return hint
         state = _agency.read_agency(repo)
@@ -1125,6 +1398,314 @@ def validate_artifact_refs(
 
     warn_issues.sort(key=lambda i: i["artifact"])
     return block_issues + warn_issues
+
+
+_LIFECYCLE_MILESTONE_BY_STAGE: dict[str, str] = {
+    "init": "discovery",
+    "brainstorm-complete": "discovery",
+    "plan-drafted": "plan",
+    "plan-validated": "plan",
+    "created": "build",
+    "verified": "verify",
+    "reviewed": "review",
+    "documented": "documented",
+    "ready-to-release": "release",
+    "released": "release",
+}
+
+_MODE_POLICY_BY_TOKEN: dict[str, str] = {
+    "conductor": "guided",
+    "orchestrator": "async",
+    # Legacy/stale tokens tolerated as execution policies.
+    "guided": "guided",
+    "direct": "direct",
+    "async": "async",
+}
+
+
+def read_legacy_delivery_summary(repo: Path | str) -> LegacyDeliverySummary:
+    """Read legacy workflow state and project it into a canonical delivery summary.
+
+    This helper is read-only and additive: it never writes delivery state,
+    lifecycle state, or any repair artifact. It tolerates legacy/corrupt reads
+    by degrading to the default delivery summary plus bounded drift notes.
+    """
+    repo_path = Path(repo)
+    notes: list[str] = []
+
+    lifecycle_state = read_lifecycle(repo_path)
+    agency_state = read_agency(repo_path)
+    pipeline_state = read_pipeline_state(repo_path)
+    program_state = _safe_read_program(repo_path, notes)
+
+    delivery = (
+        project_agency_state(agency_state)
+        if agency_state.active
+        else _project_workflow_delivery(lifecycle_state, program_state, pipeline_state)
+    )
+    delivery = replace(
+        delivery,
+        run_id=_legacy_delivery_run_id(
+            repo_path,
+            lifecycle_state=lifecycle_state,
+            agency_state=agency_state,
+            program_state=program_state,
+        ),
+    )
+
+    raw_mode_token = _read_raw_mode_token(repo_path)
+    mode_note, execution_policy = _normalize_mode_note(raw_mode_token)
+    if mode_note:
+        notes.append(mode_note)
+    if execution_policy:
+        delivery = replace(delivery, execution_policy=execution_policy)
+
+    notes.extend(
+        _workflow_drift_notes(
+            lifecycle_state=lifecycle_state,
+            agency_state=agency_state,
+            program_state=program_state,
+            pipeline_state=pipeline_state,
+        )
+    )
+    bounded_notes = notes[:5]
+    for detail in bounded_notes[:3]:
+        delivery = append_provenance_event(
+            delivery,
+            ts="",
+            kind="compat-drift-repair",
+            detail=detail,
+            source="lifecycle",
+            ref="legacy-workflow-state",
+        )
+    return LegacyDeliverySummary(delivery=delivery, drift_repair_notes=bounded_notes)
+
+
+# Back-compat aliases for callers/tests that prefer a function-style name.
+legacy_delivery_summary = read_legacy_delivery_summary
+read_delivery_summary_from_legacy_state = read_legacy_delivery_summary
+
+
+def _safe_read_program(repo: Path, notes: list[str]) -> Program | None:
+    try:
+        return read_program(repo)
+    except ProgramStateError as exc:
+        notes.append(f"program state unreadable; ignored legacy program drift ({str(exc).splitlines()[0][:72]})")
+        return None
+
+
+def _legacy_delivery_run_id(
+    repo: Path,
+    *,
+    lifecycle_state: LifecycleState | None,
+    agency_state: AgencyState,
+    program_state: Program | None,
+) -> str:
+    lifecycle_artifacts = lifecycle_state.artifacts if lifecycle_state is not None else {}
+    return stable_delivery_run_id(
+        "legacy",
+        getattr(program_state, "created_at", ""),
+        getattr(program_state, "source_sha", ""),
+        getattr(program_state, "feature", ""),
+        lifecycle_state.feature if lifecycle_state is not None else "",
+        lifecycle_state.branch if lifecycle_state is not None else "",
+        lifecycle_state.github_issue if lifecycle_state is not None else "",
+        lifecycle_artifacts.get("plan", ""),
+        getattr(agency_state, "roadmap_ref", ""),
+        repo.name,
+    )
+
+
+def _project_workflow_delivery(
+    lifecycle_state: LifecycleState | None,
+    program_state: Program | None,
+    pipeline_state: PipelineState | None,
+) -> DeliveryState:
+    delivery = default_delivery_state()
+    delivery.delivery_mode = "orchestrator"
+
+    current_program_stage = _current_program_stage(program_state)
+    if current_program_stage is not None:
+        delivery.active_milestone_id = stable_milestone_id_for_stage(current_program_stage)
+        delivery.work_packages = _work_package_summaries_for_stage(current_program_stage)
+        delivery.loop_status = delivery_state_for_program_status(current_program_stage.status)
+
+    if lifecycle_state is not None:
+        lifecycle_milestone = _LIFECYCLE_MILESTONE_BY_STAGE.get(lifecycle_state.stage, "")
+        if lifecycle_milestone and not delivery.active_milestone_id:
+            delivery.active_milestone_id = lifecycle_milestone
+        if lifecycle_state.stage in {"verified", "reviewed", "documented", "ready-to-release", "released"}:
+            delivery.verification_status = "passed"
+        if lifecycle_state.stage in {"reviewed", "documented", "ready-to-release", "released"}:
+            delivery.review_status = "passed"
+        if lifecycle_state.stage in {"ready-to-release", "released"}:
+            delivery.approval_status = "approved"
+        if lifecycle_state.stage == "released":
+            delivery.loop_status = "passed"
+
+    if pipeline_state is not None and pipeline_state.current_phase in {"orchestrate", "paused"}:
+        delivery.loop_status = "in_progress"
+
+    return replace(delivery)
+
+
+def _workflow_drift_notes(
+    *,
+    lifecycle_state: LifecycleState | None,
+    agency_state: AgencyState,
+    program_state: Program | None,
+    pipeline_state: PipelineState | None,
+) -> list[str]:
+    notes: list[str] = []
+
+    if agency_state.active and not " ".join(agency_state.current_phase.split()):
+        projected = " ".join(agency_state.current_milestone.split()) or "discovery"
+        notes.append(
+            f"agency repair: active agency had empty current_phase; projected {projected!r} as phase"
+        )
+
+    lifecycle_milestone = _lifecycle_milestone(lifecycle_state)
+    program_milestone = _program_milestone(program_state)
+    agency_milestone = _agency_milestone(agency_state)
+
+    active_markers = [
+        marker
+        for marker in (
+            f"agency:{agency_milestone}" if agency_state.active else "",
+            f"lifecycle:{lifecycle_milestone}" if lifecycle_milestone else "",
+            f"program:{program_milestone}" if program_milestone else "",
+        )
+        if marker
+    ]
+    distinct_active = {marker.split(":", 1)[1] for marker in active_markers}
+    if len(active_markers) > 1 and len(distinct_active) > 1:
+        notes.append(
+            f"contradictory active states: {', '.join(active_markers[:3])}"
+        )
+
+    if lifecycle_milestone and program_milestone and lifecycle_milestone != program_milestone:
+        lifecycle_stage = lifecycle_state.stage if lifecycle_state is not None else "unknown"
+        program_stage = _current_program_stage(program_state)
+        program_stage_id = program_stage.id if program_stage is not None else "unknown"
+        notes.append(
+            "lifecycle/program drift: "
+            f"lifecycle stage {lifecycle_stage!r}->{lifecycle_milestone}, "
+            f"program stage {program_stage_id!r}->{program_milestone}"
+        )
+
+    if (
+        pipeline_state is not None
+        and pipeline_state.current_phase in {"orchestrate", "paused"}
+        and lifecycle_state is not None
+        and lifecycle_state.stage in {"init", "brainstorm-complete", "plan-drafted", "plan-validated"}
+    ):
+        notes.append(
+            "runtime/workflow drift: "
+            f"pipeline phase {pipeline_state.current_phase!r} active while lifecycle stage is {lifecycle_state.stage!r}"
+        )
+
+    return notes[:5]
+
+
+def _current_program_stage(program_state: Program | None) -> StageNode | None:
+    if program_state is None or not program_state.stages:
+        return None
+    if program_state.current_stage_id:
+        for stage in program_state.stages:
+            if stage.id == program_state.current_stage_id:
+                return stage
+    for milestone in program_delivery_milestones(program_state):
+        if milestone.get("delivery_state") not in {"passed"}:
+            stage_id = milestone.get("stage_id")
+            for stage in program_state.stages:
+                if stage.id == stage_id:
+                    return stage
+    return program_state.stages[-1]
+
+
+def _work_package_summaries_for_stage(stage: StageNode) -> list[WorkPackageSummary]:
+    packages: list[WorkPackageSummary] = []
+    milestone_id = stable_milestone_id_for_stage(stage)
+    for task in stage.tasks[:8]:
+        packages.append(
+            WorkPackageSummary(
+                package_id=stable_work_package_id_for_task(stage, task),
+                milestone_id=milestone_id,
+                title=task.title or task.id or "(untitled task)",
+                status=delivery_state_for_program_status(task.status),
+                summary=" ".join(task.summary.split()) if task.summary else "",
+                owner="program",
+            )
+        )
+    return packages
+
+
+def _lifecycle_milestone(state: LifecycleState | None) -> str:
+    if state is None:
+        return ""
+    return _LIFECYCLE_MILESTONE_BY_STAGE.get(state.stage, "")
+
+
+def _program_milestone(state: Program | None) -> str:
+    stage = _current_program_stage(state)
+    return stable_milestone_id_for_stage(stage) if stage is not None else ""
+
+
+def _agency_milestone(state: AgencyState) -> str:
+    if not state.active:
+        return ""
+    milestone = " ".join(state.current_milestone.split())
+    phase = " ".join(state.current_phase.split())
+    token = milestone or phase or "discovery"
+    from .delivery_state import stable_milestone_id
+
+    return stable_milestone_id(token)
+
+
+def _read_raw_mode_token(repo: Path) -> str:
+    path = mode_state_path(repo)
+    if not path.exists():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    raw = payload.get("mode")
+    return raw if isinstance(raw, str) else ""
+
+
+def _normalize_mode_note(raw_mode_token: str) -> tuple[str, str]:
+    token = " ".join(raw_mode_token.split()).lower()
+    if not token:
+        return "", ""
+    policy = _MODE_POLICY_BY_TOKEN.get(token, "")
+    if token in {"guided", "direct", "async"}:
+        return (
+            f"mode repair: legacy mode token {token!r} treated as execution_policy {policy!r}",
+            policy,
+        )
+    if token not in {"conductor", "orchestrator"}:
+        return (f"mode drift: stale mode token {token!r} ignored", "")
+    return "", policy
+
+
+def _lifecycle_host(host: str | HostKind | None) -> str | HostKind:
+    """Lifecycle-local host resolution contract.
+
+    This module preserves the historical behavior documented in its own
+    preamble helpers: explicit ``host`` wins, then ``RENMARK_HOST``, and with
+    neither set it defaults to Claude-compatible capabilities. That keeps the
+    lifecycle/preamble contract stable even when the surrounding process is a
+    Codex-hosted test runner.
+    """
+    if host is not None:
+        return host
+    raw = os.getenv("RENMARK_HOST")
+    if raw and raw.strip():
+        return raw
+    return "claude"
 
 
 # ── Internal ──────────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ from ..providers.codex import codex_available as codex_available
 from ..state import (
     PauseState,
     clear_pause,
+    clear_pipeline_state,
     completed_task_indices,
     new_run_id,
     now_iso,
@@ -27,6 +28,7 @@ from ..state import (
     usage_this_month,
     usage_today,
     write_pause,
+    write_pipeline_state,
 )
 from ._codex_runner import (
     _classify_and_rollback as _classify_and_rollback,
@@ -402,6 +404,7 @@ def _handle_run_exit(
     run_id: str,
     plan_path: str,
     repo: Path,
+    tasks: list[Task],
 ) -> int:
     """Resolve the final exit code and write pause state if needed.
 
@@ -425,6 +428,7 @@ def _handle_run_exit(
                 ts=now_iso(),
             ),
         )
+        write_pipeline_state(repo, current_phase="paused")
         _print(
             f"PAUSED ({reason}): {budget_kind} gate tripped with "
             f"{len(skipped)} task(s) unrun {sorted(skipped)}.\n"
@@ -434,10 +438,27 @@ def _handle_run_exit(
 
     if failed_task is None and not needs_agent:
         _git_tag(repo, f"renmark-run-{run_id}-end")
+        _complete_clean_run(repo, run_id, plan_path, tasks)
+        clear_pipeline_state(repo)
         clear_pause(repo)
         _print("All tasks completed.")
         return 0
     if failed_task is None and needs_agent:
+        # A host-agent task has not run in this process, so this is a handoff
+        # rather than a clean completion.  Keep both durable resume pointers
+        # for the orchestrate skill that will dispatch it.
+        first_needed = min(needs_agent)
+        write_pause(
+            repo,
+            PauseState(
+                run_id=run_id,
+                plan_path=str(plan_path),
+                last_task_index=first_needed,
+                reason="needs_agent",
+                ts=now_iso(),
+            ),
+        )
+        write_pipeline_state(repo, current_phase="paused")
         _print(
             f"Note: tasks {sorted(needs_agent)} need Claude (opus/sonnet) dispatch "
             f"via the /renmark:orchestrate skill's Agent-tool path. "
@@ -460,12 +481,70 @@ def _handle_run_exit(
             ts=now_iso(),
         ),
     )
+    write_pipeline_state(repo, current_phase="paused", add_failed_task=failed_task.index)
     _print(
         f"PAUSED at task {failed_task.index} ({failure_kind}). "
         f"Artifacts: .renmark/state/escalations/task-{failed_task.index}/\n"
         f"Resume with: renmark-execute --resume {plan_path}"
     )
     return 10
+
+
+def _begin_run_state(
+    repo: Path,
+    plan_path: str,
+    waves: list[list[Task]],
+    run_id: str,
+) -> None:
+    """Persist a fresh, resumable runtime anchor before any task dispatch."""
+    from .. import delivery_state as _delivery
+
+    write_pipeline_state(
+        repo,
+        current_phase="orchestrate",
+        current_plan=str(plan_path),
+        wave_index=0,
+        wave_total=len(waves),
+        clear_tasks=True,
+    )
+    delivery = _delivery.read_delivery_state(repo)
+    delivery.run_id = run_id
+    delivery.loop_status = "in_progress"
+    # A new execution invalidates any independent review attached to an older
+    # run, even when that review had a clean/passed result.
+    delivery.review_status = "pending"
+    _delivery.write_delivery_state(repo, delivery)
+
+
+def _complete_clean_run(repo: Path, run_id: str, plan_path: str, tasks: list[Task]) -> None:
+    """Record the terminal workflow and delivery transitions for a clean run."""
+    from .. import delivery_state as _delivery
+    from .. import lifecycle as _lifecycle
+
+    delivery = _delivery.read_delivery_state(repo)
+    milestone_id = delivery.active_milestone_id or Path(plan_path).stem
+    delivery.run_id = run_id
+    # A clean executor run has completed its declared task verifiers, but has
+    # not performed an independent review of this run.
+    delivery.verification_status = "passed"
+    delivery.review_status = "pending"
+    delivery.loop_status = "passed"
+    for task in tasks:
+        delivery = _delivery.upsert_work_package(
+            delivery,
+            _delivery.WorkPackageSummary(
+                package_id=f"task-{task.index}",
+                milestone_id=milestone_id,
+                title=task.title,
+                status="passed",
+                summary="completed by renmark-execute",
+                owner="orchestrator",
+                updated_at=now_iso(),
+                artifact_ref=str(plan_path),
+            ),
+        )
+    _delivery.write_delivery_state(repo, delivery)
+    _lifecycle.write_lifecycle(repo, stage="created")
 
 
 def execute_plan(
@@ -512,10 +591,6 @@ def execute_plan(
     if dry_run:
         return _handle_dry_run(tasks, done, repo)
 
-    # Start anchor tag.
-    _git_tag(repo, f"renmark-run-{run_id}-start")
-    clear_pause(repo)
-
     deadline = time.monotonic() + (cfg.max_minutes_per_run * 60)
     tokens_used = 0
     passed: list[int] = []
@@ -534,6 +609,14 @@ def execute_plan(
     except ValueError as e:
         _print(f"ERROR: plan has invalid wave: {e}")
         return 2
+
+    # Persist the execution anchor only after the plan is fully validated, but
+    # before any tag, pause clearing, or task dispatch can make the run live.
+    _begin_run_state(repo, plan_path, waves, run_id)
+
+    # Start anchor tag.
+    _git_tag(repo, f"renmark-run-{run_id}-start")
+    clear_pause(repo)
 
     needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
 
@@ -648,12 +731,24 @@ def execute_plan(
             wave_result, runnable, tasks, repo, run_id, passed, needs_agent
         )
         tokens_used += tokens_delta
+        for task_index in passed:
+            write_pipeline_state(repo, add_completed_task=task_index)
+        if failed_task is not None:
+            write_pipeline_state(repo, add_failed_task=failed_task.index)
+        elif needs_agent:
+            # Do not advance past a host-agent handoff: pipeline_is_resumable
+            # requires this wave to remain pending, including when it is the
+            # final wave of the plan.
+            write_pipeline_state(repo, current_phase="paused", wave_index=wave_idx)
+            break
+        else:
+            write_pipeline_state(repo, wave_index=wave_idx + 1)
 
     # End-of-run summary.
     _print_run_summary(passed, failed_task, budget_kind, needs_agent, tasks, tokens_used, cfg, repo, skipped, waves)
 
     return _handle_run_exit(
-        failed_task, budget_kind, failure_kind, needs_agent, skipped, run_id, plan_path, repo
+        failed_task, budget_kind, failure_kind, needs_agent, skipped, run_id, plan_path, repo, tasks
     )
 
 
@@ -790,6 +885,53 @@ def _judge_est_cost() -> float:
     return JUDGE_EST_COST_USD
 
 
+_DELIVERY_STATE_MILESTONE_DISPLAY_LIMIT = 48
+
+
+def _bounded_delivery_state_display(value: object, limit: int) -> str:
+    """Bound a resume-facing value without changing its persisted identity."""
+    rendered = str(value)
+    if len(rendered) <= limit:
+        return rendered
+    return f"{rendered[: limit - 3]}..."
+
+
+def _delivery_state_line(repo: Path) -> str:
+    """Return a bounded read-only current-state summary for deterministic inspection."""
+    from ..delivery_state import read_delivery_state_with_report
+    from ..lifecycle import read_legacy_delivery_summary
+
+    state, report = read_delivery_state_with_report(repo)
+    drift_count: str | int = "n/a"
+
+    # If canonical delivery state is absent/corrupt, fall back to the existing
+    # legacy projection helper rather than inventing a second projection path.
+    if report.state != "loaded":
+        legacy = read_legacy_delivery_summary(repo)
+        state = legacy.canonical_delivery
+        drift_count = len(legacy.drift_repair_notes)
+        freshness = report.state
+    else:
+        legacy = read_legacy_delivery_summary(repo)
+        drift_count = len(legacy.drift_repair_notes)
+        freshness = "loaded"
+
+    milestone = _bounded_delivery_state_display(
+        state.active_milestone_id or "(none)",
+        _DELIVERY_STATE_MILESTONE_DISPLAY_LIMIT,
+    )
+    contract = state.contract_version or "(unknown)"
+    return (
+        "delivery_state "
+        f"delivery_mode={state.delivery_mode} "
+        f"execution_policy={state.execution_policy} "
+        f"active_milestone={milestone} "
+        f"contract_version={contract} "
+        f"freshness={freshness} "
+        f"drift_count={drift_count}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sub-command dispatch helpers — group the main() dispatch chain into logical
 # clusters. Each returns int (the exit code) when it handled the flag, or
@@ -801,6 +943,9 @@ def _dispatch_query_flags(
     args: argparse.Namespace, ap: argparse.ArgumentParser, repo: Path
 ) -> int | None:
     """Handle --usage/--analytics/--roadmap/--logs/--scan/--behavior/--task."""
+    if args.delivery_state:
+        print(_delivery_state_line(repo))
+        return 0
     if args.usage:
         return cmd_usage(repo)
     if args.analytics:
@@ -856,20 +1001,26 @@ def _dispatch_proactive_mode_flags(
         print(f"renmark: headless mode {state_str} ({repo}/.renmark/config.json)")
         return 0
     if args.set_mode is not None:
+        from .. import delivery_state as _delivery_state
         from .. import mode as _mode
 
-        mode_path = _mode.mode_state_path(repo)
+        mode_path = _mode.delivery_state_path(repo)
         try:
             _mode.set_mode(repo, args.set_mode)
         except ValueError as exc:
             ap.error(str(exc))
-        except OSError as exc:
+        except (OSError, _delivery_state.DeliveryStateBloatError) as exc:
             print(
                 f"renmark: failed to persist operating mode to {mode_path}: {exc}",
                 file=sys.stderr,
             )
             return 1
-        print(f"renmark: operating mode set to {args.set_mode} ({mode_path})")
+        state = _mode.read_delivery_state(repo)
+        policy = state.interaction_mode if state is not None else "unknown"
+        print(
+            f"renmark: delivery mode set to {args.set_mode} "
+            f"(execution policy: {policy}; {mode_path})"
+        )
         return 0
     return None
 
@@ -889,11 +1040,18 @@ def _dispatch_agency_flags(args: argparse.Namespace, repo: Path) -> int | None:
         return 0
     if args.activate_agency:
         from renmark import agency as _agency
+        from renmark import delivery_state as _delivery_state
+        from renmark import mode as _mode
 
         agency_path = _agency.agency_state_path(repo)
         try:
             _agency.activate(repo)
-        except (OSError, _agency.AgencyBloatError) as exc:
+            _mode.set_mode(repo, "agency")
+        except (
+            OSError,
+            _agency.AgencyBloatError,
+            _delivery_state.DeliveryStateBloatError,
+        ) as exc:
             print(
                 f"renmark: failed to activate Agency Mode at {agency_path}: {exc}",
                 file=sys.stderr,
@@ -903,11 +1061,18 @@ def _dispatch_agency_flags(args: argparse.Namespace, repo: Path) -> int | None:
         return 0
     if args.deactivate_agency:
         from renmark import agency as _agency
+        from renmark import delivery_state as _delivery_state
+        from renmark import mode as _mode
 
         agency_path = _agency.agency_state_path(repo)
         try:
             _agency.deactivate(repo)
-        except (OSError, _agency.AgencyBloatError) as exc:
+            _mode.set_mode(repo, "orchestrator")
+        except (
+            OSError,
+            _agency.AgencyBloatError,
+            _delivery_state.DeliveryStateBloatError,
+        ) as exc:
             print(
                 f"renmark: failed to deactivate Agency Mode at {agency_path}: {exc}",
                 file=sys.stderr,
@@ -925,13 +1090,16 @@ def _dispatch_mode_read_flags(
     if args.get_mode:
         from .. import mode as _mode
 
-        current = _mode.read_mode(repo)
-        print(current if current is not None else "unset")
+        state = _mode.read_delivery_state(repo)
+        if state is None:
+            print("unset")
+        else:
+            print(f"{state.delivery_mode} ({state.interaction_mode})")
         return 0
     if args.clear_mode:
         from .. import mode as _mode
 
-        mode_path = _mode.mode_state_path(repo)
+        mode_path = _mode.delivery_state_path(repo)
         try:
             _mode.clear_mode(repo)
         except OSError as exc:
@@ -940,7 +1108,7 @@ def _dispatch_mode_read_flags(
                 file=sys.stderr,
             )
             return 1
-        print(f"renmark: operating mode cleared ({mode_path})")
+        print(f"renmark: delivery mode cleared ({mode_path})")
         return 0
     return None
 
@@ -1056,6 +1224,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--resume", action="store_true", help="resume a paused run")
     ap.add_argument("--dry-run", action="store_true", help="parse plan, list tasks, exit")
     ap.add_argument("--usage", action="store_true", help="show usage and exit")
+    ap.add_argument(
+        "--delivery-state",
+        action="store_true",
+        help=(
+            "print a bounded read-only delivery-state summary "
+            "(delivery_mode, execution_policy, active milestone, contract/freshness, drift count)"
+        ),
+    )
     ap.add_argument("--analytics", action="store_true", help="show build-health analytics and exit")
     ap.add_argument(
         "--roadmap",
@@ -1154,26 +1330,26 @@ def main(argv: list[str] | None = None) -> int:
             "'false' = restore interactive behavior). Default: false."
         ),
     )
-    # P8 harness — persisted operating-mode (conductor|orchestrator)
+    # Persisted public delivery mode (agency|orchestrator).
     ap.add_argument(
         "--set-mode",
-        choices=("conductor", "orchestrator"),
-        metavar="conductor|orchestrator",
+        choices=("agency", "orchestrator"),
+        metavar="agency|orchestrator",
         help=(
-            "persist the operating mode to .renmark/state/mode.json "
-            "('conductor' = high-touch interactive drive; "
-            "'orchestrator' = hands-off autonomous plan execution)."
+            "persist the delivery mode to .renmark/state/delivery.json "
+            "('agency' = owner-facing milestone delivery; "
+            "'orchestrator' = bounded work-package execution)."
         ),
     )
     ap.add_argument(
         "--get-mode",
         action="store_true",
-        help="print the persisted operating mode (or 'unset' if none), then exit",
+        help="print the persisted delivery mode and execution policy, then exit",
     )
     ap.add_argument(
         "--clear-mode",
         action="store_true",
-        help="clear the persisted operating mode from .renmark/state/mode.json, then exit",
+        help="clear canonical and legacy delivery-mode state, then exit",
     )
     # Context hygiene gates
     ap.add_argument(
@@ -1263,7 +1439,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.plan:
         ap.error(
-            "plan path is required unless --usage / --analytics / --roadmap / --logs / "
+            "plan path is required unless --usage / --delivery-state / --analytics / --roadmap / --logs / "
             "--scan / --heartbeat / --heartbeat-check-cron / --behavior / --task / --task-brief / --review-package / "
             "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode"
         )

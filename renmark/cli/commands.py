@@ -8,9 +8,219 @@ orchestrator's shared git globals, so they live apart from the execution engine.
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from ..state import handoffs_dir, now_iso, read_usage
+
+_MAX_REVIEW_FINDINGS = 5
+_MAX_FINDING_SUMMARY_CHARS = 240
+_BLOCKING_SEVERITIES = frozenset({"critical", "major"})
+_DANGEROUS_SEVERITIES = frozenset({"critical"})
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewFindingSummary:
+    """A bounded, metadata-only review finding safe for hand-off state.
+
+    The full review body remains in its review artifact.  This shape deliberately
+    excludes evidence, diffs, prompts, and proposed code so callers can persist
+    it or pass it between review phases without leaking raw review text.
+    """
+
+    finding_id: str
+    severity: str
+    target: str
+    summary: str
+    blocks_signoff: bool
+    dangerous: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "finding_id": self.finding_id,
+            "severity": self.severity,
+            "target": self.target,
+            "summary": self.summary,
+            "blocks_signoff": self.blocks_signoff,
+            "dangerous": self.dangerous,
+        }
+
+
+def bounded_review_findings(
+    findings: Iterable[object], *, limit: int = _MAX_REVIEW_FINDINGS
+) -> tuple[ReviewFindingSummary, ...]:
+    """Normalize at most *limit* structured finding summaries.
+
+    Input is intentionally structured rather than a review-report body.  Invalid
+    entries are ignored, unrecognised severities degrade to ``unknown``, and the
+    only prose field is whitespace-normalized and capped.  Critical (or explicitly
+    dangerous) findings are never made eligible for automatic repair.
+    """
+    if limit < 1:
+        return ()
+    limit = min(limit, _MAX_REVIEW_FINDINGS)
+
+    normalized: list[ReviewFindingSummary] = []
+    for index, finding in enumerate(findings, start=1):
+        if len(normalized) >= limit:
+            break
+        if not isinstance(finding, Mapping):
+            continue
+        severity = _review_text(finding.get("severity")).casefold()
+        if severity not in {"critical", "major", "minor", "nit"}:
+            severity = "unknown"
+        finding_id = _review_identifier(finding.get("finding_id") or finding.get("id"), index)
+        target = _review_text(finding.get("target") or finding.get("file"), maximum=160)
+        summary = _review_text(
+            finding.get("summary") or finding.get("description") or finding.get("title"),
+            maximum=_MAX_FINDING_SUMMARY_CHARS,
+        )
+        if not summary:
+            continue
+        dangerous = _review_truthy(finding.get("dangerous")) or severity in _DANGEROUS_SEVERITIES
+        normalized.append(
+            ReviewFindingSummary(
+                finding_id=finding_id,
+                severity=severity,
+                target=target or "(unspecified)",
+                summary=summary,
+                blocks_signoff=severity in _BLOCKING_SEVERITIES,
+                dangerous=dangerous,
+            )
+        )
+    return tuple(normalized)
+
+
+def build_review_fix_selector(
+    findings: Iterable[Mapping[str, object]] | Iterable[ReviewFindingSummary],
+    *,
+    host: str | None = None,
+    tool_available: bool | None = None,
+) -> dict[str, Any]:
+    """Render the review/fix/re-review choice through the semantic contract.
+
+    Selecting ``fix`` only authorizes creation of a scoped *package reference*;
+    it does not edit files.  A dangerous finding recommends cancellation instead,
+    leaving any exceptional repair behind an explicit human approval boundary.
+    """
+    from ..interaction import Choice, build_selector
+
+    summaries = _coerce_review_summaries(findings)
+    dangerous = any(_is_dangerous_review_severity(item.severity) for item in summaries)
+    blocking = sum(item.blocks_signoff for item in summaries)
+    if not summaries:
+        choices: tuple[Choice, ...] = (
+            Choice("rereview", "Re-review", "Record a clean re-review result.", recommended=True),
+            Choice("cancel", "Cancel", "Stop without changing review state."),
+        )
+        question = "No bounded findings were supplied. Record a clean re-review?"
+    elif dangerous:
+        choices = (
+            Choice("cancel", "Cancel", "Keep dangerous findings for explicit human approval.", recommended=True),
+            Choice("fix", "Create scoped fix package", "Create a pointer-only package; do not edit files."),
+            Choice("rereview", "Re-review", "Run a fresh independent review after an external fix."),
+        )
+        question = "Dangerous review findings require approval. What should happen next?"
+    else:
+        choices = (
+            Choice(
+                "fix",
+                "Create scoped fix package",
+                "Create a pointer-only package; do not edit files.",
+                recommended=True,
+            ),
+            Choice("rereview", "Re-review", "Run a fresh independent review without a fix package."),
+            Choice("cancel", "Cancel", "Stop without changing review state."),
+        )
+        question = f"{blocking} signoff-blocking finding(s) need a scoped decision."
+    return build_selector(
+        question,
+        choices,
+        decision_id="review_fix_rereview",
+        header="Review action",
+        host=host,
+        tool_available=tool_available,
+        dangerous=dangerous,
+    )
+
+
+def write_scoped_fix_package(
+    review_package_ref: str | Path,
+    findings: Iterable[Mapping[str, object]] | Iterable[ReviewFindingSummary],
+    *,
+    repo: Path,
+) -> Path | None:
+    """Write a deterministic pointer-only fix package, or ``None`` if unsafe.
+
+    The package contains only the review-package reference and capped structured
+    summaries.  It never reads the review artifact, writes canonical decision
+    state, or performs a fix.  Critical/explicitly dangerous findings return
+    ``None`` so a caller cannot turn them into an automatic repair path.
+    """
+    summaries = _coerce_review_summaries(findings)
+    if not summaries or any(
+        item.dangerous or _review_text(item.severity).casefold() in _DANGEROUS_SEVERITIES
+        for item in summaries
+    ):
+        return None
+
+    reference = str(review_package_ref).strip()
+    if not reference:
+        return None
+    reference_path = Path(reference)
+    if reference_path.is_absolute():
+        try:
+            reference = str(reference_path.resolve().relative_to(repo.resolve()))
+        except ValueError:
+            return None
+
+    safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(reference).stem).strip(".-") or "review"
+    out_path = handoffs_dir(repo) / f"fix-{safe_stem}.pkg.json"
+    payload = {
+        "artifact_type": "scoped_fix_package",
+        "schema_version": 1,
+        "review_package_ref": reference,
+        "finding_count": len(summaries),
+        "findings": [item.as_dict() for item in summaries],
+        "auto_fix": False,
+        "requires_fresh_verification": True,
+        "requires_rereview": True,
+    }
+    out_path.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    return out_path
+
+
+def _coerce_review_summaries(
+    findings: Iterable[Mapping[str, object]] | Iterable[ReviewFindingSummary],
+) -> tuple[ReviewFindingSummary, ...]:
+    raw = tuple(findings)
+    if all(isinstance(item, ReviewFindingSummary) for item in raw):
+        return tuple(
+            item for item in raw[:_MAX_REVIEW_FINDINGS] if isinstance(item, ReviewFindingSummary)
+        )
+    return bounded_review_findings(item for item in raw if isinstance(item, Mapping))
+
+
+def _review_text(value: object, *, maximum: int = _MAX_FINDING_SUMMARY_CHARS) -> str:
+    text = " ".join(str(value or "").split())
+    return text[:maximum].rstrip()
+
+
+def _review_identifier(value: object, index: int) -> str:
+    text = re.sub(r"[^A-Za-z0-9._-]+", "-", _review_text(value, maximum=80)).strip(".-")
+    return text or f"finding-{index}"
+
+
+def _is_dangerous_review_severity(severity: object) -> bool:
+    """Return whether a severity is contractually unsafe for automatic repair."""
+    return _review_text(severity).casefold() in _DANGEROUS_SEVERITIES
+
+
+def _review_truthy(value: object) -> bool:
+    return value is True or (isinstance(value, str) and value.strip().casefold() in {"1", "true", "yes"})
 
 
 def cmd_usage(repo: Path) -> int:

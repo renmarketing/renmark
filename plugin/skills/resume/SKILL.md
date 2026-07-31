@@ -30,7 +30,17 @@ Cost: **one file read, zero LLM calls.** Output: a single-line recommendation (�
 
 Call `lifecycle.skill_preamble(repo, 'resume')`. Resume is a `meta` domain skill — it rarely triggers a cross-domain prompt because it touches no work. If it does return a hint, ignore: resume is cheap and should always run.
 
-### 1. Read lifecycle state
+### 1. Read canonical delivery state, then lifecycle state
+
+Read `.renmark/state/delivery.json` through
+`renmark.delivery_state.read_delivery_state_with_report` before any workflow
+ledger. A loaded canonical choice is authoritative and resume must **never
+re-ask** it. Legacy `mode.json` Conductor maps to
+Orchestrator with `execution_policy=guided`; legacy `agency.json` may enrich an
+Agency milestone summary but is not an independent public mode source. Only a
+genuinely unresolved pending decision is re-rendered using the current host
+surface; never persist selector/page state. Then cross-check lifecycle,
+pipeline/work-package IDs, and git evidence—never resume by index alone.
 
 ```bash
 python3 -c "
@@ -207,9 +217,12 @@ If `read_program` returns `None` or all stages are done, this step prints
 nothing. The existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward)
 is **unchanged** — this is an additive surfacing branch only.
 
-## When Agency Mode is active
+## When canonical DeliveryState is Agency
 
-In Agency Mode, resume reads `.renmark/state/agency.json` (via `renmark.agency.read_agency`) to locate the last MILESTONE checkpoint. Summarize where the workflow left off — which milestone was last reached, what triggered the checkpoint, any pending decision — and recommend continuing WITHOUT re-discovery of prior work. Still zero LLM calls; pure file IO. For the full Agency Mode contract and delivery mode semantics, see `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`. This recovery path is **additive** — the existing lifecycle-based resume (Steps 1–1.75 and Step 2 onward) remains unchanged for non-Agency workflows.
+Use canonical delivery/work-package state to locate the last milestone
+checkpoint. Legacy `agency.json` may supply phase detail only. Summarize the
+boundary and pending decision without rediscovery or another mode gate; approved
+execution resumes through Orchestrator.
 
 ### 2. Surface pending approval gates
 
