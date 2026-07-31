@@ -5,6 +5,23 @@ description: "Use for the Ship / Readiness pipeline (/renmark:finish) when imple
 
 # finish
 
+## M6 milestone close-out evidence
+
+Mark M6 clean only after a fresh, deterministic verification and independent
+review both pass for the final working-tree SHA. Record the command, exit status,
+SHA, and review-artifact path as the release-readiness evidence; do not treat a
+prior green run or status prose as proof. For renmark M6, run the applicable
+deterministic gates (`pytest -q`, `ruff check`, `mypy .`, and
+`renmark-execute --behavior`) plus the milestone acceptance verifier. A failed,
+missing, or stale result stops finish and routes to `/renmark:debug`.
+
+**Owner approval is a separate final gate.** Even with clean M6 evidence, obtain
+explicit owner approval before merge, tag, release, package/snapshot, or
+self-update. Approval of one operation does not authorize another; in
+particular, a merge approval does not authorize tagging, packaging, publishing,
+or installing the update. Persist the pending/cleared owner gate in lifecycle
+state and stop when approval is absent.
+
 ## Overview
 
 The **Ship / Readiness pipeline**: re-verify everything still passes (route failures to `/renmark:debug`) → show what was built → select a finish lane → offer the next action (PR / merge / release / nothing). Merge and release are Pause-Policy gates and never auto-proceed.
