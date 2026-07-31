@@ -35,6 +35,7 @@ from renmark.agency import (
     activate,
     agency_state_path,
     agency_to_delivery_state,
+    approve_milestone_for_orchestrator,
     current_agency_to_delivery_state,
     deactivate,
     is_active,
@@ -99,6 +100,81 @@ def test_activate_and_deactivate_toggle_active_flag_correctly(tmp_path: Path) ->
     assert deactivated.current_milestone == "M2"
     assert read_agency(tmp_path) == deactivated
     assert is_active(tmp_path) is False
+
+
+def test_approved_activation_hands_off_milestone_to_orchestrator(tmp_path: Path) -> None:
+    """Approved Agency activation persists the canonical delivery handoff."""
+    from renmark import delivery_state, lifecycle
+
+    activate(
+        tmp_path,
+        current_phase="build",
+        current_milestone="M6",
+        signoff_status="approved",
+    )
+
+    persisted = delivery_state.read_delivery_state(tmp_path)
+    assert persisted.delivery_mode == "agency"
+    assert persisted.execution_policy == "guided"
+    assert persisted.active_milestone_id == "m6"
+    assert persisted.milestone_execution == "orchestrator"
+    assert persisted.approval_status == "approved"
+    assert persisted.review_status == "unknown"
+    assert persisted.loop_status == "in_progress"
+
+    lifecycle.read_legacy_delivery_summary(tmp_path)
+
+    assert delivery_state.read_delivery_state(tmp_path) == persisted
+
+
+def test_approved_handoff_preserves_existing_delivery_aggregate(tmp_path: Path) -> None:
+    """Agency approval retains delivery evidence and history already on disk."""
+    from renmark.delivery_state import (
+        DeliveryProvenanceEvent,
+        DeliveryState,
+        WorkPackageSummary,
+        read_delivery_state,
+        write_delivery_state,
+    )
+
+    existing = DeliveryState(
+        run_id="delivery-0123456789ab",
+        work_packages=[WorkPackageSummary(package_id="wp1", milestone_id="m5", title="Existing")],
+        review_status="passed",
+        verification_status="passed",
+        source_sha="a" * 40,
+        provenance_events=[DeliveryProvenanceEvent(kind="existing", detail="keep")],
+        legacy_refs=["legacy:keep"],
+    )
+    write_delivery_state(tmp_path, existing)
+
+    activate(
+        tmp_path,
+        current_phase="build",
+        current_milestone="M6",
+        signoff_status="approved",
+    )
+
+    persisted = read_delivery_state(tmp_path)
+    assert persisted.run_id == "delivery-0123456789ab"
+    assert persisted.work_packages == existing.work_packages
+    assert persisted.review_status == "passed"
+    assert persisted.verification_status == "passed"
+    assert persisted.source_sha == "a" * 40
+    assert persisted.legacy_refs == ["legacy:keep"]
+    assert persisted.provenance_events[0] == existing.provenance_events[0]
+    assert persisted.provenance_events[-1].kind == "agency-approved-handoff"
+
+
+def test_handoff_rejects_inactive_and_unapproved_agency_state(tmp_path: Path) -> None:
+    """Only an active, explicitly approved Agency milestone may be delegated."""
+    with pytest.raises(ValueError, match="active Agency milestone"):
+        approve_milestone_for_orchestrator(tmp_path)
+
+    activate(tmp_path, current_milestone="M6", signoff_status="pending")
+
+    with pytest.raises(ValueError, match="owner approval"):
+        approve_milestone_for_orchestrator(tmp_path)
 
 
 def test_is_active_reflects_persisted_state(tmp_path: Path) -> None:

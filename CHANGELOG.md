@@ -3798,6 +3798,16 @@ Not yet wired (still Phase 1):
 
 The skills are visible and `/renmark:brainstorm` + `/renmark:plan` are workable today (they're Opus-driven conversations). `/renmark:orchestrate` runs the same single-task path the v0.0.1 baseline supports.
 
+## [2026-07-31] — Persist approved Agency handoff
+
+**Request:** Repair the canonical Agency approval-to-Orchestrator lifecycle handoff.
+**Built:** Explicit approved Agency activation now persists the preserving delivery handoff; regression coverage protects gate separation and reader purity.
+**Files changed:**
+- `renmark/agency.py` — persist the approved Agency handoff without overwriting delivery state.
+- `tests/test_agency.py` — cover persistence, preservation, rejection, and read-only summaries.
+**Do not change:**
+- Compatibility projections and lifecycle summaries remain read-only; owner approval does not complete independent review.
+
 ## v0.0.1 — 2026-05-12 (Phase 0)
 
 **Bootstrap of the new `ai-system` repo.** Copies the working v0.2.0 baseline from `/home/renmark/projects/ai-inference/` and retargets the Python package from `nim_execute` to `renmark`.

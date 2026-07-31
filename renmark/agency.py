@@ -33,6 +33,9 @@ from renmark.delivery_state import (
     WorkPackageSummary,
     append_provenance_event,
     default_delivery_state,
+    read_delivery_state,
+    update_active_milestone,
+    write_delivery_state,
 )
 
 # ── Budget / error ────────────────────────────────────────────────────────────
@@ -210,6 +213,8 @@ def activate(repo: str | Path, **fields: str) -> AgencyState:
         if key in _string_fields:
             setattr(state, key, value)
     write_agency(repo, state)
+    if _map_status(fields.get("signoff_status", "")) == "approved":
+        approve_milestone_for_orchestrator(repo)
     return state
 
 
@@ -223,6 +228,47 @@ def deactivate(repo: str | Path) -> AgencyState:
     state.active = False
     write_agency(repo, state)
     return state
+
+
+def approve_milestone_for_orchestrator(repo: str | Path) -> DeliveryState:
+    """Persist an owner-approved Agency milestone for Orchestrator execution.
+
+    Agency remains the owner-facing discovery and approval surface.  Once its
+    persisted signoff is explicitly ``approved``, this transition writes the
+    canonical delivery aggregate whose fixed ``milestone_execution`` contract
+    assigns the selected milestone to Orchestrator.  It never fabricates an
+    approval: inactive Agency state, or any status other than ``approved``, is
+    rejected before the delivery state is written.
+    """
+    state = read_agency(repo)
+    if not state.active:
+        raise ValueError("an active Agency milestone is required before handoff")
+    if _map_status(state.signoff_status) != "approved":
+        raise ValueError("owner approval is required before Orchestrator handoff")
+
+    milestone = _clean_text(state.current_milestone) or _clean_text(state.current_phase)
+    if not milestone:
+        raise ValueError("an Agency milestone is required before Orchestrator handoff")
+
+    # Preserve the active aggregate so an Agency approval does not discard the
+    # run, work-package, verification, review, or provenance state already
+    # produced for this delivery boundary.
+    delivery = read_delivery_state(repo)
+    delivery.delivery_mode = "agency"
+    delivery.execution_policy = "guided"
+    delivery.approval_status = "approved"
+    delivery.loop_status = "in_progress"
+    delivery = update_active_milestone(delivery, milestone)
+    delivery = append_provenance_event(
+        delivery,
+        ts="",
+        kind="agency-approved-handoff",
+        detail="owner-approved milestone delegated to Orchestrator",
+        source="agency",
+        ref="agency.json",
+    )
+    write_delivery_state(repo, delivery)
+    return read_delivery_state(repo)
 
 
 def project_agency_state(state: AgencyState) -> DeliveryState:
