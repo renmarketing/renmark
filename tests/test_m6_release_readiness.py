@@ -8,7 +8,6 @@ from pathlib import Path
 
 from renmark.release import release_readiness_report
 
-
 VERSION = "6.0.0"
 
 

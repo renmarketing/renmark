@@ -69,7 +69,7 @@ import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 # The live-model injection point, identical in shape to renmark.judge's runner:
 # a fully-composed prompt string in, the raw model response string out. Used
@@ -705,9 +705,9 @@ def _continuation_choice_id(result: object) -> str | None:
 
 def _selector_trajectory_payload(repo: Path, case: Case) -> dict[str, object]:
     """Return the bounded cross-host selector trajectory contract as data."""
-    from .interaction import build_selector, continue_selector
+    from .interaction import Choice, build_selector, continue_selector
 
-    choices = _selector_choices()
+    choices = cast(tuple[Choice, ...], _selector_choices())
     claude = build_selector(case.prompt, choices, host="claude")
     claude_page2 = build_selector(case.prompt, choices, host="claude", page=1)
     codex_plan = build_selector(
@@ -752,8 +752,9 @@ def _selector_trajectory_payload(repo: Path, case: Case) -> dict[str, object]:
     codex_default_recommended = continue_selector(codex_default, "1")
     codex_default_cancel = continue_selector(codex_default, "No")
     codex_default_invalid = continue_selector(codex_default, "explain this first")
-    recommended_choice_id = claude_semantic["choices"][0]["code"]  # type: ignore[index]
-    refusal_choice_id = claude_semantic["choices"][-1]["code"]  # type: ignore[index]
+    semantic_choices = cast(list[dict[str, str]], claude_semantic["choices"])
+    recommended_choice_id = semantic_choices[0]["code"]
+    refusal_choice_id = semantic_choices[-1]["code"]
 
     return {
         "claude": claude,
@@ -761,7 +762,7 @@ def _selector_trajectory_payload(repo: Path, case: Case) -> dict[str, object]:
         "codex_default": codex_default,
         "semantic_choice_ids": [
             choice["choice_id"]
-            for choice in claude_semantic["choices"]  # type: ignore[index]
+            for choice in semantic_choices
         ],
         "semantic_equivalent": (
             claude_semantic == codex_plan_semantic == codex_default_semantic
