@@ -62,9 +62,12 @@ human-review gate. Passing tests alone never clear an owner gate. See
 ## Decision presentation
 
 When the active host supports a native picker, present selector-capable
-decisions with that picker. Otherwise present the same choices as a numbered
-fallback, with the recommended safe option first; do not make the fallback a
-different decision or an automatic approval. See `interaction-contract.md`.
+decisions with that picker. In an interactive Claude Code main session, invoke
+`AskUserQuestion` with a real `options` array; never replace a decision with
+ordinary prose or a typed-only list. Otherwise present the same choices as a
+numbered fallback, with the recommended safe option first; do not make the
+fallback a different decision or an automatic approval. See
+`interaction-contract.md`.
 <!-- END:project-delivery-contract -->
 <!-- BEGIN:parallelism-rule -->
 ## Parallelize large plans

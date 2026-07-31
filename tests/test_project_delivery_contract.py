@@ -71,3 +71,6 @@ def test_contract_describes_equivalent_host_fallback_without_host_specific_words
     assert "numbered fallback" in text
     assert "recommended safe option first" in text
     assert "different decision or an automatic approval" in text
+    assert "interactive claude code main session" in text
+    assert "askuserquestion" in text
+    assert "real `options` array" in text

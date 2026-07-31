@@ -160,6 +160,9 @@ def test_root_templates_and_installed_templates_share_the_canonical_contract_and
         "numbered fallback",
         "recommended safe option first",
         "different decision or an automatic approval",
+        "interactive claude code main session",
+        "askuserquestion",
+        "real `options` array",
     ):
         assert phrase in canonical
 

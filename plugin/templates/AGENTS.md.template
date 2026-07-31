@@ -49,9 +49,12 @@ human-review gate. Passing tests alone never clear an owner gate. See
 ## Decision presentation
 
 When the active host supports a native picker, present selector-capable
-decisions with that picker. Otherwise present the same choices as a numbered
-fallback, with the recommended safe option first; do not make the fallback a
-different decision or an automatic approval. See `interaction-contract.md`.
+decisions with that picker. In an interactive Claude Code main session, invoke
+`AskUserQuestion` with a real `options` array; never replace a decision with
+ordinary prose or a typed-only list. Otherwise present the same choices as a
+numbered fallback, with the recommended safe option first; do not make the
+fallback a different decision or an automatic approval. See
+`interaction-contract.md`.
 <!-- END:project-delivery-contract -->
 
 **Keep replies short and plain.** After a command or tool step, give a one- or two-sentence status — what changed, whether it passed, the next gate — not a recap. No essays, pasted code/diffs, or internal chatter about which model ran or how the pipeline works, unless the user asks. Ask tight, single-purpose questions, one at a time. Continue the pipeline automatically and stop only at a real gate (Pause Policy in `plugin/skills/.shared/handoff-menu.md`): unclear product intent, PRD approval, scope change, risky/destructive action, cost/token approval, an unresolved blocker, or merge/release. Governs the prose the user reads; does NOT relax the bounded-summary, context-hygiene, or task-isolation rules. See `CLAUDE.md` § `response-style-rule`.
