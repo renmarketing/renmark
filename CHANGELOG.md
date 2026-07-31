@@ -3763,6 +3763,16 @@ The eight `.renmark/memory/` files now have proper documentation-grade templates
 - Additional native providers (Ollama, OpenRouter, OpenAI-compat) — Phase 4
 - ~~LiteLLM plug-in slot — Phase 5~~ (dropped — native providers cover the realistic use cases) (optional)
 
+## [2026-07-31] — Add cross-host selector loop trajectory coverage
+
+**Request:** Add deterministic selector/loop/resume cross-host trajectory coverage for Claude native, Codex Plan, and Codex Default outcomes, including persisted bounded loop rereads.
+**Built:** Extended `renmark/behavior.py` to emit dynamic semantic parity, continuation, cancel, overflow, and persisted loop reread proof fields; tightened the related selector behavioral fixture to assert those live outcomes.
+**Files changed:**
+- `renmark/behavior.py` — add explicit cross-host semantic parity and persisted loop reread payload fields.
+- `tests/behavioral/selector_codex.behavior.json` — assert the new dynamic selector and loop/resume proof fields.
+**Do not change:**
+- Codex still does not claim native clickable selectors; the proof must continue to come from live selector/continuation behavior and persisted loop rereads, not static metadata alone.
+
 ## v0.0.3 — 2026-05-12 (Phase 1, +memory + help)
 
 **Persistent memory module + `/renmark:help` skill.**
