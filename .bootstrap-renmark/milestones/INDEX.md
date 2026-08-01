@@ -17,13 +17,13 @@ Per addendum-03: "Phases remain sequencing and dependency containers... A Phase 
 
 | Release | Title | Type | Gates | Lifecycle status |
 |---|---|---|---|---|
-| **R-0.0** | Baseline and PRD Reconciliation | internal-enablement | gates R-0.0 → R-0.1 (R-0.1 cannot start until R-0.0 reaches RELEASED+) | **READY** (Owner-approved 2026-08-01, subject to corrections now applied). **Only WP-1 (PRD addendum) is authorized to start.** WP-2 (ADR-001), WP-3 (benchmark definitions), WP-4 (telemetry coverage analysis), WP-5 (baseline execution) each remain individually gated — see `R-0.0/contract.yaml` work_packages[].status. Instrumentation path resolved (staged hybrid, read-only-first). Benchmark budget corrected: 20 invocations / 460k tokens / 80 min aggregate, one pass per scenario, no dollar estimates. |
+| **R-0.0** | Baseline and PRD Reconciliation | internal-enablement | gates R-0.0 → R-0.1 (R-0.1 cannot start until R-0.0 reaches RELEASED+) | **RELEASED** (2026-08-01, v0.39.3, tag `v0.39.3`). All 5 work packages complete. Acceptance review executed against `internal-acceptance-scenario.md`: **ACCEPTED WITH FOLLOW-UP** (F1: Scenario B/C baseline numbers not representative, re-run corrected versions before citing; F2: R-0.1's contract must cite the Scenario C unauthorized-delete finding as founding evidence). See `R-0.0/closeout.md`. `gates_release: R-0.1` is now unlocked. |
 
-## Phase 1 + Phase 2 (blocking subset) — proposed, not yet drafted as a release contract
+## Phase 1 + Phase 2 (blocking subset) — contract drafted, pending Owner approval
 
 | Release | Title | Type | Built from | Lifecycle status |
 |---|---|---|---|---|
-| R-0.1 | Bounded Small-Task Fast Path | feature | Phase 1 + blocking subset of Phase 2 | PLANNED (working title only — gated behind R-0.0, contract not yet drafted) |
+| R-0.1 | Bounded Small-Task Fast Path | feature | Phase 1 + blocking subset of Phase 2 | **PLANNED — contract drafted** (2026-08-01, `R-0.1/contract.yaml`). Gate satisfied (R-0.0 is RELEASED) but Owner approval of the contract itself is a separate, explicit step per instruction: "do not begin R-0.1 implementation until I approve its contract." No work package may start and `allowed_paths` stays empty until approved. |
 | R-0.2 | Controlled Worker Execution | feature | remainder of Phase 2 | PLANNED (working title only, contract not yet drafted) |
 
 Phases 3–8 (minimal ledger, minimal Inspector, Planner altitude split, deterministic integration, WritingMate, advanced optimizations): no releases drafted yet. Per addendum-01 §9 / addendum-03: only one blocking release is actively worked at a time, and no future release is broken down until the preceding blocking release closes (reaches CLOSED on the 10-state lifecycle, not merely ENGINEERING VERIFIED).

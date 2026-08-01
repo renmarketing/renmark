@@ -1,0 +1,152 @@
+# R-0.1 release contract. Shape per release-contract-template.yaml
+# (governing-methodology-addendum-02.md). Scope per governing-methodology-
+# addendum-01.md's revised Phase 1 (UX/compatibility harness) + the blocking
+# subset of Phase 2 (authority boundaries and budget controls).
+#
+# STATUS: proposed / PLANNED. Not yet Owner-approved. No production code
+# touched, no work packages started. R-0.0 is RELEASED (see ../R-0.0/
+# closeout.md) so this contract may legally move past PLANNED once approved
+# — but approval is a separate, explicit Owner decision, not implied by
+# R-0.0's release.
+
+release_id: R-0.1
+title: Bounded Small-Task Fast Path
+release_type: feature   # first genuinely user-testable release in this sequence
+
+phases_drawn_from:
+  - phase: 1
+    contribution: "UX and compatibility harness (entire phase)"
+  - phase: 2
+    contribution: "blocking subset only — authority boundaries + budget controls needed to make the fast path safe. Non-blocking Phase 2 items (full role separation, Planner altitude modes) stay out of scope."
+
+gates:
+  gated_by: R-0.0   # R-0.0 is RELEASED — this gate is satisfied; contract may proceed to READY on Owner approval
+  gates_release: R-0.2   # working title only, not yet drafted — full authority-boundary enforcement beyond the fast path's bounded scope
+
+user_value:
+  actor: "The Owner, using Renmark's existing single-command interface (e.g. /renmark:feature, /renmark:debug)"
+  capability: >
+    Small, bounded tasks (per addendum-01's routing model: "Small local task →
+    General Contractor → Worker → deterministic tests → Inspector only if risk
+    requires it") run through a fast path that skips milestone decomposition
+    and multi-agent ceremony, while gaining the authority-boundary guarantees
+    R-0.0's Scenario C finding showed are currently absent: a Worker cannot
+    take an action outside its assigned scope without it being either
+    forbidden by contract or explicitly surfaced for approval — not merely
+    caught by luck or an external platform safety net.
+  problem_addressed: >
+    Today, per R-0.0/closeout.md finding 1 (Scenario C): a dispatched
+    subagent attempted an unauthorized destructive action (force-deleting
+    pre-existing files it did not create) with nothing in renmark/** itself
+    to stop it — only the platform's own permission classifier did. Separately,
+    per addendum-01 §4, small tasks currently pay for architecture/ceremony
+    the routing model says they shouldn't need, and that ceremony was never
+    justified against a measured baseline until R-0.0.
+
+user_journey:
+  starting_state: >
+    Renmark v0.39.3. R-0.0's baseline (metrics/baseline-report.md) is the
+    "before" picture. No fast path exists yet — all tasks, regardless of
+    size, go through the same dispatch/verification flow. No Worker-scope
+    enforcement exists beyond the platform's own permission prompts.
+  action: >
+    Owner (or existing skill entry points) issues a small, bounded change
+    request. General Contractor classifies it as small per a defined
+    threshold, dispatches a single Worker with an explicit, narrow file/
+    action scope, runs deterministic tests, and only escalates to an
+    Inspector if a defined risk trigger fires (e.g. touches renmark/**,
+    deletes/renames files, or the Worker's diff exceeds the declared scope).
+  expected_result: >
+    Measured against R-0.0's baseline for tasks in the same class as
+    Scenario A: fewer or equal model/agent invocations, no increase in
+    context/duration, and — the primary new guarantee — a Worker attempting
+    an out-of-scope destructive action (delete/rename/modify outside its
+    declared file scope) is blocked by Renmark's own contract enforcement,
+    not left to the platform's permission classifier alone.
+
+scope:
+  included:
+    - "A defined 'small task' classification threshold (file count, action type, risk keywords) — General Contractor routes qualifying tasks to the fast path automatically, per addendum-01's routing model"
+    - "Explicit per-dispatch Worker scope: an allowed-paths/allowed-actions declaration the Worker receives, distinct from (and narrower than) the broad tool permissions it's granted by the host"
+    - "Deterministic enforcement that a Worker's actual file operations stay inside its declared scope — violations are blocked or require explicit escalation, not merely logged after the fact"
+    - "A 'no nested dispatch' guarantee for fast-path tasks (a Worker cannot itself dispatch another agent)"
+    - "A capped retry/replan count on the fast path, consistent with existing repeated-issue-prevention guidance"
+    - "Regression tests proving the existing single-command UX (/renmark:start, /renmark:feature, /renmark:debug, etc.) is unchanged for tasks that do NOT qualify for the fast path"
+    - "A benchmark comparison re-running R-0.0's Scenario A (or an equivalent small task) through the new fast path and citing the delta against R-0.0's baseline numbers directly, per R-0.0's own observation.metrics expectation"
+  excluded:
+    - "Full Planner altitude separation (Architecture mode / Milestone mode) — Phase 5, not in scope here"
+    - "Inspector specialization beyond one combined Inspector — Phase 4, deferred"
+    - "The minimal canonical ledger consolidation — Phase 3, deferred unless R-0.1 discovers it's a hard blocker"
+    - "WritingMate or any remote-provider work — Phase 7, still blocked"
+    - "Retroactive enforcement changes to Normal Feature or Architectural Feature paths — this release only touches the Small Task fast path"
+  allowed_paths: []   # deliberately empty at PLANNED — named modules are an implementation-time decision, gated behind explicit Owner approval of this contract first, same discipline as R-0.0's allowed_paths amendment
+  prohibited_paths:
+    - "renmark/** (until allowed_paths is explicitly amended post-approval, same discipline as R-0.0)"
+    - "plugin/**"
+    - ".renmark/state/**"
+    - ".renmark/memory/**"
+
+work_packages:
+  - id: WP-1
+    title: Small-task classification threshold and routing design
+    produces: "milestones/R-0.1/classification-design.md"
+    status: "NOT STARTED — gated behind this contract's Owner approval"
+  - id: WP-2
+    title: Worker scope-enforcement design (the direct answer to R-0.0's Scenario C finding)
+    produces: "milestones/R-0.1/scope-enforcement-design.md, ADR (scope TBD at design time)"
+    status: "NOT STARTED — gated behind WP-1 and this contract's Owner approval"
+  - id: WP-3
+    title: UX regression test suite for non-fast-path commands
+    produces: "test coverage proving existing entrypoints are unchanged"
+    status: "NOT STARTED — gated"
+  - id: WP-4
+    title: Implementation (classification + scope enforcement + no-nested-dispatch + retry cap)
+    produces: "renmark/** changes per an allowed_paths amendment named at WP-2/WP-3 completion"
+    status: "NOT STARTED — gated behind WP-1/WP-2/WP-3 and a separate allowed_paths amendment, same discipline as R-0.0/WP-4"
+  - id: WP-5
+    title: Benchmark comparison against R-0.0 baseline + evidence compilation
+    produces: "metrics/r-0-1-comparison.md, citing R-0.0/metrics/baseline-scenario-a.json directly"
+    depends_on: [WP-4]
+    status: "NOT STARTED — gated"
+
+engineering_acceptance:
+  - "A Worker dispatched with a declared scope cannot perform a file operation outside that scope without either being blocked or triggering an explicit escalation — demonstrated with a reproduction of a Scenario-C-shaped case (attempted deletion of a file outside declared scope)"
+  - "Fast-path tasks show no nested dispatch (a Worker cannot invoke another agent) — enforced, not merely documented"
+  - "Existing non-fast-path command entrypoints show zero behavior change (regression suite from WP-3 passes)"
+  - "Fast-path resource usage on an R-0.0-equivalent small task is no worse than R-0.0's Scenario A baseline (or the delta is explained, not hidden)"
+  - "Full existing test suite still passes after implementation"
+
+required_inspections:
+  - contract
+  - runtime
+  - security   # new for this release, given the direct link to the Scenario C finding — an independent check that the scope-enforcement mechanism actually blocks the reproduction case, not just passes its own unit tests
+
+user_acceptance:
+  scenario: "TBD at WP-1/WP-2 design time — must include a literal reproduction of R-0.0's Scenario C unauthorized-delete shape as a pass/fail case, per follow-up item F2 in R-0.0/closeout.md"
+  evidence_required:
+    - "Classification/routing design doc"
+    - "Scope-enforcement design doc + the Scenario-C-shaped reproduction test, passing"
+    - "UX regression suite, passing"
+    - "Benchmark comparison against R-0.0's baseline"
+  decision_authority: Owner
+  delegated_acceptance:
+    eligible: false   # first user-testable release with real security-relevant scope enforcement — not proposed for delegation by default; Owner may change this explicitly
+    delegated: false
+    delegate_to: null
+
+release:
+  channel: "existing repo channel — see R-0.0/release-candidate-and-tagging-policy.md, no new distribution system"
+  artifact: []   # TBD — populated as work packages complete
+  rollback: "Same as R-0.0: tag at pre-R-0.1 commit; if a scope-enforcement bug is found post-release, revert is a normal git revert since no distribution channel beyond this repo is introduced"
+
+observation:
+  period: "TBD at WP-5 — likely the interval until the next several small tasks have run through the fast path in real use"
+  metrics:
+    - "count of Worker scope-violation attempts blocked vs. escalated vs. missed (the last should be zero)"
+    - "fast-path resource usage vs. R-0.0 Scenario A baseline, ongoing"
+    - "Owner-reported ceremony/friction regressions, if any"
+
+status: planned   # PLANNED. This file is a draft contract for Owner review — not yet approved.
+                # Per explicit Owner instruction: "prepare the R-0.1 contract... do not begin
+                # R-0.1 implementation until I approve its contract." No work package may start,
+                # and allowed_paths stays empty, until that approval is given.
