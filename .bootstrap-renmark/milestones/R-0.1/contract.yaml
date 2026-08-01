@@ -89,7 +89,19 @@ work_packages:
   - id: WP-1
     title: Small-task classification threshold and routing design
     produces: "milestones/R-0.1/classification-design.md"
-    status: "AUTHORIZED TO START — this contract approved as drafted 2026-08-01"
+    status: >
+      COMPLETE (2026-08-01) — classification-design.md drafted: 5 deterministic
+      signals (declared scope ≤2 named files, add/modify only, no renmark/**
+      or plugin/** target, no cross-file dependency via existing
+      dispatch.validate_wave check, single deterministic verifier), reusing
+      existing primitives (validate_wave, Task.complexity as an accelerant
+      not sole signal, the deterministic-first gate's shape applied one layer
+      earlier at request-routing time). Explicitly excludes delete/rename
+      actions from the fast path by definition (the exact action class from
+      R-0.0's Scenario C finding), independent of WP-2's enforcement work.
+      One open question flagged, not resolved: renmark/**/plugin/** targets
+      are excluded from the fast path entirely for R-0.1's first cut
+      (conservative default) - revisiting that is out of scope here.
   - id: WP-2
     title: Worker scope-enforcement design (the direct answer to R-0.0's Scenario C finding)
     produces: "milestones/R-0.1/scope-enforcement-design.md, ADR (scope TBD at design time)"
