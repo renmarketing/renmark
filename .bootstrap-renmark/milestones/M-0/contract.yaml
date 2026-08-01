@@ -1,0 +1,111 @@
+# SUPERSEDED 2026-07-31 (session continuation) by governing-methodology-addendum-01.md.
+# Kept for historical reference only — do not implement as written.
+# Replacement: ../R-0.0/contract.yaml (Release 0.0: Baseline and PRD
+# Reconciliation — broader scope, adds PRD reconciliation which this original
+# M-0 lacked, and is structured as a release per governing-methodology-
+# addendum-02.md/03.md rather than a plain milestone contract).
+schema_version: 1
+
+milestone_id: M-0
+title: Baseline and Architectural Freeze
+blueprint_revision: null   # no Architect blueprint exists yet — M-0 predates Milestone 3
+
+objective:
+  outcome: >
+    A documented, measured baseline of current Renmark orchestration behavior and cost,
+    plus a rollback point, exists BEFORE any architectural code change is made — so that
+    every later milestone's "reduce overhead by X%" claim (governing-architecture-roadmap.md
+    §14.3) has something real to compare against.
+  rationale: >
+    governing-bootstrap-directive.md requires Owner approval before architectural
+    implementation begins (Phase A item 8). governing-architecture-roadmap.md §15
+    defines M-0 as the first roadmap milestone and §18 Action 2 as "instrument the
+    current workflow before modifying it — the existing inefficiency must be
+    measurable." Nothing quantifies that inefficiency yet.
+
+dependencies:
+  requires: []   # first milestone
+  unlocks: [M-1]
+
+scope:
+  included:
+    - "ADR: Role-Based Governed Orchestration for Renmark (decisions/ADR-001-role-based-orchestration.md)"
+    - "Documentation of current Renmark lifecycle and executor paths (current-system-audit.md — already produced this pass)"
+    - "Temporary, additive instrumentation around: agent dispatch (dispatch.py), Codex subprocess execution (providers/codex.py), model routing (subagent_profiles.py, codex_routing.py, sizing.py, cost.py), test execution, review calls, context assembly"
+    - "Three baseline scenario runs (Scenario A: 1-2 file change; Scenario B: medium vertical feature; Scenario C: long-horizon multi-module milestone) per governing-architecture-roadmap.md §14.2"
+    - "Baseline report recording: calls, context size, replans, tests, agent count, duration per scenario"
+    - "Identification of highest-overhead execution paths from the measured data"
+    - "A tagged git rollback point"
+  excluded:
+    - "Any change to renmark/*.py production logic or plugin/skills/*.md content"
+    - "Any Role/Authority enforcement code (that is M-1)"
+    - "Any artifact schema changes (that is M-2)"
+    - "Any Architect or Engineer invocation (that is M-3)"
+    - "Any WritingMate-related work (that is M-10, explicitly blocked)"
+  allowed_paths:
+    - ".bootstrap-renmark/**"
+    - ".renmark/audits/**"        # instrumentation *output* (read-only measurement artifacts) may land here; instrumentation *code* must be additive-only, see below
+  prohibited_paths:
+    - "renmark/**"                # instrumentation must NOT modify existing modules' logic
+    - "plugin/**"
+    - ".renmark/state/**"
+    - ".renmark/memory/**"
+
+interfaces:
+  consumes:
+    - "renmark/analytics.py existing event/ledger mechanisms (read-only, for baseline measurement — do not modify)"
+    - "tests/ existing suite (run as-is for the cost/duration data point noted in current-system-audit.md §Cross-cutting observation 5)"
+  produces:
+    - ".bootstrap-renmark/decisions/ADR-001-role-based-orchestration.md"
+    - ".bootstrap-renmark/metrics/baseline-scenario-a.json"
+    - ".bootstrap-renmark/metrics/baseline-scenario-b.json"
+    - ".bootstrap-renmark/metrics/baseline-scenario-c.json"
+    - ".bootstrap-renmark/metrics/baseline-report.md"
+    - "a git tag, e.g. bootstrap-m0-rollback"
+  must_preserve:
+    - "All 1683 existing tests must still pass after M-0 (no functional change expected — M-0 is measurement-only)"
+    - "Existing Renmark commands remain fully functional throughout"
+
+acceptance_criteria:
+  - id: AC-001
+    requirement: "ADR-001 exists, approved by Owner, describing the role-based orchestration evolution at the level of governing-architecture-roadmap.md §2-4 (not full re-derivation)"
+    evidence_type: artifact-exists
+  - id: AC-002
+    requirement: "current-system-audit.md exists and covers all items in governing-bootstrap-directive.md Phase B checklist"
+    evidence_type: artifact-exists   # SATISFIED — produced this pass, see current-system-audit.md
+  - id: AC-003
+    requirement: "Three baseline scenarios executed and recorded with calls/context/replans/tests/agent-count/duration"
+    evidence_type: automated-measurement
+  - id: AC-004
+    requirement: "Highest-overhead paths identified from real measured data, not assumption"
+    evidence_type: analysis-artifact
+  - id: AC-005
+    requirement: "Full test suite (tests/) passes, confirming no functional regression from instrumentation"
+    evidence_type: automated-test
+  - id: AC-006
+    requirement: "Rollback tag created at a known-good commit"
+    evidence_type: git-tag-exists
+
+required_inspections:
+  - contract     # did the deliverables match this contract's scope
+  - runtime      # did the full test suite still pass after instrumentation
+
+risk:
+  level: low
+  factors:
+    - "Instrumentation must be additive-only (logging/measurement wrappers), not behavioral — risk is instrumentation accidentally changing timing-sensitive or ordering-sensitive logic in dispatch.py/loop.py"
+    - "Running Scenario C (long-horizon multi-module milestone) as a real baseline run consumes real inference budget — needs an explicit Owner-approved budget before it runs"
+
+budgets:
+  worker_calls: 0        # no Workers dispatched this milestone — GC does the instrumentation directly, or via read-only audit subagents as needed
+  inspector_calls: 2      # contract + runtime, manual/self-check acceptable at this scale
+  repair_cycles: 1
+  architect_calls: 0      # ADR-001 is GC-authored from existing evidence, not a full Architect blueprint invocation
+  engineer_revisions: 0
+
+open_questions_for_owner:
+  - "Scenario B and C both consume real inference budget to run as baseline measurements. What token/dollar budget should be pre-approved for this milestone's measurement runs?"
+  - "Should ADR-001 be written now (from the evidence already gathered in current-system-audit.md) or deferred until after baseline numbers exist, so the ADR can cite real overhead data?"
+  - "Instrumentation approach: wrap existing renmark/analytics.py calls with additional timing/call-count capture (lowest risk, reuses proven append-only pattern), vs. a separate lightweight tracer module under .bootstrap-renmark/ (zero risk to renmark/**, but new code to trust). Recommend the former, scoped to read+wrap only, given prohibited_paths above already blocks renmark/** edits — needs Owner decision on how to reconcile (see Found #2 in the accompanying report)."
+
+status: superseded   # see header note — replaced by ../P-0/contract.yaml

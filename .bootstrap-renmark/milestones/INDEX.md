@@ -1,0 +1,33 @@
+# Milestones / Releases Index
+
+**Reading order:** `governing-methodology-addendum-03.md` (2026-08-01) is governing for Phase/Release relationship rules and R-0.0's binding decisions. `governing-methodology-addendum-02.md` (2026-08-01) is governing for release lifecycle/acceptance-ladder mechanics. `governing-methodology-addendum-01.md` (2026-07-31) is governing for the 4-role runtime model and Phase 0–8 sequencing. Neither original document's milestone table (`governing-architecture-roadmap.md` §15) should be implemented as originally written.
+
+## Superseded — original 10-milestone sequence
+
+Historical reference only.
+
+| ID | Title | Status |
+|---|---|---|
+| M-0 | Baseline and Architectural Freeze | superseded → see R-0.0 below |
+| M-1..M-10 | (see governing-methodology-addendum-01.md reconciliation table) | superseded |
+
+## Phase 0 — sequencing container (not a unit of completion)
+
+Per addendum-03: "Phases remain sequencing and dependency containers... A Phase may not close merely because its internal tasks are complete — its associated release outcomes must meet their acceptance and observation requirements." Phase 0 currently contains one release:
+
+| Release | Title | Type | Gates | Lifecycle status |
+|---|---|---|---|---|
+| **R-0.0** | Baseline and PRD Reconciliation | internal-enablement | gates R-0.0 → R-0.1 (R-0.1 cannot start until R-0.0 reaches RELEASED+) | **READY** (Owner-approved 2026-08-01, subject to corrections now applied). **Only WP-1 (PRD addendum) is authorized to start.** WP-2 (ADR-001), WP-3 (benchmark definitions), WP-4 (telemetry coverage analysis), WP-5 (baseline execution) each remain individually gated — see `R-0.0/contract.yaml` work_packages[].status. Instrumentation path resolved (staged hybrid, read-only-first). Benchmark budget corrected: 20 invocations / 460k tokens / 80 min aggregate, one pass per scenario, no dollar estimates. |
+
+## Phase 1 + Phase 2 (blocking subset) — proposed, not yet drafted as a release contract
+
+| Release | Title | Type | Built from | Lifecycle status |
+|---|---|---|---|---|
+| R-0.1 | Bounded Small-Task Fast Path | feature | Phase 1 + blocking subset of Phase 2 | PLANNED (working title only — gated behind R-0.0, contract not yet drafted) |
+| R-0.2 | Controlled Worker Execution | feature | remainder of Phase 2 | PLANNED (working title only, contract not yet drafted) |
+
+Phases 3–8 (minimal ledger, minimal Inspector, Planner altitude split, deterministic integration, WritingMate, advanced optimizations): no releases drafted yet. Per addendum-01 §9 / addendum-03: only one blocking release is actively worked at a time, and no future release is broken down until the preceding blocking release closes (reaches CLOSED on the 10-state lifecycle, not merely ENGINEERING VERIFIED).
+
+## Release contract template
+
+`release-contract-template.yaml` — canonical shape. `R-0.0/contract.yaml` is the first filled-in instance.

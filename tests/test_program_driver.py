@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+
 from renmark.program import Program, StageNode, TaskNode, read_program
 from renmark.program_driver import (
     MilestoneDecision,
@@ -300,3 +303,57 @@ def test_decide_milestone_execution_blocks_third_equivalent_repair(tmp_path) -> 
 
     assert first.action == second.action == "repair"
     assert third == MilestoneDecision("stop", False, StopReason.RETRY_EXHAUSTED)
+
+
+# ── R-0.0 baseline-trace neutrality + positive tests (WP-4 stage 2) ──────────
+#
+# RENMARK_BASELINE_TRACE is opt-in and unset in the normal test environment;
+# these tests explicitly control it via monkeypatch to prove both states.
+
+
+def test_decide_milestone_execution_is_byte_identical_when_trace_env_unset(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.delenv("RENMARK_BASELINE_TRACE", raising=False)
+    program = milestone_program()
+    drifted = fresh_verifier_metadata(scope_drift=True)
+
+    decision = decide_milestone_execution(program, "build", drifted, repo=str(tmp_path))
+
+    assert decision == MilestoneDecision("stop", False, StopReason.PRD_DRIFT)
+    trace_path = tmp_path / ".renmark" / "analytics" / "baseline-trace.jsonl"
+    assert not trace_path.exists()
+
+
+def test_decide_milestone_execution_writes_replan_signal_when_trace_enabled(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RENMARK_BASELINE_TRACE", "1")
+    program = milestone_program()
+    drifted = fresh_verifier_metadata(scope_drift=True)
+
+    decision = decide_milestone_execution(
+        program, "build", drifted, repo=str(tmp_path), milestone_id="milestone-build"
+    )
+
+    # Same return value as the untraced case — trace is a pure side effect.
+    assert decision == MilestoneDecision("stop", False, StopReason.PRD_DRIFT)
+    trace_path = tmp_path / ".renmark" / "analytics" / "baseline-trace.jsonl"
+    rows = [json.loads(line) for line in trace_path.read_text().splitlines() if line.strip()]
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "replan_signal"
+    assert rows[0]["stop_reason"] == "prd_drift"
+    assert rows[0]["stage_id"] == "build"
+
+
+def test_decide_milestone_execution_traces_nothing_on_a_non_replan_disposition(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RENMARK_BASELINE_TRACE", "1")
+    decision = decide_milestone_execution(
+        milestone_program(), "build", fresh_verifier_metadata(), repo=str(tmp_path)
+    )
+
+    assert decision == MilestoneDecision("advance", True, None)
+    trace_path = tmp_path / ".renmark" / "analytics" / "baseline-trace.jsonl"
+    assert not trace_path.exists()

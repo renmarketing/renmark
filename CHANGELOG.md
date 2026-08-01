@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-08-01] - release(R-0.0): baseline and PRD reconciliation — ACCEPTED WITH FOLLOW-UP
+
+**Request:** Complete R-0.0 (all 5 work packages already landed), run its own acceptance review against `internal-acceptance-scenario.md`, and release it — per Owner instruction and `governing-methodology-addendum-02.md`'s release-oriented-milestones doctrine (a milestone/release isn't "done" until accepted, not merely built).
+**Built:** Ran the 6-criterion acceptance checklist with fresh evidence (not re-cited prior claims): re-ran the full `test_program_driver.py`/`test_dispatch.py` suite (51 passed) and produced a new dedicated fixed-input before/after proof (`instrumentation-neutrality-proof.md`) showing `decide_milestone_execution`'s return value is byte-identical with `RENMARK_BASELINE_TRACE` on vs off. Decision: **ACCEPTED WITH FOLLOW-UP** — Scenario B/C baseline numbers carry known task-authoring flaws and shouldn't be cited as representative without a corrected re-run (F1); R-0.1's contract must cite Scenario C's unauthorized-delete finding as founding evidence for its authority-boundary scope (F2). `contract.yaml` status moved `ready` → `released`; `gates_release: R-0.1` is now unlocked. Version bumped 0.39.2 → 0.39.3 (internal-enablement release touching real, if behavior-neutral-when-disabled, `renmark/**` instrumentation).
+**Files changed:** `.bootstrap-renmark/milestones/R-0.0/{closeout.md (new), instrumentation-neutrality-proof.md (new), contract.yaml, benchmark-tasks/scenario-{a,b,c}.md}`, `.bootstrap-renmark/ledger/events.jsonl`, `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `CHANGELOG.md`.
+**Do not change:** The `ACCEPTED WITH FOLLOW-UP` caveats (F1/F2) are load-bearing — do not cite Scenario B/C's raw numbers as representative baseline data without re-running corrected versions first; R-0.1 scoping must treat the Scenario C unauthorized-delete finding as primary evidence, not background color.
+
+## [2026-08-01] - docs(prd): reconcile PRD with invisible-by-default governance and release-oriented delivery
+
+**Request:** Reconcile PRD.md with the internal governed-orchestration architecture under active design in `.bootstrap-renmark/` (release R-0.0, work package WP-1), per Owner-approved `governing-methodology-addendum-01.md`/`-02.md`/`-03.md`.
+**Built:** Added REQ-26 (invisible-by-default internal governance — internal roles/handoffs/artifacts stay implementation detail unless they measurably reduce user effort, cost, or failure rate) and REQ-27 (work classification and release-oriented delivery — fast path for bounded corrections, milestone releases for substantial builds, applying to every project renmark manages including its own development). Added two Goals bullets and one Non-goals bullet ("not a visible internal bureaucracy"). Bumped `last_reviewed`.
+**Files changed:** `PRD.md`.
+**Do not change:** REQ-26/REQ-27 are product-level constraints, not architecture — implementation detail (roles, artifact schemas, budgets) stays in `.bootstrap-renmark/`, never re-derived in the PRD itself; the existing "PRD is not a roadmap" non-goal still holds, REQ-27 states behavior, not an actual milestone list.
+
 ## [2026-08-01] - fix(interaction): name AskUserQuestion explicitly in the interaction contract
 
 **Request:** Owner reported the CLI presenting decisions as plain text with no arrow-key/click selection, even after the earlier native-picker fix.

@@ -1,0 +1,56 @@
+# Canonical release contract shape, per governing-methodology-addendum-02.md
+# §"Release contract shape". Copy this file to
+# milestones/<phase>/R-<id>/contract.yaml when a release moves from a working
+# title in milestones/INDEX.md to an actual Owner-reviewable contract.
+#
+# This template is NOT itself a release contract — do not mark any real
+# release's status against this file.
+
+release_id: R-X.Y
+title: ""
+release_type: feature   # patch | feature | architectural | research-spike | internal-enablement | migration | maintenance
+
+user_value:
+  actor: ""
+  capability: ""
+  problem_addressed: ""
+
+user_journey:
+  starting_state: ""
+  action: ""
+  expected_result: ""
+
+scope:
+  included: []
+  excluded: []
+
+work_packages: []        # each entry groups related Work Orders (addendum-02 §"Planning hierarchy")
+engineering_acceptance: []   # component + system verification criteria (addendum-02 §"acceptance ladder" levels 1-2)
+required_inspections: []
+
+user_acceptance:
+  scenario: []            # starting state / user action / expected visible behavior / expected result / failure behavior / evidence captured / acceptance decision
+  evidence_required: []
+  decision_authority: Owner
+
+release:
+  channel: preview        # preview | internal | production
+  artifact: []
+  rollback: []
+
+observation:
+  period: ""
+  metrics: []              # e.g. total model calls, replans, context consumed, completion quality, owner intervention required
+
+status: planned   # PLANNED | READY | IN DEVELOPMENT | INTEGRATED | ENGINEERING VERIFIED | RELEASE CANDIDATE | USER ACCEPTANCE | RELEASED | OBSERVED | CLOSED
+
+# Closure requires ALL of (addendum-02 §"Release closure rule"):
+#   1. Engineering acceptance
+#   2. Required Inspector approval
+#   3. A complete release candidate
+#   4. User-level acceptance when applicable
+#   5. Release or approved internal deployment
+#   6. Observation evidence
+#   7. Closeout documentation
+# None of these may be satisfied merely by "code was written / tests passed /
+# a Worker reported completion / the branch merged / the GC believes it's correct."

@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-07-29
+last_reviewed: 2026-08-01
 status: draft
 ---
 
@@ -55,6 +55,12 @@ first-class hosts for the same product workflow, not separate product forks.
   project memory under `.renmark/` that accrue across runs.
 - Strict context hygiene: the orchestrator reads summaries, paths, and metadata
   — never generated code, diffs, or large bodies.
+- Internal orchestration (planning, bounded workers, independent inspection,
+  deterministic policy/integration/ledger) stays invisible by default —
+  visible process is added only when it measurably helps (REQ-26).
+- Substantial builds ship as a sequence of user-testable milestone releases,
+  not internal-only progress; small bounded work uses a fast path instead of
+  full planning ceremony (REQ-27).
 
 **Non-goals (product-level, durable)**
 - **Not a standalone app or hosted service.** renmark is a plugin/workflow
@@ -74,6 +80,10 @@ first-class hosts for the same product workflow, not separate product forks.
 - **The PRD is not a task tracker, a feature spec, or a roadmap.** It states
   *what* and *why*; plans decompose, specs design a single feature, roadmap
   sequences.
+- **Not a visible internal bureaucracy.** Internal execution roles, authority
+  boundaries, and governance artifacts (see REQ-26) are implementation
+  detail; users are never required to understand, configure, or manually
+  approve per-role handoffs to use renmark.
 
 ## Requirements
 
@@ -327,6 +337,47 @@ first-class hosts for the same product workflow, not separate product forks.
       done when custom content outside managed markers remains byte-for-byte
       unchanged; done when deterministic checks fail on semantic drift between
       `CLAUDE.md`, `AGENTS.md`, their templates, or installed host variants.
+26. `REQ-26` **Invisible-by-default internal governance.** Renmark may
+    implement its pipelines using internal execution roles and authority
+    boundaries (planning, bounded implementation, independent verification,
+    and deterministic policy/integration/record-keeping), but no internal
+    role, handoff, artifact schema, or governance state may become a
+    required user-facing step by default. Any user-visible governance
+    surface (a role explanation, a per-handoff approval, a governance
+    artifact shown to the user) is permitted only when it measurably
+    reduces user effort, inference cost, or failure rate; otherwise it must
+    not execute. The single plain-English entry point (`/renmark:start` et
+    al.) and the existing approval-gate surfaces (REQ-4, REQ-12, REQ-18)
+    remain the only required points of user interaction (extends REQ-1,
+    REQ-20).
+    - *Acceptance:* done when a normal `/renmark:feature` run exposes no new
+      required approval step, role name, or governance artifact beyond what
+      existed before internal governance work began, unless that step
+      demonstrably reduced rework, cost, or failure rate and was explicitly
+      added as a result.
+27. `REQ-27` **Work classification and release-oriented delivery.** Before
+    orchestrating requested work, renmark classifies it and routes
+    accordingly. A bounded correction with no material new user journey uses
+    a **fast path** — implementation, targeted tests, and inspection only
+    when risk warrants it — skipping full milestone planning and
+    multi-agent orchestration. A substantial build is planned and delivered
+    as a sequence of **milestone releases**: each release defines a
+    distinct, user-testable capability, not merely completed internal
+    modules, and passes engineering verification, independent inspection, a
+    user-level acceptance scenario, and a rollback path before being
+    considered complete. Renmark prefers vertical release slices that
+    deliver end-to-end usable capability over horizontal technical layers
+    that stay unusable until the end. This classification-and-delivery
+    behavior applies to every project renmark plans, implements, verifies,
+    and releases — including renmark's own development — not only to a
+    single class of work (extends REQ-1, REQ-7, REQ-26).
+    - *Acceptance:* done when a small bounded fix skips full milestone
+      planning and multi-agent orchestration ceremony; done when a
+      substantial feature build is decomposed into releases each
+      demonstrating a real user-testable capability rather than horizontal
+      layers with nothing usable until the end; done when a release is not
+      marked complete on internal task completion alone but requires its
+      acceptance and observation evidence.
 
 ## Success metrics
 
@@ -549,3 +600,21 @@ Amended REQ-25 and success metrics so the same concise rule propagates through
 managed project contracts and cross-host golden fixtures. M1 delivery-state
 scope remains unchanged; interaction implementation begins in M2. Approved
 explicitly by the project owner on 2026-07-29 via `/renmark:approve`.
+
+**Revision note (2026-08-01, human-approved diff):** Added REQ-26
+(invisible-by-default internal governance — internal execution roles,
+handoffs, and governance artifacts stay implementation detail unless they
+measurably reduce user effort, inference cost, or failure rate) and REQ-27
+(work classification and release-oriented delivery — bounded corrections use
+a fast path; substantial builds are planned and delivered as a sequence of
+user-testable milestone releases rather than internal-only progress, applying
+to every project renmark manages including its own development). Added two
+matching Goals bullets and one Non-goals bullet ("not a visible internal
+bureaucracy"). Reconciles the product PRD with the internal
+governed-orchestration methodology under active design in
+`.bootstrap-renmark/` (work package WP-1 of release R-0.0). Proposed by the
+General Contractor per the R-0.0 release contract; reviewed and explicitly
+approved by the project owner on 2026-08-01 via the `/renmark:prd` UPDATE
+gate, including one owner-requested revision (REQ-27 added; a draft open
+question about the doctrine staying `.bootstrap-renmark/`-only was removed in
+favor of making it a real product requirement).

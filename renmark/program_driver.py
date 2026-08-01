@@ -90,8 +90,12 @@ limits clear).
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 
 from renmark import program as _program
 from renmark.program import Program, StageNode
@@ -326,10 +330,77 @@ def evaluate_stop_for_stage(
     return evaluate_stop(merged)
 
 
+# ── R-0.0 baseline tracing (opt-in, additive, disabled by default) ────────────
+#
+# Behind RENMARK_BASELINE_TRACE=1 only. Unset (the default) means this file's
+# runtime behavior is byte-identical to before this block existed — see
+# .bootstrap-renmark/milestones/R-0.0/instrumentation-design.md. Not part of
+# Renmark's product surface; exists solely to measure current orchestration
+# behavior for the R-0.0 baseline evidence package.
+
+_BASELINE_TRACE_ENV = "RENMARK_BASELINE_TRACE"
+_BASELINE_TRACE_LEDGER = "baseline-trace.jsonl"
+
+
+def _append_baseline_trace(repo: str, record: dict[str, object]) -> None:
+    """Append one opt-in trace row. Never raises; a trace failure must not
+    affect the caller's real return value."""
+    try:
+        path = Path(repo) / ".renmark" / "analytics" / _BASELINE_TRACE_LEDGER
+        path.parent.mkdir(parents=True, exist_ok=True)
+        row = {"ts": datetime.now(timezone.utc).isoformat(), **record}
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 # ── Milestone verifier / repair decisions ─────────────────────────────────────
 
 
 def decide_milestone_execution(
+    program: Program,
+    stage_id: str,
+    verifier_metadata: dict[str, object],
+    *,
+    repo: str,
+    milestone_id: str | None = None,
+    work_package_id: str | None = None,
+) -> MilestoneDecision:
+    """Opt-in-traced wrapper around :func:`_decide_milestone_execution_impl`.
+
+    When ``RENMARK_BASELINE_TRACE`` is unset, this is a pure pass-through — same
+    call, same return value, no extra work. When set to ``"1"``, a
+    PLAN_BLOCK/PRD_DRIFT disposition (a "replan signal" — the two existing
+    :class:`StopReason` members that already mean "the plan needs
+    reconsideration") is additionally appended to the opt-in trace ledger. The
+    trace write happens strictly after the real decision is computed and never
+    influences it.
+    """
+    decision = _decide_milestone_execution_impl(
+        program,
+        stage_id,
+        verifier_metadata,
+        repo=repo,
+        milestone_id=milestone_id,
+        work_package_id=work_package_id,
+    )
+    if os.environ.get(_BASELINE_TRACE_ENV) == "1" and decision.reason in (
+        StopReason.PLAN_BLOCK,
+        StopReason.PRD_DRIFT,
+    ):
+        _append_baseline_trace(
+            repo,
+            {
+                "kind": "replan_signal",
+                "stop_reason": str(decision.reason),
+                "stage_id": stage_id,
+            },
+        )
+    return decision
+
+
+def _decide_milestone_execution_impl(
     program: Program,
     stage_id: str,
     verifier_metadata: dict[str, object],
