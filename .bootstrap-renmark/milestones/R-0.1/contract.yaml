@@ -104,8 +104,22 @@ work_packages:
       (conservative default) - revisiting that is out of scope here.
   - id: WP-2
     title: Worker scope-enforcement design (the direct answer to R-0.0's Scenario C finding)
-    produces: "milestones/R-0.1/scope-enforcement-design.md, ADR (scope TBD at design time)"
-    status: "NOT STARTED — gated behind WP-1 and this contract's Owner approval"
+    produces: "milestones/R-0.1/scope-enforcement-design.md, decisions/ADR-002-worker-scope-enforcement.md"
+    status: >
+      COMPLETE (2026-08-01) — scope-enforcement-design.md + ADR-002 drafted.
+      Two-layer model: Layer A (host permission prompt - pre-existing, out of
+      scope to change, confirmed as what actually blocked Scenario C) + Layer
+      B (new, Renmark-owned, deterministic verify_worker_scope() comparing
+      declared WorkerScope against actual `git diff --name-status`, never
+      against self-reported touched_files). Delete/rename is always a
+      violation on the fast path; any out-of-allowed_paths touch is a
+      violation. FAIL blocks merge/commit, does not auto-revert, escalates to
+      Inspector/Owner, records to an append-only ledger. The literal Scenario
+      C reproduction (scope excluding the 4 .renmark/audits/* files, a diff
+      deleting them) is specified as a required WP-4 regression test. No-
+      nested-dispatch enforcement honestly flagged as partially unresolved
+      (no host-independent signal exists today) rather than overclaimed - left
+      as an explicit WP-4 open question. Zero renmark/** changes - docs-only.
   - id: WP-3
     title: UX regression test suite for non-fast-path commands
     produces: "test coverage proving existing entrypoints are unchanged"
