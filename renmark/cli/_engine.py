@@ -14,6 +14,9 @@ from typing import Any
 from dotenv import load_dotenv
 
 from .. import __version__
+from ..ledger import WorkOrder as _LedgerWorkOrder
+from ..ledger import WorkResult as _LedgerWorkResult
+from ..ledger import append_ledger_event as _append_ledger_event
 from ..parser import PlanError, Task, parse_plan
 from ..providers.codex import codex_available as codex_available
 from ..state import (
@@ -660,6 +663,29 @@ def execute_plan(
         if _r008_precheck(task):
             r008_warned.append(task.index)
         sibling_targets = [t.target for t in current_wave if t.index != task.index]
+
+        # R-0.3/WP-4: real WorkOrder emission point. This is the actual moment
+        # a task is handed to a live executor (below, via _execute_task →
+        # codex); order_id is `{run_id}-{task_index}` since tasks have no
+        # pre-existing dispatch uuid. A ledger write failure must never block
+        # the real dispatch, so it's best-effort/never-raising, same as the
+        # R-0.0 baseline-trace convention this module already follows.
+        order_id = f"{run_id}-{task.index}"
+        try:
+            _append_ledger_event(
+                _repo,
+                _LedgerWorkOrder(
+                    order_id=order_id,
+                    task=task.spec or task.title,
+                    role=task.role or task.executor,
+                    file_scope=[task.target, *task.context_files],
+                    verifier=task.verifier,
+                ),
+                ts=now_iso(),
+            )
+        except Exception:
+            pass
+
         ok, reason, used, sha = _execute_task(
             task=task,
             repo=_repo,
@@ -669,6 +695,23 @@ def execute_plan(
             total=len(tasks),
             sibling_targets=sibling_targets,
         )
+
+        # R-0.3/WP-4: real WorkResult emission point — the return from the
+        # live executor call above, matched to the WorkOrder by order_id.
+        try:
+            _append_ledger_event(
+                _repo,
+                _LedgerWorkResult(
+                    order_id=order_id,
+                    status="complete" if ok else "failed",
+                    summary=reason,
+                    touched_files=[task.target] if ok else [],
+                ),
+                ts=now_iso(),
+            )
+        except Exception:
+            pass
+
         return _dispatch.TaskResult(
             task_index=task.index,
             executor=task.executor,

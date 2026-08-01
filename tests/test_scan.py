@@ -152,6 +152,8 @@ def test_changed_fingerprint_resurfaces_existing_item_without_duplication(
             "2026-06-16T10:11:13+00:00",
             "2026-06-16T10:11:14+00:00",
             "2026-06-16T10:11:15+00:00",
+            "2026-06-16T10:11:16+00:00",
+            "2026-06-16T10:11:17+00:00",
         ]
     )
     monkeypatch.setattr(scan, "now_iso", lambda: next(stamps))

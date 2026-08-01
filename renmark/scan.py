@@ -74,6 +74,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import audit, backlog, summary
+from .ledger import InspectionReport, append_ledger_event
 from .state import now_iso, state_dir
 from .verifier import run_verifier
 
@@ -613,6 +614,27 @@ def write_report(repo: Path | str, report: ScanReport) -> str:
         validation_status=report.validation_status,
     )
     report.evidence_path = rel_path
+
+    # R-0.3/WP-4: real InspectionReport emission point. A scan is exactly an
+    # "inspection" per the ledger's shape — verdict derives from whether any
+    # findings were raised; findings are the finding titles (full detail stays
+    # in the report artifact on disk, per this module's bounded-summary rule).
+    # Never raises into the caller — this module's contract is "never raises",
+    # and a ledger write failure must not block the (already-written) report.
+    try:
+        append_ledger_event(
+            repo,
+            InspectionReport(
+                subject_ref=rel_path,
+                verdict="pass" if report.finding_count == 0 else "changes_requested",
+                findings=[f.title for f in report.findings],
+                generator="scan",
+            ),
+            ts=now_iso(),
+        )
+    except Exception:
+        pass
+
     return rel_path
 
 

@@ -97,6 +97,29 @@ def write_pause(repo_root: str | Path, state: PauseState) -> None:
     path = state_dir(repo_root) / PAUSED_FILE
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
+    # R-0.3/WP-4: real Escalation emission point. write_pause is the single
+    # canonical writer behind every PAUSED-state call site (usage-limit pauses,
+    # manual pauses, wave-dispatch failures), so wiring here covers all of them
+    # without touching each caller. Never raises into write_pause's own
+    # caller — a ledger write failure must not block the (already-written)
+    # PAUSED file, which is the authoritative resume signal.
+    from .. import ledger as _ledger
+    from ._core import now_iso as _now_iso
+
+    try:
+        _ledger.append_ledger_event(
+            repo_root,
+            _ledger.Escalation(
+                reason=state.reason,
+                originating_skill=state.feature or state.loop_id or "renmark-execute",
+                blocking=True,
+                is_replannable=False,
+            ),
+            ts=_now_iso(),
+        )
+    except Exception:
+        pass
+
 
 def read_pause(repo_root: str | Path) -> PauseState | None:
     """Read the PAUSED file, or return None if it is absent/unreadable.
