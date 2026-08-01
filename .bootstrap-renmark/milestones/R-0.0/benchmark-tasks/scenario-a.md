@@ -2,7 +2,7 @@
 
 Part of R-0.0/WP-3. Defines the task by construction so re-running it is expected to land within the stated tolerance — see `benchmark-budget-and-circuit-breakers.md`'s "Reproducibility" section for why this replaces an empirical rerun.
 
-**Not yet executed.** Definition only — WP-5 (execution) remains gated.
+**Executed 2026-08-01 as part of WP-5.** Result: passed cleanly. See `.bootstrap-renmark/metrics/baseline-scenario-a.json` and `baseline-report.md`.
 
 ## Fixed starting state
 
@@ -32,4 +32,4 @@ Part of R-0.0/WP-3. Defines the task by construction so re-running it is expecte
 
 ## Isolation (flagged for Owner confirmation before WP-5, not assumed)
 
-R-0.0's own `contract.yaml` prohibits touching `renmark/**`/`plugin/**` **for R-0.0's own release scope**. This scenario, by design, produces a real (if trivial) code change to measure genuine current-system behavior — that change is not part of R-0.0's deliverables. Proposed resolution: run each scenario in a disposable worktree/branch, capture the measurement, then discard the branch (do not merge). **This isolation approach is proposed, not yet confirmed by the Owner** — surfacing it now rather than assuming it silently, consistent with WP-4/WP-5 both still being gated.
+R-0.0's own `contract.yaml` prohibits touching `renmark/**`/`plugin/**` **for R-0.0's own release scope**. This scenario, by design, produces a real (if trivial) code change to measure genuine current-system behavior — that change is not part of R-0.0's deliverables. Proposed resolution: run each scenario in a disposable worktree/branch, capture the measurement, then discard the branch (do not merge). **Owner-confirmed** ("Confirmed — disposable worktree/branch") and executed as described.

@@ -225,8 +225,7 @@ observation:
     - "whether R-0.1's engineering_acceptance later references R-0.0's baseline-report.md numbers directly"
     - "whether the 3 benchmark scenarios remain reproducible when re-run for R-0.1's comparison"
 
-status: ready   # READY per Owner: "R-0.0 structure is approved subject to instrumentation and budget corrections;
-                # after incorporating them, move R-0.0 from PLANNED to READY and begin only WP-1."
-                # WP-2 through WP-5 remain individually gated - see each work_packages[].status above.
-                # Do not begin instrumentation or benchmark execution until their preceding work packages
-                # and this contract's gates are satisfied.
+status: released   # RELEASED 2026-08-01. All 5 work packages complete; acceptance review executed
+                # against internal-acceptance-scenario.md's 6-point checklist; Owner decision:
+                # ACCEPTED WITH FOLLOW-UP (F1, F2). See closeout.md for the full record.
+                # gates_release: R-0.1 is now unlocked - R-0.1's contract may move past PLANNED.

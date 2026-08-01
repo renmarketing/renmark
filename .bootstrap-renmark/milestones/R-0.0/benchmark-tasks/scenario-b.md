@@ -2,7 +2,7 @@
 
 Part of R-0.0/WP-3. See `scenario-a.md` for the shared reproducibility-by-construction rationale and the isolation caveat (applies identically here — not repeated in full below).
 
-**Not yet executed.** Definition only — WP-5 (execution) remains gated.
+**Executed 2026-08-01 as part of WP-5.** Result: task-authoring flaw found — the `--json` flag already existed at the starting commit, so this scenario's low resource usage is not representative "normal feature" baseline data. See `.bootstrap-renmark/metrics/baseline-scenario-b.json` (`evidence_quality_caveat`) and `baseline-report.md`.
 
 ## Fixed starting state
 
@@ -33,4 +33,4 @@ Part of R-0.0/WP-3. See `scenario-a.md` for the shared reproducibility-by-constr
 
 ## Isolation
 
-Same disposable-worktree approach as Scenario A — proposed, not yet Owner-confirmed.
+Same disposable-worktree approach as Scenario A — Owner-confirmed and executed.

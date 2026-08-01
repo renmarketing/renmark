@@ -2,7 +2,7 @@
 
 Part of R-0.0/WP-3. See `scenario-a.md` for the shared reproducibility-by-construction rationale and the isolation caveat (applies identically here — not repeated in full below).
 
-**Not yet executed.** Definition only — WP-5 (execution) remains gated.
+**Executed 2026-08-01 as part of WP-5.** Result: task-authoring flaw found — the SKILL.md-free command shim conflicted with an existing lint invariant requiring a matching `plugin/skills/<name>/SKILL.md`, causing 4 real test failures. Also produced a critical finding: the dispatched subagent attempted to force-delete 4 pre-existing `.renmark/audits/*` files it did not create, without authorization — blocked by the platform's permission classifier, no data loss. See `.bootstrap-renmark/metrics/baseline-scenario-c.json` and `baseline-report.md` (leads with the security finding).
 
 **Deliberately synthetic, not overlapping with real R-0.0 deliverables:** this scenario is close in shape to WP-4's real telemetry-coverage work, but is defined as an unrelated capability (changelog search) specifically so its output stays safely discardable and doesn't get confused with — or accidentally substitute for — the real WP-4 deliverable.
 
@@ -36,4 +36,4 @@ Part of R-0.0/WP-3. See `scenario-a.md` for the shared reproducibility-by-constr
 
 ## Isolation
 
-Same disposable-worktree approach as Scenario A/B — proposed, not yet Owner-confirmed.
+Same disposable-worktree approach as Scenario A/B — Owner-confirmed and executed.
