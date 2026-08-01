@@ -274,6 +274,125 @@ def preview_line(challenge: PlanChallenge) -> str:
     return f"{tag}: {challenge.message}"
 
 
+# ── R-008: dispatch-reason/budget checklist ─────────────────────────────────
+#
+# R-008 ("No speculative agents — every dispatch requires a work-order ID,
+# contract, reason, scope, expected artifact, budget reservation") per
+# .renmark/plans/r-0.2/dispatch-reason-budget-design.md. This extends the
+# existing justification gate above rather than forking a new module — the
+# Q1-Q4 checks answer "should this be a subagent at all"; the checklist below
+# answers "does this dispatch carry the six required fields", checked BEFORE
+# any inference call.
+#
+# Migration path (design doc §8): ships lenient by default (Phase 1 —
+# warn + infer, never hard-reject) so today's callers keep working; a
+# ``strict=True`` caller opts into hard rejection ahead of the eventual
+# strict-by-default phase.
+
+
+class R008DispatchRejected(ValueError):
+    """Raised in strict mode when a dispatch is missing required R-008 fields."""
+
+    def __init__(self, missing: list[str]) -> None:
+        self.missing = list(missing)
+        joined = ", ".join(self.missing)
+        super().__init__(f"R-008 dispatch rejected: missing required field(s): {joined}")
+
+
+@dataclass(frozen=True)
+class R008Checklist:
+    """R-008 dispatch requirements — must be present before inference call."""
+
+    work_order_id: str | None
+    contract: str | None
+    reason: str | None
+    scope: dict | None  # {target_files, read_only_files, prohibited_files}
+    expected_artifact: str | None
+    budget_reservation: dict | None  # {max_input_tokens, max_output_tokens, max_attempts}
+
+    @property
+    def all_present(self) -> bool:
+        """True iff all six required fields are present and non-empty."""
+        return all(
+            [
+                self.work_order_id,
+                self.contract,
+                self.reason,
+                self.scope,
+                self.expected_artifact,
+                self.budget_reservation,
+            ]
+        )
+
+    def missing_fields(self) -> list[str]:
+        """Return list of field names that are missing or empty."""
+        missing = []
+        if not self.work_order_id:
+            missing.append("work_order_id")
+        if not self.contract:
+            missing.append("contract")
+        if not self.reason:
+            missing.append("reason")
+        if not self.scope:
+            missing.append("scope")
+        if not self.expected_artifact:
+            missing.append("expected_artifact")
+        if not self.budget_reservation:
+            missing.append("budget_reservation")
+        return missing
+
+
+def _r008_checklist_from_spec(dispatch_spec: Any) -> R008Checklist:
+    """Build an :class:`R008Checklist` from a dict-like (or attr-like) dispatch spec."""
+    getter = dispatch_spec.get if isinstance(dispatch_spec, dict) else None
+
+    def _field(name: str) -> Any:
+        if getter is not None:
+            return getter(name)
+        return getattr(dispatch_spec, name, None)
+
+    return R008Checklist(
+        work_order_id=_field("work_order_id"),
+        contract=_field("contract"),
+        reason=_field("reason"),
+        scope=_field("scope"),
+        expected_artifact=_field("expected_artifact"),
+        budget_reservation=_field("budget_reservation"),
+    )
+
+
+def validate_r008_dispatch(dispatch_spec: Any) -> tuple[bool, list[str]]:
+    """Check that a dispatch carries all R-008 required fields.
+
+    Returns: (is_valid, missing_field_names). Pure function, never raises —
+    an unusable ``dispatch_spec`` degrades to "all six fields missing" rather
+    than raising, matching the module's conservative-degrade convention.
+    """
+    try:
+        checklist = _r008_checklist_from_spec(dispatch_spec)
+    except Exception:
+        checklist = R008Checklist(None, None, None, None, None, None)
+    return checklist.all_present, checklist.missing_fields()
+
+
+def enforce_r008_dispatch(dispatch_spec: Any, *, strict: bool = False) -> list[str]:
+    """Pre-dispatch R-008 gate — call BEFORE any inference/Agent call.
+
+    Lenient mode (``strict=False``, the default — Phase 1 of the migration
+    path in the design doc): missing fields never block dispatch. Returns the
+    list of missing field names (empty when the checklist is fully satisfied)
+    so a caller can log a warning without breaking existing dispatch sites.
+
+    Strict mode (``strict=True``): raises :class:`R008DispatchRejected` naming
+    every missing field when the checklist is not fully satisfied. Never
+    silently proceeds in strict mode.
+    """
+    valid, missing = validate_r008_dispatch(dispatch_spec)
+    if not valid and strict:
+        raise R008DispatchRejected(missing)
+    return missing
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI: ``python -m renmark.subagent_gate <plan.md>``.
 

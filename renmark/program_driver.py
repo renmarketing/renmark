@@ -376,6 +376,19 @@ def decide_milestone_execution(
     reconsideration") is additionally appended to the opt-in trace ledger. The
     trace write happens strictly after the real decision is computed and never
     influences it.
+
+    Path-agnostic, directly callable (R-0.2/WP-5): this function makes no
+    single-dispatch-mode assumption in its own body and has no dispatch-path
+    guard — any caller (the accelerated single-Worker path, normal
+    single-task dispatch, orchestrate per-wave /
+    post-wave driver, codereview) may invoke it with the same signature to get
+    the same bounded verify→repair→retry-exhausted disposition, including the
+    third-equivalent-repair recurrence cap below. Only ``plugin/skills/
+    orchestrate/SKILL.md``'s prose currently calls it in production; wiring it
+    into additional Python dispatch call sites (``renmark/dispatch.py``,
+    ``renmark/providers/claude_agent.py``) is a future, separately-scoped
+    integration — this function itself already supports it with no changes
+    required.
     """
     decision = _decide_milestone_execution_impl(
         program,
@@ -539,6 +552,219 @@ def _is_stable_identifier(value: str) -> bool:
     return all(character.islower() or character.isdigit() or character in "._-" for character in value)
 
 
+# ── Replan evidence gate (R-0.2 WP-5, addendum-01 §9.3) ───────────────────────
+#
+# Implements ``.renmark/plans/r-0.2/replan-evidence-design.md`` §1: a replan
+# (scope / approach / authority change) is only permitted with recorded
+# machine-readable evidence for one of five triggers — never a prose
+# assertion. Reuses ``renmark.recurrence`` for the "max replans per milestone"
+# cap (§1.6), per the design doc's explicit reuse recommendation — no parallel
+# ledger.
+
+#: Owner rule (design doc §1.6): one evidence-based replan per milestone; a
+#: second requires Owner escalation, not another automatic gate pass.
+MAX_REPLANS_PER_MILESTONE: int = 1
+
+#: Recurrence identity for the replan-frequency cap. Deliberately distinct
+#: from ``_REPAIR_RECURRENCE_CHECK`` — replans and repairs are counted on
+#: independent ledger keys even though both reuse the same ledger file.
+_REPLAN_RECURRENCE_CHECK = "milestone-replan"
+_REPLAN_RECURRENCE_RULE = "replan-granted"
+
+#: The five recognised replan triggers (design doc §1.2). Any other value is
+#: rejected outright — this also rejects the common "prose-only" misuse where
+#: a caller omits a real trigger type entirely.
+_VALID_REPLAN_TRIGGERS: frozenset[int] = frozenset({1, 2, 3, 4, 5})
+
+
+@dataclass(frozen=True, slots=True)
+class ReplannableEscalation:
+    """A structured replan request: trigger claim + evidence pointer only.
+
+    Per the design doc §3.3 open-question recommendation: the gate validates
+    fields and artifact freshness/existence but does NOT re-parse artifact
+    bodies. The caller (a milestone driver or escalation handler) is
+    responsible for reading the cited artifact and populating ``metadata``
+    with the trigger-specific fields documented in the design doc's §1.4
+    evidence table.
+    """
+
+    milestone_id: str
+    trigger_type: int
+    evidence_artifact: str
+    metadata: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class ReplanDecision:
+    """Bounded permit/reject outcome for one replan request (design doc §1.5)."""
+
+    permitted: bool
+    trigger_type: int
+    evidence_artifact: str
+    reason: str
+    timestamp: str
+
+
+def permit_replan(repo: str, request: ReplannableEscalation) -> ReplanDecision:
+    """Evidence-required replan gate (design doc §1.5 pseudocode, translated).
+
+    Rejects: an unrecognised ``trigger_type``, a missing/empty evidence
+    pointer, a cited artifact that does not exist on disk, stale evidence (an
+    explicit ``stale_after`` in the past), evidence missing the fields the
+    design doc's §1.4 table requires for its trigger type, and a milestone
+    that has already exhausted :data:`MAX_REPLANS_PER_MILESTONE`.
+
+    A prose-only assertion (no artifact, no trigger-specific structured
+    fields) is rejected by construction: it fails either the artifact
+    existence check or the per-trigger field check below — there is no code
+    path that treats free text as evidence.
+
+    On success, records the replan against the milestone's replan-frequency
+    ledger entry via :func:`renmark.recurrence.observe_issue` (same ledger
+    file as the repair-recurrence cap, distinct key) so a second replan
+    request against the same milestone is rejected without needing to consult
+    external state, and remains auditable in ``.renmark/state/recurrences.json``.
+    """
+    trigger_type = request.trigger_type
+    milestone_id = _as_str(request.milestone_id)
+    evidence_artifact = _as_str(request.evidence_artifact)
+    metadata = request.metadata if isinstance(request.metadata, dict) else {}
+
+    if not milestone_id:
+        return _reject_replan(request, "no milestone_id supplied")
+
+    if trigger_type not in _VALID_REPLAN_TRIGGERS:
+        return _reject_replan(request, f"unrecognized trigger_type: {trigger_type!r}")
+
+    if not evidence_artifact:
+        return _reject_replan(request, "no evidence artifact cited")
+
+    artifact_path = _resolve_evidence_path(repo, evidence_artifact)
+    if not artifact_path.is_file():
+        return _reject_replan(request, f"artifact not found: {evidence_artifact}")
+
+    stale_reason = _stale_evidence_reason(metadata)
+    if stale_reason:
+        return _reject_replan(request, stale_reason)
+
+    valid, reason = _validate_trigger_evidence(trigger_type, metadata)
+    if not valid:
+        return _reject_replan(request, reason)
+
+    # §1.6 frequency cap — reuse the recurrence ledger's occurrence_count as
+    # the source of truth rather than re-deriving a parallel counter.
+    existing = pre_attempt(
+        repo,
+        check=_REPLAN_RECURRENCE_CHECK,
+        rule_id=_REPLAN_RECURRENCE_RULE,
+        target=milestone_id,
+    )
+    prior_replans = existing.occurrence_count if existing is not None else 0
+    if prior_replans >= MAX_REPLANS_PER_MILESTONE:
+        return _reject_replan(
+            request, "replan limit exceeded for this milestone; Owner escalation required"
+        )
+
+    observe_issue(
+        repo,
+        IssueObservation(
+            check=_REPLAN_RECURRENCE_CHECK,
+            rule_id=_REPLAN_RECURRENCE_RULE,
+            target=milestone_id,
+            title="Replan granted",
+            summary_text=f"trigger_type={trigger_type}; evidence={evidence_artifact}",
+            source="renmark.program_driver",
+            run_id=_as_str(metadata.get("run_id")),
+        ),
+    )
+
+    return ReplanDecision(
+        True, trigger_type, evidence_artifact, "replan permitted; evidence valid", _utc_now_iso()
+    )
+
+
+def _reject_replan(request: ReplannableEscalation, reason: str) -> ReplanDecision:
+    trigger_type = request.trigger_type if isinstance(request.trigger_type, int) else -1
+    return ReplanDecision(
+        False, trigger_type, _as_str(request.evidence_artifact), reason, _utc_now_iso()
+    )
+
+
+def _resolve_evidence_path(repo: str, evidence_artifact: str) -> Path:
+    candidate = Path(evidence_artifact)
+    return candidate if candidate.is_absolute() else Path(repo) / candidate
+
+
+def _stale_evidence_reason(metadata: dict[str, object]) -> str:
+    """Return a rejection reason iff ``metadata['stale_after']`` has passed."""
+    stale_after = _as_str(metadata.get("stale_after"))
+    if not stale_after:
+        return ""
+    try:
+        deadline = datetime.fromisoformat(stale_after.replace("Z", "+00:00"))
+    except ValueError:
+        return f"invalid stale_after timestamp: {stale_after!r}"
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > deadline:
+        return f"artifact stale (stale_after={stale_after})"
+    return ""
+
+
+def _validate_trigger_evidence(trigger_type: int, metadata: dict[str, object]) -> tuple[bool, str]:
+    """Per-trigger required-field check, mirroring design doc §1.5's ``match``.
+
+    Triggers 4 and 5 deliberately stop short of the design doc's pseudocode
+    ``verify_git_ref_exists`` / re-run-the-audit steps — those require
+    executing external tooling (git ref resolution, a live repo scan) that
+    this deterministic, no-I/O-beyond-the-cited-artifact gate does not
+    perform. Presence of the cited pointer field is enforced instead; the
+    live-verification step is an open follow-up the design doc itself defers
+    (§5 Q3/Q7 territory), not a silent gap introduced here.
+    """
+    if trigger_type == 1:  # Owner requirement change
+        approved_by = _as_str(metadata.get("approved_by"))
+        approved_at = _as_str(metadata.get("approved_at"))
+        if not (approved_by and approved_at):
+            return False, "change lacks Owner approval metadata"
+        if "owner" not in approved_by.lower():
+            return False, f"approval is not from Owner (from {approved_by!r})"
+        return True, ""
+    if trigger_type == 2:  # Inspector architecture failure
+        inspection_type = _as_str(metadata.get("inspection_type"))
+        if inspection_type != "architecture":
+            return False, f"inspection is {inspection_type or '(missing)'}, not architecture"
+        if not _as_str(metadata.get("reproducible_evidence_path")):
+            return False, "no reproducible evidence cited"
+        return True, ""
+    if trigger_type == 3:  # Engineer impossibility proof
+        classification = _as_str(metadata.get("classification"))
+        if classification != "architect-escalation":
+            return False, "escalation is not architect-level"
+        if not (
+            _as_str(metadata.get("acceptance_criterion_id"))
+            and _as_str(metadata.get("blocking_constraint"))
+        ):
+            return False, "proof lacks criterion/constraint identification"
+        return True, ""
+    if trigger_type == 4:  # Dependency materially changed
+        if not _as_str(metadata.get("git_diff_ref")):
+            return False, "dependency change lacks git evidence"
+        return True, ""
+    if trigger_type == 5:  # Repository materially diverged
+        if not _as_str(metadata.get("audit_path")):
+            return False, "drift audit lacks path"
+        if not _as_str(metadata.get("divergence_summary")):
+            return False, "drift audit lacks divergence summary"
+        return True, ""
+    return False, f"unrecognized trigger_type: {trigger_type!r}"  # pragma: no cover — pre-filtered above
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 # ── Advance on success (write-state-before-return) ───────────────────────────────
 
 
@@ -655,9 +881,12 @@ def driver_status(program: Program) -> str:
 
 __all__ = [
     "HARD_STOPS",
+    "MAX_REPLANS_PER_MILESTONE",
     "MAX_TASK_RETRIES",
     "MilestoneDecision",
     "RepairPackagePointer",
+    "ReplanDecision",
+    "ReplannableEscalation",
     "StopReason",
     "advance_on_success",
     "decide_milestone_execution",
@@ -667,6 +896,7 @@ __all__ = [
     "evaluate_stop_for_stage",
     "is_hard_stop",
     "next_stage",
+    "permit_replan",
 ]
 
 

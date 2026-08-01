@@ -77,6 +77,8 @@ tier-override flag:
 
 **When Agency Mode is active:** codereview runs a full review before each milestone signoff, reports both merge-readiness and risk findings, and gates the owner signoff on review verdict. The review blocks premature "done" declarations until findings are addressed. See the Agency Mode contract at `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` for gating rules and escalation conditions. When Agency Mode is off, existing codereview behavior is unchanged.
 
+**Inspector findings do not self-repair.** codereview runs an Inspector-role pass — its output is findings and evidence only, never a file edit. Any FAIL verdict, blocking finding, or finding with severity ≥ Major must NOT be patched in the same dispatch or the same agent context, even if the fix looks trivial. Instead, turn the finding into a repair work order via `renmark.dispatch.build_repair_work_order` (Inspector finding → `RepairWorkOrder`, restricted to major/critical severity) and log it with `renmark.delivery_state.record_repair_work_order` (reuses the existing provenance ledger — no parallel repair ledger). The repair itself is routed as a SEPARATE, later dispatch to a Worker role (e.g. `code-implementer`), then re-verified independently — never an inline fix folded into this review pass. See `.renmark/plans/r-0.2/inspector-repair-separation-design.md` §4 for the full pattern (ADR-046).
+
 **Adversarial escalation (REQ-2 — highest-stakes diffs only).** For release-gating,
 security-sensitive, or engine/state code, adversarial verification subagents MAY be
 dispatched on `fable` (Agent tool, `model: "fable"`) to attempt to refute the review's

@@ -101,6 +101,26 @@ Run the inspection. Update `session.md` with findings — eliminate or confirm h
 
 Once you've isolated WHY the bug exists (not just what fixes it), write the root-cause statement in `session.md`.
 
+### 5.5 Scope or approach check — replan gate
+
+If, after confirming the root cause, you discover that the fix requires **more work than originally scoped** (files outside the planned set, dependency restructuring) or that the **current approach is no longer viable**, do not proceed to Step 6 without explicit approval.
+
+Construct a `ReplannableEscalation` (from `renmark.program_driver`) with:
+- `milestone_id` — the current work / feature ID
+- `trigger_type` — one of 1–5 (see below)
+- `evidence_artifact` — path to a `.renmark/` artifact supporting the trigger
+- `metadata` — dict with trigger-specific fields per trigger type
+
+Call `permit_replan(repo, request)`. Replans are permitted **only** for one of five recognized evidence-backed triggers:
+
+1. **Owner requirement change** — Owner provides a new/modified requirement (updated PRD, decision memo)
+2. **Inspector architecture failure** — Independent verification surfaces a structural defect in the blueprint
+3. **Engineer impossibility proof** — You prove the contract cannot be satisfied as written
+4. **Dependency materially changed** — External/internal dependency (library, API, schema) invalidates the plan
+5. **Repository diverged** — Actual repo state differs materially from the approved code map
+
+**Prose assertions alone** ("I think a different approach is better") are **rejected**. A replan is permitted only if `permit_replan()` returns `permitted=true`. Otherwise, fix within the original scope or escalate to the Owner for a decision.
+
 ### 6. Fix
 
 **Gate — before writing any code:** the root cause must be written as a single sentence in `session.md`. If you cannot state WHY the bug exists (not what fixes it), return to step 4. Patching symptoms without a confirmed root cause creates new bugs.

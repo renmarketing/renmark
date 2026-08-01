@@ -47,11 +47,29 @@ def is_claude_executor(executor: str) -> bool:
     return executor in CLAUDE_EXECUTORS
 
 
-def build_agent_dispatch(task: Task, repo: Path) -> AgentDispatch:
+def build_agent_dispatch(
+    task: Task,
+    repo: Path,
+    *,
+    scope: fast_path.WorkerScope | None = None,
+) -> AgentDispatch:
     """Compose the Agent-tool prompt for a Claude-model task.
 
     Mirrors the contract that nim/codex tasks see: single file, prose spec,
     verifier the subagent must satisfy.
+
+    R-0.2/WP-5 (scope-enforcement-generalization-design.md §4/§5): ``scope``
+    is optional and defaults to ``None`` — a caller that doesn't pass it gets
+    byte-identical behavior to R-0.1 (no ``AgentDispatch.scope``, no post-hoc
+    ``verify_worker_scope`` call; the prose constraint in the prompt remains
+    the only guard, per the pinned regression baseline in
+    ``tests/test_r0_2_dispatch_regression_baseline.py``). A caller that
+    passes an explicit ``scope`` opts a single dispatch into Layer-B
+    deterministic enforcement — see ``renmark.dispatch.verify_agent_dispatch_scope``
+    for the post-hoc check. Multi-wave/cumulative scope verification (design
+    doc §3/§7, Options A/B/C) is NOT decided or implemented here; this
+    function only supports the single-dispatch case, matching fast-path's
+    existing scope granularity.
     """
     mode_verb = "Create" if task.mode == "A" else "Modify"
     ctx_block = ""
@@ -85,6 +103,7 @@ def build_agent_dispatch(task: Task, repo: Path) -> AgentDispatch:
         verifier=task.verifier,
         description=f"renmark task {task.index}: {task.title[:60]}",
         prompt=prompt,
+        scope=scope,
     )
 
 

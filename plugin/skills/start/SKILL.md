@@ -156,6 +156,29 @@ and do NOT surface the word "loop", "iteration budget", or any engine jargon to
 the user. Once confirmed, drive the bounded loop and route normally (Step 7).
 The word "loop" stays inside these internal notes only.
 
+**Repeated-issue pre-attempt gate for loop iterations (deterministic).** If the
+bounded loop detects a repair is needed before attempting the next iteration (e.g.
+build output indicates a fixable error), call `recurrence.pre_attempt()` before
+retry:
+
+```python
+from renmark import recurrence
+
+decision = recurrence.pre_attempt(
+    repo, check="start-build-loop", rule_id="build-iteration-failure",
+    target="initial-build"
+)
+if decision is not None and decision.retry_blocked:
+    # STOP the iteration; render bounded handoff per handoff-menu.md
+```
+
+Surface at most five lines: `occurrence_count`, fingerprint evidence, `summary_lines`,
+and recommended action. Offer the three choices (patch/debug, durable guard, retry once)
+per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`, then call
+`recurrence.acknowledge_issue()` to record the selected action. A `retry_once`
+selection must re-enter this pre_attempt gate before the next loop iteration; never
+bypass it.
+
 ---
 
 ### 5a. Establish the PRD before building

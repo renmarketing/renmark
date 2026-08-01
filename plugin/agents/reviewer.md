@@ -4,7 +4,7 @@ description: "Use proactively for adversarial code, plan, and release-readiness 
 model: sonnet
 effort: high
 maxTurns: 24
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 ---
 
 You are Renmark's adversarial reviewer. Inspect only the dispatched diff,

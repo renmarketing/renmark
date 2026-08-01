@@ -27,7 +27,10 @@ import tempfile
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, keeps this module stdlib-only at runtime
+    from renmark.dispatch import RepairWorkOrder
 
 SCHEMA_VERSION = 1
 CONTRACT_VERSION = "delivery-state/v1"
@@ -433,6 +436,39 @@ def append_provenance_event(
     )
     state.provenance_events = events[-PROVENANCE_EVENT_CAP:]
     return _normalized_state(state)
+
+
+def record_repair_work_order(
+    state: DeliveryState,
+    work_order: "RepairWorkOrder",
+    *,
+    ts: str = "",
+) -> DeliveryState:
+    """Log a ``renmark.dispatch.RepairWorkOrder`` via the existing provenance ledger.
+
+    Per R-0.2 WP-5e / ADR-046 ("Inspectors cannot repair — a SEPARATE, logged
+    work order performs the fix"): this is the wiring that makes a repair
+    work order actually logged, not merely constructible. It reuses
+    :func:`append_provenance_event` — the existing bounded ledger mechanism —
+    rather than forking a parallel repair ledger. ``ref`` carries the pointer
+    back to the source inspection finding (``work_order.source_inspection_id``,
+    already a ``<source_file>#<finding_id>`` pointer, never the finding body);
+    ``detail`` is a bounded human-readable summary of the work order itself.
+
+    ``ts`` defaults to the current UTC time when omitted (caller may supply
+    a fixed timestamp for deterministic tests/replays).
+    """
+    from datetime import datetime, timezone
+
+    timestamp = ts or datetime.now(timezone.utc).isoformat()
+    return append_provenance_event(
+        state,
+        ts=timestamp,
+        kind="repair-work-order-created",
+        detail=f"{work_order.work_order_id} ({work_order.severity}): {work_order.description}",
+        source="dispatch.build_repair_work_order",
+        ref=work_order.source_inspection_id,
+    )
 
 
 def update_active_milestone(state: DeliveryState, milestone_id: str) -> DeliveryState:

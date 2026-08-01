@@ -1,5 +1,29 @@
 # Decisions (ADRs)
 
+## ADR-046 — Inspector/repair separation enforcement (R-006)
+
+**Date:** 2026-08-01
+**Status:** Accepted — design; implementation pending WP-5
+
+**Context.** Constitution rule R-006 ("Inspectors cannot repair — findings and evidence only; a separate repair work order performs changes") requires that Inspector-role dispatches (codereview, verify, QA) are structurally prevented from mutating files. Today, the `reviewer.md` agent role declares `tools: Read, Grep, Glob, Bash, Write` — permitting Write access despite the contractual intent (subagent-profiles.md declares reviewer as "read-only"). This creates a gap: an Inspector COULD self-repair during its own dispatch, undermining the authority separation between Inspection and Repair.
+
+**Decision.** Two-layer enforcement:
+
+1. **Tool restriction on Inspector roles:** Remove `Write` and `Edit` from `plugin/agents/reviewer.md` and any future Inspector-class roles (e.g., QA Inspector, Architecture Inspector). Keep read and query tools (Read, Grep, Glob, Bash) to permit test execution and evidence gathering, but structurally prevent file mutation via the host platform's tool allowlist.
+
+2. **Repair work-order pattern:** Any Inspector finding with severity ≥ Major or a FAIL verdict must produce a separate, logged repair work order (with work-order ID, source inspection reference, scope, and acceptance criteria) routed through the Governor to an appropriate Worker role—not an in-context fix by the Inspector itself.
+
+**Consequences:**
+- Pro: Separation is now structural (tool restriction) + policy (work-order pattern), not just advice.
+- Pro: Audit trail records every inspection→repair flow with forward/backward pointers.
+- Pro: Authority boundaries are enforced by the host platform, not dependent on prompt discipline.
+- Con: Inspector findings are slightly delayed (one dispatch for finding, one for repair) vs. hypothetical in-line fix.
+- Con: Requires skill updates (codereview, verify, etc.) to emit repair work orders instead of assuming fixes.
+
+**Spec:** `.renmark/plans/r-0.2/inspector-repair-separation-design.md`.
+
+---
+
 ## ADR-045 — Public Agency and Orchestrator paths; internal Conductor policy
 
 **Date:** 2026-07-30

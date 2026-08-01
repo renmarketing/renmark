@@ -547,6 +547,33 @@ def _complete_clean_run(repo: Path, run_id: str, plan_path: str, tasks: list[Tas
     _lifecycle.write_lifecycle(repo, stage="created")
 
 
+def _r008_precheck(task: Task) -> list[str]:
+    """R-008 pre-dispatch checklist gate — called immediately BEFORE a task is
+    handed to a real dispatch runner (``_runner`` below), the actual per-task
+    dispatch-orchestration call site in the CLI layer.
+
+    Lenient mode only (Phase 1 of the migration path in
+    ``.renmark/plans/r-0.2/dispatch-reason-budget-design.md`` §5/§8): missing
+    fields NEVER block dispatch here — this wiring only makes the checklist
+    live-but-non-blocking. Pre-R-0.2 ``Task`` objects carry none of the six
+    R-008 fields yet, so today every dispatch is expected to warn; that is the
+    intended, unchanged behavior for existing callers. Returns the list of
+    missing field names (empty when fully satisfied) and prints one bounded
+    warning line so the gap is surfaced, not silently discarded.
+    """
+    from .. import subagent_gate as _sg
+
+    missing = _sg.enforce_r008_dispatch(task, strict=False)
+    if missing:
+        title = getattr(task, "title", "") or ""
+        index = getattr(task, "index", "?")
+        _print(
+            f"R-008 WARN: task {index} ({title}) dispatched with missing "
+            f"field(s): {', '.join(missing)} (lenient mode — not blocking)"
+        )
+    return missing
+
+
 def execute_plan(
     plan_path: str,
     *,
@@ -619,6 +646,7 @@ def execute_plan(
     clear_pause(repo)
 
     needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
+    r008_warned: list[int] = []  # tasks that dispatched with missing R-008 fields
 
     # Holder for the current wave's task list, set per-wave below so the
     # runner can compute each task's sibling targets (for rollback isolation).
@@ -626,6 +654,11 @@ def execute_plan(
 
     def _runner(task: Task, _repo: Path) -> _dispatch.TaskResult:
         """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
+        # R-008 pre-dispatch checklist (lenient — warn, never block). This is
+        # the real per-task dispatch call site: every task reaching _runner is
+        # about to be handed to a live executor (_execute_task → codex).
+        if _r008_precheck(task):
+            r008_warned.append(task.index)
         sibling_targets = [t.target for t in current_wave if t.index != task.index]
         ok, reason, used, sha = _execute_task(
             task=task,

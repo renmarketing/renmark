@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import fast_path
 from .parser import Task
 from .providers import claude_agent
 
@@ -68,6 +69,13 @@ class TaskResult:
 class WaveResult:
     group_id: int
     tasks: list[TaskResult] = field(default_factory=list)
+    # R-0.2/WP-8a: populated only for the single-task, single-file-target
+    # Claude-model case (see `_maybe_scoped_claude_dispatch` below). Keys are
+    # `task_index`. Multi-task Claude waves intentionally leave this empty —
+    # see the module-level note near `verify_agent_dispatch_scope` for why
+    # (design doc §3's multi-wave/multi-task diff-attribution problem applies
+    # equally within one wave when >1 Claude task shares a base_sha).
+    scoped_dispatches: dict[int, "claude_agent.AgentDispatch"] = field(default_factory=dict)
 
     @property
     def all_passed(self) -> bool:
@@ -160,13 +168,34 @@ def dispatch_wave(
     claude_tasks = [t for t in wave if claude_agent.is_claude_executor(t.executor)]
     runnable = [t for t in wave if not claude_agent.is_claude_executor(t.executor)]
 
+    # R-0.2/WP-8a: for a wave whose Claude-model sub-group is exactly one
+    # task with a narrow, single/few-file target (same eligibility signals
+    # `fast_path.classify_fast_path` already uses), construct that task's
+    # `WorkerScope` and build a scoped `AgentDispatch` so the caller (the
+    # host-agent skill issuing the real Agent tool call) can later run
+    # `verify_agent_dispatch_scope` against the real git diff. Multi-task
+    # Claude waves are left unscoped here on purpose — see `WaveResult
+    # .scoped_dispatches`'s docstring and `verify_wave_dispatch_scopes` below.
+    scoped_dispatch = _maybe_scoped_claude_dispatch(claude_tasks, repo)
+    if scoped_dispatch is not None:
+        task_index, agent_dispatch = scoped_dispatch
+        result.scoped_dispatches[task_index] = agent_dispatch
+
     for t in claude_tasks:
+        note = "dispatch this via the Agent tool from the orchestrate skill"
+        if t.index in result.scoped_dispatches:
+            note += (
+                " (scope declared — after it returns, call "
+                "enforce_wave_dispatch_scopes(result, repo, base_sha) to raise "
+                "loud on any violation, or verify_wave_dispatch_scopes for the "
+                "inspectable-tuple form)"
+            )
         result.tasks.append(
             TaskResult(
                 task_index=t.index,
                 executor=t.executor,
                 status="needs_agent",
-                note="dispatch this via the Agent tool from the orchestrate skill",
+                note=note,
             )
         )
 
@@ -198,6 +227,161 @@ def _run_one(run_task: Callable[[Task, Path], TaskResult], task: Task, repo: Pat
             elapsed_s=time.monotonic() - start,
             note=f"{type(e).__name__}: {e}",
         )
+
+
+# ── R-0.2/WP-5: generalized post-hoc scope verification ─────────────────────
+#
+# Per .renmark/plans/r-0.2/scope-enforcement-generalization-design.md §4/§9:
+# reuse fast_path.WorkerScope/verify_worker_scope UNCHANGED; only the call
+# site generalizes to any AgentDispatch (fast-path or normal) that declared
+# a scope. Multi-wave/cumulative verification (design doc §3/§7, Options
+# A/B/C) is explicitly NOT decided here — this function verifies exactly one
+# dispatch's diff against exactly one declared scope, the same granularity
+# fast-path already uses. Wiring cumulative or per-wave verification across
+# multiple dispatches in a single wave/program run is a documented follow-up,
+# not implemented in this work package.
+
+
+def _maybe_scoped_claude_dispatch(
+    claude_tasks: list[Task],
+    repo: Path,
+) -> tuple[int, "claude_agent.AgentDispatch"] | None:
+    """R-0.2/WP-8a wiring: build a scoped ``AgentDispatch`` for the simplest
+    case only — exactly one Claude-model task in this wave, whose target
+    passes the SAME 5-signal eligibility check ``fast_path.classify_fast_path``
+    already uses for the fast path (reused, not reinvented — same threshold,
+    e.g. ``MAX_FAST_PATH_FILES``).
+
+    Returns ``None`` (no scope constructed, unchanged R-0.1 behavior) when:
+    - there isn't exactly one Claude-model task in the wave (multi-task
+      Claude waves are a documented follow-up — see the diff-attribution
+      problem in scope-enforcement-generalization-design.md §3, which applies
+      within a single multi-task wave just as much as across waves), or
+    - the lone task doesn't pass ``classify_fast_path``'s signals (e.g. a
+      wide/glob target, a renmark/**-or-plugin/** target, a chained verifier).
+
+    This function performs no I/O beyond composing prompt strings via
+    ``claude_agent.build_agent_dispatch`` and never calls the Agent tool
+    itself (Python cannot).
+    """
+    if len(claude_tasks) != 1:
+        return None
+    task = claude_tasks[0]
+    verdict = fast_path.classify_fast_path([task])
+    if not verdict.eligible:
+        return None
+    scope = fast_path.worker_scope_from_verdict(verdict, [task])
+    agent_dispatch = claude_agent.build_agent_dispatch(task, repo, scope=scope)
+    return task.index, agent_dispatch
+
+
+@dataclass(frozen=True)
+class WaveScopeViolation:
+    """One scoped dispatch's FAILING post-hoc verification, structured so a
+    caller can act on it (block wave completion, log, escalate) instead of
+    the violation being silently dropped."""
+
+    task_index: int
+    verdict: fast_path.ScopeVerdict
+
+
+def verify_wave_dispatch_scopes(
+    scoped_dispatches: dict[int, "claude_agent.AgentDispatch"],
+    repo: Path,
+    base_sha: str,
+) -> tuple[WaveScopeViolation, ...]:
+    """Post-hoc Layer-B check for every scoped dispatch a wave produced.
+
+    Call this AFTER the host has issued the real Agent tool call(s) for
+    ``scoped_dispatches`` and the resulting changes are committed (or at
+    least present in the working tree) at HEAD. Delegates per-dispatch to
+    ``verify_agent_dispatch_scope`` (reused, not reimplemented).
+
+    Returns an empty tuple when every scoped dispatch passed (or there were
+    none to check) — NOT when verification was skipped. A non-empty tuple is
+    a hard signal: the caller MUST NOT treat the corresponding task(s) as
+    complete/mergeable. This function never swallows a violation; it always
+    surfaces it in the returned tuple.
+    """
+    violations: list[WaveScopeViolation] = []
+    for task_index, agent_dispatch in scoped_dispatches.items():
+        scope_verdict = verify_agent_dispatch_scope(agent_dispatch, repo, base_sha)
+        if scope_verdict is not None and not scope_verdict.passed:
+            violations.append(WaveScopeViolation(task_index=task_index, verdict=scope_verdict))
+    return tuple(violations)
+
+
+# R-0.2/WP-9 — the WP-8 independent re-review (`.renmark/reviews/
+# 2026-08-01-r-0.2-closeout.md`, "WP-8 Wiring Re-Review") found that
+# `verify_wave_dispatch_scopes` above is real enforcement logic that nothing
+# ever CALLS: a tuple return a caller can inspect (or just as easily ignore)
+# is not enforcement. `enforce_wave_dispatch_scopes` is the fail-loud
+# counterpart — it raises `WaveScopeViolationError` instead of handing back
+# a value that could silently go unread. There is no synchronous point
+# inside `dispatch_wave` itself where a scoped Claude dispatch's real
+# post-dispatch diff is available (the actual Agent tool call happens
+# outside this process, after `dispatch_wave` already returned
+# `status="needs_agent"` — see `_maybe_scoped_claude_dispatch`'s docstring
+# and `fast_path.py`'s module docstring steps 1-4 for the same established
+# two-phase build-then-verify pattern). This function is therefore the
+# sanctioned call site for whoever holds the real post-dispatch `base_sha`
+# once the host's Agent call has actually completed — call it instead of
+# `verify_wave_dispatch_scopes` whenever a violation must not be able to go
+# unnoticed.
+class WaveScopeViolationError(RuntimeError):
+    """Raised by `enforce_wave_dispatch_scopes` when one or more scoped
+    dispatches in a wave failed post-hoc verification. Carries the full
+    tuple of `WaveScopeViolation` (never swallowed) so the caller can log or
+    act on the specific task(s)/violation(s) involved."""
+
+    def __init__(self, violations: tuple[WaveScopeViolation, ...]) -> None:
+        self.violations = violations
+        summary = "; ".join(
+            f"task {v.task_index}: {len(v.verdict.violations)} disallowed change(s)" for v in violations
+        )
+        super().__init__(f"wave scope violation(s) detected — {summary}")
+
+
+def enforce_wave_dispatch_scopes(
+    wave_result: WaveResult,
+    repo: Path,
+    base_sha: str,
+) -> None:
+    """Fail-loud counterpart to `verify_wave_dispatch_scopes`.
+
+    Call this AFTER the host has issued the real Agent tool call(s) for
+    `wave_result.scoped_dispatches` and the resulting changes are present at
+    HEAD. Raises `WaveScopeViolationError` when any scoped dispatch in this
+    wave failed its post-hoc scope check — a violation can no longer be
+    represented only as a field nothing reads. A wave with no scoped
+    dispatches (`wave_result.scoped_dispatches` empty — unscoped tasks, or a
+    wave whose Claude sub-group didn't qualify for `_maybe_scoped_claude_dispatch`)
+    is a silent no-op: verification stays strictly opt-in per WP-8a, exactly
+    matching R-0.1 behavior for anything that never declared a scope.
+    """
+    violations = verify_wave_dispatch_scopes(wave_result.scoped_dispatches, repo, base_sha)
+    if violations:
+        raise WaveScopeViolationError(violations)
+
+
+def verify_agent_dispatch_scope(
+    dispatch: claude_agent.AgentDispatch,
+    repo: Path,
+    base_sha: str,
+) -> fast_path.ScopeVerdict | None:
+    """Post-hoc Layer-B check for one ``AgentDispatch``.
+
+    Returns ``None`` when ``dispatch.scope`` is unset — no verification is
+    performed and the caller must treat this exactly as R-0.1 unscoped
+    dispatch behaved (no enforcement). When a scope IS declared, delegates
+    to ``fast_path.verify_worker_scope`` (reused, not reimplemented) against
+    the real git diff between ``base_sha`` and ``HEAD``. A caller MUST NOT
+    treat ``None`` as a pass; ``None`` means "not opted in," not "verified
+    clean."
+    """
+    if dispatch.scope is None:
+        return None
+    return fast_path.verify_worker_scope(dispatch.scope, repo, base_sha)
 
 
 def estimate_wave_cost(wave: list[Task]) -> tuple[int, float]:
@@ -758,3 +942,122 @@ def dispatch_task_isolated(
     )
     response = subagent_runner(inp)
     return parse_subagent_response(response)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# R-0.2/WP-5e — Inspector finding -> repair work order (ADR-046)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Per .renmark/plans/r-0.2/inspector-repair-separation-design.md §4 (Decision
+# §2, ADR-046 in .renmark/memory/decisions.md): any Inspector finding with a
+# FAIL verdict or severity >= Major must produce a SEPARATE, logged repair
+# work order — never an in-context fix by the Inspector itself. This section
+# answers the design doc's open question #1 (repair work order schema) and
+# implements the pure data-transformation function only: Inspector finding
+# in, repair work order out. Wiring this into codereview/verify skill prose
+# and actual Governor routing/dispatch is explicitly deferred (design doc
+# §7.4 lists "Full repair orchestration implementation" as WP-5+ follow-up);
+# do not read this as sanctioning a change to plugin/skills/**.
+#
+# Schema decision (open question #1): a NEW `RepairWorkOrder` dataclass, not
+# a reused `Task`. `Task` is shaped for the plan-authoring/wave-dispatch
+# lifecycle (index, mode, model, parallel_group, verifier_timeout_s,
+# serves/PRD traceability) — none of which apply to a repair born from an
+# inspection finding. A repair work order instead needs an explicit
+# back-pointer to its source finding (file + id, never the full finding body
+# — G3/G11 bounded-summary/pointer discipline) plus severity and
+# acceptance_criteria fields Task has no equivalent for. Reusing Task would
+# force either abusing unrelated fields (e.g. stuffing the source-finding
+# pointer into `spec` text) or leaving provenance implicit. `scope` reuses
+# `fast_path.WorkerScope` UNCHANGED (per design doc §9, "Reused" — WP-5a's
+# `AgentDispatch.scope` field is the same type), so once a repair work order
+# is actually routed to a Worker it plugs straight into WP-1/WP-5a's existing
+# scope-enforcement machinery without inventing a parallel shape.
+
+_SEVERITY_RANK = {"info": 0, "minor": 1, "major": 2, "critical": 3}
+REPAIR_SEVERITY_THRESHOLD = "major"
+
+
+@dataclass(frozen=True)
+class InspectorFinding:
+    """One Inspector-role finding, bounded to what a repair work order needs.
+
+    ``source_file`` + ``finding_id`` are the pointer back to the full
+    inspection report (e.g. a ``.renmark/reviews/*.review.md`` or ``.json``
+    artifact) — the finding's full body never crosses into the repair work
+    order (context-hygiene: pointer, not content).
+    """
+
+    finding_id: str
+    source_file: str
+    verdict: Literal["PASS", "FAIL"]
+    severity: Literal["info", "minor", "major", "critical"]
+    target: str
+    title: str = ""
+
+
+@dataclass(frozen=True)
+class RepairWorkOrder:
+    """A repair work order routed through the Governor to a Worker role.
+
+    Fields per design doc §4.1: ``work_order_id``, ``source_inspection_id``
+    (pointer, not content), ``severity``, ``scope``, ``description``,
+    ``acceptance_criteria``. Construction is restricted to major/critical
+    severity — ``build_repair_work_order`` is the only sanctioned factory.
+    """
+
+    work_order_id: str
+    source_inspection_id: str  # "<source_file>#<finding_id>"
+    severity: Literal["major", "critical"]
+    scope: fast_path.WorkerScope
+    description: str
+    acceptance_criteria: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.severity not in ("major", "critical"):
+            raise ValueError(
+                f"RepairWorkOrder.severity={self.severity!r} must be 'major' or "
+                "'critical' — repair work orders are only emitted for "
+                "FAIL/severity>=Major findings (ADR-046)"
+            )
+        if not self.acceptance_criteria:
+            raise ValueError(
+                "RepairWorkOrder.acceptance_criteria must be non-empty — "
+                "design doc §4.1 requires 'how to verify the repair succeeded'"
+            )
+
+
+def build_repair_work_order(
+    finding: InspectorFinding,
+    *,
+    work_order_id: str,
+    description: str = "",
+    acceptance_criteria: list[str] | None = None,
+) -> RepairWorkOrder | None:
+    """Pure data transform: Inspector finding -> RepairWorkOrder, or None.
+
+    Returns ``None`` when ``finding`` does NOT meet ADR-046's trigger
+    (verdict != "FAIL" AND severity < "major") — a PASS/low-severity finding
+    must never produce a repair work order. This function performs no I/O,
+    no dispatch, and no Governor/ledger interaction; it only shapes data.
+    Wiring the returned work order into an actual dispatch is a separate,
+    larger integration left for later per the design doc.
+    """
+    severity_rank = _SEVERITY_RANK.get(finding.severity, 0)
+    triggers = finding.verdict == "FAIL" or severity_rank >= _SEVERITY_RANK[REPAIR_SEVERITY_THRESHOLD]
+    if not triggers:
+        return None
+
+    effective_severity = finding.severity if severity_rank >= _SEVERITY_RANK[REPAIR_SEVERITY_THRESHOLD] else "major"
+
+    scope = fast_path.WorkerScope(allowed_paths=frozenset({finding.target}))
+    return RepairWorkOrder(
+        work_order_id=work_order_id,
+        source_inspection_id=f"{finding.source_file}#{finding.finding_id}",
+        severity=cast(Literal["major", "critical"], effective_severity),
+        scope=scope,
+        description=description or f"Repair: {finding.title or finding.finding_id}",
+        acceptance_criteria=list(
+            acceptance_criteria or [f"Re-run Inspector check for {finding.finding_id}; verdict must be PASS"]
+        ),
+    )

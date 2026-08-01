@@ -234,6 +234,27 @@ On approval, invoke `/renmark:orchestrate` with the produced plan. Orchestrate r
 check-plan in pre-flight, executes waves, re-verifies on completion, and shows the
 hand-off menu. If the user declines, stop with the validated plan on disk.
 
+**Repeated-issue pre-attempt gate (deterministic).** If orchestrate indicates a
+failed wave or if the user selects repair and wishes to retry the orchestrate dispatch,
+call `recurrence.pre_attempt()` before the retry attempt:
+
+```python
+from renmark import recurrence
+
+decision = recurrence.pre_attempt(
+    repo, check="feature-orchestrate", rule_id="orchestrate-repair",
+    target=<feature>
+)
+if decision is not None and decision.retry_blocked:
+    # STOP the retry; render bounded handoff per handoff-menu.md
+```
+
+Surface at most five lines: `occurrence_count`, fingerprint evidence, `summary_lines`,
+and recommended action. Offer the three choices (patch/debug, durable guard, retry once)
+per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md`, then call
+`recurrence.acknowledge_issue()` to record the selected action. A `retry_once`
+selection must re-enter this pre_attempt gate before dispatch; never bypass it.
+
 ### 5. Blueprint Update
 
 After orchestrate completes (whether or not all tasks pass), invoke `/renmark:blueprint`
