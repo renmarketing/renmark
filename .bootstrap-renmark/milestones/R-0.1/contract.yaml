@@ -78,7 +78,12 @@ scope:
     - "The minimal canonical ledger consolidation — Phase 3, deferred unless R-0.1 discovers it's a hard blocker"
     - "WritingMate or any remote-provider work — Phase 7, still blocked"
     - "Retroactive enforcement changes to Normal Feature or Architectural Feature paths — this release only touches the Small Task fast path"
-  allowed_paths: []   # deliberately empty at PLANNED — named modules are an implementation-time decision, gated behind explicit Owner approval of this contract first, same discipline as R-0.0's allowed_paths amendment
+  allowed_paths:
+    # Amended 2026-08-01 for WP-3: a new regression-test file, not renmark/**
+    # production code. prohibited_paths below never listed tests/ - this is
+    # a documentation amendment, not a scope exception. renmark/** itself
+    # stays prohibited until a future WP-4 amendment names exact modules.
+    - "tests/test_r0_1_ux_regression_baseline.py"
   prohibited_paths:
     - "renmark/** (until allowed_paths is explicitly amended post-approval, same discipline as R-0.0)"
     - "plugin/**"
@@ -122,8 +127,21 @@ work_packages:
       as an explicit WP-4 open question. Zero renmark/** changes - docs-only.
   - id: WP-3
     title: UX regression test suite for non-fast-path commands
-    produces: "test coverage proving existing entrypoints are unchanged"
-    status: "NOT STARTED — gated"
+    produces: "tests/test_r0_1_ux_regression_baseline.py"
+    status: >
+      COMPLETE (2026-08-01) — 4 tests pin TODAY's real dispatch/routing/gating
+      behavior for task shapes that fail WP-1's fast-path classifier: a
+      single renmark/** target (single-Agent/code-implementer routing), a
+      2-file parallel wave (fanout via Workflow), a medium-complexity task
+      (subagent_gate.justify_task verdict), and the existing 8-location
+      version-drift invariant (unrelated to R-0.1, asserted to stay clean
+      throughout). Each assertion was verified against live current output
+      before being pinned, not guessed. WP-4 must not change any assertion
+      here for these shapes — a fast path is additive, not a replacement of
+      existing Normal/Architectural Feature routing. Full suite: 1662
+      passed (1658 + 4 new), 31 skipped - zero regressions. allowed_paths
+      amended to name this one new test file (not renmark/** production
+      code - tests/ was never in prohibited_paths).
   - id: WP-4
     title: Implementation (classification + scope enforcement + no-nested-dispatch + retry cap)
     produces: "renmark/** changes per an allowed_paths amendment named at WP-2/WP-3 completion"
