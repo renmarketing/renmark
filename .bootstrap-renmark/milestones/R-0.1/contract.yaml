@@ -246,8 +246,8 @@ observation:
     - "fast-path resource usage vs. R-0.0 Scenario A baseline, ongoing"
     - "Owner-reported ceremony/friction regressions, if any"
 
-status: engineering_verified   # All 5 WPs COMPLETE (2026-08-01). Acceptance review executed against
-                # engineering_acceptance: 4/5 criteria PASS, 1 honestly NOT MET (no-nested-dispatch is
+status: released   # RELEASED 2026-08-01, v0.39.4. All 5 WPs COMPLETE. Acceptance review: 4/5
+                # engineering_acceptance criteria PASS, 1 honestly NOT MET (no-nested-dispatch is
                 # prompt-level only, flagged since WP-2's design doc, not overclaimed). Owner decision:
-                # ACCEPTED WITH FOLLOW-UP (F1, F2). See closeout.md. Awaiting explicit Owner go-ahead
-                # to merge/tag/release per renmark's own merge/release Pause-Policy gate.
+                # ACCEPTED WITH FOLLOW-UP (F1, F2) - see closeout.md. Owner approved tag/release via
+                # AskUserQuestion ("Tag and release"). gates_release: R-0.2 is now unlocked.
