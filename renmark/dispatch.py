@@ -16,13 +16,40 @@ sees one Bash prompt per wave instead of one per task.
 from __future__ import annotations
 
 import concurrent.futures
+import json
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .parser import Task
 from .providers import claude_agent
+
+# ── R-0.0 baseline tracing (opt-in, additive, disabled by default) ────────────
+#
+# Behind RENMARK_BASELINE_TRACE=1 only. Unset (the default) means dispatch_wave's
+# runtime behavior is byte-identical to before this block existed — see
+# .bootstrap-renmark/milestones/R-0.0/instrumentation-design.md. Not part of
+# Renmark's product surface; exists solely to measure current orchestration
+# behavior for the R-0.0 baseline evidence package.
+
+_BASELINE_TRACE_ENV = "RENMARK_BASELINE_TRACE"
+_BASELINE_TRACE_LEDGER = "baseline-trace.jsonl"
+
+
+def _append_baseline_trace(repo: Path, record: dict[str, object]) -> None:
+    """Append one opt-in trace row. Never raises; a trace failure must not
+    affect the caller's real return value."""
+    try:
+        path = Path(repo) / ".renmark" / "analytics" / _BASELINE_TRACE_LEDGER
+        path.parent.mkdir(parents=True, exist_ok=True)
+        row = {"ts": datetime.now(timezone.utc).isoformat(), **record}
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, sort_keys=True) + "\n")
+    except OSError:
+        pass
 
 
 @dataclass
@@ -112,6 +139,21 @@ def dispatch_wave(
 
     validate_wave(wave)
     gid = wave[0].parallel_group if wave[0].parallel_group is not None else wave[0].index
+
+    if os.environ.get(_BASELINE_TRACE_ENV) == "1":
+        _append_baseline_trace(
+            repo,
+            {
+                "kind": "wave_dispatch",
+                "group_id": gid,
+                "wave_size": len(wave),
+                "parallel_groups": sorted(
+                    {t.parallel_group for t in wave if t.parallel_group is not None}
+                ),
+                "task_targets": [t.target for t in wave],
+            },
+        )
+
     result = WaveResult(group_id=gid)
 
     # Split: Claude-model tasks marked needs_agent; everything else runs in parallel.

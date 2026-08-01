@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-08-01] - docs(prd): reconcile PRD with invisible-by-default governance and release-oriented delivery
+
+**Request:** Reconcile PRD.md with the internal governed-orchestration architecture under active design in `.bootstrap-renmark/` (release R-0.0, work package WP-1), per Owner-approved `governing-methodology-addendum-01.md`/`-02.md`/`-03.md`.
+**Built:** Added REQ-26 (invisible-by-default internal governance — internal roles/handoffs/artifacts stay implementation detail unless they measurably reduce user effort, cost, or failure rate) and REQ-27 (work classification and release-oriented delivery — fast path for bounded corrections, milestone releases for substantial builds, applying to every project renmark manages including its own development). Added two Goals bullets and one Non-goals bullet ("not a visible internal bureaucracy"). Bumped `last_reviewed`.
+**Files changed:** `PRD.md`.
+**Do not change:** REQ-26/REQ-27 are product-level constraints, not architecture — implementation detail (roles, artifact schemas, budgets) stays in `.bootstrap-renmark/`, never re-derived in the PRD itself; the existing "PRD is not a roadmap" non-goal still holds, REQ-27 states behavior, not an actual milestone list.
+
 ## [2026-08-01] - fix(interaction): name AskUserQuestion explicitly in the interaction contract
 
 **Request:** Owner reported the CLI presenting decisions as plain text with no arrow-key/click selection, even after the earlier native-picker fix.

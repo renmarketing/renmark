@@ -1,0 +1,218 @@
+# R-0.0 release contract. Shape per release-contract-template.yaml
+# (governing-methodology-addendum-02.md). Decisions applied per
+# governing-methodology-addendum-03.md Part 2, Decision 1.
+#
+# STATUS: proposed / PLANNED. Not yet Owner-approved. No production code
+# touched, no benchmark runs executed to produce this contract.
+
+release_id: R-0.0
+title: Baseline and PRD Reconciliation
+release_type: internal-enablement   # per Owner Decision 1 - do not manufacture an end-user story
+
+phases_drawn_from:
+  - phase: 0
+    contribution: "entire release scope"
+  # single-phase release; no cross-phase dependency to declare here.
+
+gates:
+  gates_release: R-0.1   # per Owner Decision 1: "R-0.0 gates R-0.1"
+
+user_value:
+  # Deliberately not a user-facing capability - see release_type above.
+  actor: "General Contractor / Owner (internal operational readiness, not an end user)"
+  capability: >
+    A reconciled PRD addendum, three reproducible benchmark task definitions,
+    behavior-neutral-when-disabled instrumentation, and measured baseline
+    evidence sufficient to judge whether R-0.1 is actually an improvement.
+  problem_addressed: >
+    No measurable baseline exists today. Every later release's "reduced
+    overhead / fewer replans / less context" claim (governing-architecture-
+    roadmap.md §14.3) currently has nothing real to compare against, and the
+    PRD has not yet been reconciled with the internal governance architecture
+    (governing-methodology-addendum-01.md §2.2's risk: the contractor-
+    architect-worker structure must not become visible to the user).
+
+user_journey:
+  starting_state: >
+    Renmark v0.39.2, no baseline measurements exist, PRD.md does not mention
+    internal governance/role architecture, current-system-audit.md exists
+    (already produced, does not need rework per this session's ledger).
+  action: >
+    General Contractor produces the PRD addendum, defines 3 benchmark tasks,
+    designs additive-only instrumentation, proves it is behavior-neutral when
+    disabled, runs the 3 benchmarks once each under the budget in
+    benchmark-budget-and-circuit-breakers.md, and compiles the evidence.
+  expected_result: >
+    A PRD addendum ready for Owner review; 3 reproducible benchmark
+    definitions; a baseline-report.md with real measured numbers; proof
+    instrumentation is a no-op when disabled; sufficient evidence to open
+    R-0.1 with a real "before" to compare against.
+
+scope:
+  included:
+    - "PRD addendum: reconcile PRD.md with internal governance architecture per addendum-01 §2.2 (vibe-coder UX stays external; roles/authority stay internal unless a listed trigger fires)"
+    - "ADR-001: Role-Based Governed Orchestration for Renmark (deferred from original M-0, now in scope here per governing-architecture-roadmap.md §18 Action 1)"
+    - "3 benchmark task definitions (Scenario A: 1-2 file change; Scenario B: medium vertical feature; Scenario C: long-horizon multi-module milestone), each reproducible (same task run twice within stated variance tolerance)"
+    - "Instrumentation design (NOT implementation yet - this pass is contract-drafting only, per Owner's explicit 'do not instrument production code ... yet')"
+    - "Proof-of-design that instrumentation is additive-only and behavior-neutral when disabled (a design argument this pass; empirical proof happens when R-0.0 moves to IN DEVELOPMENT)"
+    - "One real baseline execution of each of the 3 benchmark scenarios, under the budget/circuit-breakers in benchmark-budget-and-circuit-breakers.md"
+    - "baseline-report.md compiling calls, dispatches, replans, retries, context estimates, duration, completion status, and result quality per scenario"
+    - "A tagged rollback point"
+  excluded:
+    - "Any change to renmark/*.py production logic or plugin/skills/*.md content beyond what instrumentation strictly requires (and even that is NOT executed this pass)"
+    - "Any Role/Authority enforcement code (Phase 2 / R-0.2)"
+    - "Any Worker/Inspector implementation (Phase 2/4)"
+    - "R-0.1 fast-path implementation itself"
+    - "Any WritingMate-related work (Phase 7, still blocked)"
+  allowed_paths:
+    - ".bootstrap-renmark/**"
+    - "PRD.md"   # addendum only, human-gated per plugin/skills/prd/SKILL.md's existing UPDATE-mode diff contract - no auto-write
+    - ".renmark/audits/**"   # measurement output only
+    # Amended 2026-08-01 per Owner approval, WP-4 stage 2 -> implementation:
+    - "renmark/program_driver.py"   # evaluate_stop / evaluate_stop_for_stage only, per instrumentation-design.md
+    - "renmark/dispatch.py"         # dispatch_wave only, per instrumentation-design.md
+    - "tests/test_program_driver.py"
+    - "tests/test_dispatch.py"
+    - ".renmark/analytics/baseline-trace.jsonl"   # new ledger, output only, opt-in
+  prohibited_paths:
+    - "renmark/**"   # still prohibited EXCEPT the 2 exact files named in allowed_paths above (amended 2026-08-01,
+                      # Owner-approved, per instrumentation-design.md). Never a blanket exception - any renmark/**
+                      # file not explicitly listed in allowed_paths remains prohibited.
+    - "plugin/**"
+    - ".renmark/state/**"
+    - ".renmark/memory/**"
+
+work_packages:
+  - id: WP-1
+    title: PRD addendum drafting
+    produces: "PRD.md diff (via existing /renmark:prd UPDATE-mode human-gated flow, not a direct write)"
+    status: >
+      COMPLETE (2026-08-01) — PRD.md diff (REQ-26, REQ-27, 2 Goals bullets, 1
+      Non-goals bullet) presented via AskUserQuestion, approved with one
+      Owner-requested revision (REQ-27 added, draft open question removed),
+      written, last_reviewed bumped, CHANGELOG entry appended.
+  - id: WP-2
+    title: ADR-001 authorship
+    produces: "decisions/ADR-001-role-based-orchestration.md"
+    status: >
+      COMPLETE (2026-08-01) — ADR-001 drafted covering the full reconciled
+      architecture (4 runtime roles, authority boundaries, release-oriented
+      completion, 4 execution paths, UX-first sequencing, Owner acceptance
+      authority, incremental gating, deferred WritingMate). Status: Proposed,
+      not yet Accepted — R-0.0's own acceptance step evaluates it alongside
+      WP-1/WP-3/WP-4/WP-5.
+  - id: WP-3
+    title: Benchmark task definitions
+    produces: "milestones/R-0.0/benchmark-tasks/scenario-{a,b,c}.md"
+    status: >
+      COMPLETE (2026-08-01) — 3 scenarios defined by construction (fixed
+      starting commit 173542ee4d46f903a138c27b6dab5c96357b0909, exact task
+      text, scoring rubric, budget from benchmark-budget-and-circuit-
+      breakers.md). One open item surfaced, not silently resolved: each
+      scenario proposes running in a disposable worktree/branch since R-0.0's
+      own contract prohibits touching renmark/**/plugin/** but genuine
+      baseline measurement requires a real (discardable) code change - this
+      isolation approach needs Owner confirmation before WP-5 executes.
+  - id: WP-4
+    title: Telemetry coverage analysis (staged hybrid instrumentation approach, per Owner correction)
+    stage_1: >
+      Read existing .renmark/analytics/*.jsonl output (events.jsonl,
+      task-runs.jsonl, feature-runs.jsonl) and produce a coverage table
+      against every required baseline metric: model/agent invocations,
+      dispatch type, context-size estimates, output-size estimates, replans,
+      retries, worker dispatches, test executions, verification executions,
+      duration, completion status, failure classification. Read-only — zero
+      renmark/** changes. Do not assume coverage merely because the files
+      exist; verify each metric against real recorded fields.
+    stage_2: >
+      For any metric stage_1 shows is genuinely missing: identify the exact
+      renmark/** hook location(s), design opt-in instrumentation gated behind
+      RENMARK_BASELINE_TRACE=1 (behavior-neutral when unset — no routing,
+      planning, retry, test, or verification decision may change), reusing
+      the existing append-only analytics path where practical, plus a test
+      plan proving behavior neutrality. This is a DESIGN deliverable only —
+      implementation does not start until this design is inspected and this
+      contract's allowed_paths is explicitly amended to name the exact
+      modules. Not a general telemetry platform.
+    produces: "milestones/R-0.0/telemetry-coverage-table.md, milestones/R-0.0/instrumentation-design.md (if stage_2 is needed at all)"
+    status: >
+      STAGE 1 COMPLETE (2026-08-01) — read-only coverage table produced,
+      checked against real recorded data (0/124 task-runs have nonzero
+      duration_s/tokens_in/tokens_out - verified empirically, not assumed).
+      5 gaps found: context/output token estimates, duration, replans,
+      dispatch-wave granularity, raw test-execution counts. Recommendation
+      surfaced (not yet approved): narrow stage 2 to just replans +
+      dispatch-wave granularity, since duration/tokens are capturable
+      externally by the WP-5 harness and test-execution counts may be
+      derivable from per-scenario ledger row counts given the confirmed
+      disposable-worktree isolation. STAGE 2 (design) COMPLETE (2026-08-01,
+      corrected scope per Owner: test-execution counts come from the WP-5
+      harness's own command log, not ledger row counts). IMPLEMENTATION
+      COMPLETE (2026-08-01) — allowed_paths amended and Owner-approved.
+      Actual hook site for the replan signal differs from the original
+      design sketch: rather than editing evaluate_stop's 5 individual return
+      statements, decide_milestone_execution (the one caller with `repo`
+      available) was split into a thin traced wrapper + a renamed
+      _decide_milestone_execution_impl, so evaluate_stop/evaluate_stop_for_stage
+      stay fully untouched and pure. This was a design-time-flagged
+      contingency ("exact insertion points... belongs in implementation, not
+      this design doc"), not a silent deviation. dispatch_wave hooked as
+      designed. New .renmark/analytics/baseline-trace.jsonl ledger, opt-in
+      RENMARK_BASELINE_TRACE=1, unset by default. 6 new tests (3 per file):
+      neutrality (env unset -> byte-identical return, no trace file),
+      positive (env set -> correct trace row, same return value), and a
+      no-signal/empty-wave negative case each. Full suite: 1658 passed, 31
+      skipped (was 1683 total before + 6 new = 1689, matches exactly - zero
+      regressions). Full precommit guardrail (7 steps, ruff/mypy skip
+      gracefully - not installed) passes clean.
+  - id: WP-5
+    title: Baseline execution and evidence compilation
+    produces: "metrics/baseline-scenario-{a,b,c}.json, metrics/baseline-report.md"
+    depends_on: [WP-3, WP-4]
+    status: gated — not authorized to start yet; also gated on the corrected budget in benchmark-budget-and-circuit-breakers.md being the operative ceiling (superseded values below)
+
+engineering_acceptance:
+  - "Reproducibility is established by construction at WP-3 (deterministic starting commit, fixed task text, fixed scoring rubric), not by an empirical rerun — the corrected WP-5 budget (see benchmark-budget-and-circuit-breakers.md) covers ONE execution pass per scenario. If empirical rerun-based reproducibility verification is wanted later, that is a separate future work package under a separate budget decision, not assumed as part of this contract's current scope."
+  - "WP-4 stage_1 (telemetry coverage analysis) is read-only against existing .renmark/analytics/*.jsonl output — zero renmark/** changes for this stage"
+  - "IF WP-4 stage_2 instrumentation is needed: opt-in only via RENMARK_BASELINE_TRACE=1; behavior is unchanged when unset (byte-identical output on a fixed test input, empirically checked); no routing/planning/retry/test/verification decision may change; only the exact modules named in an amended allowed_paths are touched; a test proves behavior neutrality"
+  - "Full existing test suite (1683 tests per current-system-audit.md) still passes after any instrumentation lands"
+
+required_inspections:
+  - contract   # did WP-1..WP-5 deliverables match this contract's scope
+  - runtime    # full test suite still green after instrumentation
+  - reproducibility   # new: the 2x-rerun variance check above
+
+user_acceptance:
+  scenario: "see internal-acceptance-scenario.md (this release's acceptance is INTERNAL per Owner Decision 1 - operational readiness and evidence, not a user-facing feature demo)"
+  evidence_required:
+    - "PRD addendum text, reviewed"
+    - "3 benchmark task definitions, marked reproducible"
+    - "baseline-report.md with real numbers"
+    - "instrumentation behavior-neutral-when-disabled proof"
+  decision_authority: Owner
+  delegated_acceptance:
+    eligible: true   # internal-enablement release - listed as delegable in addendum-03 Decision 2
+    delegated: false  # Explicitly reconfirmed false by Owner (2026-08-01 correction): "Keep delegated_acceptance: false
+                       # for R-0.0. Present its evidence package to me for the final acceptance decision."
+    delegate_to: null
+
+release:
+  channel: "existing repo channel - see release-candidate-and-tagging-policy.md. No new distribution system introduced, per Owner Decision 3."
+  artifact:
+    - "PRD.md addendum (merged)"
+    - "decisions/ADR-001-role-based-orchestration.md"
+    - "milestones/R-0.0/benchmark-tasks/scenario-{a,b,c}.md"
+    - "metrics/baseline-report.md + 3 scenario JSON files"
+  rollback: "git tag at pre-R-0.0 commit (see release-candidate-and-tagging-policy.md); R-0.0 touches no renmark/** or plugin/** production logic this pass, so rollback is a simple revert of docs/artifacts"
+
+observation:
+  period: "N/A in the traditional sense - R-0.0 produces no user-facing runtime behavior to observe. Its 'observation' is whether R-0.1 (or later releases) actually cite and rely on R-0.0's baseline numbers without dispute."
+  metrics:
+    - "whether R-0.1's engineering_acceptance later references R-0.0's baseline-report.md numbers directly"
+    - "whether the 3 benchmark scenarios remain reproducible when re-run for R-0.1's comparison"
+
+status: ready   # READY per Owner: "R-0.0 structure is approved subject to instrumentation and budget corrections;
+                # after incorporating them, move R-0.0 from PLANNED to READY and begin only WP-1."
+                # WP-2 through WP-5 remain individually gated - see each work_packages[].status above.
+                # Do not begin instrumentation or benchmark execution until their preceding work packages
+                # and this contract's gates are satisfied.

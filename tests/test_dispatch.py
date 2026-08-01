@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -307,3 +308,57 @@ def test_host_prompt_carries_canonical_reasoning_instruction() -> None:
 def test_host_dispatch_plan_rejects_unknown_host() -> None:
     with pytest.raises(ValueError, match="unsupported host"):
         dispatch.build_host_dispatch_plan([_task(1, "src/a.py", executor="sonnet")], host="other")
+
+
+# ── R-0.0 baseline-trace neutrality + positive tests (WP-4 stage 2) ──────────
+#
+# RENMARK_BASELINE_TRACE is opt-in and unset in the normal test environment;
+# these tests explicitly control it via monkeypatch to prove both states.
+
+
+def test_dispatch_wave_is_byte_identical_when_trace_env_unset(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("RENMARK_BASELINE_TRACE", raising=False)
+
+    def runner(task: Task, repo: Path) -> TaskResult:
+        return TaskResult(task_index=task.index, executor=task.executor, status="passed")
+
+    wave = [_task(1, "a", parallel_group=1), _task(2, "b", parallel_group=1)]
+    result = dispatch.dispatch_wave(wave, repo=tmp_path, run_task=runner)
+
+    assert result.all_passed
+    assert len(result.tasks) == 2
+    trace_path = tmp_path / ".renmark" / "analytics" / "baseline-trace.jsonl"
+    assert not trace_path.exists()
+
+
+def test_dispatch_wave_writes_wave_dispatch_trace_when_enabled(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("RENMARK_BASELINE_TRACE", "1")
+
+    def runner(task: Task, repo: Path) -> TaskResult:
+        return TaskResult(task_index=task.index, executor=task.executor, status="passed")
+
+    wave = [_task(1, "a", parallel_group=1), _task(2, "b", parallel_group=1)]
+    result = dispatch.dispatch_wave(wave, repo=tmp_path, run_task=runner)
+
+    # Same result as the untraced case — trace is a pure side effect.
+    assert result.all_passed
+    assert len(result.tasks) == 2
+    trace_path = tmp_path / ".renmark" / "analytics" / "baseline-trace.jsonl"
+    rows = [json.loads(line) for line in trace_path.read_text().splitlines() if line.strip()]
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "wave_dispatch"
+    assert rows[0]["wave_size"] == 2
+    assert rows[0]["parallel_groups"] == [1]
+    assert sorted(rows[0]["task_targets"]) == ["a", "b"]
+
+
+def test_dispatch_wave_traces_nothing_for_an_empty_wave_even_when_enabled(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RENMARK_BASELINE_TRACE", "1")
+
+    result = dispatch.dispatch_wave([], repo=tmp_path, run_task=lambda t, r: None)  # type: ignore[arg-type]
+
+    assert result.tasks == []
+    trace_path = tmp_path / ".renmark" / "analytics" / "baseline-trace.jsonl"
+    assert not trace_path.exists()
