@@ -246,7 +246,8 @@ observation:
     - "fast-path resource usage vs. R-0.0 Scenario A baseline, ongoing"
     - "Owner-reported ceremony/friction regressions, if any"
 
-status: ready   # READY. Approved as drafted, 2026-08-01 ("Approve as drafted"). Only WP-1
-                # (small-task classification design) is authorized to start. WP-2 through
-                # WP-5 remain individually gated — see work_packages[].status above.
-                # allowed_paths stays empty until an explicit amendment names exact modules.
+status: engineering_verified   # All 5 WPs COMPLETE (2026-08-01). Acceptance review executed against
+                # engineering_acceptance: 4/5 criteria PASS, 1 honestly NOT MET (no-nested-dispatch is
+                # prompt-level only, flagged since WP-2's design doc, not overclaimed). Owner decision:
+                # ACCEPTED WITH FOLLOW-UP (F1, F2). See closeout.md. Awaiting explicit Owner go-ahead
+                # to merge/tag/release per renmark's own merge/release Pause-Policy gate.
