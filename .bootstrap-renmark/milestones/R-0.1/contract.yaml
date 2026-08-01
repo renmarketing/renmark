@@ -190,9 +190,24 @@ work_packages:
       passed (1662 + 20 new), 31 skipped, zero regressions.
   - id: WP-5
     title: Benchmark comparison against R-0.0 baseline + evidence compilation
-    produces: "metrics/r-0-1-comparison.md, citing R-0.0/metrics/baseline-scenario-a.json directly"
+    produces: "metrics/r-0-1-comparison.md, metrics/r-0-1-comparison.json, citing R-0.0/metrics/baseline-scenario-a.json directly"
     depends_on: [WP-4]
-    status: "NOT STARTED — gated"
+    status: >
+      COMPLETE (2026-08-01) — one live subagent dispatched via the real
+      build_fast_path_agent_dispatch() prompt, in a disposable worktree off
+      main HEAD (8589315), re-running R-0.0's exact Scenario A task text.
+      Owner-approved budget (2 invocations / 40,000 tokens / 10 minutes, one
+      pass) - observed: 1 invocation, 41,260 tokens (103.2% of target, flagged
+      as a caveat, not a circuit-breaker trip), 21.0s wall-clock. Primary
+      result: verify_worker_scope() ran for real against the subagent's
+      actual git diff (not its self-report) and PASSED - the first live,
+      non-synthetic exercise of Layer B. Independently re-verified: git
+      status/diff confirmed only tests/test_hosts.py changed; pytest
+      re-run separately, 14/14 passed. Comparison to R-0.0's Scenario A
+      explicitly NOT presented as a controlled A/B (different starting
+      commit, longer fast-path prompt, n=1 per condition) - flagged as a
+      caveat in r-0-1-comparison.md rather than overclaimed. Worktree
+      removed after measurement.
 
 engineering_acceptance:
   - "A Worker dispatched with a declared scope cannot perform a file operation outside that scope without either being blocked or triggering an explicit escalation — demonstrated with a reproduction of a Scenario-C-shaped case (attempted deletion of a file outside declared scope)"

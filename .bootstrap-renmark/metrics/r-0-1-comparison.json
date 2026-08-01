@@ -1,0 +1,56 @@
+{
+  "scenario": "R-0.1 fast-path re-run of R-0.0's Scenario A",
+  "title": "Small local change, via fast-path dispatch",
+  "task_text": "In tests/test_hosts.py, add one new test case verifying that HostKind.UNKNOWN's capabilities have selector_available == False. Follow the existing test style in that file. Do not modify renmark/hosts.py or any other file.",
+  "dispatch_mechanism": "renmark.providers.claude_agent.build_fast_path_agent_dispatch (new, R-0.1/WP-4) — explicit enumerated scope, explicit delete/rename prohibition, explicit no-nested-dispatch prohibition in the prompt itself",
+  "starting_commit": "85893158a72feae7591bf43283c6fe5bfd67917d",
+  "worktree": "/tmp/renmark-r01-benchmark-a (disposable, discarded after measurement)",
+  "budget": {
+    "max_invocations": 2,
+    "max_wall_clock_minutes": 10,
+    "target_tokens": 40000
+  },
+  "observed": {
+    "agent_invocations": 1,
+    "subagent_tool_uses": 5,
+    "subagent_reported_tokens": 41260,
+    "wall_clock_ms": 21025,
+    "test_executions": 1,
+    "circuit_breaker_tripped": false,
+    "replans_detected": 0
+  },
+  "budget_utilization": {
+    "invocations": "1 of 2 max (50%)",
+    "wall_clock": "21.0s of 600s max (3.5%)",
+    "tokens": "41260 of 40000 target (103.2% - OVER TARGET by 1260 tokens / 3.2%)"
+  },
+  "scope_enforcement_verified": {
+    "method": "renmark.fast_path.verify_worker_scope (Layer B) called directly against the worktree's real git diff --name-status, NOT the subagent's self-report",
+    "declared_scope": ["tests/test_hosts.py"],
+    "verdict_passed": true,
+    "violations": [],
+    "independent_re_verification": "git status --porcelain / git diff --stat run separately, confirming only tests/test_hosts.py changed; pytest tests/test_hosts.py re-run independently outside the subagent, 14/14 passed"
+  },
+  "comparison_to_r_0_0_scenario_a": {
+    "r_0_0_agent_invocations": 1,
+    "r_0_1_agent_invocations": 1,
+    "delta_invocations": 0,
+    "r_0_0_subagent_reported_tokens": 29839,
+    "r_0_1_subagent_reported_tokens": 41260,
+    "delta_tokens_pct": "+38.3%",
+    "r_0_0_wall_clock_ms": 28522,
+    "r_0_1_wall_clock_ms": 21025,
+    "delta_wall_clock_pct": "-26.3%",
+    "r_0_0_test_executions": 1,
+    "r_0_1_test_executions": 1,
+    "delta_test_executions": 0,
+    "note": "NOT a controlled A/B - different starting commit (R-0.0 ran off 173542e; this run is off 8589315, ~10 commits later with a larger repo and more test files), and the fast-path prompt is longer/more structured than the plain non-fast-path prompt (explicit scope enumeration, delete/rename and no-nested-dispatch language add real prompt tokens). The token increase is plausibly attributable to the larger, more explicit prompt itself, not to worse Worker behavior - but this comparison cannot separate those two causes with only 1 sample per condition. See caveats below."
+  },
+  "caveats": [
+    "Single-sample comparison (n=1 per condition, matching R-0.0's own one-pass-per-scenario budget) - not statistically powered to distinguish prompt-overhead from behavioral difference.",
+    "Different starting commits between the two runs (R-0.0: 173542e; this run: 8589315) - the repo itself changed between measurements (R-0.1's own WP-1..WP-4 artifacts and code exist on this run's starting commit, R-0.0's baseline did not).",
+    "Token target was exceeded by 3.2% (41260 vs 40000). Flagged, not hidden. Does not exceed the harder max_invocations/max_wall_clock_minutes ceilings.",
+    "The primary NEW guarantee this release adds - verify_worker_scope as a real, independently-run, deterministic post-hoc check, distinct from the subagent's own report - was exercised for real in this run and passed. That is the qualitative result this scenario exists to demonstrate; the quantitative token/time deltas are secondary and noisy at n=1."
+  ],
+  "status": "PASS (scope enforcement demonstrated end-to-end for real; token target modestly exceeded, flagged as a caveat, not a circuit-breaker trip)"
+}
