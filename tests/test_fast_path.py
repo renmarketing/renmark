@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from renmark import fast_path
+from renmark.providers import claude_agent
 from renmark.parser import Task
 
 
@@ -217,3 +218,43 @@ def test_verify_worker_scope_fails_closed_on_unreadable_repo(tmp_path: Path) -> 
 
     assert verdict.passed is False
     assert verdict.violations[0].kind == "diff_unavailable"
+
+
+# ── build_fast_path_agent_dispatch (live-wiring, WP-4) ───────────────────────
+
+
+def test_build_fast_path_agent_dispatch_carries_real_scope() -> None:
+    task = _task(1, "tests/test_hosts.py")
+    dispatch = claude_agent.build_fast_path_agent_dispatch([task], Path("."))
+
+    assert dispatch.scope is not None
+    assert dispatch.scope.allowed_paths == frozenset({"tests/test_hosts.py"})
+    assert dispatch.target == "tests/test_hosts.py"
+    assert dispatch.model == "sonnet"
+
+
+def test_build_fast_path_agent_dispatch_prompt_declares_scope_and_forbids_nesting() -> None:
+    task = _task(1, "a.py")
+    dispatch = claude_agent.build_fast_path_agent_dispatch([task], Path("."))
+
+    assert "You may ADD or MODIFY only these exact files: a.py" in dispatch.prompt
+    assert "may not delete or rename ANY file" in dispatch.prompt
+    assert "must not invoke another agent, subagent, Task, or Agent tool call" in dispatch.prompt
+
+
+def test_build_fast_path_agent_dispatch_rejects_non_eligible_tasks() -> None:
+    task = _task(1, "renmark/x.py")
+    with pytest.raises(ValueError, match="not fast-path eligible"):
+        claude_agent.build_fast_path_agent_dispatch([task], Path("."))
+
+
+def test_build_agent_dispatch_unaffected_by_fast_path_addition() -> None:
+    """WP-3's guarantee, re-asserted at the unit level: the existing
+    non-fast-path dispatch composer's prompt is untouched by this module's
+    addition — it has no scope field populated and no fast-path language."""
+    task = _task(1, "a.py")
+    dispatch = claude_agent.build_agent_dispatch(task, Path("."))
+
+    assert dispatch.scope is None
+    assert "fast-path" not in dispatch.prompt
+    assert "must not invoke another agent" not in dispatch.prompt

@@ -18,6 +18,22 @@ Both functions are pure and side-effect-free except ``verify_worker_scope``'s
 single read-only ``git diff`` subprocess call, mirroring the never-raises,
 degrade-to-conservative style already used by ``renmark.subagent_gate`` and
 ``renmark.release._git_stdout``.
+
+Live call sequence (General Contractor, i.e. the Claude Code/Codex host
+session — Python cannot issue the Agent tool call itself, same limitation
+``renmark.providers.claude_agent`` already documents for the non-fast-path
+path):
+
+1. ``verdict = classify_fast_path(candidate_tasks)`` — if ``verdict.eligible``
+   is False, fall back to the existing plan/dispatch flow unchanged (WP-3's
+   guarantee).
+2. ``dispatch = claude_agent.build_fast_path_agent_dispatch(candidate_tasks,
+   repo)`` — carries ``dispatch.scope`` (the same ``WorkerScope`` used below).
+3. Issue the Agent tool call with ``dispatch.prompt``/``dispatch.model``.
+4. After the Worker returns: ``verdict = verify_worker_scope(dispatch.scope,
+   repo, base_sha)``. If ``verdict.passed`` is False, do NOT commit/merge —
+   escalate (Inspector/Owner) per scope-enforcement-design.md §5. Only a
+   passing verdict may be treated as done.
 """
 
 from __future__ import annotations
