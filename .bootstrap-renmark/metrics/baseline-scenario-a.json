@@ -1,0 +1,38 @@
+{
+  "scenario": "A",
+  "title": "Small local change",
+  "starting_commit": "173542ee4d46f903a138c27b6dab5c96357b0909",
+  "worktree": "/tmp/renmark-benchmark-a (disposable, discarded after measurement)",
+  "budget": {
+    "max_invocations": 2,
+    "max_wall_clock_minutes": 10,
+    "target_tokens": 40000
+  },
+  "observed": {
+    "agent_invocations": 1,
+    "subagent_tool_uses": 5,
+    "subagent_reported_tokens": 29839,
+    "wall_clock_ms": 28522,
+    "test_executions": 1,
+    "circuit_breaker_tripped": false,
+    "replans_detected": 0
+  },
+  "scope_compliance": {
+    "files_touched": ["tests/test_hosts.py"],
+    "declared_allowed_files": ["tests/test_hosts.py"],
+    "verified_independently": true,
+    "verification_method": "git diff --stat + full pytest re-run outside the subagent's own report"
+  },
+  "scoring_rubric_result": {
+    "scope": "PASS - only tests/test_hosts.py modified",
+    "correctness": "PASS - new test asserts capabilities_for(HostKind.UNKNOWN).selector_available is False",
+    "no_regression": "PASS - 14/14 tests pass (13 existing + 1 new)",
+    "completion": "PASS - no follow-up clarification required"
+  },
+  "budget_utilization": {
+    "invocations": "1 of 2 max (50%)",
+    "wall_clock": "28.5s of 600s max (4.8%)",
+    "tokens": "29839 of 40000 target (74.6%)"
+  },
+  "status": "PASS"
+}

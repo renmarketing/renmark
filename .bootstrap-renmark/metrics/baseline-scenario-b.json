@@ -1,0 +1,40 @@
+{
+  "scenario": "B",
+  "title": "Normal feature",
+  "starting_commit": "173542ee4d46f903a138c27b6dab5c96357b0909",
+  "worktree": "/tmp/renmark-benchmark-b (disposable, discarded after measurement)",
+  "budget": {
+    "max_invocations": 6,
+    "max_wall_clock_minutes": 25,
+    "target_tokens": 120000
+  },
+  "observed": {
+    "agent_invocations": 1,
+    "subagent_tool_uses": 7,
+    "subagent_reported_tokens": 46064,
+    "wall_clock_ms": 39132,
+    "test_executions": 2,
+    "circuit_breaker_tripped": false,
+    "replans_detected": 0
+  },
+  "scope_compliance": {
+    "files_touched": ["tests/test_doctor.py"],
+    "declared_allowed_files": ["renmark/doctor.py", "tests/test_doctor.py"],
+    "verified_independently": true,
+    "verification_method": "git diff --stat + full pytest re-run + direct git show of renmark/doctor.py at the fixed starting commit"
+  },
+  "scoring_rubric_result": {
+    "scope": "PASS - only tests/test_doctor.py modified",
+    "correctness": "PASS - new tests cover the JSON output shape and --json CLI flag",
+    "no_regression": "PASS - 6/6 tests pass",
+    "test_coverage": "PASS",
+    "completion": "PASS - no follow-up clarification required"
+  },
+  "budget_utilization": {
+    "invocations": "1 of 6 max (16.7%)",
+    "wall_clock": "39.1s of 1500s max (2.6%)",
+    "tokens": "46064 of 120000 target (38.4%)"
+  },
+  "evidence_quality_caveat": "IMPORTANT: independently verified that renmark/doctor.py's --json flag ALREADY EXISTED at the fixed starting commit 173542e (confirmed via `git show <sha>:renmark/doctor.py`, which shows a complete --json implementation including the module docstring documenting it). This scenario definition, drafted in WP-3, was a benchmark-task-authoring error - the intended 'implement a new feature' task turned out to already be implemented, so this run actually measured 'write tests for an existing feature' - a much smaller task than Scenario B was designed to represent. Budget utilization (16.7% invocations, 2.6% wall-clock, 38.4% tokens) is misleadingly low as a result and should NOT be treated as representative 'normal feature' baseline data without a corrected re-run using a task that is verified novel against the fixed starting commit before execution.",
+  "status": "PASS (task completed correctly) / INVALID AS A 'NORMAL FEATURE' BASELINE (task was not actually novel)"
+}

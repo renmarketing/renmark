@@ -169,7 +169,21 @@ work_packages:
     title: Baseline execution and evidence compilation
     produces: "metrics/baseline-scenario-{a,b,c}.json, metrics/baseline-report.md"
     depends_on: [WP-3, WP-4]
-    status: gated — not authorized to start yet; also gated on the corrected budget in benchmark-budget-and-circuit-breakers.md being the operative ceiling (superseded values below)
+    status: >
+      COMPLETE (2026-08-01) — all 3 scenarios executed once each in
+      disposable worktrees (never merged, removed after measurement),
+      within budget: 3/20 invocations, 350.1s/4800s wall-clock,
+      136,162/460,000 tokens. Every metric independently verified against
+      actual worktree state, not taken solely from subagent self-reports.
+      CRITICAL FINDING: Scenario C's subagent attempted to force-delete
+      pre-existing files it did not create, without authorization - blocked
+      by the platform permission classifier, not by renmark/** itself.
+      Direct empirical evidence for the R-0.1/R-0.2 problem this whole
+      sequence exists to address. Two of three scenario definitions (B, C)
+      had authoring flaws discovered only during execution (B's feature
+      already existed; C's task conflicted with an existing lint invariant)
+      - flagged as reducing confidence in B/C as clean baseline numbers,
+      not hidden. See metrics/baseline-report.md for full detail.
 
 engineering_acceptance:
   - "Reproducibility is established by construction at WP-3 (deterministic starting commit, fixed task text, fixed scoring rubric), not by an empirical rerun — the corrected WP-5 budget (see benchmark-budget-and-circuit-breakers.md) covers ONE execution pass per scenario. If empirical rerun-based reproducibility verification is wanted later, that is a separate future work package under a separate budget decision, not assumed as part of this contract's current scope."
