@@ -84,6 +84,15 @@ scope:
     # a documentation amendment, not a scope exception. renmark/** itself
     # stays prohibited until a future WP-4 amendment names exact modules.
     - "tests/test_r0_1_ux_regression_baseline.py"
+    # Amended 2026-08-01 for WP-4 (core deliverable only): one new, isolated
+    # module implementing WP-1/WP-2's design docs exactly, plus its tests.
+    # Deliberately does NOT amend claude_agent.py or program_driver.py yet -
+    # wiring these functions into General Contractor's live dispatch flow is
+    # a system-wide behavior change (affects routing for every future
+    # request) and is being flagged for an explicit decision rather than
+    # folded silently into this same amendment.
+    - "renmark/fast_path.py"
+    - "tests/test_fast_path.py"
   prohibited_paths:
     - "renmark/** (until allowed_paths is explicitly amended post-approval, same discipline as R-0.0)"
     - "plugin/**"
@@ -144,8 +153,33 @@ work_packages:
       code - tests/ was never in prohibited_paths).
   - id: WP-4
     title: Implementation (classification + scope enforcement + no-nested-dispatch + retry cap)
-    produces: "renmark/** changes per an allowed_paths amendment named at WP-2/WP-3 completion"
-    status: "NOT STARTED — gated behind WP-1/WP-2/WP-3 and a separate allowed_paths amendment, same discipline as R-0.0/WP-4"
+    produces: "renmark/fast_path.py + tests/test_fast_path.py (core); live wiring is a separate sub-step, see status"
+    status: >
+      CORE COMPLETE (2026-08-01) — renmark/fast_path.py implements both
+      design docs exactly: classify_fast_path() (WP-1's 5 signals, returns
+      ALL failed signals not just the first, for a complete ledger
+      justification) and WorkerScope/verify_worker_scope() (WP-2's Layer B —
+      compares declared scope against REAL `git diff --name-status`, never
+      self-reported touched_files; delete/rename always a violation
+      regardless of path; fails CLOSED on an unverifiable repo, never a
+      silent pass). 16 tests, including the literal required R-0.0 Scenario C
+      reproduction (a scope excluding 4 pre-existing audit files, a diff
+      deleting them, asserted to fail with all 4 listed) - passing. Retry cap
+      needs no new code: reuses the existing decide_milestone_execution
+      third-equivalent-repair block (program_driver.py, already tested) per
+      WP-1/WP-2's "reused, not new" discipline. Full suite: 1678 passed
+      (1662 + 16 new), 31 skipped, zero regressions.
+      REMAINING, deliberately not done in this pass: wiring
+      classify_fast_path/verify_worker_scope into General Contractor's live
+      dispatch flow (claude_agent.py's prompt composer, program_driver.py's
+      stage transitions) and the no-nested-dispatch dispatch-prompt text
+      (which only makes sense once a fast-path-specific dispatch composer
+      exists — adding it to the shared build_agent_dispatch would change
+      prompt text for non-fast-path tasks too, contradicting WP-3's
+      unchanged-behavior guarantee). This live-wiring is a system-wide
+      behavior change (affects routing for every future request across every
+      skill) - flagged as a genuine decision point per the Owner's own
+      "architecture change" stop condition, not folded in silently.
   - id: WP-5
     title: Benchmark comparison against R-0.0 baseline + evidence compilation
     produces: "metrics/r-0-1-comparison.md, citing R-0.0/metrics/baseline-scenario-a.json directly"
