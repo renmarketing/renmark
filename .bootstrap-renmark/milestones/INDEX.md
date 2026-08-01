@@ -23,7 +23,7 @@ Per addendum-03: "Phases remain sequencing and dependency containers... A Phase 
 
 | Release | Title | Type | Built from | Lifecycle status |
 |---|---|---|---|---|
-| R-0.1 | Bounded Small-Task Fast Path | feature | Phase 1 + blocking subset of Phase 2 | **PLANNED — contract drafted** (2026-08-01, `R-0.1/contract.yaml`). Gate satisfied (R-0.0 is RELEASED) but Owner approval of the contract itself is a separate, explicit step per instruction: "do not begin R-0.1 implementation until I approve its contract." No work package may start and `allowed_paths` stays empty until approved. |
+| R-0.1 | Bounded Small-Task Fast Path | feature | Phase 1 + blocking subset of Phase 2 | **READY** (Owner-approved as drafted, 2026-08-01). **Only WP-1 (small-task classification design) is authorized to start.** WP-2 (Worker scope-enforcement design), WP-3 (UX regression suite), WP-4 (implementation), WP-5 (benchmark comparison vs. R-0.0) each remain individually gated — see `R-0.1/contract.yaml` work_packages[].status. `allowed_paths` stays empty until an explicit amendment. |
 | R-0.2 | Controlled Worker Execution | feature | remainder of Phase 2 | PLANNED (working title only, contract not yet drafted) |
 
 Phases 3–8 (minimal ledger, minimal Inspector, Planner altitude split, deterministic integration, WritingMate, advanced optimizations): no releases drafted yet. Per addendum-01 §9 / addendum-03: only one blocking release is actively worked at a time, and no future release is broken down until the preceding blocking release closes (reaches CLOSED on the 10-state lifecycle, not merely ENGINEERING VERIFIED).

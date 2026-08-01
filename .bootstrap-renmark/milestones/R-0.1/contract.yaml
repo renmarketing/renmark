@@ -3,11 +3,10 @@
 # addendum-01.md's revised Phase 1 (UX/compatibility harness) + the blocking
 # subset of Phase 2 (authority boundaries and budget controls).
 #
-# STATUS: proposed / PLANNED. Not yet Owner-approved. No production code
-# touched, no work packages started. R-0.0 is RELEASED (see ../R-0.0/
-# closeout.md) so this contract may legally move past PLANNED once approved
-# — but approval is a separate, explicit Owner decision, not implied by
-# R-0.0's release.
+# STATUS: READY. Owner-approved as drafted 2026-08-01. WP-1 is authorized
+# to start. WP-2 through WP-5 remain individually gated — see
+# work_packages[].status below. allowed_paths stays empty until an explicit
+# amendment names exact modules, same discipline as R-0.0.
 
 release_id: R-0.1
 title: Bounded Small-Task Fast Path
@@ -90,7 +89,7 @@ work_packages:
   - id: WP-1
     title: Small-task classification threshold and routing design
     produces: "milestones/R-0.1/classification-design.md"
-    status: "NOT STARTED — gated behind this contract's Owner approval"
+    status: "AUTHORIZED TO START — this contract approved as drafted 2026-08-01"
   - id: WP-2
     title: Worker scope-enforcement design (the direct answer to R-0.0's Scenario C finding)
     produces: "milestones/R-0.1/scope-enforcement-design.md, ADR (scope TBD at design time)"
@@ -146,7 +145,7 @@ observation:
     - "fast-path resource usage vs. R-0.0 Scenario A baseline, ongoing"
     - "Owner-reported ceremony/friction regressions, if any"
 
-status: planned   # PLANNED. This file is a draft contract for Owner review — not yet approved.
-                # Per explicit Owner instruction: "prepare the R-0.1 contract... do not begin
-                # R-0.1 implementation until I approve its contract." No work package may start,
-                # and allowed_paths stays empty, until that approval is given.
+status: ready   # READY. Approved as drafted, 2026-08-01 ("Approve as drafted"). Only WP-1
+                # (small-task classification design) is authorized to start. WP-2 through
+                # WP-5 remain individually gated — see work_packages[].status above.
+                # allowed_paths stays empty until an explicit amendment names exact modules.
