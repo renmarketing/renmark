@@ -71,7 +71,10 @@ decision as refused; selecting navigational `cancel` exits without approval.
 Resolve presentation capability when the question is rendered. The semantic
 decision is identical on every host.
 
-- **Claude:** use native choices only when the active render contains no more
+- **Claude:** in an interactive Claude Code session, render native choices by
+  invoking the `AskUserQuestion` tool with a real `options` array — never by
+  printing the choices as prose or a typed-only list and calling that
+  "native." Use native choices only when the active render contains no more
   than four selectable entries, including navigation entries.
 - **Codex Plan:** use native choices only when the active render fits the
   host's active cap of two or three selectable entries. Never manufacture a

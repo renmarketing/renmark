@@ -1,6 +1,6 @@
 {
   "name": "renmark",
-  "version": "0.39.1",
+  "version": "0.39.2",
   "description": "Pipeline-first build assistant for Codex and Claude Code. The user works through six pipelines — /renmark:init (adopt a repo), /renmark:start (new build), /renmark:feature (add/change), /renmark:debug (fix), /renmark:roadmap (gaps / what's next), /renmark:finish (ship) — backed by guided planning, implementation, verification, recovery, and release skills. Persistent project state lives in .renmark/.",
   "author": {
     "name": "renmark"

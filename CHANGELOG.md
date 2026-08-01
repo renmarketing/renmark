@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-08-01] - fix(interaction): name AskUserQuestion explicitly in the interaction contract
+
+**Request:** Owner reported the CLI presenting decisions as plain text with no arrow-key/click selection, even after the earlier native-picker fix.
+**Built:** `interaction-contract.md` — the single host-neutral contract every skill points to for rendering decisions — described "native choices" without ever naming the concrete tool, unlike every other SKILL.md and shared fragment (which already say `AskUserQuestion` explicitly). Closed that gap: the Claude render-time capability bullet now explicitly requires invoking `AskUserQuestion` with a real `options` array and explicitly forbids printing choices as prose/typed-only list and calling that "native."
+**Files changed:** `plugin/skills/.shared/interaction-contract.md`, `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md`, `CHANGELOG.md`.
+**Do not change:** `interaction-contract.md` remains the single host-neutral contract; host-specific tool names belong in its render-time capability-resolution bullets, not scattered ad hoc across skills.
+
 ## [2026-07-31] - feat(delivery): complete M6 Agency trajectories
 
 **Request:** Prove Agency-approved and direct-Orchestrator entry trajectories for M6.
