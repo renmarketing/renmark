@@ -36,6 +36,11 @@ class UsageRecord:
     agent_calls: int = 0
     requests: int = 0
     feature: str = ""
+    # Honest-measurement flag (REQ-30 instrumentation). False means prompt_tokens/
+    # completion_tokens are NOT a real measured value — do not treat 0 as "zero
+    # tokens used." Defaults False so every pre-existing usage.jsonl row (which
+    # predates this field) parses as "unmeasured", which is the truthful reading.
+    measured: bool = False
     # source: local-observed | configured-local-limit | provider-reported
     #         | estimated | unknown
     source: str = "local-observed"
