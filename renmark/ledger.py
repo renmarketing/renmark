@@ -54,6 +54,18 @@ class LedgerValidationError(ValueError):
     """
 
 
+class DispatchIndependenceError(LedgerValidationError):
+    """Raised when an :class:`InspectionReport` fails the dispatch-independence
+    check against the :class:`WorkResult` it inspects (R-0.4, WP-2).
+
+    Raised — never returned as ``False``/logged-and-continued — when the
+    inspector's ``dispatch_identity`` equals the worker's, or when the
+    inspector's ``dispatch_identity`` is empty (an unset identity cannot prove
+    independence, so it is treated as "independence unproven", not
+    "independence assumed").
+    """
+
+
 # ── Paths ───────────────────────────────────────────────────────────────────
 
 LEDGER_SUBDIR = "ledger"
@@ -116,6 +128,7 @@ class WorkResult:
     summary: str = ""
     touched_files: list[str] = field(default_factory=list)
     artifact_refs: list[str] = field(default_factory=list)
+    dispatch_identity: str = ""  # who/what dispatch produced this result (R-0.4, WP-2)
 
 
 @dataclass
@@ -130,6 +143,7 @@ class InspectionReport:
     verdict: str = ""  # e.g. "pass" | "fail" | "changes_requested"
     findings: list[str] = field(default_factory=list)
     generator: str = ""
+    dispatch_identity: str = ""  # who/what dispatch produced this verdict (R-0.4, WP-2)
 
 
 @dataclass
@@ -227,6 +241,7 @@ def validate_work_result(data: dict[str, Any]) -> list[str]:
     issues += _check_str(data, "summary", required=False)
     issues += _check_str_list(data, "touched_files")
     issues += _check_str_list(data, "artifact_refs")
+    issues += _check_str(data, "dispatch_identity", required=False)
     return issues
 
 
@@ -237,6 +252,7 @@ def validate_inspection_report(data: dict[str, Any]) -> list[str]:
     issues += _check_str(data, "verdict")
     issues += _check_str_list(data, "findings")
     issues += _check_str(data, "generator", required=False)
+    issues += _check_str(data, "dispatch_identity", required=False)
     return issues
 
 
@@ -304,6 +320,64 @@ def append_ledger_event(repo: Path | str, event: LedgerEvent, *, ts: str) -> Non
         fh.write("\n")
 
 
+# ── Dispatch independence check (R-0.4, WP-2) ────────────────────────────
+#
+# Pure check — no I/O, no ledger write. Callers (WP-4) invoke this before
+# appending an InspectionReport so a same-identity self-graded verdict is
+# rejected before it ever reaches the ledger. This function raises on
+# failure; it never returns False or logs-and-continues.
+
+
+def check_dispatch_independence(
+    repo: Path | str,
+    work_result_dispatch_identity: str,
+    inspector_dispatch_identity: str,
+) -> None:
+    """Raise :class:`DispatchIndependenceError` unless the inspector's dispatch
+    is provably independent of the worker's dispatch.
+
+    ``repo`` is accepted (unused by this pure comparison today) so the
+    signature matches this module's other ``repo``-first functions and so a
+    future revision can look up ledger context without changing callers.
+
+    Rejects (raises) when:
+
+    - ``inspector_dispatch_identity`` is empty/blank — an unset inspector
+      identity cannot prove independence, so it is treated as "independence
+      unproven", never "independence assumed".
+    - ``inspector_dispatch_identity == work_result_dispatch_identity`` and
+      both are non-empty — the mechanical self-grading signal: the same
+      dispatch invocation producing both the work and its own inspection.
+
+    An empty ``work_result_dispatch_identity`` does not by itself fail this
+    check (an old, pre-R-0.4 WorkResult may legitimately have no identity
+    recorded); it is the inspector side emptiness that is disqualifying,
+    per WP-1's design decision.
+    """
+    del repo  # unused today; kept for signature consistency with this module
+
+    inspector = inspector_dispatch_identity.strip() if isinstance(
+        inspector_dispatch_identity, str
+    ) else ""
+    worker = work_result_dispatch_identity.strip() if isinstance(
+        work_result_dispatch_identity, str
+    ) else ""
+
+    if not inspector:
+        raise DispatchIndependenceError(
+            "inspector dispatch_identity is empty; independence unproven "
+            "(an unset inspector identity can never demonstrate independence "
+            "from the worker that produced the work being inspected)"
+        )
+
+    if worker and inspector == worker:
+        raise DispatchIndependenceError(
+            f"inspector dispatch_identity {inspector_dispatch_identity!r} "
+            "matches the work result's dispatch_identity; a dispatch cannot "
+            "independently inspect its own work"
+        )
+
+
 # ── Reader (WP-3) ─────────────────────────────────────────────────────────
 
 
@@ -362,6 +436,7 @@ __all__ = [
     "KIND_WORK_RESULT",
     "LEDGER_FILE",
     "LEDGER_SUBDIR",
+    "DispatchIndependenceError",
     "Escalation",
     "InspectionReport",
     "LedgerEvent",
@@ -369,6 +444,7 @@ __all__ = [
     "WorkOrder",
     "WorkResult",
     "append_ledger_event",
+    "check_dispatch_independence",
     "ledger_dir",
     "ledger_path",
     "read_ledger_events",
