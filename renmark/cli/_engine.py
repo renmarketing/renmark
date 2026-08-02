@@ -22,6 +22,7 @@ from ..ledger import DispatchIndependenceError as _DispatchIndependenceError
 from ..ledger import emit_inspection_verdict as _emit_inspection_verdict
 from ..parser import PlanError, Task, parse_plan
 from ..providers.codex import codex_available as codex_available
+from ..verifier import run_verifier as _run_verifier
 from ..state import (
     PauseState,
     clear_pause,
@@ -729,15 +730,22 @@ def execute_plan(
         except Exception:
             pass
 
-        # R-0.4/WP-4: real InspectionReport emission point — a bounded, real
-        # (non-LLM) verdict derived from the task's own verifier pass/fail
-        # (`ok`), dispatched under a fixed deterministic-verifier identity
-        # that is structurally distinct from `work_result_dispatch_identity`
-        # (which always carries the task's own executor + order_id). The
-        # independence check runs UNWRAPPED so a genuine
-        # `DispatchIndependenceError` is a real, visible rejection — never
-        # silently swallowed. Only the ledger *write* is best-effort /
-        # never-raising, matching the WorkOrder/WorkResult convention above
+        # R-0.4/WP-4b (bounded repair): real InspectionReport emission point.
+        # The verdict is now derived from a FRESH, independently-rerun
+        # `task.verifier` execution (a genuinely separate subprocess call,
+        # decoupled from the Worker's own verifier run inside
+        # `_execute_task`/`_execute_task_codex`) rather than from the
+        # Worker's own already-known `ok`/`reason` variables — see
+        # 2026-08-01-r-0.4-wp6-independent-review.md Finding 3. This is a
+        # deterministic, read-only-by-convention re-check (this codebase's
+        # verifier commands are check/test commands, e.g. pytest/py_compile,
+        # not mutating ones), dispatched under a fixed deterministic-verifier
+        # identity that is structurally distinct from
+        # `work_result_dispatch_identity` (which always carries the task's
+        # own executor + order_id). The independence check runs UNWRAPPED so
+        # a genuine `DispatchIndependenceError` is a real, visible rejection
+        # — never silently swallowed. Only the ledger *write* is best-effort
+        # / never-raising, matching the WorkOrder/WorkResult convention above
         # (a disk/IO failure must never block the pipeline).
         try:
             _check_dispatch_independence(
@@ -751,13 +759,18 @@ def execute_plan(
                 f"(dispatch independence check failed): {exc}"
             )
         else:
+            fresh_result = _run_verifier(
+                task.verifier,
+                cwd=_repo,
+                timeout_s=task.verifier_timeout_s,
+            )
             try:
                 _emit_inspection_verdict(
                     _repo,
                     work_result_id=order_id,
                     work_order_id=order_id,
-                    verdict="pass" if ok else "fail",
-                    evidence=[reason] if reason else [],
+                    verdict="pass" if fresh_result.ok else "fail",
+                    evidence=[fresh_result.tail] if fresh_result.tail else [],
                     inspector_dispatch_identity=_INSPECTOR_DISPATCH_IDENTITY,
                     work_result_dispatch_identity=work_result_dispatch_identity,
                     ts=now_iso(),

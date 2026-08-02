@@ -170,6 +170,52 @@ def test_execute_plan_emits_independent_inspection_verdict(tmp_path, monkeypatch
     assert verdict.verdict == "pass"
 
 
+def _write_plan_failing_verifier(path: Path) -> Path:
+    p = path / "plan.md"
+    p.write_text(
+        "### Task 1: task 1\n"
+        "- **mode:** A\n"
+        "- **target:** out/file1.txt\n"
+        "- **context_files:** []\n"
+        "- **verifier:** false\n"
+        "- **verifier_timeout_s:** 5\n"
+        "- **spec:**\n"
+        "  make file 1\n"
+    )
+    return p
+
+
+def test_inspection_verdict_derived_from_independent_rerun_not_worker_ok(
+    tmp_path, monkeypatch
+):
+    # R-0.4/WP-4b (bounded repair): the Worker reports success (ok=True) via
+    # the mocked _execute_task, but the task's real verifier command ("false")
+    # fails. The Inspection verdict must be derived from a FRESH, independent
+    # rerun of the verifier — not the Worker's own `ok` — so it must land as
+    # "fail" here even though the Worker claimed success. This is the direct
+    # regression proof for review finding 3 (same-process relabel).
+    _init_repo(tmp_path)
+    plan = _write_plan_failing_verifier(tmp_path)
+
+    monkeypatch.setattr(_engine, "codex_available", lambda: True)
+    monkeypatch.setattr(
+        _engine,
+        "_execute_task",
+        lambda **kwargs: (True, "worker claims success", 100, "deadbeef"),
+    )
+
+    _engine.execute_plan(str(plan), repo=tmp_path)
+
+    results = ledger.read_ledger_events(tmp_path, kind=ledger.KIND_WORK_RESULT)
+    assert len(results) == 1
+    assert results[0]["status"] == "complete"  # Worker's own ok still True
+
+    order_id = results[0]["order_id"]
+    verdict = ledger.latest_verdict_for(tmp_path, order_id)
+    assert verdict is not None
+    assert verdict.verdict == "fail"  # derived from the independent rerun
+
+
 def test_write_pause_emits_escalation(tmp_path):
     state = pause_state.PauseState(
         run_id="run-1",
