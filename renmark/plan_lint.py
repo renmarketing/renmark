@@ -388,9 +388,7 @@ def escalation_reason_for(task: Task) -> str | None:
         kind: str | None = None
         if role == "reviewer":
             kind = "adversarial-review"
-        elif task.complexity == "hard" and any(
-            marker in spec_lc for marker in _ARCHITECTURE_SPEC_MARKERS
-        ):
+        elif any(marker in spec_lc for marker in _ARCHITECTURE_SPEC_MARKERS):
             kind = "architecture"
 
         from . import cost as _cost
