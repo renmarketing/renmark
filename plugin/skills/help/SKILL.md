@@ -191,5 +191,5 @@ calls.
 - Make any HTTP calls or run subprocesses for `/renmark:help`. It's pure documentation.
 - Advertise a pipeline stage or a modifier flag that the skill doesn't actually
   implement. Help is the workflow's contract; keep it honest.
-- Reorder the pipeline list without strong reason — `init → start → feature →
-  debug → roadmap → finish` is the documented user-facing model.
+- Reorder the pipeline list without strong reason — `init → start → rethink →
+  feature → debug → roadmap → finish` is the documented user-facing model.
