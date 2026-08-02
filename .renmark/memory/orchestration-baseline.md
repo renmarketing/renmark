@@ -45,6 +45,30 @@ blocker:
   file read, zero LLM calls, and never re-dispatches an already-completed
   task (REQ-3; `_cross_check_skip_list` in `renmark/cli/_engine.py`).
 
+## Audit — 2026-08-02
+
+Full evidence-based gap audit: `.renmark/audits/orchestration-baseline-audit-2026-08-02.md`.
+Headline findings: per-run token/wall-clock telemetry is effectively unmeasured (`tokens_in`/
+`tokens_out`/`duration_s` are ~0 across `.renmark/state/usage.jsonl` and
+`.renmark/analytics/task-runs.jsonl`); `context_budget_hint` has zero production callers; the
+model-routing table and `subagent_gate.py` are enforced only at plan-authoring/cost-preview time,
+not inside `dispatch_task_isolated`/`dispatch_wave`; `.renmark/memory/analytics.md` is ~27 days
+stale. The audit mines real historical runs instead of spending new tokens on fresh scenarios:
+Feature/Fix (`add-rethink-pipeline-skill`, 2026-08-02) and Orchestrate (M2 milestone + R-0.2/R-0.3,
+2026-07-30/08-01) both have real dispatch-count/verification/gate-timestamp data (audit §8); Start
+predates telemetry by 16 days and Rethink has never been invoked, so both are honestly `unknown`,
+not estimated. Minimal instrumentation (audit §9) is proposed as a prerequisite to closing the
+token/wall-clock gap, pending Owner approval.
+
+**Note on `milestone_context_checkpoint`:** The hook is wired at the Agency milestone boundary
+(`renmark/agency.py`'s `approve_milestone_for_orchestrator`), but that call site currently always
+passes `estimated_tokens=None` — there is no reliable Python-side context-size signal to feed it yet.
+This makes it a **dormant hook today, not an active compaction trigger**: the manual `/compact`
+recommendation can be produced by the function when given a real signal, but nothing supplies one yet.
+Closing this gap requires either a host-exposed context-size API or a self-reported estimate from the
+calling agent — neither exists yet. Flagged by codex codereview as spec "under-built" for exactly
+this reason.
+
 ## What still needs to be captured (this artifact's open item)
 
 This entry pins the *qualitative* baseline and the *mechanism* REQ-30
