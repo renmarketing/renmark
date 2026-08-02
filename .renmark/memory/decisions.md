@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-047 — Approved R-0.4 contract as drafted
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+**Context.** Contract: .renmark/plans/2026-08-01-r-0.4-minimal-independent-inspector-contract.md. R-0.2 follow-ups and roadmap Phase 3 items remain tracked debt, out of scope for R-0.4.
+
+**Decision.** Owner approved R-0.4 (Minimal Independent Inspector) as drafted; PRD wording gap on mechanical Inspector independence tracked as debt, not a blocker. Execution proceeds WP-1..WP-6 under Continue-by-Default Policy.
+
+---
+
 ## ADR-046 — Inspector/repair separation enforcement (R-006)
 
 **Date:** 2026-08-01
