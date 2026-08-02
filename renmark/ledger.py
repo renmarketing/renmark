@@ -428,6 +428,105 @@ def read_ledger_events(
     return events
 
 
+# ── Inspector verdict emit/read helpers (R-0.4, WP-3) ────────────────────
+#
+# Per WP-1's design (`.renmark/plans/2026-08-01-r-0.4-wp1-inspector-design.md`
+# §1), `InspectionReport` has no separate "work_result_id"/"work_order_id"
+# field — `WorkResult` carries `order_id`, not its own id, and
+# `WorkOrder.order_id == WorkResult.order_id` for a given pair, so the
+# existing `subject_ref` field unambiguously identifies both the order and
+# the result being inspected. `emit_inspection_verdict` therefore writes
+# `subject_ref = work_result_id` (callers pass `work_order_id` too, for
+# call-site clarity/future divergence, but today it must equal
+# `work_result_id` — mismatches are rejected loud rather than silently
+# picking one).
+
+VERDICTS: tuple[str, ...] = ("pass", "fail", "escalate")
+
+
+def emit_inspection_verdict(
+    repo: Path | str,
+    *,
+    work_result_id: str,
+    work_order_id: str,
+    verdict: str,
+    evidence: list[str],
+    inspector_dispatch_identity: str,
+    work_result_dispatch_identity: str,
+    ts: str,
+) -> InspectionReport:
+    """Check dispatch independence, then construct + append an
+    :class:`InspectionReport` verdict for a Work Result, and return it.
+
+    Order of operations (never reordered):
+
+    1. :func:`check_dispatch_independence` runs FIRST. If it raises
+       :class:`DispatchIndependenceError`, this function propagates the
+       error unchanged and writes NOTHING to the ledger.
+    2. On success, an :class:`InspectionReport` is constructed with
+       ``subject_ref = work_result_id`` (see module-level note above),
+       ``verdict``, ``findings = evidence``, and
+       ``dispatch_identity = inspector_dispatch_identity``.
+    3. :func:`append_ledger_event` persists it with the caller-supplied
+       ``ts``.
+
+    Raises :class:`LedgerValidationError` if ``work_order_id !=
+    work_result_id`` (today's schema has one reference field, so a caller
+    claiming they differ is a contract violation, not silently resolved),
+    or if ``verdict`` is not one of :data:`VERDICTS`.
+    """
+    check_dispatch_independence(
+        repo, work_result_dispatch_identity, inspector_dispatch_identity
+    )
+
+    if work_order_id != work_result_id:
+        raise LedgerValidationError(
+            f"work_order_id {work_order_id!r} != work_result_id "
+            f"{work_result_id!r}; InspectionReport has a single subject_ref "
+            "field and cannot represent two different reference ids"
+        )
+
+    normalized_verdict = verdict.strip().lower() if isinstance(verdict, str) else ""
+    if normalized_verdict not in VERDICTS:
+        raise LedgerValidationError(
+            f"verdict {verdict!r} must be one of {VERDICTS}"
+        )
+
+    report = InspectionReport(
+        subject_ref=work_result_id,
+        verdict=normalized_verdict,
+        findings=list(evidence),
+        generator="inspector",
+        dispatch_identity=inspector_dispatch_identity,
+    )
+    append_ledger_event(repo, report, ts=ts)
+    return report
+
+
+def latest_verdict_for(
+    repo: Path | str, work_result_id: str
+) -> InspectionReport | None:
+    """Return the most recent :class:`InspectionReport` for ``work_result_id``
+    (matched against ``subject_ref``), or ``None`` if none exist.
+
+    Reads via :func:`read_ledger_events` (kind-filtered to
+    ``KIND_INSPECTION_REPORT``), which already returns events oldest-first;
+    the last matching event in that order is the latest verdict.
+    """
+    events = read_ledger_events(repo, kind=KIND_INSPECTION_REPORT)
+    matching = [e for e in events if e.get("subject_ref") == work_result_id]
+    if not matching:
+        return None
+    latest = matching[-1]
+    return InspectionReport(
+        subject_ref=latest.get("subject_ref", ""),
+        verdict=latest.get("verdict", ""),
+        findings=list(latest.get("findings", [])),
+        generator=latest.get("generator", ""),
+        dispatch_identity=latest.get("dispatch_identity", ""),
+    )
+
+
 __all__ = [
     "KINDS",
     "KIND_ESCALATION",
@@ -436,6 +535,7 @@ __all__ = [
     "KIND_WORK_RESULT",
     "LEDGER_FILE",
     "LEDGER_SUBDIR",
+    "VERDICTS",
     "DispatchIndependenceError",
     "Escalation",
     "InspectionReport",
@@ -445,6 +545,8 @@ __all__ = [
     "WorkResult",
     "append_ledger_event",
     "check_dispatch_independence",
+    "emit_inspection_verdict",
+    "latest_verdict_for",
     "ledger_dir",
     "ledger_path",
     "read_ledger_events",
