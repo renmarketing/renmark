@@ -268,6 +268,7 @@ def append_routing(
     run_id: str | None = None,
     date: str | None = None,
     role: str | None = None,
+    escalation_reason: str | None = None,
 ) -> None:
     """Append a routing observation to `routing.md` under 'Learned overrides'."""
     ensure_memory(repo)
@@ -278,6 +279,8 @@ def append_routing(
         line += f", run={run_id}"
     if role and role.strip():
         line += f", role={role.strip()}"
+    if escalation_reason and escalation_reason.strip():
+        line += f", escalation={escalation_reason.strip()}"
     line += ")"
     if line in text:
         # Idempotent on the exact entry: routing.md is curated (hygiene refuses
