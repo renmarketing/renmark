@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-08-01
+last_reviewed: 2026-08-02
 status: draft
 ---
 
@@ -61,6 +61,10 @@ first-class hosts for the same product workflow, not separate product forks.
 - Substantial builds ship as a sequence of user-testable milestone releases,
   not internal-only progress; small bounded work uses a fast path instead of
   full planning ceremony (REQ-27).
+- A distinct entry point for **reassessing and transforming an existing
+  application** (brownfield), separate from `/renmark:start`'s greenfield
+  entry point — survey before structural change, never a silent rewrite
+  (REQ-28).
 
 **Non-goals (product-level, durable)**
 - **Not a standalone app or hosted service.** renmark is a plugin/workflow
@@ -378,6 +382,35 @@ first-class hosts for the same product workflow, not separate product forks.
       layers with nothing usable until the end; done when a release is not
       marked complete on internal task completion alone but requires its
       acceptance and observation evidence.
+28. `REQ-28` **Brownfield transformation entry point.** Renmark provides a
+    distinct pipeline (`/renmark:rethink`) for reassessing and transforming
+    an *existing* application, separate from `/renmark:start`'s greenfield
+    (new-project) entry point. Before any structural change, it: (a)
+    surveys the current system (architecture, data flows, in-use features,
+    tests/integrations/deployment/ops dependencies, known pain and cost) via
+    a bounded subagent — the full survey never enters orchestrator context
+    (extends REQ-5); (b) establishes a behavioral baseline (what must keep
+    working, current outputs/acceptance examples, measurements, compatibility
+    tests) before any structural edit; (c) classifies existing components as
+    Keep / Improve / Replace / Remove / Unknown-needs-spike; (d) produces a
+    target blueprint (desired capabilities, new architecture only where
+    justified, migration constraints, explicit non-goals); (e) produces a
+    transformation roadmap of small, independently-usable releases with a
+    compatibility/rollback path per release — never a big-bang rewrite, and
+    old/new components may coexist temporarily. Rethink hands off to
+    renmark's existing milestone/Agency execution machinery rather than a
+    parallel system (extends REQ-22, REQ-27), and does not implement or
+    restructure anything until the baseline, the keep/replace/remove
+    classification, and the first migration milestone are explicit and
+    Owner-approved (extends REQ-4, REQ-12).
+    - *Acceptance:* done when invoking rethink on an existing project
+      produces a baseline + classification + target blueprint + roadmap
+      artifact set with no production code changed; done when the first
+      proposed release is a baseline/compatibility-coverage release, not an
+      architecture replacement, unless the Owner explicitly overrides that
+      default; done when execution of any migration milestone routes
+      through the same Owner-gated milestone machinery `/renmark:start`'s
+      Agency mode already uses, not a bespoke rethink-only executor.
 
 ## Success metrics
 
@@ -618,3 +651,15 @@ approved by the project owner on 2026-08-01 via the `/renmark:prd` UPDATE
 gate, including one owner-requested revision (REQ-27 added; a draft open
 question about the doctrine staying `.bootstrap-renmark/`-only was removed in
 favor of making it a real product requirement).
+
+**Revision note (2026-08-02, human-approved diff):** Added REQ-28
+(brownfield transformation entry point — `/renmark:rethink`, a distinct
+pipeline for reassessing and transforming an existing application, separate
+from `/renmark:start`'s greenfield lane: survey → behavioral baseline →
+Keep/Improve/Replace/Remove/Unknown classification → target blueprint →
+independently-usable-release roadmap → hand off to renmark's existing
+milestone/Agency execution machinery; no structural change before baseline +
+classification + first milestone are Owner-approved). Added a matching Goals
+bullet. Proposed by `/renmark:feature`'s PRD-alignment gate for the
+`add-rethink-pipeline-skill` feature; reviewed and explicitly approved by the
+project owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.

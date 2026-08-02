@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-02] — PRD updated: REQ-28 brownfield transformation entry point
+
+**Request:** Add a new `/renmark:rethink` pipeline skill for reassessing/transforming an existing application (brownfield), distinct from `/renmark:start`'s greenfield lane. The feature router's PRD-alignment gate flagged this as drift.
+**Built:** Reconciled Requirements and Goals sections of `PRD.md`; bumped `last_reviewed`.
+**Files changed:**
+- `PRD.md` — added REQ-28 (survey → behavioral baseline → Keep/Improve/Replace/Remove/Unknown classification → target blueprint → independently-usable-release roadmap → hand off to existing milestone/Agency machinery; no structural change before baseline + classification + first milestone are Owner-approved) and a matching Goals bullet.
+**Do not change:**
+- Rethink hands off execution to renmark's existing milestone/Agency machinery — it does not get a bespoke parallel executor.
+- The first proposed release under rethink defaults to baseline/compatibility coverage, not architecture replacement, unless the Owner explicitly overrides.
+
 ## [2026-08-01] - R-0.4: minimal independent inspector — RELEASE CANDIDATE
 
 **Request:** Draft R-0.4 (Minimal Independent Inspector), a narrowed slice of Milestone 5's Inspector Framework: the smallest viable mechanism that reads R-0.3's ledger and emits its own PASS/FAIL/ESCALATE verdict, mechanically decoupled from the Worker that produced the work. R-0.2 follow-ups and roadmap Phase 3/Milestone 5 remainder carried as tracked debt, not reopened. Owner approved as drafted and authorized continuation through WP-1–WP-6 without routine-gate pauses.
