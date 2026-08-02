@@ -1,6 +1,6 @@
 {
   "name": "renmark",
-  "version": "0.39.6",
+  "version": "0.39.7",
   "description": "Pipeline-first build assistant for Codex and Claude Code with guided planning, implementation, verification, and release workflows.",
   "author": {
     "name": "renmark"
