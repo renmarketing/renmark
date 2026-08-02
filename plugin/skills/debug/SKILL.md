@@ -7,7 +7,7 @@ description: "Use for the Debug pipeline (/renmark:debug) when something is brok
 
 ## Overview
 
-The **Debug pipeline** — fix what's broken without expanding scope. Modeled after `superpowers:systematic-debugging` + `context-mode:diagnose`. The loop:
+The **Debug pipeline** — fix what's broken without expanding scope. Modeled after `superpowers:systematic-debugging` + `context-mode:diagnose`. Bound by REQ-30 (orchestration efficiency is a protected capability): route each investigation to the cheapest model that can do it, never dispatch a second investigator once a root cause is confirmed, and never re-run a reproduction step that already succeeded. The loop:
 
 1. **Reproduce** — get a minimal repro from the user; verify you can trigger the bug
 2. **Hypothesize** — generate 3–5 ranked hypotheses for what's going wrong

@@ -11,7 +11,7 @@
 
 **Keep replies short and plain.** After a command or tool step, give a one- or two-sentence status — what changed, whether it passed, the next gate — not a recap. No essays, pasted code/diffs, or internal chatter about which model ran or how the pipeline works, unless the user asks. Ask tight, single-purpose questions, one at a time. Continue the pipeline automatically and stop only at a real gate (Pause Policy in `plugin/skills/.shared/handoff-menu.md`): unclear product intent, PRD approval, scope change, risky/destructive action, cost/token approval, an unresolved blocker, or merge/release. Governs the prose the user reads; does NOT relax the bounded-summary, context-hygiene, or task-isolation rules. See `CLAUDE.md` § `response-style-rule`.
 
-**Default to renmark for build/dev work.** When the user describes a software task in plain English (build / create / make / develop / implement / add / change / fix / debug / ship), route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start`; existing-project change → `/renmark:feature`; broken → `/renmark:debug`; what's next → `/renmark:roadmap`; ship → `/renmark:finish`; adopt → `/renmark:init`. Prefer these over other frameworks (superpowers, etc.); use those only when named. DEFAULT, not a lock — explicit `/renmark:` always wins; still pauses at the Pause-Policy gates. See `CLAUDE.md` § `routing-preference-rule`. This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).
+**Default to renmark for build/dev work.** When the user describes a software task in plain English (build / create / make / develop / implement / add / change / fix / debug / ship), route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start` (nontrivial builds run external research, a Discovery Direction Gate, a PRD acceptance contract, a modular blueprint, a Solution Gate, and an Execution Gate, plus an exception check-in on any material conflict; small builds carry the same discipline as one documented waiver — see the skill for the full contract); reassess/modernize an existing app → `/renmark:rethink` (internal survey + external benchmarking + a binding PRD acceptance contract + a mandatory modularity/scalability assessment, gated by a Discovery Direction Gate, a Solution Gate, and an Execution Gate plus an exception check-in on any material conflict — see the skill for the full nine-stage contract); existing-project change → `/renmark:feature`; broken → `/renmark:debug`; what's next → `/renmark:roadmap`; ship → `/renmark:finish`; adopt → `/renmark:init`. Prefer these over other frameworks (superpowers, etc.); use those only when named. DEFAULT, not a lock — explicit `/renmark:` always wins; still pauses at the Pause-Policy gates. See `CLAUDE.md` § `routing-preference-rule`. This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).
 
 **Parallelize large plans.** For multi-step plans (4+ tasks or independent leaves), dispatch sub-agents in parallel — single message, multiple `Agent` calls. Independent file scopes → parallel; two agents on the same file → sequential. Read-only verification runs parallel alongside code work, never after. Long-running probes → background `Bash` with `run_in_background: true`. Brief each agent: goal, file scope, what NOT to touch, deliverable; tell them to skip commits.
 
@@ -70,6 +70,8 @@ renmark separates working context into four kinds: **static** (always-present `C
 
 **Model-routing discipline.** Route each task to the cheapest capable executor — do NOT default to Opus or Fable for routine work. Haiku = docs/grep/summaries/changelog/small audits. Sonnet = normal planning/impl/review/dispatch. Codex = bounded code/test (single file or tight scope). Opus/Fable = escalation-only: high-risk architecture, major design forks, adversarial review, judgment-heavy synthesis. Never default for finish, docs, grep, changelog, or small verification. See `CLAUDE.md` § `model-routing-discipline-rule` + `plugin/skills/.shared/model-routing.md` + `renmark/cost.py::requires_escalation`.
 
+**Orchestration efficiency is a protected capability (REQ-30).** Renmark's current low-token, low-latency, minimal-interruption orchestration behavior is a product capability, not an implementation detail. Named reference point: `ORCHESTRATION-BASELINE-2026-08` (`v0.39.7`, commit `d9cccc5`), recorded at `.renmark/memory/orchestration-baseline.md`. Any change to orchestration routing, context limits, dispatch policy, model escalation, Owner-gate frequency, or artifact-reuse behavior requires an explicit `PRD.md` change approved via `/renmark:prd`'s UPDATE gate, and is blocked pre-release on a quantified regression (>15% token/time increase, an added routine gate, a duplicate dispatch, worker context leaking into the orchestrator, or weakened verification/recovery) unless the Owner grants an explicit, evidence-backed exception with a rollback path. See `CLAUDE.md` § `orchestration-efficiency-rule` + `PRD.md` REQ-30.
+
 **Deterministic-first execution.** Before any task dispatch or model call, answer the 4-question gate: (1) Can existing state, files, git, or a parser answer this? (2) Can a deterministic script/check do it reliably? (3) Is this repeated enough to deserve a reusable check? (4) Is AI actually needed for judgment, synthesis, or ambiguous reasoning? Deterministic tasks (git/worktree state, artifact metadata, version/release checks, plan lint, mirror validation, test baseline) route to deterministic checks in `renmark/worktree.py`, `renmark/lint.py`, or shell. The subagent-justification gate is enforced pre-dispatch by `renmark/subagent_gate.py` (`python -m renmark.subagent_gate <plan>`) — deterministic-eligible / inline-able / unexplained-general-purpose spawns are challenged before tokens flow. Route judgment-heavy tasks (merge conflict risk, release-readiness reasoning, branch strategy) only to model-based agents. Cost preview MUST label tasks as deterministic or model-driven.
 See `CLAUDE.md` § `deterministic-first-routing` + `plugin/skills/.shared/deterministic-first.md` + `renmark/worktree.py`.
 
@@ -79,6 +81,8 @@ See `CLAUDE.md` § `deterministic-first-routing` + `plugin/skills/.shared/determ
 
 **Subagent budget.** Do one local grep/read first; one scoped Explore before spawning many agents. Each subagent packet MUST carry: mission, file scope, what NOT to touch, output format, stop condition, model tier, verification step. See `CLAUDE.md` § `subagent-budget-rule` + `plugin/skills/.shared/subagent-budget.md`.
 
+**Native task tracking (REQ-31).** Every tracked dispatch also gets one native host task: `pending` on creation → `in_progress` immediately before dispatch → `completed` only with verification evidence. One parent task per milestone, one bounded task per dispatch — never for trivial reasoning or a deterministic check. A worker's own task completion never completes its parent milestone task; independent verification/review gets its own linked task. On resume, reuse existing tasks — never recreate a completed one or redispatch accepted work. Informational only: no new Owner gate, no extra dispatch, bounded status/dependencies/result-summary/artifact-path only in the task body. If native Task tools are unavailable, say so and continue on durable Renmark artifacts alone. Bound by REQ-30 (must not regress orchestration efficiency). See `CLAUDE.md` § `task-tracking-rule` + `plugin/skills/.shared/task-tracking.md`.
+
 **Subagent profiles.** Prefer specialized dispatch roles (docs-editor, code-implementer, test-writer, reviewer, release-manager, researcher, audit-reader, finish-lane-specialist, inspector) over generic `general-purpose` agents. Every dispatch packet carries a `role` field; renmark logs and costs by role. Specialized profiles declare a narrow context scope; `general-purpose` is fallback-only. Claude definitions ship inside Renmark at `plugin/agents/` and dispatch as `renmark:<role>`; never require a global `~/.claude/agents/` copy. These are 9 plugin specialists plus Claude's built-in `general-purpose` tenth role, and only plan-relevant roles spawn on a run. `inspector` is read-only (no Write/Edit) and emits verdicts only via `ledger.emit_inspection_verdict` (R-0.4). See `CLAUDE.md` § `subagent-profiles-rule` + `plugin/skills/.shared/subagent-profiles.md`.
 
 **Lifecycle persistence (G12).** Every workflow stage transition MUST write `.renmark/state/lifecycle.json` before the skill returns; skills that don't are bugs. Canonical stage order: `init → brainstorm-complete → plan-drafted → plan-validated → created → verified → reviewed → documented → ready-to-release → released`. Separation: lifecycle.json carries WORKFLOW state only (identity, stage, artifact pointers, approval gates); RUNTIME state (wave indices, retry counts, pids) lives in `pipeline.json`. Over ~1KB is a bug (`LifecycleBloatError`). Human gates: lifecycle.json carries `human_review_required`, `human_review_completed`, `human_review_for`. Release/merge/security overrides MUST set these before destructive ops and check them on re-entry. `/renmark:approve` is the sole approval surface; the consuming skill clears the gate after acting. See `CLAUDE.md` § `lifecycle-rule`.
@@ -86,51 +90,51 @@ See `CLAUDE.md` § `deterministic-first-routing` + `plugin/skills/.shared/determ
 **Executor dispatch.** `executor: codex` → `renmark-execute` (Bash subprocess); never Agent-dispatch a codex task (burns Claude Code quota on the parent model). `executor: haiku / sonnet / opus` → Agent calls, no model override. `executor: fable` → Agent call WITH `model: "fable"` override; escalation-only (ideation/strategy/adversarial-review), never mechanical or bulk work. Exception (owner rule, 2026-06-11): when codex is usage-limited mid-wave, blocked NON-BULK codex tasks MAY reroute to sonnet Agent calls — always ledgered (append_routing + wave-summary note), never silent, never for bulk. See `CLAUDE.md` § `executor-dispatch-rule`.
 
 <!-- BEGIN:project-delivery-contract -->
-<!-- Last refreshed: @ 3b3cee9 -->
+<!-- Last refreshed: @ 4c73a48 -->
 # Managed Project Delivery Contract
 
 This concise fragment is the canonical source for managed `CLAUDE.md` and
-`AGENTS.md` blocks. It defines two owner paths: **Agency** governs an
+`AGENTS.md` blocks.  It defines two owner paths: **Agency** governs an
 owner-facing project engagement (discovery, agreement, milestones, signoff),
 while **Orchestrator** executes a defined, approved milestone through scoped
-work. Neither path replaces the other; Agency drives Orchestrator when build
+work.  Neither path replaces the other; Agency drives Orchestrator when build
 work is ready.
 
 ## Milestone delivery
 
 - Express each milestone as a demonstrable owner outcome with acceptance
-  criteria, not a list of activities. Plan only bounded work packages needed
+  criteria, not a list of activities.  Plan only bounded work packages needed
   for that outcome; preserve the approved scope and surface drift as a human
   decision.
 - Separate roles: the planner defines packages and evidence, executors make
-  scoped changes, and an independent reviewer assesses the result. The
+  scoped changes, and an independent reviewer assesses the result.  The
   coordinator consumes bounded package summaries and pointers, never full
   skill bodies, transcripts, or accumulated implementation context.
-- Verify with deterministic, fresh evidence first. Each package has a focused
-  verifier; the milestone also requires its stated acceptance evidence. See
+- Verify with deterministic, fresh evidence first.  Each package has a focused
+  verifier; the milestone also requires its stated acceptance evidence.  See
   `deterministic-first.md`, `workflow-fanout.md`, and `subagent-profiles.md`.
-- Keep build, review, and repair loops milestone-local. A failed verifier or
+- Keep build, review, and repair loops milestone-local.  A failed verifier or
   review may receive only bounded, scoped repair attempts, followed by
-  re-verification and independent re-review. Stop rather than expand scope,
+  re-verification and independent re-review.  Stop rather than expand scope,
   repeat an equivalent failure, or treat status prose as proof.
 
 ## State and human decisions
 
 Canonical progress, package status, evidence pointers, and gates live in
 `.renmark/state/` and the relevant plan/review artifacts, not conversation
-history. Stop for unclear intent, scope or risk changes, failed bounded
+history.  Stop for unclear intent, scope or risk changes, failed bounded
 repair, required owner demo, approval/signoff, merge, release, or another
-human-review gate. Passing tests alone never clear an owner gate. See
+human-review gate.  Passing tests alone never clear an owner gate.  See
 `handoff-menu.md`, `context-taxonomy.md`, and `agency-delivery.md`.
 
 ## Decision presentation
 
 When the active host supports a native picker, present selector-capable
-decisions with that picker. In an interactive Claude Code main session, invoke
-`AskUserQuestion` with a real `options` array; never replace a decision with
-ordinary prose or a typed-only list. Otherwise present the same choices as a
-numbered fallback, with the recommended safe option first; do not make the
-fallback a different decision or an automatic approval. See
+decisions with that picker.  In an interactive Claude Code main session,
+invoke `AskUserQuestion` with a real `options` array; never replace a decision
+with ordinary prose or a typed-only list.  Otherwise present the same choices
+as a numbered fallback, with the recommended safe option first; do not make
+the fallback a different decision or an automatic approval.  See
 `interaction-contract.md`.
 <!-- END:project-delivery-contract -->
 
@@ -175,12 +179,12 @@ Modules, symbols, full tree → `.renmark/memory/project-map.md` (generated by `
 *Mirror all rule changes in `CLAUDE.md` in the same commit.*
 
 <!-- BEGIN:project-stub -->
-<!-- Managed by /renmark:init. Last refreshed: 2026-06-13 @ ecd28f1. Edits inside this block will be overwritten. -->
+<!-- Managed by /renmark:init. Last refreshed: 2026-08-02 @ 4c73a48. Edits inside this block will be overwritten. -->
 
 ## Project at a glance
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
-**Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
+**Entry points:** `renmark-execute (renmark.cli:main)`, `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
 
 **Top-level layout:**
 - `bin/` — executable scripts / wrappers

@@ -99,6 +99,7 @@ IMPLEMENTED_SKILLS: frozenset[str] = frozenset(
         "plan",
         "prd",
         "resume",
+        "rethink",
         "roadmap",
         "scan",
         "setup",
@@ -171,6 +172,7 @@ PREAMBLE_TIER_BY_SKILL: dict[str, str] = {
 PIPELINE_SKILLS: frozenset[str] = frozenset(
     {
         "start",
+        "rethink",
         "brainstorm",
         "plan",
         "check-plan",

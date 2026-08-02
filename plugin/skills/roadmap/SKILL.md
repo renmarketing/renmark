@@ -7,7 +7,7 @@ description: "Use for the Maintenance / Gap pipeline (/renmark:roadmap) to see s
 
 ## Overview
 
-The **Maintenance / Gap pipeline** — keeps the product moving toward the PRD. Default mode is a zero-cost status reporter; `--gaps` compares PRD vs shipped work, surfaces gaps, and proposes backlog items; `--research` adds web research. Pulls from two sources to build a per-task table with totals:
+The **Maintenance / Gap pipeline** — keeps the product moving toward the PRD. Default mode is a zero-cost status reporter; `--gaps` compares PRD vs shipped work, surfaces gaps, and proposes backlog items; `--research` adds web research. Bound by REQ-30 (orchestration efficiency is a protected capability): the default status report stays zero-LLM, and `--research` is an explicit opt-in, never a default cost. Pulls from two sources to build a per-task table with totals:
 
 - `.renmark/state/usage.jsonl` — token spend per LLM call
 - `git log` — task-N commits that have landed

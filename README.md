@@ -4,6 +4,7 @@ A Claude Code and Codex plugin that provides a **pipeline-first** build assistan
 
 - **`/renmark:init`** — adopt renmark into any repo (new, in-progress, or production)
 - **`/renmark:start`** — build something new from plain English
+- **`/renmark:rethink`** — reassess and transform an existing app
 - **`/renmark:feature`** — add or change a feature in an existing build
 - **`/renmark:debug`** — fix what's broken
 - **`/renmark:roadmap`** — find gaps and decide what's next
@@ -108,12 +109,13 @@ Describe what you want to build. renmark asks at most 2 questions, confirms the 
 
 ---
 
-## The six pipelines
+## The seven pipelines
 
 | Pipeline | For | Internal stages it runs |
 |---|---|---|
 | `/renmark:init` | Adopt renmark into a repo | repo scan → stack/test detect → CLAUDE/AGENTS → project map → standards → PRD check → lifecycle-ready |
 | `/renmark:start` | Build something new | intent → brainstorm (if fuzzy) → PRD → roadmap → first feature → plan → build → verify → review |
+| `/renmark:rethink` | Reassess/transform an existing app | survey → behavioral baseline → keep/improve/replace/remove/spike classification → target blueprint → transformation roadmap → milestone hand-off |
 | `/renmark:feature` | Add/change a feature | PRD alignment → reuse check → plan → build → verify → review → finish |
 | `/renmark:debug` | Fix what's broken | reproduce → root cause → fix → regression test → verify → review |
 | `/renmark:roadmap` | Find gaps / what's next | status → gap discovery → backlog proposals → next-feature pick |
@@ -128,6 +130,7 @@ The pipelines above are the front door; every command (with its modifiers) also 
 | Command | What it does |
 |---|---|
 | `/renmark:start` | Vibe coder entry — describe what you want, renmark routes the pipeline |
+| `/renmark:rethink` | Brownfield survey → baseline → classify → blueprint → migration roadmap; hands off to milestone execution |
 | `/renmark:brainstorm` | Design a feature into a spec — researches prior art + best practices, sets the scope contract |
 | `/renmark:prd` | Create/update the project PRD — the durable source of truth that plans align to |
 | `/renmark:blueprint` | Generate/refresh the living schematic (+ prototype for UI builds) |

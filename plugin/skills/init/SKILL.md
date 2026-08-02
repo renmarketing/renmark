@@ -12,6 +12,12 @@ pipeline for bringing renmark into any project, with or without an existing
 `CLAUDE.md`. It both *initializes* (scaffolds what's missing) and *documents*
 (maps the code), then routes the now-mapped project at its uncovered gaps.
 
+Bound by REQ-30 (orchestration efficiency is a protected capability): the
+deterministic scan/scaffold/merge path below is exactly the kind of
+zero-LLM, zero-dispatch work REQ-30 requires by default — do not add a
+subagent dispatch where the deterministic module already answers the
+question.
+
 All scanning, scaffolding, rule-block merging, regex, rendering, and file I/O is
 done by the **deterministic, zero-LLM** Python module `renmark.init`. **No LLM
 calls are made for the work itself.** The agent's only jobs are: invoke the

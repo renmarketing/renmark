@@ -1,6 +1,6 @@
 # Subagent Budget Discipline — Reference (single source of truth)
 
-**Shared by `/renmark:orchestrate`, `/renmark:finish`, `/renmark:feature`, and `/renmark:brainstorm`.** This is the one place the rules for spawning, sizing, and costing subagents live: when to spawn them, how to pack dispatch inputs, what output formats to enforce, and warning signals for subagent-heavy workflows. Operationalizes context hygiene (REQ-5 / G11) and cost discipline (REQ-19).
+**Shared by `/renmark:orchestrate`, `/renmark:finish`, `/renmark:feature`, and `/renmark:brainstorm`.** This is the one place the rules for spawning, sizing, and costing subagents live: when to spawn them, how to pack dispatch inputs, what output formats to enforce, and warning signals for subagent-heavy workflows. Operationalizes context hygiene (REQ-5 / G11) and cost discipline (REQ-19). Native task tracking for every dispatch this contract governs is defined once in `_shared/task-tracking.md` (REQ-31) — cited here, not restated.
 
 ---
 
@@ -30,6 +30,19 @@ Every subagent MUST receive a complete, bounded packet with NO ambiguity about s
 | `verification_expectation` | Yes | How will the orchestrator validate the output? (artifact path, summary fields, exit code). |
 
 A dispatch packet missing any of these is incomplete and MUST NOT be sent.
+
+**Native task tracking.** Before sending a complete dispatch packet through
+the `Agent` tool, **call `TaskCreate` yourself** — your own real tool call,
+per `_shared/task-tracking.md`: one native task per dispatch, one parent per
+milestone, `pending` → `in_progress` (call `TaskUpdate` immediately before
+this dispatch call) → `completed` (call `TaskUpdate` again) only once the
+packet's `verification_expectation` has actual evidence. This is
+informational scaffolding around the packet above — it does not change what
+gets dispatched. `renmark.task_tracking` (the Python module) is a mirror for
+the headless `renmark-execute` CLI executor path only, where no live
+Claude Code session exists to call `TaskCreate`/`TaskUpdate` — it is never a
+substitute for calling them yourself when you ARE the live session
+dispatching via `Agent`.
 
 ---
 
@@ -98,7 +111,7 @@ Early drafts left subagent dispatch discipline to individual skills. One skill s
 
 When citing in a SKILL.md, write:
 
-> *Honor subagent budget discipline in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/subagent-budget.md`: local-first (grep/read before spawning); each dispatch packet carries mission, files, output_format, stop_condition, model_tier, and verification_expectation; prefer cheaper models for read-only work; warn when >5 subagents are needed. Do not pass full skill bodies in dispatch packets (see `_shared/context-taxonomy.md`).*
+> *Honor subagent budget discipline in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/subagent-budget.md`: local-first (grep/read before spawning); each dispatch packet carries mission, files, output_format, stop_condition, model_tier, and verification_expectation; prefer cheaper models for read-only work; warn when >5 subagents are needed. Do not pass full skill bodies in dispatch packets (see `_shared/context-taxonomy.md`). Track each dispatch as a native task per `_shared/task-tracking.md`.*
 
 Do not paste the contract table or examples into the calling SKILL.md — cite this file.
 

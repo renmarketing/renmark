@@ -30,12 +30,13 @@ first, so it is option 1 in the host selector and the full numbered fallback:
 >
 > 1. Build something new — start a new app, tool, or feature from scratch
 > 2. Change or add to an existing build
-> 3. Something is broken and I need to fix it
-> 4. See what's been built / find gaps / decide what's next
-> 5. We're done — I want to verify, review, and ship
-> 6. Adopt renmark into an existing repo that doesn't use it yet
-> 7. Continue an interrupted workflow
-> 8. I'm not sure — show me the options
+> 3. Reassess or transform an app I already have — survey it, decide what stays, plan a migration
+> 4. Something is broken and I need to fix it
+> 5. See what's been built / find gaps / decide what's next
+> 6. We're done — I want to verify, review, and ship
+> 7. Adopt renmark into an existing repo that doesn't use it yet
+> 8. Continue an interrupted workflow
+> 9. I'm not sure — show me the options
 
 Recommend Start if no lifecycle state exists; otherwise recommend the option
 matching the current lifecycle stage. Exactly one option is `(Recommended)` and
@@ -48,12 +49,13 @@ do not mistake an unavailable selector for headless mode.
 |--------|--------------------|-----------------------------|
 | 1 — new build | `/renmark:start` | Offer `/renmark:brainstorm` if the idea sounds fuzzy ("I have an idea but…") |
 | 2 — change / add | `/renmark:feature` | — |
-| 3 — broken / bug | `/renmark:debug` | — |
-| 4 — what's next | `/renmark:roadmap` | — |
-| 5 — ship it | `/renmark:finish` | Mention `/renmark:verify` if there is doubt whether the last build passed |
-| 6 — adopt renmark | `/renmark:init` | — |
-| 7 — interrupted | Claude Code: `/renmark:resume`; Codex: continue directly from `.renmark/state/` | Never ask a Codex user to run `/clear` or `/resume` when the host does not expose those commands |
-| 8 — not sure | Print the quick "Which one?" map (copied from `/renmark:help`) and re-ask |
+| 3 — reassess/transform | `/renmark:rethink` | Mention `/renmark:feature` if it turns out to be a small bounded addition, not a full reassessment |
+| 4 — broken / bug | `/renmark:debug` | — |
+| 5 — what's next | `/renmark:roadmap` | — |
+| 6 — ship it | `/renmark:finish` | Mention `/renmark:verify` if there is doubt whether the last build passed |
+| 7 — adopt renmark | `/renmark:init` | — |
+| 8 — interrupted | Claude Code: `/renmark:resume`; Codex: continue directly from `.renmark/state/` | Never ask a Codex user to run `/clear` or `/resume` when the host does not expose those commands |
+| 9 — not sure | Print the quick "Which one?" map (copied from `/renmark:help`) and re-ask |
 
 ### 3. Confirm and hand off
 
@@ -63,7 +65,7 @@ After routing, say exactly one sentence:
 
 Then invoke the chosen command (dispatch via the skill's own invocation path — do NOT inline its steps here). The user is now in the pipeline; `guide` is done.
 
-**Exception — option 8 (not sure):** Print the quick map and loop back to the question once. If the user is still unsure after the second pass, invoke `/renmark:help` and let them browse.
+**Exception — option 9 (not sure):** Print the quick map and loop back to the question once. If the user is still unsure after the second pass, invoke `/renmark:help` and let them browse.
 
 ## Do not
 

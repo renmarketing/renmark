@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-08-01
+last_reviewed: 2026-08-02
 status: draft
 ---
 
@@ -61,6 +61,21 @@ first-class hosts for the same product workflow, not separate product forks.
 - Substantial builds ship as a sequence of user-testable milestone releases,
   not internal-only progress; small bounded work uses a fast path instead of
   full planning ceremony (REQ-27).
+- A distinct entry point for **reassessing and transforming an existing
+  application** (brownfield), separate from `/renmark:start`'s greenfield
+  entry point — survey before structural change, never a silent rewrite
+  (REQ-28).
+- For a non-trivial new build (greenfield), external evidence, binding PRD
+  traceability, and deliberate modular architecture before a single line of
+  target code is written — proportional to scope, with a documented waiver
+  for genuinely small builds (REQ-29).
+- Renmark's current low-token, low-latency, minimal-interruption
+  orchestration behavior is a protected product capability, measured against
+  a named baseline, not a subjective impression that can silently regress as
+  new features land (REQ-30).
+- Every dispatched unit of work is visible as a native host task with an
+  honest lifecycle — created once, updated in place, never self-approved,
+  never silently recreated on resume (REQ-31).
 
 **Non-goals (product-level, durable)**
 - **Not a standalone app or hosted service.** renmark is a plugin/workflow
@@ -378,6 +393,337 @@ first-class hosts for the same product workflow, not separate product forks.
       layers with nothing usable until the end; done when a release is not
       marked complete on internal task completion alone but requires its
       acceptance and observation evidence.
+28. `REQ-28` **Brownfield modernization entry point.** Renmark provides a
+    distinct pipeline (`/renmark:rethink`) for reassessing and transforming
+    an *existing* application, separate from `/renmark:start`'s greenfield
+    (new-project) entry point. Before any structural change, it confirms a
+    **Transformation Intake** (desired outcome, protected behavior,
+    constraints, non-goals, areas open to change — Owner-level blocking
+    questions only) and then runs nine bounded stages: (a) surveys the
+    current system internally (architecture,
+    data flows, in-use features, tests/integrations/deployment/ops
+    dependencies, known pain and cost) via a bounded subagent — the full
+    survey never enters orchestrator context (extends REQ-5); (b) establishes
+    a behavioral baseline (what must keep working, current outputs/acceptance
+    examples, measurements, compatibility tests) before any structural edit;
+    (c) extracts a **PRD acceptance contract** — every applicable PRD
+    requirement, non-goal, and acceptance criterion mapped to current
+    evidence, compliance status, target behavior, planned release, and
+    verification method, with missing/ambiguous/contradictory/obsolete/
+    untestable criteria flagged and material conflicts routed to the Owner;
+    behavioral compatibility (b) and PRD compliance (c) are distinct — current
+    behavior is never treated as correct merely because it exists; (d)
+    performs **external discovery and benchmarking** — a separate, mandatory
+    subagent stage researching comparable products, competitors, and
+    industry-standard architecture/UX/security/observability/deployment/
+    scaling patterns relevant to this product's actual domain, with sourced,
+    dated, evidence-rated findings separated into verified facts / inferences
+    / recommendations / unknowns; if external access is unavailable the stage
+    is reported blocked/incomplete and never silently backed by model memory;
+    (e) runs a **modularity, scalability, and maintainability assessment** —
+    domain/module boundaries, coupling and dependency direction, duplication,
+    data ownership, API/contract stability, extension points, testability,
+    observability, and scaling bottlenecks, producing current- and
+    target-state module/dependency maps while avoiding speculative
+    microservices; (f) classifies existing components as Keep / Improve /
+    Replace / Remove / Unknown-needs-spike, each decision citing internal
+    evidence, PRD impact, external evidence where relevant, and modularity
+    impact — architectural redesign is not limited to `Replace`, as an
+    `Improve` item may need boundary extraction, decomposition, dependency
+    inversion, or interface stabilization. Between stage 5 and stage 6, a
+    **Discovery Direction Gate** presents material findings/implications,
+    PRD/architecture/capability/research gaps, a recommended transformation
+    direction, up to two viable alternatives, and the exact Owner decision
+    required, and obtains one explicit Owner direction before classification
+    or blueprint work continues; (g) produces a target modular blueprint
+    (desired capabilities traced to PRD requirements, new/restructured
+    architecture for `Replace` and evidence-justified `Improve` items, module
+    contracts and dependency directions, migration constraints, explicit
+    non-goals). Between stage 7 and stage 8, a **Solution Gate** presents the
+    proposed classification and blueprint — behavioral/PRD changes, protected
+    behavior, module/data/integration boundaries, removals/incompatibilities
+    and their migration risk, and material tradeoffs/exclusions/unresolved
+    decisions — and obtains one explicit Owner approval before the roadmap is
+    finalized; (h) produces an incremental transformation roadmap of small,
+    independently-usable, user-testable releases, each carrying PRD-traceable
+    acceptance scenarios, a compatibility/rollback path, and a verification
+    method — never a big-bang rewrite, and old/new components may coexist
+    temporarily; (i) an **Execution Gate** presenting that roadmap — release
+    outcomes, PRD criteria, compatibility guarantees, dependencies, migration,
+    verification, observability, rollback, and Owner acceptance scenarios —
+    and obtaining one explicit Owner approval before any target production
+    code changes or Agency execution begins. A cross-cutting **exception
+    check-in** interrupts the current stage immediately — pausing only the
+    affected decision, discarding no completed work — on a material PRD/
+    Owner-intent conflict, unreliable or blocked research, a major cost/
+    scope/security impact, a proposed removal of protected behavior, or a
+    high-impact unknown that cannot be safely bounded, rather than waiting
+    for the next scheduled gate. No gate's approval may be inferred from
+    silence or from a different gate's approval, and no agent may approve
+    its own recommendation at any of the three gates. Rethink hands off to
+    renmark's existing milestone/Agency execution machinery rather than a
+    parallel system (extends REQ-22, REQ-27), and does not implement or
+    restructure anything — nor may any agent self-approve a structural
+    recommendation — until the PRD acceptance contract, the external-benchmark
+    findings, the modularity assessment, the keep/improve/replace/remove
+    classification, and the first migration milestone are explicit and
+    Owner-approved (extends REQ-4, REQ-12).
+    - *Acceptance:* done when invoking rethink on an existing project
+      produces a survey + baseline + PRD-acceptance-map + external-benchmark +
+      modularity-assessment + classification + target-blueprint + roadmap
+      artifact set with no production code changed; done when the
+      external-benchmark artifact reports an honest `complete` /
+      `blocked` / `incomplete` status and is never marked complete from
+      model memory alone; done when the transformation is never reported
+      complete while an applicable PRD acceptance criterion is failed,
+      omitted, unverified, or changed without explicit Owner approval; done
+      when at least one `Improve`-classified item's blueprint reflects a
+      modularity-driven boundary change without full replacement, whenever
+      the modularity assessment identifies one; done when the first proposed
+      release is a baseline/compatibility-coverage release, not an
+      architecture replacement, unless the Owner explicitly overrides that
+      default with recorded evidence; done when the Discovery Direction
+      Gate, the Solution Gate, and the Execution Gate each require and
+      record one distinct explicit Owner decision, none skipped or merged
+      into another; done when a material PRD/Owner-intent conflict,
+      unreliable/blocked research, a major cost/scope/security impact, a
+      proposed removal of protected behavior, or a high-impact unknown
+      triggers an exception check-in immediately rather than waiting for the
+      next scheduled gate, pausing only the affected decision without
+      discarding completed work; done when a resumed rethink run reuses
+      existing stage artifacts and cleared gate decisions rather than
+      re-dispatching completed research or re-asking a cleared gate; done
+      when execution of any migration milestone routes through the same
+      Owner-gated milestone machinery `/renmark:start`'s Agency mode already
+      uses, not a bespoke rethink-only executor.
+29. `REQ-29` **Evidence-based greenfield entry point.** For a non-trivial
+    (Complex-scope) `/renmark:start` build, before any target application
+    code is written: (a) performs external discovery — a bounded subagent
+    researches comparable products, domain-standard workflows, and relevant
+    architecture/UX/security/observability/deployment/scaling patterns for
+    this product's actual domain, with sourced, dated, evidence-rated
+    findings separated into facts / inferences / recommendations / unknowns;
+    research informs but never overrides Owner intent, and unavailable
+    external access is reported `blocked`/`incomplete` rather than silently
+    backed by model memory; a clearly-scoped (Simple) build carries this
+    forward as one documented, Owner-approved waiver (reason, risk, scope)
+    inside its existing confirmation, never a silent skip; (b) presents a
+    **Discovery Direction Gate** — findings, implications, a recommended
+    direction, viable alternatives, assumptions, risks, and the exact
+    decisions required — and obtains one explicit Owner direction choice
+    before the PRD is drafted; (c) establishes a **PRD acceptance/
+    traceability contract** after PRD approval — every applicable PRD
+    requirement and acceptance criterion mapped to planned behavior, its
+    target module/contract, its planned release, and its verification
+    method, with missing/ambiguous/contradictory/untestable criteria flagged
+    and material PRD/scope changes routed to the Owner; no release is
+    reported complete while an applicable criterion is failed, omitted,
+    unverified, or changed without explicit Owner approval; (d) produces a
+    **prospective modular blueprint** before execution — domain boundaries,
+    dependency direction, data ownership, public contracts/adapters,
+    extension points, test seams, observability, and security boundaries for
+    the system about to be built, reusing `/renmark:blueprint`'s existing
+    diagram convention, preferring the simplest maintainable design over
+    speculative microservices or premature abstraction; (e) presents a
+    **Solution Gate** — scope, workflows, requirements, module boundaries,
+    exclusions, unresolved decisions, and material tradeoffs — and obtains
+    one explicit Owner approval before the release roadmap is finalized;
+    (f) produces an **incremental release roadmap** whose every release
+    states its user value, PRD criteria, affected modules/contracts,
+    dependencies, migration, verification, observability, and Owner
+    acceptance scenario; (g) presents an **Execution Gate** — the finalized
+    roadmap or plan — and obtains one explicit Owner approval before any
+    build task is dispatched, with no agent in the pipeline permitted to
+    self-approve a structural or scope decision at any of the three gates;
+    and (h) triggers an immediate **exception check-in** — interrupting the
+    current stage rather than waiting for its scheduled gate — on a material
+    PRD conflict, unreliable/blocked research bearing on a live decision, a
+    major cost/scope/security implication, or a high-impact unknown,
+    presenting the specific finding and concrete options (never raw research)
+    for one explicit Owner decision; an unresolved high-impact unknown
+    becomes a bounded spike (question, scope, evidence requirement, budget,
+    stop condition) rather than a silent assumption. This is `/renmark:start`'s
+    greenfield counterpart to REQ-28's brownfield discipline: it excludes
+    brownfield-only concerns (system survey, compatibility baseline,
+    Keep/Improve/Replace/Remove classification — there is no existing system)
+    while applying the same evidence, traceability, and modularity discipline
+    to a system that does not exist yet (extends REQ-1, REQ-4, REQ-5, REQ-12,
+    REQ-27, REQ-28).
+    - *Acceptance:* done when a Complex-scope build produces an
+      external-research artifact reporting an honest `complete` / `blocked` /
+      `incomplete` status (never claimed complete from model memory alone), a
+      PRD-acceptance-map artifact, and a modular blueprint, all before any
+      target code exists; done when the Discovery Direction Gate, the
+      Solution Gate, and the Execution Gate each require and record one
+      distinct explicit Owner decision, and none is skipped or merged into
+      another for a Complex build; done when a material PRD conflict,
+      `blocked` research bearing on a live decision, a major cost/scope/
+      security implication, or a high-impact unknown triggers an exception
+      check-in immediately rather than waiting for the next scheduled gate;
+      done when a Simple-scope build instead records one explicit,
+      Owner-approved waiver (reason, risk, scope) and proceeds through its
+      existing single confirmation with no added gate; done when a build is
+      never reported complete while an applicable PRD acceptance criterion
+      is failed, omitted, unverified, or changed without Owner approval;
+      done when execution of any release — single-feature or staged-program
+      — routes through the same Owner-gated milestone machinery
+      `/renmark:rethink` and `/renmark:start`'s Agency mode already use, not
+      a parallel executor.
+30. `REQ-30` **Orchestration efficiency and UX stability is a protected
+    capability.** Renmark's current low-token, low-latency, owner-focused
+    orchestration behavior — bounded subagent dispatch, context hygiene,
+    deterministic-first execution, work-classification fast paths, and
+    minimal Owner-gate interruption — is a product capability, not an
+    implementation detail, and every pipeline (`init`, `start`, `feature`,
+    `debug`, `roadmap`, `finish`, `rethink`, and the `orchestrate` engine
+    they share) must cite and preserve it.
+    - **Required behavior** (each clause extends an existing requirement;
+      REQ-30 does not restate their mechanics, it protects them from silent
+      regression): (a) the orchestrator coordinates bounded subagents and
+      artifacts — it does not absorb detailed worker context, research
+      bodies, diffs, or logs (extends REQ-5, REQ-20); (b) completed or
+      approved artifacts are reused — renmark does not repeat discovery,
+      reread unchanged files, regenerate plans, or redispatch completed work
+      unless an input was invalidated (extends REQ-3, REQ-24); (c)
+      deterministic checks run before LLM reasoning, and the smallest capable
+      model is the default — escalation requires an explicit trigger such as
+      failure, ambiguity, high-risk judgment, or unresolved review (extends
+      REQ-2, REQ-21); (d) one bounded worker per task is the default —
+      parallel or additional dispatch requires independent work and a clear
+      time/quality benefit, and duplicate investigation is prohibited
+      (extends REQ-21, REQ-24); (e) the Owner is asked only for decisions
+      requiring Owner authority — never a technical question renmark can
+      resolve safely from evidence (extends REQ-27, and the Discovery
+      Direction/Solution/Execution gate contracts in REQ-28/REQ-29); (f)
+      every Owner-facing gate stays structured as findings → implications →
+      recommendation → alternatives → the exact decision required, with raw
+      research and agent logs staying in artifacts (extends REQ-5, REQ-28,
+      REQ-29); (g) a new pipeline stage may add a durable artifact — it may
+      not add retained orchestrator context or a parallel execution engine
+      (extends REQ-5, REQ-22); (h) every pipeline reuses the existing
+      Agency/milestone executor unless the Owner explicitly approves a
+      replacement (extends REQ-22, REQ-28, REQ-29); (i) any change to
+      orchestration routing, context limits, dispatch policy, model
+      escalation, Owner-gate frequency, or artifact-reuse behavior requires
+      an explicit PRD change and Owner approval through `/renmark:prd`'s
+      UPDATE gate — it is never a side effect of an unrelated feature.
+    - **Named baseline.** The release tagged `v0.39.7`
+      (commit `d9cccc5`, 2026-08-02) is the reference point for this
+      requirement, named **`ORCHESTRATION-BASELINE-2026-08`**, recorded at
+      `.renmark/memory/orchestration-baseline.md`. "Preserve current
+      behavior" means preserve *that* recorded baseline's structural
+      guarantees and — once captured — its measured token/latency/dispatch
+      numbers, not a subjective later impression of "still feels fast."
+    - **Regression protection.** Before any change touching orchestration
+      routing, context limits, dispatch policy, model escalation, Owner-gate
+      frequency, or artifact reuse, run the same representative Start /
+      Feature-or-Fix / Orchestrate / Rethink scenarios against
+      `ORCHESTRATION-BASELINE-2026-08` and capture: total input/output
+      tokens, wall-clock and active execution time, agent dispatch count,
+      repeated file/artifact reads, Owner question/gate count, time to first
+      useful Owner checkpoint, and verification/completion results. A
+      release is **blocked** when it: increases median token use or
+      execution time by more than 15% over the baseline; adds a routine
+      Owner question or gate beyond the named gates each pipeline already
+      defines; introduces a duplicate dispatch or repeats completed work;
+      sends detailed worker context into the orchestrator; or weakens
+      verification, completion, or recovery behavior. An exception requires
+      quantified evidence, explicit Owner approval, a documented benefit, and
+      a rollback path — new functionality alone never justifies an
+      efficiency regression.
+    - *Acceptance:* done when orchestrator-visible summaries stay bounded
+      (≤5 lines / ≤300 tokens) and artifact-linked on every task; done when
+      an interrupted run resumes from durable state without repeating a
+      completed stage or re-asking a cleared gate; done when routine work
+      routes to the lowest-cost capable executor and escalation carries a
+      documented reason; done when the Owner sees only material decisions
+      and actionable checkpoints, never a raw research dump or a resolvable
+      technical question; done when `init`, `start`, `feature`, `debug`,
+      `roadmap`, `finish`, `rethink`, and `orchestrate` each cite this
+      requirement in their own SKILL.md; done when a proposed orchestration
+      change is blocked, or explicitly Owner-exempted with quantified
+      evidence and a rollback path, per the regression-protection rule above.
+31. `REQ-31` **Native task tracking for dispatched work.** Every pipeline
+    that dispatches agents (`start`, `feature`, `debug`, `rethink`,
+    `orchestrate`, `codereview`, `finish`, and any future pipeline that
+    dispatches) tracks that work through **two distinct, non-substitutable
+    mechanisms**, defined once in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/
+    task-tracking.md` and cited — never restated — by each pipeline's
+    dispatch path via the existing `subagent-budget.md` contract:
+    (i) **the live host's own native Task tools** (Claude Code's
+    `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`) — whenever an interactive
+    session is itself executing a renmark skill and calls `Agent` to
+    dispatch a subagent, that session calls its own native tools around the
+    dispatch; this is a skill instruction to the executing agent, satisfied
+    only by that agent's real tool calls, and is the sole mechanism that
+    satisfies "before dispatching work, create a native task using the
+    available Task tools" — no Python module can invoke a host's tools on
+    an agent's behalf; and (ii) **`renmark.task_tracking`**
+    (`.renmark/state/tasks.json`), a real, tested Python mirror of the same
+    lifecycle wired into the one dispatch path that has no live session to
+    call native tools at all — `renmark.cli._engine.execute_plan`'s
+    `_runner`, which hands work to the headless `codex`/subprocess executor.
+    Mechanism (ii) is scoped strictly to that headless path; it never
+    substitutes for (i) when a live agent is present. One
+    parent task per milestone, one bounded task per dispatch — never a task
+    for trivial internal reasoning or a deterministic check. Each dispatched
+    task's content mirrors the dispatch packet's existing required fields
+    (title/role/scope-and-expected-result/dependencies/verification
+    requirement) — no new schema. Lifecycle: `pending` on creation →
+    `in_progress` immediately before dispatch → blockers/retries/
+    reassignment/failure recorded on the same task as they occur →
+    `completed` only once required output and verification evidence exist.
+    A worker's own task completion never completes its parent milestone
+    task — independent verification/review gets its own linked task, and
+    `renmark.task_tracking.complete_worker_task` mechanically enforces this
+    by reusing `renmark.ledger.check_dispatch_independence` (the same
+    dispatch-identity independence check R-0.4's Inspector already relies
+    on) rather than trusting a caller-asserted flag (extends REQ-4, REQ-12,
+    REQ-28, REQ-29). On interruption or
+    resume, existing tasks are reloaded and reused — a completed or
+    accepted task is never recreated or redispatched (extends REQ-3,
+    REQ-24). A scope change updates or explicitly closes the existing task
+    with a reason before any replacement is created. Task tracking is
+    strictly informational: it adds no Owner gate, question, or agent
+    dispatch of its own, and carries only bounded status/dependencies/
+    result-summary/artifact-path — never raw research, transcripts, or logs
+    — into the native task (extends REQ-5, REQ-30). Graceful degradation
+    (requirement 12) applies only to a genuinely tool-less path — a headless
+    `renmark-execute` invocation with no live session attached — never to an
+    interactive session where the native tools are simply present in the
+    tool palette; there, calling them is not optional. When they are
+    genuinely unavailable, renmark states that live tracking is unavailable
+    and continues on durable Renmark artifacts (and, for the headless path,
+    `renmark.task_tracking`'s own state) alone; it never claims a native
+    task was created or updated when the live host tool was not actually
+    called.
+    - *Acceptance:* done when an interactive session executing any
+      dispatching pipeline calls its own host's `TaskCreate` before, and
+      `TaskUpdate` through, each real `Agent` dispatch — a live, in-transcript
+      tool call, not a Python side effect, per the skill instructions in
+      `task-tracking.md`/`subagent-budget.md`/`orchestrate/SKILL.md`; done
+      when `renmark.cli._engine.execute_plan`'s real headless dispatch loop
+      (proven by `tests/test_task_tracking_engine_wiring.py`, not by a
+      fragment's presence) creates or reuses exactly one native worker task
+      per dispatched plan task and one parent task per plan run;
+      done when a task's status transitions match its actual dispatch
+      lifecycle (`pending` → `in_progress` → `completed`, with
+      blockers/retries/failure recorded in place, proven by
+      `tests/test_task_tracking.py`); done when a worker task's completion
+      alone never marks itself `completed` while its linked verification
+      task is not itself `completed` and provably independent — proven by a
+      real `SelfApprovalError`/`MissingVerificationError` raised from
+      `renmark.task_tracking.complete_worker_task`, not asserted about
+      documentation; done when a resumed run reuses existing tasks rather
+      than recreating or redispatching completed work — proven by
+      `should_skip_dispatch` and idempotent `create_or_reuse_task`; done when
+      a `renmark.task_tracking` failure never blocks the real dispatch/commit
+      it wraps (best-effort, never-raising to the caller); done when task
+      tracking
+      introduces no additional Owner gate, question, or dispatch, and no
+      measured token/time regression beyond REQ-30's 15% threshold; done
+      when native Task tools being unavailable is reported honestly rather
+      than silently skipped or fabricated.
 
 ## Success metrics
 
@@ -618,3 +964,194 @@ approved by the project owner on 2026-08-01 via the `/renmark:prd` UPDATE
 gate, including one owner-requested revision (REQ-27 added; a draft open
 question about the doctrine staying `.bootstrap-renmark/`-only was removed in
 favor of making it a real product requirement).
+
+**Revision note (2026-08-02, human-approved diff):** Added REQ-28
+(brownfield transformation entry point — `/renmark:rethink`, a distinct
+pipeline for reassessing and transforming an existing application, separate
+from `/renmark:start`'s greenfield lane: survey → behavioral baseline →
+Keep/Improve/Replace/Remove/Unknown classification → target blueprint →
+independently-usable-release roadmap → hand off to renmark's existing
+milestone/Agency execution machinery; no structural change before baseline +
+classification + first milestone are Owner-approved). Added a matching Goals
+bullet. Proposed by `/renmark:feature`'s PRD-alignment gate for the
+`add-rethink-pipeline-skill` feature; reviewed and explicitly approved by the
+project owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-08-02, human-approved diff):** Amended REQ-28 to expand
+`/renmark:rethink` from a six-stage survey/baseline/classify/blueprint/
+roadmap pipeline into a nine-stage evidence-based modernization pipeline.
+Renamed to "brownfield modernization entry point." Added: (1) a mandatory
+**PRD acceptance contract** stage, distinct from the behavioral baseline —
+existing behavior is not treated as correct merely because it exists, and the
+transformation cannot be reported complete while an applicable PRD acceptance
+criterion is failed, omitted, unverified, or changed without Owner approval;
+(2) a mandatory **external discovery and benchmarking** stage, distinct from
+the internal survey — sourced, dated, evidence-rated competitor/industry
+research that must honestly report `blocked`/`incomplete` when external
+access is unavailable rather than substituting model memory; (3) a mandatory
+**modularity, scalability, and maintainability assessment**, whose findings
+now inform classification and blueprint decisions for `Improve` items too, not
+only `Replace` items. Classification decisions must now cite internal, PRD,
+external, and modularity evidence. This does not invalidate rethink's prior
+approved behavior — the original survey → baseline → classify → blueprint →
+roadmap → handoff shape and its Owner-gate, no-production-mutation, and
+milestone-handoff guarantees are preserved and extended, not replaced.
+Proposed by `/renmark:feature`'s PRD-alignment gate for the
+`upgrade-rethink-modernization-pipeline` change; reviewed and explicitly
+approved by the project owner on 2026-08-02 via the `/renmark:prd` UPDATE
+gate.
+
+
+**Revision note (2026-08-02, human-approved diff):** Added REQ-29
+(evidence-based greenfield entry point — `/renmark:start`'s Complex-scope
+builds now run mandatory external discovery, a PRD acceptance/traceability
+contract, and a prospective modular blueprint, gated by an explicit
+readiness-review approval before any target code is written; Simple-scope
+builds carry the same discipline forward as one documented, Owner-approved
+waiver inside their existing single confirmation, preserving the
+entry-question-plus-2-follow-ups fast path). Explicitly excludes
+brownfield-only concerns (system survey, compatibility baseline,
+Keep/Improve/Replace/Remove classification) — REQ-29 is the greenfield
+counterpart to REQ-28, not a duplicate of it. Added a matching Goals bullet.
+Does not invalidate `/renmark:start`'s prior approved behavior for Simple
+builds — the entry question, the 2-follow-up cap, and the single-confirmation
+gate are preserved and extended, not replaced. Proposed by
+`/renmark:feature`'s PRD-alignment gate for the
+`upgrade-start-evidence-traceability-modularity` change; reviewed and
+explicitly approved by the project owner on 2026-08-02 via the
+`/renmark:prd` UPDATE gate.
+
+
+**Revision note (2026-08-02, human-approved diff):** Amended REQ-29 to split
+its single "readiness-review" gate into three distinct, named Owner gates —
+the **Discovery Direction Gate** (direction, before the PRD is drafted), the
+**Solution Gate** (scope/design, before the roadmap is finalized), and the
+**Execution Gate** (the finalized roadmap, before any build task is
+dispatched) — and added a cross-cutting **exception check-in** that
+interrupts the current stage immediately on a material PRD conflict,
+unreliable/blocked research bearing on a live decision, a major cost/scope/
+security implication, or a high-impact unknown, rather than waiting for the
+next scheduled gate. This is a structural elaboration of REQ-29's existing
+discipline, not a new requirement or a reversal: the external-research,
+PRD-traceability, and modular-blueprint substance from REQ-29's original
+approval is unchanged, and the Simple-scope fast-path waiver (one documented
+waiver, no added gate) is preserved exactly as before. Proposed by
+`/renmark:feature`'s PRD-alignment gate for the
+`upgrade-start-three-gate-structure` change; reviewed and explicitly approved
+by the project owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+
+**Revision note (2026-08-02, human-approved diff):** Amended REQ-28 to add a
+**Transformation Intake** (desired outcome, protected behavior, constraints,
+non-goals, areas open to change — Owner-level blocking questions only)
+ahead of stage 1, and to thread three named Owner gates through rethink's
+existing nine stages at the points where a real decision is made: the
+**Discovery Direction Gate** (between stage 5 and stage 6 — direction, not
+yet classification), the **Solution Gate** (between stage 7 and stage 8 —
+the classification and blueprint, not yet the roadmap), and the **Execution
+Gate** (stage 9, elaborated — the finalized roadmap, before any production
+code or Agency execution). Added a cross-cutting **exception check-in** that
+interrupts the current stage immediately on a material PRD/Owner-intent
+conflict, unreliable/blocked research, a major cost/scope/security impact, a
+proposed removal of protected behavior, or an unboundable high-impact
+unknown, pausing only the affected decision without discarding completed
+work. This is a structural elaboration of REQ-28's existing discipline, not a
+pipeline redesign: the nine stages, their artifacts, their bounded-subagent
+dispatch, the ≤5-line orchestrator-visible summaries, the incremental-roadmap
+`Program` format, and the hand-off to renmark's existing Agency/milestone
+machinery are all unchanged. No gate's approval may be inferred from silence
+or another gate's approval, and no agent may approve its own recommendation.
+A resumed run reuses existing stage artifacts and cleared gate decisions
+rather than re-dispatching completed work. Proposed by `/renmark:feature`'s
+PRD-alignment gate for the `rethink-owner-gate-contract` change; reviewed and
+explicitly approved by the project owner on 2026-08-02 via the
+`/renmark:prd` UPDATE gate.
+
+
+**Revision note (2026-08-02, human-approved diff):** Added REQ-30
+(orchestration efficiency and UX stability is a protected capability —
+renmark's current bounded-dispatch, context-hygiene, deterministic-first,
+fast-path, and minimal-Owner-interruption behavior, already specified
+piecemeal by REQ-2/REQ-5/REQ-20/REQ-21/REQ-22/REQ-24/REQ-27, is now an
+explicit cross-cutting requirement that every pipeline must cite and that
+blocks a release on a quantified efficiency regression unless the Owner
+grants an explicit, evidence-backed exception with a rollback path). Named
+the current release the reference baseline — `ORCHESTRATION-BASELINE-2026-08`
+(`v0.39.7`, commit `d9cccc5`) — recorded at
+`.renmark/memory/orchestration-baseline.md`, so "preserve current behavior"
+points to a dated, versioned artifact rather than becoming subjective later.
+Added a matching Goals bullet. This does not restate REQ-2/5/20/21/22/24/27's
+mechanics — it protects them from being silently loosened by a future
+feature that doesn't realize it's touching orchestration. Proposed by the
+project owner directly, motivated by observed token/latency savings from the
+current dispatch discipline; reviewed and explicitly approved by the project
+owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+
+**Revision note (2026-08-02, human-approved diff):** Added REQ-31 (native
+task tracking for dispatched work — every dispatching pipeline tracks its
+work as native Claude Code tasks, defined once in `${CLAUDE_PLUGIN_ROOT}/
+skills/.shared/task-tracking.md` and cited via the existing
+`subagent-budget.md` dispatch-packet contract rather than restated per
+pipeline: one parent task per milestone, one bounded task per dispatch,
+pending → in_progress → completed-with-evidence lifecycle, no worker
+self-approval of its own milestone, resume reuses existing tasks instead of
+recreating them, and the mechanism adds no Owner gate, question, or
+dispatch of its own — informational scaffolding around dispatch, not a
+second execution path). Explicitly bound by REQ-30: task tracking must not
+regress token/time efficiency or add routine interruptions. Added a matching
+Goals bullet. Implemented once in `_shared/task-tracking.md` and wired
+through `_shared/subagent-budget.md`'s existing contract rather than
+rewriting each pipeline's SKILL.md, per the Owner's explicit instruction to
+avoid duplicating the mechanism per pipeline. Proposed by the project owner
+directly; reviewed and explicitly approved by the project owner on
+2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-08-02, human-approved diff):** Amended REQ-31 to
+require and name a real, host-independent Python enforcement layer —
+`renmark.task_tracking` (`.renmark/state/tasks.json`) — wired into the
+actual per-task dispatch call site in `renmark.cli._engine.execute_plan`'s
+`_runner`: one native parent task per plan run, one worker task per
+dispatched task, one linked verification task per worker (dispatched under
+the same `_INSPECTOR_DISPATCH_IDENTITY` R-0.4 already uses), and
+`complete_worker_task` mechanically enforcing no-self-approval by reusing
+`renmark.ledger.check_dispatch_independence` rather than trusting an
+asserted flag. This closes the gap the first REQ-31 revision left open — a
+markdown contract describing intended behavior with only content-presence
+tests proving the contract text existed, not that any dispatch actually
+created, updated, or completed a task under enforced invariants. The
+skill-level `task-tracking.md` guidance (native Claude Code Task tools for
+live in-session dispatch) is unchanged; this adds the mechanically verified
+backing for `/renmark:orchestrate`'s actual dispatch loop specifically, with
+real unit tests (`tests/test_task_tracking.py`) and real dispatch-loop
+integration tests (`tests/test_task_tracking_engine_wiring.py`) replacing
+content-presence-only proof. Every `task_tracking` call site in the engine
+is best-effort/never-raising, matching the existing ledger-emission
+convention, so this addition carries zero dispatch/commit-path regression
+risk. Proposed by the project owner directly, in response to a Stop-hook
+rejection of the prior revision for providing specification without
+enforcement; reviewed and explicitly approved by the project owner on
+2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-08-02, human-approved diff):** Corrected REQ-31's
+second revision, which had conflated two distinct mechanisms into one
+sentence in a way a reader could mistake `renmark.task_tracking`'s Python
+state file for satisfying "create a native Claude Code task using the
+available Task tools." REQ-31 now names them explicitly as separate,
+non-substitutable: (i) the live host's own `TaskCreate`/`TaskUpdate` —
+satisfied only by the executing agent's real tool calls in an interactive
+session, which is the sole mechanism requirement 1 names, and (ii)
+`renmark.task_tracking`, scoped strictly to the one dispatch path with no
+live session at all (`renmark.cli._engine.execute_plan`'s headless
+`codex`/subprocess executor). Mechanism (ii) never substitutes for (i).
+Graceful degradation (requirement 12) is now scoped to genuinely tool-less
+paths only — an interactive session always has the tools and must use them.
+`task-tracking.md`, `subagent-budget.md`, and `orchestrate/SKILL.md` were
+reworded from descriptive ("track dispatches per...") to imperative ("call
+`TaskCreate` yourself") to remove the ambiguity. No change to the module,
+its engine wiring, or its tests from the prior revision — this corrects
+which requirement they satisfy, not their behavior. Proposed by the project
+owner directly, in response to a second Stop-hook rejection identifying that
+the fix for the first rejection still did not name the live host tools as
+the actual requirement-1 mechanism; reviewed and explicitly approved by the
+project owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.

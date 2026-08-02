@@ -24,7 +24,7 @@ state and stop when approval is absent.
 
 ## Overview
 
-The **Ship / Readiness pipeline**: re-verify everything still passes (route failures to `/renmark:debug`) → show what was built → select a finish lane → offer the next action (PR / merge / release / nothing). Merge and release are Pause-Policy gates and never auto-proceed.
+The **Ship / Readiness pipeline**: re-verify everything still passes (route failures to `/renmark:debug`) → show what was built → select a finish lane → offer the next action (PR / merge / release / nothing). Merge and release are Pause-Policy gates and never auto-proceed. Bound by REQ-30 (orchestration efficiency is a protected capability): the lane selection below picks the cheapest-safe lane for the current lifecycle state — never default to `full` when `quick` already satisfies it.
 
 ## Finish Lanes
 
