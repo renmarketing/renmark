@@ -14,15 +14,15 @@ from typing import Any
 from dotenv import load_dotenv
 
 from .. import __version__
+from .. import task_tracking as _task_tracking
+from ..ledger import DispatchIndependenceError as _DispatchIndependenceError
 from ..ledger import WorkOrder as _LedgerWorkOrder
 from ..ledger import WorkResult as _LedgerWorkResult
 from ..ledger import append_ledger_event as _append_ledger_event
 from ..ledger import check_dispatch_independence as _check_dispatch_independence
-from ..ledger import DispatchIndependenceError as _DispatchIndependenceError
 from ..ledger import emit_inspection_verdict as _emit_inspection_verdict
 from ..parser import PlanError, Task, parse_plan
 from ..providers.codex import codex_available as codex_available
-from ..verifier import run_verifier as _run_verifier
 from ..state import (
     PauseState,
     clear_pause,
@@ -37,6 +37,7 @@ from ..state import (
     write_pause,
     write_pipeline_state,
 )
+from ..verifier import run_verifier as _run_verifier
 from ._codex_runner import (
     _classify_and_rollback as _classify_and_rollback,
 )
@@ -661,6 +662,23 @@ def execute_plan(
     _git_tag(repo, f"renmark-run-{run_id}-start")
     clear_pause(repo)
 
+    # REQ-31: one native parent task per milestone (this plan run). Reused
+    # unchanged on resume — create_or_reuse_task is idempotent by task_id.
+    # Best-effort: a tracking-layer failure must never block a real dispatch.
+    parent_task_id = f"run-{run_id}"
+    try:
+        _task_tracking.create_or_reuse_task(
+            repo,
+            parent_task_id,
+            title=f"Execute plan {plan_path}",
+            role="orchestrator",
+            scope=plan_path,
+            verification_expectation="every dispatched task independently verified",
+        )
+        _task_tracking.mark_in_progress(repo, parent_task_id)
+    except Exception:
+        pass
+
     needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
     r008_warned: list[int] = []  # tasks that dispatched with missing R-008 fields
 
@@ -684,6 +702,13 @@ def execute_plan(
         # the real dispatch, so it's best-effort/never-raising, same as the
         # R-0.0 baseline-trace convention this module already follows.
         order_id = f"{run_id}-{task.index}"
+        # `work_result_dispatch_identity` only depends on already-known
+        # values (executor + order_id), so it's safe to compute here, before
+        # dispatch, for the native worker task's `dispatch_identity` field —
+        # the same identity the WorkResult ledger event below records.
+        work_result_dispatch_identity = f"{task.executor or 'unknown'}:{order_id}"
+        worker_task_id = f"task-{order_id}"
+        verify_task_id = f"task-{order_id}-verify"
         try:
             _append_ledger_event(
                 _repo,
@@ -696,6 +721,25 @@ def execute_plan(
                 ),
                 ts=now_iso(),
             )
+        except Exception:
+            pass
+
+        # REQ-31: one native task per dispatch, reused unchanged on resume.
+        # `mark_in_progress` fires immediately before the real dispatch call
+        # below — never after. Best-effort: tracking must never block
+        # dispatch.
+        try:
+            _task_tracking.create_or_reuse_task(
+                _repo,
+                worker_task_id,
+                title=task.title or task.spec or f"task {task.index}",
+                role=task.role or task.executor or "unknown",
+                scope=task.target,
+                verification_expectation=task.verifier,
+                parent_id=parent_task_id,
+                dispatch_identity=work_result_dispatch_identity,
+            )
+            _task_tracking.mark_in_progress(_repo, worker_task_id)
         except Exception:
             pass
 
@@ -714,7 +758,7 @@ def execute_plan(
         # R-0.4/WP-2: `dispatch_identity` records which real dispatch produced
         # this result (executor + order_id, unique per task/run) so a later
         # inspector can prove independence rather than assume it.
-        work_result_dispatch_identity = f"{task.executor or 'unknown'}:{order_id}"
+        # (identity computed above, before dispatch, for the native task record)
         try:
             _append_ledger_event(
                 _repo,
@@ -758,6 +802,12 @@ def execute_plan(
                 f"WARNING: inspection verdict rejected for {order_id} "
                 f"(dispatch independence check failed): {exc}"
             )
+            try:
+                _task_tracking.record_blocker(
+                    _repo, worker_task_id, f"dispatch independence check failed: {exc}"
+                )
+            except Exception:
+                pass
         else:
             fresh_result = _run_verifier(
                 task.verifier,
@@ -775,6 +825,48 @@ def execute_plan(
                     work_result_dispatch_identity=work_result_dispatch_identity,
                     ts=now_iso(),
                 )
+            except Exception:
+                pass
+
+            # REQ-31: the native verification task is completed from the
+            # SAME fresh, independently-rerun verifier result the ledger's
+            # InspectionReport above uses — never from the worker's own
+            # `ok`. Only once that verification task is `completed` does
+            # `complete_worker_task` allow the worker task to complete; this
+            # is the mechanical no-self-approval enforcement (REQ-31 rule 5),
+            # reusing the same dispatch-identity independence check the
+            # ledger's InspectionReport already relies on.
+            try:
+                _task_tracking.create_or_reuse_task(
+                    _repo,
+                    verify_task_id,
+                    title=f"Verify task {task.index}",
+                    role="inspector",
+                    scope=task.target,
+                    verification_expectation=task.verifier,
+                    parent_id=parent_task_id,
+                    depends_on=(worker_task_id,),
+                    dispatch_identity=_INSPECTOR_DISPATCH_IDENTITY,
+                )
+                _task_tracking.mark_in_progress(_repo, verify_task_id)
+                _task_tracking.complete_task(
+                    _repo,
+                    verify_task_id,
+                    artifact_path=f".renmark/state/wave-summaries/{run_id}",
+                    result_summary="pass" if fresh_result.ok else "fail",
+                )
+                if fresh_result.ok:
+                    _task_tracking.complete_worker_task(
+                        _repo,
+                        worker_task_id,
+                        verification_task_id=verify_task_id,
+                        artifact_path=sha or task.target,
+                        result_summary=reason,
+                    )
+                else:
+                    _task_tracking.record_failure(
+                        _repo, worker_task_id, "independent verifier rerun failed"
+                    )
             except Exception:
                 pass
 

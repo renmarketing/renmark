@@ -1,5 +1,5 @@
 ---
-description: "Use for the Brownfield Transformation pipeline (/renmark:rethink) when reassessing or migrating an EXISTING application — plain requests like 'rethink this app', 'this needs a rebuild plan', 'modernize X'. Surveys before structurally changing anything; for a new project use /renmark:start, for a bounded addition use /renmark:feature."
+description: "Use for the Brownfield Modernization pipeline (/renmark:rethink) when reassessing or migrating an EXISTING application — plain requests like 'rethink this app', 'this needs a rebuild plan', 'modernize X'. Surveys internally, benchmarks externally, binds to PRD acceptance criteria, and assesses modularity before structurally changing anything; for a new project use /renmark:start, for a bounded addition use /renmark:feature."
 argument-hint: '[app or project description]'
 ---
 

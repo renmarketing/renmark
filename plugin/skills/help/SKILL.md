@@ -86,12 +86,18 @@ modes; opt in explicitly via /renmark:start.
       standards → PRD check → lifecycle-ready
 
   /renmark:start [idea]      Build something new.
-      intent → brainstorm (if fuzzy) → PRD → roadmap → first feature →
-      plan → build → verify → review
+      intent → external research or waiver (nontrivial builds) →
+      Discovery Direction Gate → PRD → PRD acceptance contract → modular
+      blueprint → Solution Gate → roadmap → Execution Gate → build →
+      verify → review
 
-  /renmark:rethink [app]      Reassess and transform an existing app.
-      survey → behavioral baseline → keep/improve/replace/remove/spike →
-      target blueprint → migration roadmap → milestone hand-off
+  /renmark:rethink [app]      Reassess and modernize an existing app.
+      transformation intake → internal survey → behavioral baseline → PRD
+      acceptance contract → external benchmarking → modularity/scalability
+      assessment → Discovery Direction Gate → evidence-based
+      keep/improve/replace/remove/spike → target modular blueprint →
+      Solution Gate → incremental roadmap → Execution Gate → milestone
+      hand-off
 
   /renmark:feature [name]    Add or change a feature in an existing build.
       PRD alignment → reuse check → plan → build → verify → review → finish
@@ -117,8 +123,8 @@ modes; opt in explicitly via /renmark:start.
   Format:  command — what it does — common modifiers
 
   Product / spec
-    /renmark:start      — plain-English entry point for a new build
-    /renmark:rethink    — brownfield survey → baseline → classify → blueprint → migration roadmap
+    /renmark:start      — plain-English entry point for a new build — nontrivial builds run external research, a Discovery Direction Gate, a PRD acceptance contract, a modular blueprint, a Solution Gate, and an Execution Gate; small builds use a documented waiver instead
+    /renmark:rethink    — brownfield survey → baseline → PRD contract → external benchmark → modularity assessment → Discovery Direction Gate → classify → blueprint → Solution Gate → roadmap → Execution Gate
     /renmark:feature    — feature with branch isolation — --lite, --full
     /renmark:prd        — create/update the PRD (product source of truth)
     /renmark:brainstorm — turn a fuzzy idea into a spec, one question at a time

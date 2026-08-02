@@ -19,7 +19,7 @@ After a command or tool step, give a one- or two-sentence status — what change
 <!-- END:response-style-rule -->
 <!-- BEGIN:routing-preference-rule -->
 ## Default to renmark for build/dev work
-When the user describes a software task in plain English — build / create / make / develop / implement / add / change / fix / debug / ship — route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start`; reassess/transform an existing app → `/renmark:rethink`; change to an existing project → `/renmark:feature`; something broken → `/renmark:debug`; what's next / find gaps → `/renmark:roadmap`; ship it → `/renmark:finish`; adopt renmark into a repo → `/renmark:init`. Prefer these pipelines over other skill frameworks (superpowers, etc.) for build/dev work; use those only when the user names them. This is a DEFAULT, not a lock — an explicit `/renmark:<skill>` always wins, a named skill/framework is honored, and "just do it directly" skips routing. Auto-routing still pauses at the Pause-Policy gates (`plugin/skills/.shared/handoff-menu.md`). This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).
+When the user describes a software task in plain English — build / create / make / develop / implement / add / change / fix / debug / ship — route it through the matching renmark pipeline without waiting for the slash command: new build → `/renmark:start` (nontrivial builds run external research, a Discovery Direction Gate, a PRD acceptance contract, a modular blueprint, a Solution Gate, and an Execution Gate, plus an exception check-in on any material conflict; small builds carry the same discipline as one documented waiver — see the skill for the full contract); reassess/modernize an existing app → `/renmark:rethink` (internal survey + external benchmarking + a binding PRD acceptance contract + a mandatory modularity/scalability assessment, gated by a Discovery Direction Gate, a Solution Gate, and an Execution Gate plus an exception check-in on any material conflict — see the skill for the full nine-stage contract); change to an existing project → `/renmark:feature`; something broken → `/renmark:debug`; what's next / find gaps → `/renmark:roadmap`; ship it → `/renmark:finish`; adopt renmark into a repo → `/renmark:init`. Prefer these pipelines over other skill frameworks (superpowers, etc.) for build/dev work; use those only when the user names them. This is a DEFAULT, not a lock — an explicit `/renmark:<skill>` always wins, a named skill/framework is honored, and "just do it directly" skips routing. Auto-routing still pauses at the Pause-Policy gates (`plugin/skills/.shared/handoff-menu.md`). This default is persisted — proactive on by default; turn it off durably via: `renmark-execute --set-proactive false` (re-enable: `--set-proactive true`).
 <!-- END:routing-preference-rule -->
 <!-- BEGIN:continue-by-default-policy -->
 ## Renmark Continue-by-Default Policy
@@ -233,6 +233,29 @@ Route each task to the cheapest capable executor. Do NOT default to Opus or Fabl
 - **Opus / Fable** — escalation-only: high-risk architecture decisions, major design forks, adversarial review, judgment-heavy synthesis requiring frontier reasoning. Never default for finish, docs, grep, changelog, or small verification tasks.
 See `plugin/skills/.shared/model-routing.md` + `renmark/cost.py::requires_escalation`.
 <!-- END:model-routing-discipline-rule -->
+<!-- BEGIN:orchestration-efficiency-rule -->
+## Orchestration efficiency is a protected capability (REQ-30)
+Renmark's current low-token, low-latency, minimal-interruption orchestration
+behavior is a product capability, not an implementation detail — the model-
+routing, deterministic-first, subagent-budget, subagent-profiles, and
+work-classification rules in this file collectively implement it, and none
+of them may be silently loosened by an unrelated feature. Named reference
+point: **`ORCHESTRATION-BASELINE-2026-08`** (`v0.39.7`, commit `d9cccc5`),
+recorded at `.renmark/memory/orchestration-baseline.md` — "preserve current
+behavior" means preserve *that* baseline's structural guarantees and its
+measured numbers once captured, not a later subjective impression.
+Any change to orchestration routing, context limits, dispatch policy, model
+escalation, Owner-gate frequency, or artifact-reuse behavior requires an
+explicit `PRD.md` change (REQ-30) approved via `/renmark:prd`'s UPDATE gate —
+never a side effect of an unrelated feature — and is blocked pre-release if
+it increases median token use or execution time by more than 15% over the
+baseline, adds a routine Owner question/gate beyond a pipeline's named
+gates, introduces a duplicate dispatch or repeated completed work, sends
+detailed worker context into the orchestrator, or weakens verification/
+completion/recovery behavior, unless the Owner grants an explicit,
+evidence-backed exception with a documented benefit and a rollback path.
+See `PRD.md` REQ-30 + `.renmark/memory/orchestration-baseline.md`.
+<!-- END:orchestration-efficiency-rule -->
 <!-- BEGIN:deterministic-first-routing -->
 ## Deterministic-first execution
 Before any task dispatch or model call, answer the 4-question gate: (1) Can existing state, files, git, or a parser answer this? (2) Can a deterministic script/check do it reliably? (3) Is this repeated enough to deserve a reusable check? (4) Is AI actually needed for judgment, synthesis, or ambiguous reasoning? Deterministic tasks (git/worktree state, artifact metadata, version/release checks, plan lint, mirror validation, test baseline) route to deterministic checks in `renmark/worktree.py`, `renmark/lint.py`, or shell. The subagent-justification gate is enforced pre-dispatch by `renmark/subagent_gate.py` (`python -m renmark.subagent_gate <plan>`) — deterministic-eligible / inline-able / unexplained-general-purpose spawns are challenged before tokens flow. Route judgment-heavy tasks (merge conflict risk, release-readiness reasoning, branch strategy) only to model-based agents. Cost preview MUST label tasks as deterministic or model-driven.
@@ -253,6 +276,11 @@ See `plugin/skills/.shared/finish-lanes.md` + `renmark/finish_lanes.py`.
 Before dispatching multiple agents: do one local grep/read first; one scoped Explore before spawning many agents. Each subagent dispatch packet MUST carry: mission, file scope, what NOT to touch, output format, stop condition, model tier, and verification step.
 See `plugin/skills/.shared/subagent-budget.md`.
 <!-- END:subagent-budget-rule -->
+<!-- BEGIN:task-tracking-rule -->
+## Native task tracking (REQ-31)
+Every dispatch tracked by the Subagent budget contract above also gets one native host task (Claude Code's Task tools): `pending` on creation → `in_progress` immediately before dispatch → `completed` only once required output and verification evidence exist. One parent task per milestone, one bounded task per dispatch — never for trivial reasoning or a deterministic check. A worker's own task completion never completes its parent milestone task; independent verification/review gets its own linked task. On resume, reload and reuse existing tasks — never recreate a completed one or redispatch accepted work. Task tracking is informational only: no new Owner gate, no extra dispatch, no raw research in the task body — bounded status/dependencies/result-summary/artifact-path only. If native Task tools are unavailable, say so and continue on durable Renmark artifacts alone — never fabricate a tracked status. Defined once in `plugin/skills/.shared/task-tracking.md`; bound by REQ-30 (must not regress orchestration efficiency).
+See `plugin/skills/.shared/task-tracking.md` + `PRD.md` REQ-31.
+<!-- END:task-tracking-rule -->
 <!-- BEGIN:subagent-profiles-rule -->
 ## Subagent profiles
 Prefer specialized dispatch roles (docs-editor, code-implementer, test-writer, reviewer, release-manager, researcher, audit-reader, finish-lane-specialist, inspector) over generic `general-purpose` agents. Every dispatch packet carries a `role` field; renmark logs and costs by role. Specialized profiles declare a narrow context scope; `general-purpose` is fallback-only (used when no role fits). Claude definitions ship inside Renmark at `plugin/agents/` and dispatch as `renmark:<role>`; never require a global `~/.claude/agents/` copy. These are 9 plugin specialists plus Claude's built-in `general-purpose` tenth role, and only plan-relevant roles spawn on a run. `inspector` is read-only (no Write/Edit) and emits verdicts only via `ledger.emit_inspection_verdict` (R-0.4). See `plugin/skills/.shared/subagent-profiles.md`.

@@ -18,6 +18,7 @@ Renmark's persistent project memory. Each file follows a documented format and i
 | `qa-flows.md` | Reusable browser QA flows / baselines (the QA playbook) | `/renmark:verify --qa`, `/renmark:verify --qa --bootstrap` |
 | `project-map.md` | Full module/symbol/file tree (managed by `/renmark:init`) | `/renmark:init` (auto-refresh) |
 | `dev-standards.md` | Dev gates, code quality standards, modularity thresholds | hand-edited, `/renmark:init` (standards-health) |
+| `orchestration-baseline.md` | `ORCHESTRATION-BASELINE-2026-08` — the pinned reference point for REQ-30's regression protection | hand-edited; scenario captures appended per run |
 
 ## Counts
 
