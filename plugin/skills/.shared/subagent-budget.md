@@ -71,6 +71,22 @@ When a workflow requires MANY subagents (5+):
 
 ---
 
+## Independent reviewer — risk triggers
+
+An independent `reviewer`-role dispatch is warranted when a task matches ANY of these:
+
+- security-sensitive change
+- data-loss risk
+- public/external contract change (API, schema, CLI flags)
+- migration (data or schema)
+- broad cross-module change
+- failed verification on the first pass
+- unresolved ambiguity in the task spec
+
+Routine single-file changes with a clean first-pass verifier do not require independent review by default.
+
+---
+
 ## Interaction with reuse-check and context-taxonomy
 
 **Reuse-check** (`_shared/reuse-check.md`) is a special subagent: it searches a large surface (registry, specs, plans) in bounded time. It is **not** a violation of the local-first rule — it's the gate that prevents reinventing wheels.

@@ -31,6 +31,8 @@ Before dispatching to Opus or Fable, **consult `renmark.cost.requires_escalation
 - **Judgment required** that cannot be decomposed to Sonnet-grade planning (trade-off between competing correctness constraints, adversarial review).
 - **Prior Sonnet attempt failed** in a way that indicates deeper reasoning is needed (not just missing context, but a conceptual gap).
 
+Check 11 in `renmark/plan_lint.py` enforces this requirement at the real pre-dispatch gate, flagging any `opus`/`fable` route lacking a `requires_escalation`-satisfying justification as a WARN during every plan validation (not merely in the `--dry-run` preview).
+
 Escalation is opt-in, not default. A task that "might benefit from Opus" is still a Sonnet task unless it hits one of the three criteria.
 
 ---
