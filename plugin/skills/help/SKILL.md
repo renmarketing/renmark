@@ -89,6 +89,10 @@ modes; opt in explicitly via /renmark:start.
       intent → brainstorm (if fuzzy) → PRD → roadmap → first feature →
       plan → build → verify → review
 
+  /renmark:rethink [app]      Reassess and transform an existing app.
+      survey → behavioral baseline → keep/improve/replace/remove/spike →
+      target blueprint → migration roadmap → milestone hand-off
+
   /renmark:feature [name]    Add or change a feature in an existing build.
       PRD alignment → reuse check → plan → build → verify → review → finish
 
@@ -106,6 +110,7 @@ modes; opt in explicitly via /renmark:start.
 
   Which one?
     new app → start          existing app → feature     broke → debug
+    existing app, needs rethinking → rethink
     what's next? → roadmap    adopt renmark → init       ship → finish
 
 ── All skills (grouped) ────────────────────────────────────────────────────
@@ -113,6 +118,7 @@ modes; opt in explicitly via /renmark:start.
 
   Product / spec
     /renmark:start      — plain-English entry point for a new build
+    /renmark:rethink    — brownfield survey → baseline → classify → blueprint → migration roadmap
     /renmark:feature    — feature with branch isolation — --lite, --full
     /renmark:prd        — create/update the PRD (product source of truth)
     /renmark:brainstorm — turn a fuzzy idea into a spec, one question at a time

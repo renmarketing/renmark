@@ -214,6 +214,13 @@ SKILLS: dict[str, SkillMeta] = {
         has_handoff=True,
         disable_model_invocation=False,
     ),
+    "rethink": SkillMeta(
+        domain="build",
+        next_steps_class=1,
+        cites=("next-steps", "handoff-menu"),
+        has_handoff=True,
+        disable_model_invocation=False,
+    ),
     "roadmap": SkillMeta(
         domain="meta",
         next_steps_class=3,

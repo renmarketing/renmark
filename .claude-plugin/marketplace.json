@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "renmark",
-      "description": "Pipeline-first build assistant for Codex and Claude Code. Six pipelines — /renmark:init (adopt a repo), /renmark:start (new build), /renmark:feature (add/change), /renmark:debug (fix), /renmark:roadmap (gaps / what's next), /renmark:finish (ship) — plus guided planning, implementation, verification, recovery, and release skills. Persistent project state lives in .renmark/.",
+      "description": "Pipeline-first build assistant for Codex and Claude Code. Seven pipelines — /renmark:init (adopt a repo), /renmark:start (new build), /renmark:rethink (reassess/transform an existing app), /renmark:feature (add/change), /renmark:debug (fix), /renmark:roadmap (gaps / what's next), /renmark:finish (ship) — plus guided planning, implementation, verification, recovery, and release skills. Persistent project state lives in .renmark/.",
       "version": "0.39.7",
       "author": {
         "name": "renmark"
