@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-048 — R-0.4 flipped to RELEASE CANDIDATE
+
+**Date:** 2026-08-01
+**Status:** Accepted
+
+**Context.** Contract: .renmark/plans/2026-08-01-r-0.4-minimal-independent-inspector-contract.md. Full suite 1776 passed/31 skipped/0 failed. Awaiting Owner release decision (version bump/tag/RELEASED).
+
+**Decision.** WP-1..WP-6 (+bounded repair WP-4b, re-review WP-6b) complete. WP-6b independent re-review: PASS. F-R0.4-2 (verifier-rerun read-only not mechanically enforced) tracked as non-blocking debt for Milestone 5.
+
+---
+
 ## ADR-047 — Approved R-0.4 contract as drafted
 
 **Date:** 2026-08-01
