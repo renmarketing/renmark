@@ -6,9 +6,9 @@ cheaper-capable (Haiku for read-only/docs/audit roles, Sonnet for code/tests/rev
 and declares a deliberately narrow ``context_scope`` so the dispatch packet
 carries less context.
 
-Claude Code discovers the eight specialized profiles from the enabled Renmark
+Claude Code discovers the nine specialized profiles from the enabled Renmark
 plugin's ``agents/`` directory. Its built-in ``general-purpose`` agent remains
-the ninth dispatch role and fallback. Renmark tracks and logs the role from this
+the tenth dispatch role and fallback. Renmark tracks and logs the role from this
 module and emits a plugin-scoped native type such as ``renmark:reviewer``.
 
 Design contract:
@@ -139,6 +139,16 @@ PROFILES: dict[str, ProfileSpec] = {
         verification="artifact exists at .renmark/research/<topic>.md; no source edits",
         context_scope="narrow",
     ),
+    # ── Independent inspection / verdicts (R-0.4) ─────────────────────────────
+    "inspector": ProfileSpec(
+        role="inspector",
+        model_tier="sonnet",
+        allowed_targets=".renmark/ledger/** (read-only; emits verdicts via ledger.emit_inspection_verdict only)",
+        output_format="PASS/FAIL/ESCALATE verdict + cited evidence + Work Result reference; structured JSON per G11",
+        stop_condition="InspectionReport verdict emitted to the ledger; no production file edited",
+        verification="InspectionReport event appended with dispatch_identity distinct from the Work Result's dispatch_identity; no production files in touched_files",
+        context_scope="narrow",
+    ),
     # ── Finish-lane specialist (verify + QA + ship gates) ────────────────────
     "finish-lane-specialist": ProfileSpec(
         role="finish-lane-specialist",
@@ -256,6 +266,7 @@ _NATIVE_AGENT_ROLES: frozenset[str] = frozenset(
         "researcher",
         "audit-reader",
         "finish-lane-specialist",
+        "inspector",
     }
 )
 

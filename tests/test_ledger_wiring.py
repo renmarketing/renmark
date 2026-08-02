@@ -138,6 +138,38 @@ def test_scan_write_report_with_findings_emits_changes_requested(tmp_path):
     assert events[0]["findings"] == ["pytest failed"]
 
 
+def test_execute_plan_emits_independent_inspection_verdict(tmp_path, monkeypatch):
+    # R-0.4/WP-4: the _runner call site derives a real InspectionReport from
+    # the task's own verifier pass/fail outcome, with a dispatch_identity
+    # structurally distinct from the WorkResult's — proving the wiring, not
+    # just the underlying ledger primitives, offline (no live executor).
+    _init_repo(tmp_path)
+    plan = _write_plan(tmp_path)
+
+    monkeypatch.setattr(_engine, "codex_available", lambda: True)
+    monkeypatch.setattr(
+        _engine,
+        "_execute_task",
+        lambda **kwargs: (True, "", 100, "deadbeef"),
+    )
+
+    rc = _engine.execute_plan(str(plan), repo=tmp_path)
+    assert rc == 0
+
+    results = ledger.read_ledger_events(tmp_path, kind=ledger.KIND_WORK_RESULT)
+    assert len(results) == 1
+    work_result_dispatch_identity = results[0]["dispatch_identity"]
+    assert work_result_dispatch_identity
+
+    order_id = results[0]["order_id"]
+    verdict = ledger.latest_verdict_for(tmp_path, order_id)
+    assert verdict is not None
+    assert verdict.dispatch_identity
+    assert verdict.dispatch_identity != work_result_dispatch_identity
+    assert verdict.verdict in ledger.VERDICTS
+    assert verdict.verdict == "pass"
+
+
 def test_write_pause_emits_escalation(tmp_path):
     state = pause_state.PauseState(
         run_id="run-1",

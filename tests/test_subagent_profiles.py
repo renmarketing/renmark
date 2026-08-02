@@ -107,6 +107,7 @@ def test_plugin_ships_every_specialized_agent_definition() -> None:
         "researcher",
         "audit-reader",
         "finish-lane-specialist",
+        "inspector",
     }
 
     assert set(subagent_profiles.native_agent_roles()) == specialized_roles

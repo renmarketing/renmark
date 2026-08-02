@@ -196,3 +196,77 @@ def test_read_ledger_events_missing_file_returns_empty(repo: Path) -> None:
     assert ledger.read_ledger_events(repo) == []
     assert ledger.read_ledger_events(repo, kind="work_order") == []
     assert ledger.read_ledger_events(repo, limit=5) == []
+
+
+# ── R-0.4 WP-1/WP-2/WP-3: verdict schema + dispatch independence ────────────
+
+
+def test_validate_inspection_report_with_dispatch_identity_validates() -> None:
+    from dataclasses import asdict
+
+    event = ledger.InspectionReport(
+        subject_ref="wo-1",
+        verdict="pass",
+        findings=[],
+        generator="renmark-verifier",
+        dispatch_identity="codex:run-1-0",
+    )
+    assert ledger.validate_inspection_report(asdict(event)) == []
+
+
+def test_validate_inspection_report_rejects_missing_verdict() -> None:
+    issues = ledger.validate_inspection_report(
+        {"subject_ref": "wo-1", "findings": [], "dispatch_identity": "codex:run-1-0"}
+    )
+    assert issues  # missing 'verdict'
+
+
+def test_emit_inspection_verdict_rejects_verdict_not_in_verdicts(repo: Path) -> None:
+    with pytest.raises(ledger.LedgerValidationError):
+        ledger.emit_inspection_verdict(
+            repo,
+            work_result_id="wo-1",
+            work_order_id="wo-1",
+            verdict="changes_requested",  # not in VERDICTS = ("pass","fail","escalate")
+            evidence=[],
+            inspector_dispatch_identity="renmark-verifier",
+            work_result_dispatch_identity="codex:wo-1",
+            ts="2026-08-01T00:00:00+00:00",
+        )
+    assert ledger.read_ledger_events(repo, kind=ledger.KIND_INSPECTION_REPORT) == []
+
+
+def test_check_dispatch_independence_rejects_same_identity(repo: Path) -> None:
+    with pytest.raises(ledger.DispatchIndependenceError):
+        ledger.check_dispatch_independence(repo, "codex:wo-1", "codex:wo-1")
+
+
+def test_emit_inspection_verdict_rejects_self_grading(repo: Path) -> None:
+    with pytest.raises(ledger.DispatchIndependenceError):
+        ledger.emit_inspection_verdict(
+            repo,
+            work_result_id="wo-1",
+            work_order_id="wo-1",
+            verdict="pass",
+            evidence=[],
+            inspector_dispatch_identity="codex:wo-1",
+            work_result_dispatch_identity="codex:wo-1",
+            ts="2026-08-01T00:00:00+00:00",
+        )
+    assert ledger.read_ledger_events(repo, kind=ledger.KIND_INSPECTION_REPORT) == []
+
+
+def test_check_dispatch_independence_rejects_empty_inspector_identity(
+    repo: Path,
+) -> None:
+    with pytest.raises(ledger.DispatchIndependenceError):
+        ledger.check_dispatch_independence(repo, "codex:wo-1", "")
+
+
+def test_check_dispatch_independence_allows_empty_worker_identity_only(
+    repo: Path,
+) -> None:
+    # Per WP-1's design: an empty work_result_dispatch_identity (a legacy,
+    # pre-R-0.4 WorkResult with no recorded identity) does not by itself fail
+    # the check — only an empty *inspector* identity is disqualifying.
+    ledger.check_dispatch_independence(repo, "", "renmark-verifier")  # must not raise
