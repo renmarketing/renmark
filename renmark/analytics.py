@@ -177,6 +177,7 @@ def record_task_run(
     total_tokens: int = 0,
     est_cost_usd: float = 0.0,
     sha: str = "",
+    measured: bool = False,
 ) -> None:
     """Append one orchestrate task-run record (``task-runs.jsonl``)."""
     _append(
@@ -199,6 +200,7 @@ def record_task_run(
             "total_tokens": total_tokens,
             "est_cost_usd": est_cost_usd,
             "sha": sha,
+            "measured": measured,
         },
     )
 
@@ -489,6 +491,8 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
     tokens_by_model: Counter[str] = Counter()
     tokens_by_provider: Counter[str] = Counter()
     passed = failed = skipped = 0
+    measured_tokens_total = 0
+    unmeasured_task_count = 0
     for r in rows:
         raw_status = _as_str(r.get("status"))
         status = raw_status.upper()
@@ -510,6 +514,10 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
             tokens_by_executor[_as_str(r.get("executor")) or "unknown"] += tokens
             tokens_by_model[_as_str(r.get("model")) or "unknown"] += tokens
             tokens_by_provider[_as_str(r.get("provider")) or "unknown"] += tokens
+            if r.get("measured"):
+                measured_tokens_total += tokens
+            else:
+                unmeasured_task_count += 1
     return {
         "total": len(rows),
         "passed": passed,
@@ -521,6 +529,8 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
         "tokens_by_executor": _cap_map(dict(tokens_by_executor)),
         "tokens_by_model": _cap_map(dict(tokens_by_model)),
         "tokens_by_provider": _cap_map(dict(tokens_by_provider)),
+        "measured_tokens_total": measured_tokens_total,
+        "unmeasured_task_count": unmeasured_task_count,
     }
 
 
