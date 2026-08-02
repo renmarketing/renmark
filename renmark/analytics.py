@@ -514,10 +514,10 @@ def _agg_tasks(rows: list[dict[str, object]]) -> dict[str, object]:
             tokens_by_executor[_as_str(r.get("executor")) or "unknown"] += tokens
             tokens_by_model[_as_str(r.get("model")) or "unknown"] += tokens
             tokens_by_provider[_as_str(r.get("provider")) or "unknown"] += tokens
-            if r.get("measured"):
-                measured_tokens_total += tokens
-            else:
-                unmeasured_task_count += 1
+        if r.get("measured"):
+            measured_tokens_total += tokens
+        else:
+            unmeasured_task_count += 1
     return {
         "total": len(rows),
         "passed": passed,
