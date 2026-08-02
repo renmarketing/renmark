@@ -252,6 +252,7 @@ def _memory_log_outcome(repo: Path, task: Task, outcome: str, run_id: str, note:
     """Append a routing.md entry after each task completes. Best-effort."""
     try:
         from .. import memory as _mem
+        from .. import plan_lint as _plan_lint
 
         _mem.append_routing(
             repo,
@@ -259,6 +260,7 @@ def _memory_log_outcome(repo: Path, task: Task, outcome: str, run_id: str, note:
             executor=task.executor,
             outcome=outcome,
             run_id=run_id,
+            escalation_reason=_plan_lint.escalation_reason_for(task),
         )
         if outcome == "failed" and note:
             _mem.append_learning(
