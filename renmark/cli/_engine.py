@@ -560,7 +560,13 @@ def _complete_clean_run(repo: Path, run_id: str, plan_path: str, tasks: list[Tas
                 artifact_ref=str(plan_path),
             ),
         )
-    _delivery.write_delivery_state(repo, delivery)
+    # Archive (not plain-write): every package upserted above is status="passed",
+    # so this immediately compacts them into .renmark/state/delivery-archive.json
+    # instead of leaving delivery.json's work_packages to accumulate run over
+    # run — the same byte-budget class of bug fixed for provenance_events above,
+    # now closed for work_packages too. archive_completed_work_packages already
+    # calls write_delivery_state itself.
+    _delivery.archive_completed_work_packages(repo, delivery)
     _lifecycle.write_lifecycle(repo, stage="created")
 
 
