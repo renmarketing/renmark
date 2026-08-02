@@ -17,6 +17,9 @@ from .. import __version__
 from ..ledger import WorkOrder as _LedgerWorkOrder
 from ..ledger import WorkResult as _LedgerWorkResult
 from ..ledger import append_ledger_event as _append_ledger_event
+from ..ledger import check_dispatch_independence as _check_dispatch_independence
+from ..ledger import DispatchIndependenceError as _DispatchIndependenceError
+from ..ledger import emit_inspection_verdict as _emit_inspection_verdict
 from ..parser import PlanError, Task, parse_plan
 from ..providers.codex import codex_available as codex_available
 from ..state import (
@@ -146,6 +149,15 @@ def _git_tag(cwd: Path, name: str) -> None:
 # string. The skill (`/renmark:orchestrate`) is then responsible for batching
 # commits per wave, in task-index order, after the wave finishes.
 _NO_COMMIT_MODE = False
+
+# R-0.4/WP-4: fixed dispatch identity for the deterministic verifier-derived
+# inspector wired below. It is a constant precisely because it names a
+# subsystem (this module's own verifier pass/fail check), not a per-task
+# executor invocation — every real WorkResult's `dispatch_identity` varies
+# by executor+order_id (see `_runner`), so the two can never coincidentally
+# collide and `check_dispatch_independence` has a real structural distinction
+# to enforce, not a coincidental one.
+_INSPECTOR_DISPATCH_IDENTITY = "renmark-verifier"
 
 
 def _git_commit(cwd: Path, target: str, message: str, trailer: str) -> str:
@@ -698,6 +710,10 @@ def execute_plan(
 
         # R-0.3/WP-4: real WorkResult emission point — the return from the
         # live executor call above, matched to the WorkOrder by order_id.
+        # R-0.4/WP-2: `dispatch_identity` records which real dispatch produced
+        # this result (executor + order_id, unique per task/run) so a later
+        # inspector can prove independence rather than assume it.
+        work_result_dispatch_identity = f"{task.executor or 'unknown'}:{order_id}"
         try:
             _append_ledger_event(
                 _repo,
@@ -706,11 +722,48 @@ def execute_plan(
                     status="complete" if ok else "failed",
                     summary=reason,
                     touched_files=[task.target] if ok else [],
+                    dispatch_identity=work_result_dispatch_identity,
                 ),
                 ts=now_iso(),
             )
         except Exception:
             pass
+
+        # R-0.4/WP-4: real InspectionReport emission point — a bounded, real
+        # (non-LLM) verdict derived from the task's own verifier pass/fail
+        # (`ok`), dispatched under a fixed deterministic-verifier identity
+        # that is structurally distinct from `work_result_dispatch_identity`
+        # (which always carries the task's own executor + order_id). The
+        # independence check runs UNWRAPPED so a genuine
+        # `DispatchIndependenceError` is a real, visible rejection — never
+        # silently swallowed. Only the ledger *write* is best-effort /
+        # never-raising, matching the WorkOrder/WorkResult convention above
+        # (a disk/IO failure must never block the pipeline).
+        try:
+            _check_dispatch_independence(
+                _repo,
+                work_result_dispatch_identity,
+                _INSPECTOR_DISPATCH_IDENTITY,
+            )
+        except _DispatchIndependenceError as exc:
+            _print(
+                f"WARNING: inspection verdict rejected for {order_id} "
+                f"(dispatch independence check failed): {exc}"
+            )
+        else:
+            try:
+                _emit_inspection_verdict(
+                    _repo,
+                    work_result_id=order_id,
+                    work_order_id=order_id,
+                    verdict="pass" if ok else "fail",
+                    evidence=[reason] if reason else [],
+                    inspector_dispatch_identity=_INSPECTOR_DISPATCH_IDENTITY,
+                    work_result_dispatch_identity=work_result_dispatch_identity,
+                    ts=now_iso(),
+                )
+            except Exception:
+                pass
 
         return _dispatch.TaskResult(
             task_index=task.index,
