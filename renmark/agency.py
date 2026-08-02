@@ -267,6 +267,21 @@ def approve_milestone_for_orchestrator(repo: str | Path) -> DeliveryState:
         source="agency",
         ref="agency.json",
     )
+    try:
+        from . import lifecycle as _lifecycle
+
+        hint = _lifecycle.milestone_context_checkpoint(repo, skill="agency")
+    except Exception:
+        hint = None
+    if hint is not None:
+        delivery = append_provenance_event(
+            delivery,
+            ts="",
+            kind="context-checkpoint-hint",
+            detail=hint,
+            source="agency",
+            ref="agency.json",
+        )
     write_delivery_state(repo, delivery)
     return read_delivery_state(repo)
 
