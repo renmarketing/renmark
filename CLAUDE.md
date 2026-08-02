@@ -26,51 +26,51 @@ When the user describes a software task in plain English — build / create / ma
 Once the Owner approves a release or milestone contract, Renmark may automatically continue through all included design, implementation, testing, inspection, documentation, integration, and bounded repair work. Renmark must not ask for approval between routine work packages or role transitions. Renmark stops only when: a real blocker prevents progress; scope conflicts with the PRD, contract, or an ADR; a destructive or irreversible action is required; a budget, retry, or repair limit is reached; a material architecture change is required; acceptance still fails after bounded repair; or the contract explicitly reserves the decision for the Owner. Progress updates are informational, not approval gates. **Default:** continue to the release candidate. **Exception:** stop only for a specific, evidence-backed reason. This refines — does not replace — the Pause-Policy gates in `plugin/skills/.shared/handoff-menu.md`: those gates (merge, release, security overrides, unclear intent, scope change) still apply; this policy is what governs the routine work *between* those gates.
 <!-- END:continue-by-default-policy -->
 <!-- BEGIN:project-delivery-contract -->
-<!-- Last refreshed: @ 3b3cee9 -->
+<!-- Last refreshed: @ 4c73a48 -->
 # Managed Project Delivery Contract
 
 This concise fragment is the canonical source for managed `CLAUDE.md` and
-`AGENTS.md` blocks. It defines two owner paths: **Agency** governs an
+`AGENTS.md` blocks.  It defines two owner paths: **Agency** governs an
 owner-facing project engagement (discovery, agreement, milestones, signoff),
 while **Orchestrator** executes a defined, approved milestone through scoped
-work. Neither path replaces the other; Agency drives Orchestrator when build
+work.  Neither path replaces the other; Agency drives Orchestrator when build
 work is ready.
 
 ## Milestone delivery
 
 - Express each milestone as a demonstrable owner outcome with acceptance
-  criteria, not a list of activities. Plan only bounded work packages needed
+  criteria, not a list of activities.  Plan only bounded work packages needed
   for that outcome; preserve the approved scope and surface drift as a human
   decision.
 - Separate roles: the planner defines packages and evidence, executors make
-  scoped changes, and an independent reviewer assesses the result. The
+  scoped changes, and an independent reviewer assesses the result.  The
   coordinator consumes bounded package summaries and pointers, never full
   skill bodies, transcripts, or accumulated implementation context.
-- Verify with deterministic, fresh evidence first. Each package has a focused
-  verifier; the milestone also requires its stated acceptance evidence. See
+- Verify with deterministic, fresh evidence first.  Each package has a focused
+  verifier; the milestone also requires its stated acceptance evidence.  See
   `deterministic-first.md`, `workflow-fanout.md`, and `subagent-profiles.md`.
-- Keep build, review, and repair loops milestone-local. A failed verifier or
+- Keep build, review, and repair loops milestone-local.  A failed verifier or
   review may receive only bounded, scoped repair attempts, followed by
-  re-verification and independent re-review. Stop rather than expand scope,
+  re-verification and independent re-review.  Stop rather than expand scope,
   repeat an equivalent failure, or treat status prose as proof.
 
 ## State and human decisions
 
 Canonical progress, package status, evidence pointers, and gates live in
 `.renmark/state/` and the relevant plan/review artifacts, not conversation
-history. Stop for unclear intent, scope or risk changes, failed bounded
+history.  Stop for unclear intent, scope or risk changes, failed bounded
 repair, required owner demo, approval/signoff, merge, release, or another
-human-review gate. Passing tests alone never clear an owner gate. See
+human-review gate.  Passing tests alone never clear an owner gate.  See
 `handoff-menu.md`, `context-taxonomy.md`, and `agency-delivery.md`.
 
 ## Decision presentation
 
 When the active host supports a native picker, present selector-capable
-decisions with that picker. In an interactive Claude Code main session, invoke
-`AskUserQuestion` with a real `options` array; never replace a decision with
-ordinary prose or a typed-only list. Otherwise present the same choices as a
-numbered fallback, with the recommended safe option first; do not make the
-fallback a different decision or an automatic approval. See
+decisions with that picker.  In an interactive Claude Code main session,
+invoke `AskUserQuestion` with a real `options` array; never replace a decision
+with ordinary prose or a typed-only list.  Otherwise present the same choices
+as a numbered fallback, with the recommended safe option first; do not make
+the fallback a different decision or an automatic approval.  See
 `interaction-contract.md`.
 <!-- END:project-delivery-contract -->
 <!-- BEGIN:parallelism-rule -->
@@ -330,12 +330,12 @@ Dev gates and standards → see `.renmark/memory/dev-standards.md` (generated by
 *Mirror all rule changes in `AGENTS.md` in the same commit.*
 
 <!-- BEGIN:project-stub -->
-<!-- Managed by /renmark:init. Last refreshed: 2026-06-13 @ ecd28f1. Edits inside this block will be overwritten. -->
+<!-- Managed by /renmark:init. Last refreshed: 2026-08-02 @ 4c73a48. Edits inside this block will be overwritten. -->
 
 ## Project at a glance
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
-**Entry points:** `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
+**Entry points:** `renmark-execute (renmark.cli:main)`, `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
 
 **Top-level layout:**
 - `bin/` — executable scripts / wrappers
