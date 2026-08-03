@@ -9,6 +9,7 @@ import pytest
 
 from renmark import delivery_state, schemas
 from renmark.delivery_state import (
+    DELIVERY_JSON_BYTE_BUDGET,
     PROVENANCE_EVENT_CAP,
     DeliveryProvenanceEvent,
     DeliveryReadReport,
@@ -170,10 +171,85 @@ def test_append_provenance_event_keeps_latest_events_within_cap() -> None:
             ref=f"ref-{index}",
         )
 
-    assert len(state.provenance_events) == PROVENANCE_EVENT_CAP
-    assert state.provenance_events[0].kind == "kind-5"
+    # The count cap is an upper bound, not a target — the byte-budget trim
+    # (see test_append_provenance_event_trims_by_byte_budget_not_just_count)
+    # can and does keep fewer than PROVENANCE_EVENT_CAP events for this
+    # detail size. What must hold: never exceed the cap, always keep the
+    # most recent contiguous suffix, and always fit the byte budget.
+    assert len(state.provenance_events) <= PROVENANCE_EVENT_CAP
     assert state.provenance_events[-1].kind == f"kind-{PROVENANCE_EVENT_CAP + 4}"
     assert "\n" not in state.provenance_events[-1].detail
+    assert len(state.to_json().encode("utf-8")) <= DELIVERY_JSON_BYTE_BUDGET
+
+
+def test_append_provenance_event_trims_by_byte_budget_not_just_count() -> None:
+    """Long-detail events can bloat past the byte budget well under the
+    count cap (observed 2026-08-02: 18 events, 5876 bytes vs. 4096 budget).
+    append_provenance_event must self-trim by size, keeping the most recent
+    events, mirroring the count-cap's keep-most-recent semantics.
+    """
+    state = DeliveryState()
+
+    # Each event's detail is long enough that far fewer than PROVENANCE_EVENT_CAP
+    # of them will exceed the byte budget.
+    for index in range(PROVENANCE_EVENT_CAP):
+        state = append_provenance_event(
+            state,
+            ts=f"2026-08-02T10:{index:02d}:00Z",
+            kind=f"kind-{index}",
+            detail="x" * 100,
+            source="source-suite",
+            ref=f"ref-{index}",
+        )
+
+    assert len(state.to_json().encode("utf-8")) <= DELIVERY_JSON_BYTE_BUDGET
+    # Trimmed below the count cap by size, not just by PROVENANCE_EVENT_CAP.
+    assert len(state.provenance_events) < PROVENANCE_EVENT_CAP
+    # Kept the most recent event, dropped the oldest.
+    assert state.provenance_events[-1].kind == f"kind-{PROVENANCE_EVENT_CAP - 1}"
+    assert state.provenance_events[0].kind != "kind-0"
+
+
+def test_append_provenance_event_trimmed_state_writes_without_bloat_error(
+    tmp_path: Path,
+) -> None:
+    """A state that append_provenance_event trimmed by size must actually be
+    writable — the trim exists precisely so write_delivery_state never has
+    to raise DeliveryStateBloatError on organically-accumulated history."""
+    state = DeliveryState()
+    for index in range(PROVENANCE_EVENT_CAP):
+        state = append_provenance_event(
+            state,
+            ts=f"2026-08-02T10:{index:02d}:00Z",
+            kind=f"kind-{index}",
+            detail="x" * 100,
+            source="source-suite",
+            ref=f"ref-{index}",
+        )
+
+    write_delivery_state(tmp_path, state)  # must not raise
+
+
+def test_append_provenance_event_minimal_details_hit_count_cap_not_byte_trim() -> None:
+    """Regression guard: with truly minimal per-event content, the existing
+    count cap is still the binding constraint — the byte trim only bites
+    when accumulated detail text is long enough to matter, it doesn't fire
+    early against ordinary short events.
+    """
+    state = DeliveryState()
+
+    for _index in range(PROVENANCE_EVENT_CAP + 5):
+        state = append_provenance_event(
+            state,
+            ts="",
+            kind="k",
+            detail="",
+            source="",
+            ref="",
+        )
+
+    assert len(state.provenance_events) == PROVENANCE_EVENT_CAP
+    assert len(state.to_json().encode("utf-8")) <= DELIVERY_JSON_BYTE_BUDGET
 
 
 def test_write_rejects_bloated_state(tmp_path: Path) -> None:
@@ -330,10 +406,16 @@ def test_archive_is_idempotent_and_restores_capacity_for_fresh_m3_package(tmp_pa
     ]
 
 
-def test_archive_rejects_oversize_without_partial_state_or_archive_write(tmp_path: Path) -> None:
-    baseline = DeliveryState(work_packages=[WorkPackageSummary(milestone_id="M3", title="Pending")])
-    state_path = write_delivery_state(tmp_path, baseline)
-    original_state = state_path.read_text(encoding="utf-8")
+def test_archive_trims_stale_provenance_instead_of_rejecting(tmp_path: Path) -> None:
+    """A state that's oversized ONLY because of accumulated provenance history
+    (not because of the work_packages content itself) now archives
+    successfully — append_provenance_event's byte-budget trim (see above)
+    drops enough stale history to fit, rather than blocking a legitimate
+    archive of completed work. This supersedes the old hard-reject
+    expectation: silently discarding recoverable provenance history (it
+    remains in CHANGELOG.md / .renmark/reviews/) is preferable to permanently
+    blocking archival on organic history growth.
+    """
     oversized = DeliveryState(
         work_packages=[WorkPackageSummary(milestone_id="M2", title="Passed", status="passed")],
         provenance_events=[
@@ -345,6 +427,42 @@ def test_archive_rejects_oversize_without_partial_state_or_archive_write(tmp_pat
                 ref="ref" * 24,
             )
             for index in range(PROVENANCE_EVENT_CAP)
+        ],
+    )
+
+    result = archive_completed_work_packages(tmp_path, oversized)
+
+    assert len(result.to_json().encode("utf-8")) <= DELIVERY_JSON_BYTE_BUDGET
+    assert result.work_packages == []  # the one passed package was archived out
+    assert delivery_archive_path(tmp_path).exists()
+
+
+def test_archive_still_rejects_oversize_from_work_packages_themselves(tmp_path: Path) -> None:
+    """Provenance trimming can't fix bloat caused by the RETAINED (non-passed)
+    work_packages content itself — that still fails loud, with no partial
+    state or archive write, exactly as before.
+    """
+    baseline = DeliveryState(work_packages=[WorkPackageSummary(milestone_id="M3", title="Pending")])
+    state_path = write_delivery_state(tmp_path, baseline)
+    original_state = state_path.read_text(encoding="utf-8")
+    oversized = DeliveryState(
+        work_packages=[
+            WorkPackageSummary(
+                milestone_id=f"M{index}",
+                title="Passed",
+                status="passed",
+                summary="s" * 160,
+            )
+            for index in range(20)
+        ]
+        + [
+            WorkPackageSummary(
+                milestone_id=f"P{index}",
+                title="Pending",
+                status="pending",
+                summary="p" * 160,
+            )
+            for index in range(20)
         ],
     )
 

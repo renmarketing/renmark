@@ -188,13 +188,24 @@ def is_active(repo: str | Path) -> bool:
     return read_agency(repo).active
 
 
-def activate(repo: str | Path, **fields: str) -> AgencyState:
+def activate(
+    repo: str | Path, *, estimated_tokens: int | None = None, **fields: str
+) -> AgencyState:
     """Set ``active=True``, optionally updating other string fields, and persist.
 
     Keyword arguments map to :class:`AgencyState` string fields:
     ``current_phase``, ``current_milestone``, ``next_checkpoint``,
     ``signoff_status``, ``cost_lane``, ``roadmap_ref``.  Unknown keys are
     silently ignored to allow forward-compatible callers.
+
+    ``estimated_tokens`` is the calling agent's own self-reported context-size
+    estimate at this moment — the same self-monitored convention CLAUDE.md's
+    60%/80% compact-gate rule already asks it to track. Only used when this
+    call's ``signoff_status`` transitions to ``approved`` (a genuine milestone
+    boundary); threaded straight through to
+    :func:`approve_milestone_for_orchestrator`, which only recommends a
+    checkpoint when a real estimate crosses the configured threshold.
+    Omitting it (the default) keeps the checkpoint dormant exactly as before.
 
     Returns the updated :class:`AgencyState`.
     Raises :class:`AgencyBloatError` or :class:`OSError` on write failure.
@@ -214,7 +225,7 @@ def activate(repo: str | Path, **fields: str) -> AgencyState:
             setattr(state, key, value)
     write_agency(repo, state)
     if _map_status(fields.get("signoff_status", "")) == "approved":
-        approve_milestone_for_orchestrator(repo)
+        approve_milestone_for_orchestrator(repo, estimated_tokens=estimated_tokens)
     return state
 
 
@@ -230,7 +241,9 @@ def deactivate(repo: str | Path) -> AgencyState:
     return state
 
 
-def approve_milestone_for_orchestrator(repo: str | Path) -> DeliveryState:
+def approve_milestone_for_orchestrator(
+    repo: str | Path, *, estimated_tokens: int | None = None
+) -> DeliveryState:
     """Persist an owner-approved Agency milestone for Orchestrator execution.
 
     Agency remains the owner-facing discovery and approval surface.  Once its
@@ -239,6 +252,16 @@ def approve_milestone_for_orchestrator(repo: str | Path) -> DeliveryState:
     assigns the selected milestone to Orchestrator.  It never fabricates an
     approval: inactive Agency state, or any status other than ``approved``, is
     rejected before the delivery state is written.
+
+    ``estimated_tokens`` is the calling agent's own self-reported context-size
+    estimate at this milestone boundary (the same self-monitored convention
+    CLAUDE.md's 60%/80% compact-gate rule already asks the orchestrating agent
+    to track) — optional because no host-exposed context-size API exists to
+    measure it automatically (ORCHESTRATION-BASELINE-2026-08 audit). Passed
+    straight through to :func:`renmark.lifecycle.milestone_context_checkpoint`,
+    which only recommends a checkpoint when a real estimate crosses the
+    configured threshold — omitting it (the default) keeps the checkpoint
+    dormant exactly as before, never fabricating a trigger.
     """
     state = read_agency(repo)
     if not state.active:
@@ -267,6 +290,23 @@ def approve_milestone_for_orchestrator(repo: str | Path) -> DeliveryState:
         source="agency",
         ref="agency.json",
     )
+    try:
+        from . import lifecycle as _lifecycle
+
+        hint = _lifecycle.milestone_context_checkpoint(
+            repo, skill="agency", estimated_tokens=estimated_tokens
+        )
+    except Exception:
+        hint = None
+    if hint is not None:
+        delivery = append_provenance_event(
+            delivery,
+            ts="",
+            kind="context-checkpoint-hint",
+            detail=hint,
+            source="agency",
+            ref="agency.json",
+        )
     write_delivery_state(repo, delivery)
     return read_delivery_state(repo)
 

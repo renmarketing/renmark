@@ -35,6 +35,46 @@ Opus and Fable are escalation-only executors — never default them for finish, 
 
 ## Learned overrides
 
+- (2026-08-02) `target=orchestration-baseline.md, complexity=simple` → **haiku** (passed, run=orch-baseline-controls-fixes)
+
+- (2026-08-02) `target=renmark/analytics.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-fixes)
+
+- (2026-08-02) `target=renmark/plan_lint.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-fixes)
+
+- (2026-08-02) `target=tests/test_plan_lint_escalation.py, complexity=medium` → **codex** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=renmark/cli/_engine.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260802-204747-f2b5)
+
+- (2026-08-02) `target=*.py, complexity=simple, mode=B` → **codex** (passed, run=20260802-204411-91f4)
+
+- (2026-08-02) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260802-204120-6bcd)
+
+- (2026-08-02) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260802-203633-fc1b)
+
+- (2026-08-02) `target=*.py, complexity=simple, mode=B` → **codex** (passed, run=20260802-203454-cb22)
+
+- (2026-08-02) `target=renmark/plan_lint.py, complexity=hard` → **opus** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=task9, complexity=simple` → **haiku** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=task6, complexity=simple` → **sonnet** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=task5, complexity=simple` → **haiku** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=task4, complexity=simple` → **haiku** (passed, run=orch-baseline-controls-p2)
+
+- (2026-08-02) `target=renmark/agency.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-p1)
+
+- (2026-08-02) `target=renmark/lifecycle.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-p1)
+
+- (2026-08-02) `target=plugin/skills/orchestrate/SKILL.md, complexity=simple` → **haiku** (passed, run=orch-baseline-controls-p1)
+
+- (2026-08-02) `target=plugin/skills/.shared/usage-instrumentation.md, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-p1)
+
+- (2026-08-02) `target=renmark/analytics.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-p1)
+
 - (2026-07-30) `target=tests/**, complexity=hard, mode=A` → **codex** (passed, run=20260730-143128-8136)
 
 - (2026-07-30) `target=tests/**, complexity=hard, mode=A` → **codex** (failed, run=20260730-143128-8136)

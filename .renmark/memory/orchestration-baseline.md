@@ -45,6 +45,39 @@ blocker:
   file read, zero LLM calls, and never re-dispatches an already-completed
   task (REQ-3; `_cross_check_skip_list` in `renmark/cli/_engine.py`).
 
+## Audit — 2026-08-02
+
+Full evidence-based gap audit: `.renmark/audits/orchestration-baseline-audit-2026-08-02.md`.
+Headline findings: per-run token/wall-clock telemetry is effectively unmeasured (`tokens_in`/
+`tokens_out`/`duration_s` are ~0 across `.renmark/state/usage.jsonl` and
+`.renmark/analytics/task-runs.jsonl`); `context_budget_hint` has zero production callers; the
+model-routing table and `subagent_gate.py` are enforced only at plan-authoring/cost-preview time,
+not inside `dispatch_task_isolated`/`dispatch_wave`; `.renmark/memory/analytics.md` is ~27 days
+stale. The audit mines real historical runs instead of spending new tokens on fresh scenarios:
+Feature/Fix (`add-rethink-pipeline-skill`, 2026-08-02) and Orchestrate (M2 milestone + R-0.2/R-0.3,
+2026-07-30/08-01) both have real dispatch-count/verification/gate-timestamp data (audit §8); Start
+predates telemetry by 16 days and Rethink has never been invoked, so both are honestly `unknown`,
+not estimated. Minimal instrumentation (audit §9) is proposed as a prerequisite to closing the
+token/wall-clock gap, pending Owner approval.
+
+**Update on `milestone_context_checkpoint`:** originally flagged by codex codereview as spec
+"under-built" — wired at the Agency milestone boundary (`renmark/agency.py`'s
+`approve_milestone_for_orchestrator`) but with no way to supply a real signal, making it a dormant
+hook. Closed: `approve_milestone_for_orchestrator` and `agency.activate` now both accept an
+`estimated_tokens: int | None = None` keyword, threaded straight through to
+`milestone_context_checkpoint`. No host-exposed context-size API exists (confirmed by the audit,
+still true), so this is the **self-reported-estimate path** the audit named as the other viable
+signal source: the live agent driving Agency Mode passes its own self-monitored context estimate —
+the same number it already tracks for CLAUDE.md's 60%/80% compact-gate rule — as `estimated_tokens`
+when it calls `activate(..., signoff_status="approved", estimated_tokens=<self-reported count>)` at
+a genuine milestone approval. Cited in `plugin/skills/.shared/agency-delivery.md`. Proven end-to-end
+(not just unit-mocked) in `tests/test_agency.py`: a real `estimated_tokens` crossing the configured
+threshold produces a real `context-checkpoint-hint` provenance event and a real
+`.renmark/state/compact_checkpoint.json` write; omitting it stays exactly as dormant as before —
+never fabricates a trigger. The one remaining gap is genuinely unclosable without new host
+capability: nothing here *measures* real context size automatically, it only wires the pipe for a
+self-report to travel through.
+
 ## What still needs to be captured (this artifact's open item)
 
 This entry pins the *qualitative* baseline and the *mechanism* REQ-30

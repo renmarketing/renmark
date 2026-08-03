@@ -316,3 +316,70 @@ def test_byte_budget_enforced(tmp_path: Path) -> None:
             tmp_path,
             AgencyState(active=True, roadmap_ref=huge_ref),
         )
+
+
+def test_activate_with_estimated_tokens_threads_through_to_checkpoint(tmp_path: Path) -> None:
+    """A live agent's self-reported estimated_tokens, passed at signoff, must
+    reach milestone_context_checkpoint and — when it crosses the configured
+    threshold — actually produce a checkpoint (real end-to-end proof, not a
+    mock of the intermediate call). Omitting it (the default, exercised
+    elsewhere in this file) must stay exactly as dormant as before."""
+    from renmark import config
+    from renmark.delivery_state import read_delivery_state
+
+    config.set_compact_gate_tokens(tmp_path, 1000)
+    try:
+        activate(
+            tmp_path,
+            current_phase="delivery",
+            current_milestone="M-estimate-test",
+            signoff_status="approved",
+            estimated_tokens=5000,
+        )
+        delivery = read_delivery_state(tmp_path)
+        kinds = [e.kind for e in delivery.provenance_events]
+        assert "context-checkpoint-hint" in kinds
+        hint_event = next(e for e in delivery.provenance_events if e.kind == "context-checkpoint-hint")
+        assert "/compact" in hint_event.detail
+        assert (tmp_path / ".renmark" / "state" / "compact_checkpoint.json").exists()
+    finally:
+        config.set_compact_gate_tokens(tmp_path, 120_000)
+
+
+def test_activate_without_estimated_tokens_stays_dormant(tmp_path: Path) -> None:
+    """The default (no self-report) must never fabricate a checkpoint trigger
+    — approve_milestone_for_orchestrator's own default behavior, unchanged."""
+    from renmark.delivery_state import read_delivery_state
+
+    activate(
+        tmp_path,
+        current_phase="delivery",
+        current_milestone="M-no-estimate",
+        signoff_status="approved",
+    )
+    delivery = read_delivery_state(tmp_path)
+    kinds = [e.kind for e in delivery.provenance_events]
+    assert "context-checkpoint-hint" not in kinds
+
+
+def test_approve_milestone_for_orchestrator_accepts_estimated_tokens_kwarg(tmp_path: Path) -> None:
+    """Direct call (bypassing activate()) also threads estimated_tokens —
+    proves the parameter lives on the function signature itself, not just
+    activate()'s pass-through."""
+    from renmark import config
+    from renmark.delivery_state import read_delivery_state
+
+    activate(tmp_path, current_phase="delivery", current_milestone="M-direct")
+    from renmark.agency import read_agency, write_agency
+
+    state = read_agency(tmp_path)
+    state.signoff_status = "approved"
+    write_agency(tmp_path, state)
+
+    config.set_compact_gate_tokens(tmp_path, 100)
+    try:
+        approve_milestone_for_orchestrator(tmp_path, estimated_tokens=999)
+        delivery = read_delivery_state(tmp_path)
+        assert any(e.kind == "context-checkpoint-hint" for e in delivery.provenance_events)
+    finally:
+        config.set_compact_gate_tokens(tmp_path, 120_000)

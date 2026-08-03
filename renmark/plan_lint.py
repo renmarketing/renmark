@@ -1,7 +1,7 @@
 """Deterministic plan-validation engine shared by /renmark:check-plan and
 /renmark:orchestrate pre-flight.
 
-This module is the SINGLE authoritative implementation of the 8 checks that
+This module is the SINGLE authoritative implementation of the 12 checks that
 ``plugin/skills/check-plan/SKILL.md`` defines.  Both surfaces — the
 ``/renmark:check-plan`` skill and the orchestrate pre-flight gate — MUST run
 ``python -m renmark.plan_lint <plan.md>`` so they can never produce different
@@ -32,8 +32,13 @@ Check severities (behaviour-preserving — mirrors the SKILL's definitions):
          a declared `top_tier: fable`), 10 fable-mechanical REQ-2 (executor
          fable on a simple/mechanical task).
   WARN:  2b test -f only verifier, 7 unbounded verifier output, 8 spec
-         length >80 lines, 11 general-purpose without role_reason, and sanity
-         extras (negative/absurd est_ fields).
+         length >80 lines, 11 general-purpose without role_reason, 12
+         escalation-unjustified (executor opus/fable with no hard-complexity,
+         architecture, or adversarial-review signal), and sanity extras
+         (negative/absurd est_ fields).
+
+``escalation_reason_for(task) -> str | None`` is the single shared home of the
+Check-12 justification logic; ``renmark/cli/_engine.py`` reuses it directly.
 """
 
 from __future__ import annotations
@@ -72,6 +77,16 @@ _MAX_SPEC_LINES = 80
 _HEAVY_READ_LINE_THRESHOLD = 200
 _MAX_EST_TOKENS = 200_000
 _MAX_EST_COST_USD = 50.0
+
+# Spec substrings that signal an architecture-shaped task (Check 12). Kept
+# deliberately conservative — this only suppresses a WARN, never adds one.
+_ARCHITECTURE_SPEC_MARKERS = (
+    "state machine",
+    "architecture",
+    "cross-file",
+    "cross-module",
+    "migration",
+)
 
 # Executors that BLOCK on heavy-read (G5); codex/haiku are exempt.
 _HEAVY_READ_BLOCK_EXECUTORS = frozenset({"sonnet", "opus", "fable"})
@@ -347,6 +362,62 @@ def _check_role_profiles(tasks: list[Task]) -> list[tuple[str, str]]:
     return issues
 
 
+def escalation_reason_for(task: Task) -> str | None:
+    """Return a WARN message iff *task* escalates to opus without justification.
+
+    Single authoritative implementation of the escalation-justification signal:
+    ``renmark/cli/_engine.py`` and Check 12 below both call this helper so the
+    logic can never diverge.  Returns ``None`` when the task does not escalate
+    or when :func:`renmark.cost.requires_escalation` accepts it.  Never raises.
+
+    Scoped to ``opus`` only, deliberately excluding ``fable``: fable already
+    has two dedicated BLOCK checks (9 — undeclared ``top_tier: fable``; 10 —
+    fable on a mechanical/simple task) that fully govern its escalation
+    legitimacy. Adding this WARN on top of those would double-regulate the
+    same concern and was found to conflict with existing fable fixtures
+    (``test_fable_declared_passes`` et al.) that have no separate reason to
+    justify — opus is where ``requires_escalation()`` actually has zero
+    production callers today (the audit's finding this check closes).
+    """
+    try:
+        if task.executor != "opus":
+            return None
+
+        role = (task.role or "").strip().lower()
+        spec_lc = (task.spec or "").lower()
+        kind: str | None = None
+        if role == "reviewer":
+            kind = "adversarial-review"
+        elif any(marker in spec_lc for marker in _ARCHITECTURE_SPEC_MARKERS):
+            kind = "architecture"
+
+        from . import cost as _cost
+
+        justified = _cost.requires_escalation(complexity=task.complexity, kind=kind)
+        if justified:
+            return None
+
+        return (
+            f"Task {task.index}: executor `{task.executor}` has no escalation "
+            f"justification recorded (complexity={task.complexity!r}, no "
+            "architecture/adversarial/design-fork signal detected). See "
+            ".renmark/memory/routing.md and plugin/skills/.shared/model-routing.md "
+            "— confirm this escalation is intentional or reassign to `sonnet`/`codex`."
+        )
+    except Exception:
+        return None
+
+
+def _check_escalation_justified(tasks: list[Task]) -> list[tuple[str, str]]:
+    """Check 12 — opus/fable without an escalation signal → WARN (never BLOCK)."""
+    issues: list[tuple[str, str]] = []
+    for t in tasks:
+        reason = escalation_reason_for(t)
+        if reason:
+            issues.append(("WARN", reason))
+    return issues
+
+
 def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
     """Sanity extras — all WARN only, never BLOCK (behaviour-preserving)."""
     issues: list[tuple[str, str]] = []
@@ -527,6 +598,7 @@ def lint_plan(path: str | Path) -> PlanLintReport:
     raw.extend(_check_fable_declared(tasks, repo_root))
     raw.extend(_check_fable_mechanical(tasks))
     raw.extend(_check_role_profiles(tasks))
+    raw.extend(_check_escalation_justified(tasks))
     raw.extend(_check_sanity_extras(tasks))
 
     verdict = _derive_verdict(raw)

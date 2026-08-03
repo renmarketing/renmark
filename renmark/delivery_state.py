@@ -435,12 +435,39 @@ def append_provenance_event(
         ).normalized()
     )
     state.provenance_events = events[-PROVENANCE_EVENT_CAP:]
-    return _normalized_state(state)
+    candidate = _normalized_state(state)
+    return _trim_provenance_to_budget(candidate)
+
+
+def _trim_provenance_to_budget(state: DeliveryState) -> DeliveryState:
+    """Drop the oldest provenance events until the serialized state fits
+    ``DELIVERY_JSON_BYTE_BUDGET``, or none remain.
+
+    ``PROVENANCE_EVENT_CAP`` bounds event *count*, not byte size — a handful
+    of events with long ``detail`` text can exceed the byte budget well
+    before the count cap ever triggers (observed 2026-08-02: 18 events,
+    5876 bytes against a 4096 budget). This mirrors the count-cap's
+    keep-most-recent semantics, just budget-aware. Dropped events remain
+    fully recoverable from CHANGELOG.md and .renmark/reviews/, which is
+    where their durable record already lives — provenance_events has never
+    been the sole record of what happened. Never raises; if the state still
+    doesn't fit with zero events (e.g. work_packages alone are oversized),
+    returns the zero-events state and lets the caller's own size validation
+    report the real problem.
+    """
+    events = list(state.provenance_events)
+    while events:
+        state.provenance_events = events
+        if len(state.to_json().encode("utf-8")) <= DELIVERY_JSON_BYTE_BUDGET:
+            return state
+        events = events[1:]  # drop the oldest
+    state.provenance_events = events
+    return state
 
 
 def record_repair_work_order(
     state: DeliveryState,
-    work_order: "RepairWorkOrder",
+    work_order: RepairWorkOrder,
     *,
     ts: str = "",
 ) -> DeliveryState:

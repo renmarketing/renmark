@@ -124,6 +124,7 @@ def test_usage_record_round_trips_with_new_fields(tmp_path):
             "agent_calls": 0,
             "requests": 0,
             "feature": "orchestrate",
+            "measured": False,
             "source": "provider-export",
             "kind": "usage_limit",
         }

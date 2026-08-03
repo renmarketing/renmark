@@ -906,6 +906,41 @@ def persist_compact_checkpoint(
         pass
 
 
+def milestone_context_checkpoint(
+    repo: Path | str,
+    *,
+    skill: str,
+    estimated_tokens: int | None = None,
+    host: str | HostKind | None = None,
+) -> str | None:
+    """At an approved Agency milestone boundary, recommend a compact checkpoint
+    ONLY when a real context-size signal has been provided and it has reached
+    the configured threshold. Never fires on every milestone — only when
+    `estimated_tokens` is given and crosses `config.compact_gate_tokens(repo)`.
+    No SDK/launcher exists in this codebase to send /compact programmatically
+    (see the ORCHESTRATION-BASELINE-2026-08 audit) — this returns a manual
+    instruction string, never fabricated automation. Never raises.
+    """
+    from . import config as _config  # lazy — avoid circular import at module load
+
+    try:
+        if estimated_tokens is None:
+            return None
+
+        threshold = _config.compact_gate_tokens(repo)
+        if threshold == 0 or estimated_tokens < threshold:
+            return None
+
+        persist_compact_checkpoint(repo, skill, reason="milestone-boundary", host=host)
+        return (
+            f"Context at milestone boundary: ~{estimated_tokens} tokens (threshold {threshold}). "
+            "Checkpoint written to .renmark/state/compact_checkpoint.json. "
+            "Run: /compact — then run: /renmark:resume"
+        )
+    except Exception:
+        return None
+
+
 def skill_preamble(
     repo: Path | str,
     skill: str,
