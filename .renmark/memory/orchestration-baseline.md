@@ -60,14 +60,23 @@ predates telemetry by 16 days and Rethink has never been invoked, so both are ho
 not estimated. Minimal instrumentation (audit §9) is proposed as a prerequisite to closing the
 token/wall-clock gap, pending Owner approval.
 
-**Note on `milestone_context_checkpoint`:** The hook is wired at the Agency milestone boundary
-(`renmark/agency.py`'s `approve_milestone_for_orchestrator`), but that call site currently always
-passes `estimated_tokens=None` — there is no reliable Python-side context-size signal to feed it yet.
-This makes it a **dormant hook today, not an active compaction trigger**: the manual `/compact`
-recommendation can be produced by the function when given a real signal, but nothing supplies one yet.
-Closing this gap requires either a host-exposed context-size API or a self-reported estimate from the
-calling agent — neither exists yet. Flagged by codex codereview as spec "under-built" for exactly
-this reason.
+**Update on `milestone_context_checkpoint`:** originally flagged by codex codereview as spec
+"under-built" — wired at the Agency milestone boundary (`renmark/agency.py`'s
+`approve_milestone_for_orchestrator`) but with no way to supply a real signal, making it a dormant
+hook. Closed: `approve_milestone_for_orchestrator` and `agency.activate` now both accept an
+`estimated_tokens: int | None = None` keyword, threaded straight through to
+`milestone_context_checkpoint`. No host-exposed context-size API exists (confirmed by the audit,
+still true), so this is the **self-reported-estimate path** the audit named as the other viable
+signal source: the live agent driving Agency Mode passes its own self-monitored context estimate —
+the same number it already tracks for CLAUDE.md's 60%/80% compact-gate rule — as `estimated_tokens`
+when it calls `activate(..., signoff_status="approved", estimated_tokens=<self-reported count>)` at
+a genuine milestone approval. Cited in `plugin/skills/.shared/agency-delivery.md`. Proven end-to-end
+(not just unit-mocked) in `tests/test_agency.py`: a real `estimated_tokens` crossing the configured
+threshold produces a real `context-checkpoint-hint` provenance event and a real
+`.renmark/state/compact_checkpoint.json` write; omitting it stays exactly as dormant as before —
+never fabricates a trigger. The one remaining gap is genuinely unclosable without new host
+capability: nothing here *measures* real context size automatically, it only wires the pipe for a
+self-report to travel through.
 
 ## What still needs to be captured (this artifact's open item)
 
