@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-08-02 @ b95d9b1 -->
+<!-- Last refreshed: 2026-08-02 @ f20da05 -->
 
 # Project map — renmark
 
