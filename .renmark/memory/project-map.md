@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-08-02 @ 4c73a48 -->
+<!-- Last refreshed: 2026-08-02 @ b95d9b1 -->
 
 # Project map — renmark
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `renmark-execute (renmark.cli:main)`, `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=187
+**Languages:** python=190
 
 ## Directory tree
 
@@ -39,10 +39,10 @@ renmark/
 | `renmark/loop.py` | Loop Mode state machine — the deterministic core of renmark's bounded, verified, | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
 | `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `no_raw_jsonl`, `disclaimer_present`, `shim_thinness` |
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
-| `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | `test_write_then_read_loop_round_trip`, `test_loop_id_sanitises_slug`, `test_read_loop_missing_returns_none`, `test_read_loop_corrupt_returns_none_no_raise`, `test_read_loop_non_dict_payload_returns_none`, `test_read_loop_drops_unknown_fields` |
+| `renmark/delivery_state.py` | Delivery-run aggregate state persisted to ``.renmark/state/delivery.json``. | `DeliveryStateBloatError`, `DeliveryReadReport`, `DeliveryProvenanceEvent`, `WorkPackageSummary`, `DeliveryState`, `delivery_state_path` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
 | `renmark/cli/_codex_runner.py` | Codex execution helpers: git rollback, lane-checking, and codex task dispatch. | — |
-| `renmark/delivery_state.py` | Delivery-run aggregate state persisted to ``.renmark/state/delivery.json``. | — |
+| `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | — |
 
 ## Commands (user-facing)
 
