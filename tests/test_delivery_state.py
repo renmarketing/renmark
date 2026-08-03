@@ -238,7 +238,7 @@ def test_append_provenance_event_minimal_details_hit_count_cap_not_byte_trim() -
     """
     state = DeliveryState()
 
-    for index in range(PROVENANCE_EVENT_CAP + 5):
+    for _index in range(PROVENANCE_EVENT_CAP + 5):
         state = append_provenance_event(
             state,
             ts="",

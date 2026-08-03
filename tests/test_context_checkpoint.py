@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from renmark.config import set_compact_gate_tokens
 from renmark import lifecycle
+from renmark.config import set_compact_gate_tokens
 
 
 @pytest.fixture

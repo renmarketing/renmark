@@ -4,7 +4,6 @@ from pathlib import Path
 from renmark import analytics
 from renmark.state.usage import UsageRecord, read_usage
 
-
 NOW = "2026-08-02T12:00:00Z"
 
 

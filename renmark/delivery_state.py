@@ -467,7 +467,7 @@ def _trim_provenance_to_budget(state: DeliveryState) -> DeliveryState:
 
 def record_repair_work_order(
     state: DeliveryState,
-    work_order: "RepairWorkOrder",
+    work_order: RepairWorkOrder,
     *,
     ts: str = "",
 ) -> DeliveryState:
