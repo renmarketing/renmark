@@ -26,7 +26,7 @@ When the user describes a software task in plain English — build / create / ma
 Once the Owner approves a release or milestone contract, Renmark may automatically continue through all included design, implementation, testing, inspection, documentation, integration, and bounded repair work. Renmark must not ask for approval between routine work packages or role transitions. Renmark stops only when: a real blocker prevents progress; scope conflicts with the PRD, contract, or an ADR; a destructive or irreversible action is required; a budget, retry, or repair limit is reached; a material architecture change is required; acceptance still fails after bounded repair; or the contract explicitly reserves the decision for the Owner. Progress updates are informational, not approval gates. **Default:** continue to the release candidate. **Exception:** stop only for a specific, evidence-backed reason. This refines — does not replace — the Pause-Policy gates in `plugin/skills/.shared/handoff-menu.md`: those gates (merge, release, security overrides, unclear intent, scope change) still apply; this policy is what governs the routine work *between* those gates.
 <!-- END:continue-by-default-policy -->
 <!-- BEGIN:project-delivery-contract -->
-<!-- Last refreshed: @ b95d9b1 -->
+<!-- Last refreshed: @ f20da05 -->
 # Managed Project Delivery Contract
 
 This concise fragment is the canonical source for managed `CLAUDE.md` and
