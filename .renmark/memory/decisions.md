@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-049 — Finished feature renmark-artifact-lifecycle
+
+**Date:** 2026-08-04
+**Status:** Accepted
+
+**Context.** Completed stages: plan-drafted, plan-validated, created, verified, reviewed
+
+**Decision.** Branch feature/renmark-artifact-lifecycle reached stage ready-to-release; PR opened at https://github.com/renmarketing/renmark/pull/3
+
+---
+
 ## ADR-048 — R-0.4 flipped to RELEASE CANDIDATE
 
 **Date:** 2026-08-01
