@@ -36,7 +36,13 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from renmark.hygiene import ARTIFACT_REGISTRY, prune_memory, scan_artifacts, validate_registry_compliance
+from renmark.hygiene import (
+    ARTIFACT_REGISTRY,
+    _all_dependency_refs,
+    prune_memory,
+    scan_artifacts,
+    validate_registry_compliance,
+)
 
 
 def _write_artifact(
@@ -226,6 +232,74 @@ def test_safe_delete_gate_requires_age_inbound_refs_and_not_newest(tmp_path: Pat
     assert referenced.exists()
     assert newest.exists()
     assert young.exists()
+
+
+def test_version_unpacked_is_registry_driven_safe_delete_candidate() -> None:
+    # Regression for the finding: budget_age_days=None used to filter
+    # version-unpacked out of the ephemeral safe-deletion candidate list
+    # entirely. It must now have a concrete age budget and participate.
+    spec = next(item for item in ARTIFACT_REGISTRY if item.name == "version-unpacked")
+    assert spec.art_class == "ephemeral"
+    assert spec.regenerable is True
+    assert spec.budget_age_days is not None
+    ephemeral_specs = [
+        s for s in ARTIFACT_REGISTRY if s.art_class == "ephemeral" and s.regenerable and s.budget_age_days is not None
+    ]
+    assert "version-unpacked" in {s.name for s in ephemeral_specs}
+
+
+def test_version_unpacked_stale_old_tree_deleted_current_tree_protected(tmp_path: Path) -> None:
+    spec = next(item for item in ARTIFACT_REGISTRY if item.name == "version-unpacked")
+    age_days = spec.budget_age_days
+    assert age_days is not None
+
+    old_file = tmp_path / ".renmark" / "version" / "v1" / "unpacked.txt"
+    current_file = tmp_path / ".renmark" / "version" / "v2" / "unpacked.txt"
+    old_file.parent.mkdir(parents=True, exist_ok=True)
+    current_file.parent.mkdir(parents=True, exist_ok=True)
+    old_file.write_text("stale unpacked tree")
+    current_file.write_text("current unpacked tree")
+    _set_mtime(old_file, age_days + 30)
+    _set_mtime(current_file, 0)
+
+    report = scan_artifacts(tmp_path, dry_run=False)
+
+    assert old_file in report.archived_paths
+    assert not old_file.exists()
+    assert current_file.exists()
+
+
+def test_all_dependency_refs_picks_up_json_metadata(tmp_path: Path) -> None:
+    referenced = tmp_path / ".renmark" / "reviews" / "referenced-code.md"
+    referenced.parent.mkdir(parents=True, exist_ok=True)
+    referenced.write_text("content")
+
+    review_json = tmp_path / ".renmark" / "reviews" / "persistence-final-review.json"
+    review_json.write_text(
+        json.dumps(
+            {
+                "artifact_type": "code_review",
+                "schema_version": "1.0",
+                "created_at": _iso_days_ago(1),
+                "source_sha": "abc123",
+                "related_plan": "",
+                "generator": "reviewer",
+                "dependency_refs": [".renmark/reviews/referenced-code.md"],
+                "completion_state": "complete",
+                "confidence": "high",
+                "validation_status": "validated",
+                "retry_count": 0,
+                "parser_success": True,
+                "schema_compliance": True,
+                "gate": "FAIL",
+                "findings": [],
+            }
+        )
+    )
+
+    refs = _all_dependency_refs(tmp_path)
+
+    assert referenced.resolve() in refs
 
 
 def test_scan_empty_repo(tmp_path: Path) -> None:

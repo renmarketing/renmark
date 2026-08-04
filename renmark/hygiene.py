@@ -89,7 +89,15 @@ ARTIFACT_REGISTRY: tuple[ArtifactTypeSpec, ...] = (
     ArtifactTypeSpec("roadmap", "roadmap/*.md", "active-context", "roadmap", False, 2, 307_200, None),
     ArtifactTypeSpec("specs", "specs/*.md", "canonical-evidence", "brainstorm", False, 100, 500_000, None),
     ArtifactTypeSpec("debug", "debug/*/*", "ephemeral", "debug", True, 40, 1_000_000, 90),
-    ArtifactTypeSpec("version-unpacked", "version/v*/**", "ephemeral", "release", True, 1, None, None),
+    # budget_age_days=7: short enough that a stale unpacked version tree is
+    # reclaimed promptly (it's a pure build byproduct, budget_count=1 means
+    # only the single most-recent version's tree should ever be kept), but
+    # long enough that the CURRENT (just-unpacked) version's tree is never
+    # old enough to qualify on its own — the safe-deletion predicate already
+    # protects the single newest-mtime file unconditionally (see
+    # `_apply_hygiene`'s ephemeral+regenerable pass), and 7 days is a wide
+    # margin against any mtime skew across files within the same unpack.
+    ArtifactTypeSpec("version-unpacked", "version/v*/**", "ephemeral", "release", True, 1, None, 7),
     ArtifactTypeSpec("version-zip", "version/*.zip", "canonical-evidence", "release", False, None, None, None),
 )
 
@@ -363,11 +371,27 @@ def _read_meta_if_present(path: Path) -> dict[str, Any]:
     return {}
 
 
+def _add_dependency_refs_from_meta(repo: Path, meta: dict[str, Any], refs: set[Path]) -> None:
+    """Normalize and add each ``dependency_refs`` entry from a parsed
+    artifact-metadata dict into ``refs`` — shared by both the ``.md``
+    frontmatter path and the whole-document ``.json`` path so they converge
+    on identical string-to-Path resolution."""
+    deps = meta.get("dependency_refs")
+    if not isinstance(deps, list):
+        return
+    for dep in deps:
+        if isinstance(dep, str):
+            norm = _normalize_ref(repo, dep)
+            if norm is not None:
+                refs.add(norm)
+
+
 def _all_dependency_refs(repo: Path) -> set[Path]:
-    """Union of lifecycle.json artifact refs and frontmatter ``dependency_refs``
-    across ``.renmark/`` — best-effort inbound-reference set for the ephemeral
+    """Union of lifecycle.json artifact refs and ``dependency_refs`` declared
+    in either ``.md`` frontmatter or whole-document ``.json`` metadata across
+    ``.renmark/`` — best-effort inbound-reference set for the ephemeral
     safe-deletion predicate. Extends ``_referenced_paths`` (which only covers
-    ``lifecycle.json``) with a repo-wide frontmatter scan."""
+    ``lifecycle.json``) with a repo-wide frontmatter + JSON-metadata scan."""
     refs = set(_referenced_paths(repo))
     renmark_root = repo / ".renmark"
     if not renmark_root.exists():
@@ -379,14 +403,17 @@ def _all_dependency_refs(repo: Path) -> set[Path]:
             meta = summary.read_metadata(path)
         except OSError:
             continue
-        deps = meta.get("dependency_refs")
-        if not isinstance(deps, list):
+        _add_dependency_refs_from_meta(repo, meta, refs)
+    for path in renmark_root.rglob("*.json"):
+        if not path.is_file():
             continue
-        for dep in deps:
-            if isinstance(dep, str):
-                norm = _normalize_ref(repo, dep)
-                if norm is not None:
-                    refs.add(norm)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        _add_dependency_refs_from_meta(repo, data, refs)
     return refs
 
 

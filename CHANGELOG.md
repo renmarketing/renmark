@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-04] — fix: 2 Major codereview findings (version-unpacked predicate, JSON dependency_refs)
+**Request:** Repair work order from the full codex review (`.renmark/reviews/2026-08-04-713dfee3.review.md`) — dispatched as a separate, isolated task per codereview's Inspector-findings-do-not-self-repair rule.
+**Built:** (1) `version-unpacked`'s `budget_age_days` changed from `None` to `7`, making it eligible for the ephemeral safe-deletion predicate going forward — the predicate's existing "not the single most-recent file of its type" condition still protects the current version's tree regardless of age. (2) `_all_dependency_refs` extended to also scan `.json` files under `.renmark/` for a top-level `dependency_refs` key, via a new shared `_add_dependency_refs_from_meta` helper so `.md` frontmatter and whole-document `.json` paths converge on identical ref-normalization. 3 new tests; full `tests/test_hygiene.py` suite (24 passed) and full `pytest -q` (1959 passed, 31 skipped) both green.
+**Files changed:**
+- `renmark/hygiene.py` — `version-unpacked` registry entry, `_add_dependency_refs_from_meta`, `_all_dependency_refs` JSON scan.
+- `tests/test_hygiene.py` — 3 new tests.
+**Do not change:**
+- The "not the single most-recent file of its type" protection is load-bearing for `version-unpacked`'s new age budget — do not lower it without re-verifying the current version's tree can never be deleted alongside an older one.
+
 ## [2026-08-04] — test: --artifact-hygiene CLI flag tests (final task, hygiene plan complete)
 **Request:** Task 9 (final) of the `.renmark` artifact-lifecycle hygiene plan — end-to-end CLI coverage for `renmark-execute --artifact-hygiene`.
 **Built:** 3 tests in `tests/test_cli_artifact_hygiene.py` covering dry-run output/no-filesystem-change, the `--artifact-hygiene-apply` requires `--artifact-hygiene` guard, and a live apply-mode deletion through the full CLI path.
