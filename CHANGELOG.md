@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-04] — test: Hermes allowlist enforcement (runtime instrumentation)
+**Request:** Task 7 of the `.renmark` artifact-lifecycle hygiene plan — prove `skill_preamble()` never reads outside `HERMES_STARTUP_ALLOWLIST` and never lists a directory, via runtime tracing rather than a static grep (a grep of `preamble.py` alone can't see reads inside the 5 helper modules it calls into).
+**Built:** `tests/test_preamble_allowlist.py` monkeypatches `Path.open`/`read_text`/`write_text` (record) and `Path.rglob`/`glob`/`iterdir` (forbid) around live `skill_preamble()` calls for `debug`, `feature`, and a `SYNTHESIS_SKILLS` member (exercising the `routing.md` read path). Red-capability self-verified during the task (temporarily narrowed the allowlist, confirmed 3 failures naming the offending path, then reverted).
+**Files changed:**
+- `tests/test_preamble_allowlist.py` — new, 4 tests.
+**Do not change:**
+- This test is the safety net for the "Hermes never recurses" invariant — any future `skill_preamble` change that adds a file read or a directory listing should fail this test before it fails in production.
+
 ## [2026-08-04] — feat: finish-time artifact-budget gate
 **Request:** Task 5 of the `.renmark` artifact-lifecycle hygiene plan — surface budget/placement violations at finish-time without adding a new Owner gate.
 **Built:** `_gate_artifact_budget(repo)` added to `renmark/finish_lanes.py`, calling `hygiene.validate_registry_compliance`. Added to `_INFORMATIONAL_GATES` (reported, never blocks `release_readiness().ready`) and wired into `release_readiness()`'s gate list. Verified live: today's tree reports `406 WARN, 6 BLOCK` (dominated by pre-existing audits/reviews over budget and rethink survey files missing the project-map pointer) yet correctly does NOT affect `ready` — `ready=False` today is due to `tree_clean` (mid-orchestration uncommitted work), not this gate.
