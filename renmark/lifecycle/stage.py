@@ -28,9 +28,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import skillmeta
-from .agency import AgencyState, project_agency_state, read_agency
-from .delivery_state import (
+from .. import skillmeta
+from ..agency import AgencyState, project_agency_state, read_agency
+from ..delivery_state import (
     DeliveryState,
     WorkPackageSummary,
     append_provenance_event,
@@ -39,9 +39,9 @@ from .delivery_state import (
     stable_delivery_run_id,
     stable_milestone_id,
 )
-from .hosts import HostKind, capabilities_for
-from .mode import mode_state_path
-from .program import (
+from ..hosts import HostKind, capabilities_for
+from ..mode import mode_state_path
+from ..program import (
     Program,
     ProgramStateError,
     StageNode,
@@ -51,9 +51,9 @@ from .program import (
     stable_milestone_id_for_stage,
     stable_work_package_id_for_task,
 )
-from .schemas import STAGES
-from .state.pipeline import PipelineState, read_pipeline_state
-from .summary import is_stale, read_metadata
+from ..schemas import STAGES
+from ..state.pipeline import PipelineState, read_pipeline_state
+from ..summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
 
@@ -654,7 +654,7 @@ def milestone_release_ready(repo: Path | str) -> bool:
 def _current_head_sha(repo: Path) -> str:
     """Return HEAD for evidence comparison, degrading safely outside git."""
     try:
-        from .summary import git_head_sha
+        from ..summary import git_head_sha
 
         head = git_head_sha(repo)
         return head if isinstance(head, str) else ""
@@ -799,7 +799,7 @@ def _gates_not_run(repo: Path | str) -> list[str]:
     unavailable.
     """
     try:
-        from .summary import git_head_sha
+        from ..summary import git_head_sha
 
         head = git_head_sha(repo)
         if not head:
@@ -875,7 +875,7 @@ def persist_compact_checkpoint(
     """
     import json as _json
 
-    from . import state as _state  # lazy — avoid circular import at module load
+    from .. import state as _state  # lazy — avoid circular import at module load
 
     try:
         host_capabilities = capabilities_for(_lifecycle_host(host))
@@ -916,7 +916,7 @@ def milestone_context_checkpoint(
     (see the ORCHESTRATION-BASELINE-2026-08 audit) — this returns a manual
     instruction string, never fabricated automation. Never raises.
     """
-    from . import config as _config  # lazy — avoid circular import at module load
+    from .. import config as _config  # lazy — avoid circular import at module load
 
     try:
         if estimated_tokens is None:
@@ -965,7 +965,7 @@ def skill_preamble(
     transition and continue without presenting an unusable gate.
     """
     # Imported lazily to avoid a state ↔ lifecycle circular import at module load.
-    from . import state as _state
+    from .. import state as _state
 
     domain = domain_of(skill)
     tier = preamble_tier(skill)
@@ -994,7 +994,7 @@ def skill_preamble(
         else:
             persist_compact_checkpoint(repo, skill, reason="clear", host=host)
         # Headless: skip the interactive gate so non-interactive runs are not blocked.
-        from . import config as _config
+        from .. import config as _config
         if verdict == "clear" and _config.is_headless(repo):
             # Record now — headless runs proceed automatically past the gate.
             _state.record_skill_invocation(repo, skill, domain)
@@ -1044,7 +1044,7 @@ def skill_preamble(
 
     if tier == "full" and skill in SYNTHESIS_SKILLS:
         # Imported lazily to keep capability resolution off the module-load path.
-        from . import capabilities as _capabilities
+        from .. import capabilities as _capabilities
 
         if _capabilities.top_tier(Path(repo)) == "fable":
             fragments.append(
@@ -1090,7 +1090,7 @@ def _choose_mode_hint(skill: str) -> str:
     Tells the orchestrator to ask the user Agency vs Orchestrator via
     AskUserQuestion, recommending the per-skill default, then persist the choice.
     """
-    from . import mode as _mode
+    from .. import mode as _mode
 
     recommended = _mode.default_mode_for_skill(skill)
     return (
@@ -1113,7 +1113,7 @@ def _with_mode_note(repo: Path | str, skill: str, hint: str | None) -> str | Non
     - Mode UNSET + non-entry skill → no mode line (returns ``hint`` unchanged).
     """
     try:
-        from . import mode as _mode
+        from .. import mode as _mode
 
         current = _mode.read_mode(repo)
         if current is None and skill in _MODE_DEFAULT_SKILLS:
@@ -1172,9 +1172,9 @@ def _with_agency_note(repo: Path | str, skill: str, hint: str | None) -> str | N
     if skill not in _AGENCY_AWARE_SKILLS:
         return hint
     try:
-        from . import agency as _agency
-        from . import context as _context
-        from . import mode as _mode
+        from .. import agency as _agency
+        from .. import context as _context
+        from .. import mode as _mode
 
         # Canonical delivery.json wins over the legacy agency overlay. This
         # prevents split-brain hints after an explicit Orchestrator choice.
@@ -1202,7 +1202,7 @@ def _with_headless_note(repo: Path | str, hint: str | None) -> str | None:
     appends one line; if ``hint`` was None the note becomes the whole return.
     Never raises — config helpers are themselves no-raise.
     """
-    from . import config as _config
+    from .. import config as _config
 
     try:
         if not _config.is_headless(repo):
@@ -1689,7 +1689,7 @@ def _agency_milestone(state: AgencyState) -> str:
     milestone = " ".join(state.current_milestone.split())
     phase = " ".join(state.current_phase.split())
     token = milestone or phase or "discovery"
-    from .delivery_state import stable_milestone_id
+    from ..delivery_state import stable_milestone_id
 
     return stable_milestone_id(token)
 

@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 5 (step 1/5): lifecycle.py -> lifecycle/ package (mechanical)
+
+**Files:** `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`
+
+Converted renmark/lifecycle.py (1747 lines) into a lifecycle/ package via git mv to stage.py + a new __init__.py re-export shim. Discovered ~25 tests monkeypatch internal lifecycle.py names expecting single-module attribute semantics; solved with a ModuleType subclass forwarding attribute writes to the impl module. Zero logic split yet -- that comes in steps 2-4. Full suite unchanged (1936/31).
+
+---
+
 ### 2026-08-03 — Rethink Release 4 complete: renmark/cli/_engine.py split into 4 modules
 
 **Files:** `renmark/cli/_engine.py`, `renmark/cli/_dispatch_flags.py`, `renmark/cli/_run_lifecycle.py`, `renmark/cli/_wave_loop.py`
