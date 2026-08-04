@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 5 (step 3/5): extract lifecycle/preamble.py
+
+**Files:** `renmark/lifecycle/preamble.py`, `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`
+
+Extracted skill_preamble/preamble_tier/persist_compact_checkpoint/milestone_context_checkpoint/_with_*_note from stage.py into preamble.py. _IMPL_MODULES now (_stage, _next_steps_mod, _preamble_mod). Full suite unchanged (1936/31), independently re-verified after subagent final report was truncated mid-sentence.
+
+---
+
 ### 2026-08-04 — Rethink Release 5 (step 2/5): extract lifecycle/next_steps.py
 
 **Files:** `renmark/lifecycle/next_steps.py`, `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`

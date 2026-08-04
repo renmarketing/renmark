@@ -1,9 +1,10 @@
 """renmark lifecycle package.
 
 Split from a single 1747-line module (`renmark/lifecycle.py`) into a package.
-Stage/state primitives live in `stage.py` and next-step routing in
-`next_steps.py`; later steps split out `preamble.py` and `reconciliation.py`
-per `.renmark/rethink/renmark-architecture/target-blueprint.md` §1.2.
+Stage/state primitives live in `stage.py`, next-step routing in
+`next_steps.py`, and skill-preamble/context-checkpoint helpers in
+`preamble.py`; a later step splits out `reconciliation.py` per
+`.renmark/rethink/renmark-architecture/target-blueprint.md` §1.2.
 
 This package re-exports the prior surface so `from renmark.lifecycle import X`
 and `from renmark import lifecycle; lifecycle.X` keep working unchanged.
@@ -20,6 +21,7 @@ import sys as _sys
 from types import ModuleType as _ModuleType
 
 from . import next_steps as _next_steps_mod
+from . import preamble as _preamble_mod
 from . import stage as _stage
 from .next_steps import *  # noqa: F403
 from .next_steps import (  # noqa: F401
@@ -28,6 +30,16 @@ from .next_steps import (  # noqa: F401
     _resolve_next,
     next_recommended,
     next_steps,
+)
+from .preamble import *  # noqa: F403
+from .preamble import (  # noqa: F401
+    _with_agency_note,
+    _with_headless_note,
+    _with_mode_note,
+    milestone_context_checkpoint,
+    persist_compact_checkpoint,
+    preamble_tier,
+    skill_preamble,
 )
 from .stage import *  # noqa: F403
 from .stage import (  # noqa: F401
@@ -61,16 +73,13 @@ from .stage import (  # noqa: F401
     _signoff_milestone_id,
     _state_dir,
     _validate_one_artifact,
-    _with_agency_note,
-    _with_headless_note,
-    _with_mode_note,
     _work_package_summaries_for_stage,
     _workflow_drift_notes,
 )
 
 #: Implementation modules that own the re-exported names, in resolution order.
 #: Extended as `stage.py` is split into the blueprint's four modules.
-_IMPL_MODULES: tuple[_ModuleType, ...] = (_stage, _next_steps_mod)
+_IMPL_MODULES: tuple[_ModuleType, ...] = (_stage, _next_steps_mod, _preamble_mod)
 
 
 class _LifecyclePackage(_ModuleType):
