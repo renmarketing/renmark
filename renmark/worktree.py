@@ -261,3 +261,43 @@ def stale_worktrees(repo: Path, *, clean_only: bool = True) -> list[dict[str, ob
         stale.append(wt)
 
     return stale
+
+
+def stale_local_branches(repo: Path) -> list[str]:
+    """Return local branches that are merged into the default branch and
+    should have been deleted already (leftover feature branches).
+
+    Excludes: the default branch itself, the currently checked-out branch
+    (never delete what's checked out), and any branch that still backs a
+    worktree (those are :func:`stale_worktrees`' concern — deleting the
+    branch requires removing the worktree first, a different operation).
+
+    This is the plain-``git branch`` counterpart to :func:`stale_worktrees`:
+    a feature branch merged via a normal ``git merge`` (no worktree involved)
+    that ``git branch -d`` was never run on. Never raises — a git failure
+    degrades to an empty list.
+    """
+    default = _default_branch(repo)
+    current = current_branch(repo)
+    worktree_branches: set[str] = set()
+    for wt in list_worktrees(repo):
+        branch_ref = wt.get("branch")
+        if not branch_ref:
+            continue
+        name = str(branch_ref)
+        if name.startswith("refs/heads/"):
+            name = name[len("refs/heads/"):]
+        worktree_branches.add(name)
+
+    proc = _run_git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+    if proc.returncode != 0:
+        return []
+
+    stale: list[str] = []
+    for line in proc.stdout.splitlines():
+        branch = line.strip()
+        if not branch or branch in (default, current) or branch in worktree_branches:
+            continue
+        if is_merged(repo, branch, into=default):
+            stale.append(branch)
+    return stale

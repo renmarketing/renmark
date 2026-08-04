@@ -311,7 +311,7 @@ class ReadinessReport:
 
 
 # Gates that are reported but do NOT gate the overall ``ready`` decision.
-_INFORMATIONAL_GATES = frozenset({"tests_present", "artifact_budget"})
+_INFORMATIONAL_GATES = frozenset({"tests_present", "artifact_budget", "stray_branches"})
 
 
 def _gate_version_consistent(repo: Path) -> GateResult:
@@ -415,6 +415,35 @@ def _gate_artifact_budget(repo: Path) -> GateResult:
         return GateResult("artifact_budget", False, f"check error: {exc}")
 
 
+def _gate_stray_branches(repo: Path) -> GateResult:
+    """Optional check: surface merged-but-undeleted local branches and stale
+    worktrees at release time. Never blocks ``ready`` — informational only,
+    same shape as ``artifact_budget``. Deleting them is a destructive git
+    operation an Owner/agent must do explicitly (SKILL.md's branch/worktree
+    cleanup steps); this gate exists so that step being skipped is VISIBLE at
+    release time instead of silently accumulating across releases.
+    """
+    try:
+        from renmark import worktree
+
+        branches = worktree.stale_local_branches(repo)
+        worktrees = worktree.stale_worktrees(repo)
+        passed = not branches and not worktrees
+        if passed:
+            detail = "ok — no stray branches or worktrees"
+        else:
+            parts = []
+            if branches:
+                parts.append(f"{len(branches)} merged branch(es) not deleted: {', '.join(branches)}")
+            if worktrees:
+                names = [str(wt.get("path", "?")) for wt in worktrees]
+                parts.append(f"{len(worktrees)} stale worktree(s): {', '.join(names)}")
+            detail = "; ".join(parts)
+        return GateResult("stray_branches", passed, detail)
+    except Exception as exc:
+        return GateResult("stray_branches", False, f"check error: {exc}")
+
+
 def release_readiness(repo: str | Path = ".") -> ReadinessReport:
     """Aggregate deterministic release-readiness checks for *repo*.
 
@@ -433,12 +462,20 @@ def release_readiness(repo: str | Path = ".") -> ReadinessReport:
        manifest (or the repo dir name); reuses
        ``renmark.release.package_basename``.
     4. ``tests_present`` — optional structural check that ``tests/`` exists.
+    5. ``artifact_budget`` — optional check of ``.renmark/`` artifact registry
+       compliance; reuses ``renmark.hygiene.validate_registry_compliance``.
+    6. ``stray_branches`` — optional check for merged-but-undeleted local
+       branches and stale worktrees left over from a prior feature/release
+       cycle; reuses ``renmark.worktree.stale_local_branches`` and
+       ``renmark.worktree.stale_worktrees``.
 
     Returns a :class:`ReadinessReport` whose ``ready`` flag is ``True`` only
-    when all **required** gates pass.  ``tests_present`` is an *informational*
-    gate — it is reported but does NOT gate ``ready`` (many valid repos ship
-    without a ``tests/`` directory, or name it differently).  Never raises —
-    any uncaught error degrades to a not-ready report rather than propagating.
+    when all **required** gates pass.  ``tests_present``, ``artifact_budget``,
+    and ``stray_branches`` are *informational* gates — reported but do NOT
+    gate ``ready`` (deleting a branch/worktree is a destructive git operation
+    that must stay an explicit human/agent action, not an automatic release
+    blocker). Never raises — any uncaught error degrades to a not-ready
+    report rather than propagating.
 
     AI reasoning about *why* a release might not be ready is an owner-level
     explanation layer built on top of these results; it never replaces them.
@@ -451,6 +488,7 @@ def release_readiness(repo: str | Path = ".") -> ReadinessReport:
             _gate_package_buildable(root),
             _gate_tests_present(root),
             _gate_artifact_budget(root),
+            _gate_stray_branches(root),
         ]
     except Exception as exc:  # honor the "never raises" contract
         return ReadinessReport(

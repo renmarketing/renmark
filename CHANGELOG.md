@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-04] — feat: deterministic stray-branch/worktree gate at release-readiness time
+**Request:** Follow-up to the version-tree compaction fix, same session — the user's real concern was broader than the version tree: branch/worktree cleanup after a merge/release was purely prose (`plugin/skills/finish/SKILL.md` instructs `git branch -d` / `git worktree remove`) with no code ever verifying it actually happened, so a skipped step would silently accumulate across releases with nothing to catch it — the same failure shape as the version-tree bug (a step existing only as intent, not as an enforced mechanism).
+**Built:** `renmark.worktree.stale_local_branches(repo)` — new function, the plain-`git branch` counterpart to the existing `stale_worktrees`: lists local branches merged into the default branch, excluding the default branch, the currently checked-out branch, and any branch still backing a worktree. `renmark.finish_lanes._gate_stray_branches` — new informational gate (same shape as `artifact_budget`/`tests_present`) added to `release_readiness()`, reporting merged-undeleted branches and stale worktrees; added to `_INFORMATIONAL_GATES` so it never blocks `ready` (REQ-30 — deleting a branch/worktree stays an explicit destructive action, not an automatic release blocker) but now shows up every time release-readiness is checked instead of only when someone happens to remember to look. Verified live: current repo reports `stray_branches: True — ok — no stray branches or worktrees`. 8 new tests (4 for `stale_local_branches` covering merged/unmerged/checked-out/post-delete cases, 3 for the gate, 1 informational-gate assertion). Full suite green (1970 passed, 31 skipped), ruff + mypy clean (one pre-existing unrelated mypy note in `ledger.py`, not touched by this change).
+**Files changed:**
+- `renmark/worktree.py` — `stale_local_branches`.
+- `renmark/finish_lanes.py` — `_gate_stray_branches`, wired into `release_readiness()` gates + `_INFORMATIONAL_GATES`.
+- `tests/test_worktree.py` — 5 new tests.
+- `tests/test_finish_lanes.py` — 3 new tests.
+**Do not change:** this gate stays informational-only — do not promote it to a blocking gate without an explicit Owner decision (REQ-30); it reports, it does not delete anything itself (deletion stays the finish skill's explicit `git branch -d`/`git worktree remove` steps).
+
 ## [2026-08-04] — fix: release snapshot never compacted the previous version's unpacked tree
 **Request:** Debug session — `.renmark/version/v0.41.0/` was still a full 740KB unpacked source tree even though `v0.42.0` had already released; the artifact-lifecycle plan's RETIRE-UNPACKED-VERSION-TREES step had only ever compacted `v0.39.7`/`v0.40.0` as a one-off manual action, with no code ever wired to do it automatically on release.
 **Root cause:** `renmark/release.py::build_version_snapshot` wrote a fresh full unpacked snapshot dir on every release but no function anywhere in the codebase ever retired the prior version's snapshot dir, and no call site invoked such a step — the release lane had no retirement step for the version it superseded.

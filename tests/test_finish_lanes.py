@@ -367,3 +367,45 @@ def test_artifact_budget_detail_mentions_issue_count_for_unregistered_file(tmp_p
     assert gate.detail
     assert "1" in gate.detail
     assert gate.detail == "1 WARN, 0 BLOCK"
+
+
+# ---------------------------------------------------------------------------
+# stray_branches gate — regression coverage for the "release leaves merged
+# branches/worktrees behind" gap: nothing previously surfaced this at
+# release-readiness time, so it silently accumulated across releases.
+# ---------------------------------------------------------------------------
+
+
+def test_stray_branches_passes_on_clean_repo(tmp_path: Path) -> None:
+    repo = _write_versioned_repo(tmp_path / "clean")
+    gate = next(g for g in release_readiness(repo).gates if g.name == "stray_branches")
+    assert gate.passed is True
+    assert gate.detail == "ok — no stray branches or worktrees"
+
+
+def test_stray_branches_detects_merged_undeleted_branch(tmp_path: Path) -> None:
+    repo = _write_versioned_repo(tmp_path / "stray")
+    default = subprocess.run(
+        ["git", "symbolic-ref", "--short", "HEAD"], cwd=repo, capture_output=True, text=True
+    ).stdout.strip()
+    subprocess.run(["git", "checkout", "-b", "feature/leftover"], cwd=repo, check=True, capture_output=True, text=True)
+    (repo / "extra.txt").write_text("x\n", encoding="utf-8")
+    subprocess.run(["git", "add", "extra.txt"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "feature work"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "checkout", default], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", "merge", "--no-ff", "feature/leftover", "-m", "merge"], cwd=repo, check=True, capture_output=True, text=True
+    )
+
+    report = release_readiness(repo)
+    gate = next(g for g in report.gates if g.name == "stray_branches")
+    assert gate.passed is False
+    assert "feature/leftover" in gate.detail
+    # informational only — must not flip ready to False (REQ-30)
+    assert report.ready is True
+
+
+def test_stray_branches_is_informational_gate() -> None:
+    from renmark.finish_lanes import _INFORMATIONAL_GATES
+
+    assert "stray_branches" in _INFORMATIONAL_GATES

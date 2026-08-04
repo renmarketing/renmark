@@ -16,6 +16,7 @@ from renmark.worktree import (
     is_clean_tree,
     is_merged,
     list_worktrees,
+    stale_local_branches,
     stale_worktrees,
 )
 
@@ -282,3 +283,58 @@ def test_stale_worktrees_returns_list_type(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path / "repo")
     result = stale_worktrees(repo)
     assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# stale_local_branches — regression coverage for the "release leaves merged
+# branches behind" gap: a plain `git merge` (no worktree involved) that
+# never got `git branch -d` run on it must be detected.
+# ---------------------------------------------------------------------------
+
+
+def test_stale_local_branches_detects_merged_undeleted_branch(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo", branch="main")
+    _git(repo, "checkout", "-b", "feature/done")
+    (repo / "feature.txt").write_text("done\n", encoding="utf-8")
+    _git(repo, "add", "feature.txt")
+    _git(repo, "commit", "-m", "feature work")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature/done", "-m", "merge feature/done")
+    # Branch is merged but was never deleted with `git branch -d`.
+    assert stale_local_branches(repo) == ["feature/done"]
+
+
+def test_stale_local_branches_excludes_unmerged_branch(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo", branch="main")
+    _git(repo, "checkout", "-b", "feature/wip")
+    (repo / "wip.txt").write_text("wip\n", encoding="utf-8")
+    _git(repo, "add", "wip.txt")
+    _git(repo, "commit", "-m", "in progress")
+    _git(repo, "checkout", "main")
+    assert stale_local_branches(repo) == []
+
+
+def test_stale_local_branches_excludes_default_and_checked_out_branch(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo", branch="main")
+    _git(repo, "checkout", "-b", "feature/current")
+    # Currently checked out, and trivially "merged" (no new commits) — must
+    # never be reported as stale (deleting what's checked out is unsafe).
+    assert stale_local_branches(repo) == []
+
+
+def test_stale_local_branches_after_delete_is_clean(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo", branch="main")
+    _git(repo, "checkout", "-b", "feature/done")
+    (repo / "feature.txt").write_text("done\n", encoding="utf-8")
+    _git(repo, "add", "feature.txt")
+    _git(repo, "commit", "-m", "feature work")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "feature/done", "-m", "merge feature/done")
+    _git(repo, "branch", "-d", "feature/done")
+    # Proper cleanup (like finish's `git branch -d` step) leaves it clean.
+    assert stale_local_branches(repo) == []
+
+
+def test_stale_local_branches_returns_list_type_on_bad_path(tmp_path: Path) -> None:
+    result = stale_local_branches(tmp_path / "does-not-exist")
+    assert result == []
