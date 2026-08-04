@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-08-04] — feat: .renmark artifact-lifecycle registry + budget/validate CLI
+**Request:** Task 2 of the `.renmark` artifact-lifecycle hygiene plan (downstream of a scoped `/renmark:rethink` run) — add a 14-entry artifact-type registry and deterministic budget/placement/ownership validation.
+**Built:** `ArtifactTypeSpec` dataclass + `ARTIFACT_REGISTRY` (14 entries: audits, plans, reviews, state-live, state-scratch, memory, ledger, reports, rethink, roadmap, specs, debug, version-unpacked, version-zip) added to `renmark/hygiene.py`. New CLI subcommands `budget` (read-only count/bytes/age report per type) and `validate` (`validate_registry_compliance` — placement, metadata via `schemas.validate_artifact_metadata`, budget warn/block, canonical-ownership pointer check for the audits/inventory + rethink/survey vs. `project-map.md` overlap). `scan`/`all` gained a safe-deletion predicate for `ephemeral`+regenerable types (age + zero inbound refs + not-newest, all three required).
+**Files changed:**
+- `renmark/hygiene.py` — registry, `budget`/`validate` subcommands, `validate_registry_compliance`, safe-deletion predicate.
+**Do not change:**
+- `scan_artifacts`/`prune_memory`'s existing signatures and dry-run default are unchanged — this is additive only. Existing `.renmark/rethink/*/survey.md` files predate the canonical-ownership rule and are *expected* to fail `validate` until a follow-up backfills their `dependency_refs` — that's an honest finding, not a bug.
+
+## [2026-08-04] — feat: Hermes startup allowlist for skill_preamble
+**Request:** Task 6 of the `.renmark` artifact-lifecycle hygiene plan — turn `skill_preamble()`'s already-narrow file-read behavior into an enforced, documented invariant ahead of a future lightweight "Hermes" startup mode.
+**Built:** `HERMES_STARTUP_ALLOWLIST` frozenset added to `renmark/lifecycle/preamble.py`, code-verified by tracing `skill_preamble`'s actual call graph (not copied from the rethink proposal, which had the wrong file list and was missing `.renmark/memory/routing.md` entirely).
+**Files changed:**
+- `renmark/lifecycle/preamble.py` — new `HERMES_STARTUP_ALLOWLIST` constant, no function bodies touched.
+**Do not change:**
+- The allowlist documents `skill_preamble`'s real read surface (`last-skill.json`, `delivery.json`, `mode.json`, `agency.json`, `config.json`, `compact_checkpoint.json`, `memory/routing.md`) — do not add `lifecycle.json`/`program.json`/`tasks.json`/`memory/INDEX.md`, which are read by other Step-0 calls outside `skill_preamble`, not by it.
+
 ## [2026-08-04] — feat: rethink Release 7 (final) — skillmeta-completeness lint gate
 **Request:** The last item on the rethink roadmap (flagged optional/stretch, scheduled last per its own recommendation): extend `plan_lint.py` to BLOCK on a `plugin/skills/<name>/` directory with a `SKILL.md` but no `skillmeta.SKILLS` entry, instead of `domain_of()` silently defaulting it to `"build"` (classification.md item 5).
 **Built:** New Check 13 (`_check_skillmeta_registered`) scans `plugin/skills/*/` for directories containing `SKILL.md`, cross-references each against `skillmeta.SKILLS`, and BLOCKs on any miss. No-op when `plugin/skills/` doesn't exist (e.g. a non-renmark repo). 3 new fixture tests: unregistered dir BLOCKs, a real registered dir (`plan`) lints clean, and no `plugin/skills/` dir at all is a safe no-op. Confirmed zero drift exists today — full suite already green before and after (30 existing skill dirs, 30 registered `SKILL` entries, exact match). Ran the actual acceptance-scenario demo: created an intentionally unregistered skill dir in a scratch repo, confirmed `lint_plan` returns `BLOCK` with the exact expected message.
