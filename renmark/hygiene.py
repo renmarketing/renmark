@@ -12,6 +12,8 @@ Stdlib only. Mypy-strict clean.
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -19,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from renmark import lifecycle, memory, summary
+from renmark import lifecycle, memory, schemas, summary
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,76 @@ _ARTIFACT_SUBDIRS: tuple[str, ...] = (
 )
 _ARTIFACT_SUFFIXES: tuple[str, ...] = (".md", ".yaml", ".yml", ".json")
 _MEMORY_LOGS: tuple[str, ...] = ("learnings.md", "bugs.md", "features.md")
+
+
+@dataclass(frozen=True)
+class ArtifactTypeSpec:
+    """One row of the ``.renmark/`` artifact-type registry.
+
+    ``path_glob`` is relative to ``repo/.renmark`` and may use a single
+    ``{a,b,c}`` brace-expansion group (Python's ``glob`` does not support
+    brace expansion natively — see ``_expand_braces``).
+    """
+
+    name: str
+    path_glob: str
+    art_class: str  # active-context | canonical-evidence | archived-history | ephemeral
+    owner: str
+    regenerable: bool
+    budget_count: int | None
+    budget_bytes: int | None
+    budget_age_days: int | None
+    warn_pct: float = 0.8
+
+
+# Copied verbatim (paths/class/budget/owner/regenerable) from
+# .renmark/rethink/artifact-lifecycle/implementation-proposal.md §1.
+ARTIFACT_REGISTRY: tuple[ArtifactTypeSpec, ...] = (
+    ArtifactTypeSpec("audits", "audits/**", "ephemeral", "audit", True, 60, 1_500_000, 60),
+    ArtifactTypeSpec("plans", "plans/**", "canonical-evidence", "plan", False, 150, 3_000_000, None),
+    ArtifactTypeSpec("reviews", "reviews/**", "canonical-evidence", "review", False, 250, 1_500_000, None),
+    ArtifactTypeSpec(
+        "state-live",
+        "state/{lifecycle,program,delivery,mode,agency,tasks,compact_checkpoint,last-skill}.json",
+        "active-context",
+        "lifecycle",
+        False,
+        None,
+        51_200,
+        None,
+    ),
+    ArtifactTypeSpec(
+        "state-scratch",
+        "state/{escalations,_wave-prompts,handoffs,adhoc-specs}/**",
+        "ephemeral",
+        "dispatch",
+        True,
+        200,
+        1_000_000,
+        14,
+    ),
+    ArtifactTypeSpec("memory", "memory/*.md", "active-context", "memory", False, 16, None, None),
+    ArtifactTypeSpec("ledger", "ledger/events.jsonl", "canonical-evidence", "ledger", False, None, 25_000_000, None),
+    ArtifactTypeSpec("reports", "reports/features/*/*", "archived-history", "reports", True, 100, 500_000, None),
+    ArtifactTypeSpec("rethink", "rethink/*/*.md", "canonical-evidence", "rethink", False, None, 500_000, None),
+    ArtifactTypeSpec("roadmap", "roadmap/*.md", "active-context", "roadmap", False, 2, 307_200, None),
+    ArtifactTypeSpec("specs", "specs/*.md", "canonical-evidence", "brainstorm", False, 100, 500_000, None),
+    ArtifactTypeSpec("debug", "debug/*/*", "ephemeral", "debug", True, 40, 1_000_000, 90),
+    # budget_age_days=7: short enough that a stale unpacked version tree is
+    # reclaimed promptly (it's a pure build byproduct, budget_count=1 means
+    # only the single most-recent version's tree should ever be kept), but
+    # long enough that the CURRENT (just-unpacked) version's tree is never
+    # old enough to qualify on its own — the safe-deletion predicate already
+    # protects the single newest-mtime file unconditionally (see
+    # `_apply_hygiene`'s ephemeral+regenerable pass), and 7 days is a wide
+    # margin against any mtime skew across files within the same unpack.
+    ArtifactTypeSpec("version-unpacked", "version/v*/**", "ephemeral", "release", True, 1, None, 7),
+    ArtifactTypeSpec("version-zip", "version/*.zip", "canonical-evidence", "release", False, None, None, None),
+)
+
+# Top-level names under .renmark/ that are never registry-governed content.
+_REGISTRY_SKIP_TOP_DIRS: frozenset[str] = frozenset({"archive", "logs"})
+_REGISTRY_SKIP_TOP_FILES: frozenset[str] = frozenset({"config.json", "README.md"})
 
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -53,6 +125,17 @@ class PruneReport:
     aged_out: int = 0
     files_touched: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class BudgetEntry:
+    name: str
+    count: int
+    total_bytes: int
+    oldest_days: int | None
+    budget_count: int | None
+    budget_bytes: int | None
+    status: str  # ok | warn | block
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -171,6 +254,234 @@ def _is_stale_for_gc(path: Path, ttl_days: int) -> bool:
         return False
 
 
+def _expand_braces(pattern: str) -> list[str]:
+    """Expand a single ``{a,b,c}`` group in a glob pattern.
+
+    Python's ``pathlib.Path.glob`` does not support brace expansion, so
+    registry entries that use it (``state-live``, ``state-scratch``) must be
+    pre-expanded into one concrete glob per option.
+    """
+    m = re.search(r"\{([^{}]*)\}", pattern)
+    if not m:
+        return [pattern]
+    options = m.group(1).split(",")
+    prefix, suffix = pattern[: m.start()], pattern[m.end() :]
+    return [f"{prefix}{opt}{suffix}" for opt in options]
+
+
+def _iter_registry_files(repo: Path, spec: ArtifactTypeSpec) -> list[Path]:
+    """Resolve every live file matching ``spec.path_glob`` under ``.renmark/``."""
+    renmark_root = repo / ".renmark"
+    if not renmark_root.exists():
+        return []
+    files: set[Path] = set()
+    for sub_glob in _expand_braces(spec.path_glob):
+        # Path.glob("x/**") only matches "x/" itself (depth 0) — it does NOT
+        # descend into files, unlike shell globstar. "x/**/*" is required to
+        # actually enumerate files at any depth (including immediate
+        # children). Normalize trailing "**" so registry authors can write
+        # the natural "dir/**" form.
+        patterns = [sub_glob]
+        if sub_glob.endswith("/**"):
+            patterns.append(sub_glob + "/*")
+        for pattern in patterns:
+            for path in renmark_root.glob(pattern):
+                if path.is_file():
+                    files.add(path.resolve())
+    return sorted(files)
+
+
+def _registry_stats(files: list[Path]) -> tuple[int, int, int | None]:
+    """Return (count, total_bytes, oldest_age_days) for a set of files."""
+    count = len(files)
+    total_bytes = 0
+    oldest_days: int | None = None
+    now = _now_utc().timestamp()
+    for path in files:
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        total_bytes += st.st_size
+        age_days = int((now - st.st_mtime) / 86400)
+        if oldest_days is None or age_days > oldest_days:
+            oldest_days = age_days
+    return count, total_bytes, oldest_days
+
+
+def _budget_status(spec: ArtifactTypeSpec, count: int, total_bytes: int, oldest_days: int | None) -> str:
+    """ok / warn / block against whichever budget dimensions are bounded."""
+    ratios: list[float] = []
+    if spec.budget_count is not None and spec.budget_count > 0:
+        ratios.append(count / spec.budget_count)
+    if spec.budget_bytes is not None and spec.budget_bytes > 0:
+        ratios.append(total_bytes / spec.budget_bytes)
+    if spec.budget_age_days is not None and spec.budget_age_days > 0 and oldest_days is not None:
+        ratios.append(oldest_days / spec.budget_age_days)
+    if not ratios:
+        return "ok"
+    worst = max(ratios)
+    if worst >= 1.0:
+        return "block"
+    if worst >= spec.warn_pct:
+        return "warn"
+    return "ok"
+
+
+def compute_budget_report(repo: Path) -> list[BudgetEntry]:
+    """Live count/bytes/oldest-age + status for every ``ARTIFACT_REGISTRY`` type."""
+    repo = Path(repo)
+    entries: list[BudgetEntry] = []
+    for spec in ARTIFACT_REGISTRY:
+        files = _iter_registry_files(repo, spec)
+        count, total_bytes, oldest_days = _registry_stats(files)
+        status = _budget_status(spec, count, total_bytes, oldest_days)
+        entries.append(
+            BudgetEntry(
+                name=spec.name,
+                count=count,
+                total_bytes=total_bytes,
+                oldest_days=oldest_days,
+                budget_count=spec.budget_count,
+                budget_bytes=spec.budget_bytes,
+                status=status,
+            )
+        )
+    return entries
+
+
+def _read_meta_if_present(path: Path) -> dict[str, Any]:
+    """Parse frontmatter (``.md``) or a top-level metadata object (``.json``).
+
+    Returns ``{}`` when the file carries no recognizable artifact metadata —
+    callers should skip validation in that case rather than flag a file that
+    was never meant to carry a provenance block.
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".md":
+        return summary.read_metadata(path)
+    if suffix == ".json":
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        if isinstance(data, dict) and "artifact_type" in data:
+            return data
+        return {}
+    return {}
+
+
+def _add_dependency_refs_from_meta(repo: Path, meta: dict[str, Any], refs: set[Path]) -> None:
+    """Normalize and add each ``dependency_refs`` entry from a parsed
+    artifact-metadata dict into ``refs`` — shared by both the ``.md``
+    frontmatter path and the whole-document ``.json`` path so they converge
+    on identical string-to-Path resolution."""
+    deps = meta.get("dependency_refs")
+    if not isinstance(deps, list):
+        return
+    for dep in deps:
+        if isinstance(dep, str):
+            norm = _normalize_ref(repo, dep)
+            if norm is not None:
+                refs.add(norm)
+
+
+def _all_dependency_refs(repo: Path) -> set[Path]:
+    """Union of lifecycle.json artifact refs and ``dependency_refs`` declared
+    in either ``.md`` frontmatter or whole-document ``.json`` metadata across
+    ``.renmark/`` — best-effort inbound-reference set for the ephemeral
+    safe-deletion predicate. Extends ``_referenced_paths`` (which only covers
+    ``lifecycle.json``) with a repo-wide frontmatter + JSON-metadata scan."""
+    refs = set(_referenced_paths(repo))
+    renmark_root = repo / ".renmark"
+    if not renmark_root.exists():
+        return refs
+    for path in renmark_root.rglob("*.md"):
+        if not path.is_file():
+            continue
+        try:
+            meta = summary.read_metadata(path)
+        except OSError:
+            continue
+        _add_dependency_refs_from_meta(repo, meta, refs)
+    for path in renmark_root.rglob("*.json"):
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        _add_dependency_refs_from_meta(repo, data, refs)
+    return refs
+
+
+def validate_registry_compliance(repo: Path) -> list[str]:
+    """Repo-wide placement/metadata/budget/ownership check against
+    ``ARTIFACT_REGISTRY``. Distinct from ``schemas.validate_artifact_metadata``
+    (single-document contract) — this walks the whole ``.renmark/`` tree."""
+    repo = Path(repo)
+    renmark_root = repo / ".renmark"
+    issues: list[str] = []
+    if not renmark_root.exists():
+        return ["no .renmark directory found"]
+
+    registry_files: set[Path] = set()
+    for spec in ARTIFACT_REGISTRY:
+        registry_files |= set(_iter_registry_files(repo, spec))
+
+    # (a) placement + (b) metadata.
+    for path in sorted(renmark_root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.resolve().relative_to(renmark_root.resolve())
+        parts = rel.parts
+        if parts and parts[0] in _REGISTRY_SKIP_TOP_DIRS:
+            continue
+        if "archive" in parts:
+            continue
+        if len(parts) == 1 and parts[0] in _REGISTRY_SKIP_TOP_FILES:
+            continue
+
+        if path.resolve() not in registry_files:
+            issues.append(f"no registry entry: {rel.as_posix()}")
+
+        if path.suffix.lower() in (".md", ".json"):
+            meta = _read_meta_if_present(path)
+            if meta:
+                issues.extend(schemas.validate_artifact_metadata(meta))
+
+    # (c) budget.
+    for entry in compute_budget_report(repo):
+        if entry.status == "block":
+            issues.append(f"BLOCK {entry.name}: count={entry.count} bytes={entry.total_bytes}")
+        elif entry.status == "warn":
+            issues.append(f"WARN {entry.name}: count={entry.count} bytes={entry.total_bytes}")
+
+    # (d) canonical ownership — project-map.md is the sole structural home;
+    # inventory/survey files must cite it.
+    project_map = renmark_root / "memory" / "project-map.md"
+    if not project_map.exists():
+        issues.append("missing canonical file: .renmark/memory/project-map.md")
+    else:
+        citation_files: list[Path] = []
+        citation_files.extend((renmark_root / "audits").glob("inventory-*.md"))
+        citation_files.extend((renmark_root / "rethink").glob("*/survey.md"))
+        for cand in citation_files:
+            if not cand.is_file():
+                continue
+            meta = summary.read_metadata(cand)
+            refs = meta.get("dependency_refs")
+            refs = refs if isinstance(refs, list) else []
+            has_pointer = any(isinstance(r, str) and r.endswith("memory/project-map.md") for r in refs)
+            if not has_pointer:
+                rel = cand.resolve().relative_to(repo.resolve())
+                issues.append(f"no project-map.md pointer: {rel.as_posix()}")
+
+    return issues
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 
@@ -222,6 +533,49 @@ def scan_artifacts(
             except OSError as e:
                 report.errors.append(f"{path}: {e}")
 
+    # Type-aware ephemeral+regenerable safe-deletion (additive, registry-driven).
+    # A file is only ever a delete (not archive) candidate on --apply when ALL
+    # of: (i) older than its type's budget_age_days, (ii) zero inbound
+    # dependency_refs, (iii) not the single most-recent file of its type.
+    # canonical-evidence / active-context types are never touched here.
+    ephemeral_specs = [
+        s for s in ARTIFACT_REGISTRY if s.art_class == "ephemeral" and s.regenerable and s.budget_age_days is not None
+    ]
+    if ephemeral_specs:
+        dep_refs = _all_dependency_refs(repo)
+        for spec in ephemeral_specs:
+            age_days = spec.budget_age_days
+            if age_days is None:
+                continue
+            files = [f for f in _iter_registry_files(repo, spec) if not str(f).startswith(archive_root_str)]
+            if not files:
+                continue
+            try:
+                newest = max(files, key=lambda p: p.stat().st_mtime)
+            except OSError:
+                continue
+            for candidate in files:
+                if candidate == newest:
+                    continue  # (iii) never delete the sole most-recent file
+                try:
+                    if not _is_older_than(_file_mtime_utc(candidate), age_days):
+                        continue  # (i) not old enough
+                except OSError:
+                    continue
+                if candidate in dep_refs:
+                    continue  # (ii) has an inbound reference — keep
+
+                report.scanned += 1
+                if dry_run:
+                    report.archived_paths.append(candidate)
+                else:
+                    try:
+                        candidate.unlink()
+                        report.archived += 1
+                        report.archived_paths.append(candidate)
+                    except OSError as e:
+                        report.errors.append(f"{candidate}: {e}")
+
     try:
         report.ghost_refs = _ghost_count(repo)
     except OSError as e:
@@ -265,7 +619,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Defaults to dry-run; pass --apply to make changes."
         ),
     )
-    parser.add_argument("subcommand", choices=("scan", "prune", "all"))
+    parser.add_argument("subcommand", choices=("scan", "prune", "all", "budget", "validate"))
     parser.add_argument("--repo", default=".", help="Project root (default: .)")
     parser.add_argument(
         "--apply",
@@ -314,6 +668,26 @@ def main(argv: list[str] | None = None) -> int:
         print(hint)
 
     sub = args.subcommand
+
+    # budget/validate are read-only, registry-driven reports — handled and
+    # returned before the scan/prune/all dispatch below.
+    if sub == "budget":
+        for entry in compute_budget_report(repo):
+            cap_count = entry.budget_count if entry.budget_count is not None else "-"
+            cap_bytes = entry.budget_bytes if entry.budget_bytes is not None else "-"
+            print(
+                f"BUDGET  {entry.name}  count={entry.count}/{cap_count}  "
+                f"bytes={entry.total_bytes}/{cap_bytes}  status={entry.status}"
+            )
+        return 0
+
+    if sub == "validate":
+        issues = validate_registry_compliance(repo)
+        print(f"VALIDATE  issues={len(issues)}")
+        for issue in issues:
+            print(issue)
+        return 0
+
     run_scan = sub in ("scan", "all")
     run_prune = sub in ("prune", "all") or (sub == "scan" and args.include_memory)
 

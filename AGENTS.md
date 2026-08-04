@@ -90,7 +90,7 @@ See `CLAUDE.md` § `deterministic-first-routing` + `plugin/skills/.shared/determ
 **Executor dispatch.** `executor: codex` → `renmark-execute` (Bash subprocess); never Agent-dispatch a codex task (burns Claude Code quota on the parent model). `executor: haiku / sonnet / opus` → Agent calls, no model override. `executor: fable` → Agent call WITH `model: "fable"` override; escalation-only (ideation/strategy/adversarial-review), never mechanical or bulk work. Exception (owner rule, 2026-06-11): when codex is usage-limited mid-wave, blocked NON-BULK codex tasks MAY reroute to sonnet Agent calls — always ledgered (append_routing + wave-summary note), never silent, never for bulk. See `CLAUDE.md` § `executor-dispatch-rule`.
 
 <!-- BEGIN:project-delivery-contract -->
-<!-- Last refreshed: @ f20da05 -->
+<!-- Last refreshed: @ 495962d -->
 # Managed Project Delivery Contract
 
 This concise fragment is the canonical source for managed `CLAUDE.md` and

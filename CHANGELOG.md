@@ -1,5 +1,87 @@
 # Changelog
 
+## [2026-08-04] — fix: 2 Major codereview findings (version-unpacked predicate, JSON dependency_refs)
+**Request:** Repair work order from the full codex review (`.renmark/reviews/2026-08-04-713dfee3.review.md`) — dispatched as a separate, isolated task per codereview's Inspector-findings-do-not-self-repair rule.
+**Built:** (1) `version-unpacked`'s `budget_age_days` changed from `None` to `7`, making it eligible for the ephemeral safe-deletion predicate going forward — the predicate's existing "not the single most-recent file of its type" condition still protects the current version's tree regardless of age. (2) `_all_dependency_refs` extended to also scan `.json` files under `.renmark/` for a top-level `dependency_refs` key, via a new shared `_add_dependency_refs_from_meta` helper so `.md` frontmatter and whole-document `.json` paths converge on identical ref-normalization. 3 new tests; full `tests/test_hygiene.py` suite (24 passed) and full `pytest -q` (1959 passed, 31 skipped) both green.
+**Files changed:**
+- `renmark/hygiene.py` — `version-unpacked` registry entry, `_add_dependency_refs_from_meta`, `_all_dependency_refs` JSON scan.
+- `tests/test_hygiene.py` — 3 new tests.
+**Do not change:**
+- The "not the single most-recent file of its type" protection is load-bearing for `version-unpacked`'s new age budget — do not lower it without re-verifying the current version's tree can never be deleted alongside an older one.
+
+## [2026-08-04] — test: --artifact-hygiene CLI flag tests (final task, hygiene plan complete)
+**Request:** Task 9 (final) of the `.renmark` artifact-lifecycle hygiene plan — end-to-end CLI coverage for `renmark-execute --artifact-hygiene`.
+**Built:** 3 tests in `tests/test_cli_artifact_hygiene.py` covering dry-run output/no-filesystem-change, the `--artifact-hygiene-apply` requires `--artifact-hygiene` guard, and a live apply-mode deletion through the full CLI path.
+**Files changed:**
+- `tests/test_cli_artifact_hygiene.py` — new, 3 tests.
+**Do not change:**
+- Independently re-verified (`pytest -q`, 3 passed) before trusting codex's low-confidence report, per this plan's established pattern.
+
+**Plan complete: all 10 tasks of `.renmark/plans/2026-08-04-renmark-artifact-lifecycle.plan.md` PASS.** First migration step (RETIRE-UNPACKED-VERSION-TREES) landed with metadata preserved as `.meta` sidecars; registry/CLI/gate/allowlist machinery all shipped and tested.
+
+## [2026-08-04] — feat: wire --artifact-hygiene into renmark-execute
+**Request:** Task 4 of the `.renmark` artifact-lifecycle hygiene plan — expose the hygiene registry/budget/validate machinery through the `renmark-execute` CLI surface.
+**Built:** `--artifact-hygiene` (dry-run) and `--artifact-hygiene-apply` (requires `--artifact-hygiene`) added to `renmark/cli/_engine.py`'s argparse parser and handler chain, dispatching to `_dispatch_artifact_hygiene_flags`. Verified live: `renmark-execute --artifact-hygiene --repo .` runs and prints the validate report; `--artifact-hygiene-apply` alone correctly exits 2.
+**Files changed:**
+- `renmark/cli/_engine.py` — two new flags, one handler-chain entry.
+**Do not change:**
+- Same codex low-confidence-report caveat as Task 3/8 — independently re-verified before trusting.
+
+## [2026-08-04] — test: finish-lanes artifact_budget gate coverage
+
+- Request: cover clean/WARN-only pass behavior, informational-gate readiness, and issue-count detail reporting.
+- Built: added a reusable fixture repo builder plus three deterministic tests in `tests/test_finish_lanes.py`.
+- Files changed: `tests/test_finish_lanes.py`.
+- Do not change: keep `artifact_budget` in `_INFORMATIONAL_GATES`; it must never become a release-blocking Owner gate.
+
+## [2026-08-04] — test: Hermes allowlist enforcement (runtime instrumentation)
+**Request:** Task 7 of the `.renmark` artifact-lifecycle hygiene plan — prove `skill_preamble()` never reads outside `HERMES_STARTUP_ALLOWLIST` and never lists a directory, via runtime tracing rather than a static grep (a grep of `preamble.py` alone can't see reads inside the 5 helper modules it calls into).
+**Built:** `tests/test_preamble_allowlist.py` monkeypatches `Path.open`/`read_text`/`write_text` (record) and `Path.rglob`/`glob`/`iterdir` (forbid) around live `skill_preamble()` calls for `debug`, `feature`, and a `SYNTHESIS_SKILLS` member (exercising the `routing.md` read path). Red-capability self-verified during the task (temporarily narrowed the allowlist, confirmed 3 failures naming the offending path, then reverted).
+**Files changed:**
+- `tests/test_preamble_allowlist.py` — new, 4 tests.
+**Do not change:**
+- This test is the safety net for the "Hermes never recurses" invariant — any future `skill_preamble` change that adds a file read or a directory listing should fail this test before it fails in production.
+
+## [2026-08-04] — feat: finish-time artifact-budget gate
+**Request:** Task 5 of the `.renmark` artifact-lifecycle hygiene plan — surface budget/placement violations at finish-time without adding a new Owner gate.
+**Built:** `_gate_artifact_budget(repo)` added to `renmark/finish_lanes.py`, calling `hygiene.validate_registry_compliance`. Added to `_INFORMATIONAL_GATES` (reported, never blocks `release_readiness().ready`) and wired into `release_readiness()`'s gate list. Verified live: today's tree reports `406 WARN, 6 BLOCK` (dominated by pre-existing audits/reviews over budget and rethink survey files missing the project-map pointer) yet correctly does NOT affect `ready` — `ready=False` today is due to `tree_clean` (mid-orchestration uncommitted work), not this gate.
+**Files changed:**
+- `renmark/finish_lanes.py` — `_gate_artifact_budget`, `_INFORMATIONAL_GATES` entry, gate-list wiring.
+**Do not change:**
+- `artifact_budget` must stay in `_INFORMATIONAL_GATES` — REQ-30 requires this feature add zero new Owner gates.
+
+## [2026-08-04] — feat: --artifact-hygiene CLI dispatch handler
+**Request:** Task 3 of the `.renmark` artifact-lifecycle hygiene plan — CLI entry point for the new registry/budget/validate machinery.
+**Built:** `_dispatch_artifact_hygiene_flags(args, repo)` added to `renmark/cli/_dispatch_flags.py`, mirroring `_dispatch_compact_flags`. Runs `hygiene.main(["all", ...])` (dry-run unless `--artifact-hygiene-apply`), then `budget` and `validate` subcommands.
+**Files changed:**
+- `renmark/cli/_dispatch_flags.py` — new `_dispatch_artifact_hygiene_flags`, `hygiene` import added.
+**Do not change:**
+- Codex dispatched this task (per project executor-dispatch rule); its own structured report came back low-confidence/partial, so it was independently re-verified (`py_compile` + direct import) before being trusted — do not treat a codex PASS status alone as sufficient evidence.
+
+## [2026-08-04] — test: registry + validator coverage for hygiene.py
+**Request:** Task 8 of the `.renmark` artifact-lifecycle hygiene plan — test coverage for Task 2's registry/budget/validate additions.
+**Built:** 21 new tests in `tests/test_hygiene.py` covering registry shape, budget ok/warn/block thresholds, placement/metadata/ownership validation issues, and the ephemeral safe-deletion predicate's three-condition gate.
+**Files changed:**
+- `tests/test_hygiene.py` — 21 new tests.
+**Do not change:**
+- Same independent-verification note as above: codex's own report was low-confidence; `pytest -q tests/test_hygiene.py` (21 passed) was run directly before trusting it.
+
+## [2026-08-04] — feat: .renmark artifact-lifecycle registry + budget/validate CLI
+**Request:** Task 2 of the `.renmark` artifact-lifecycle hygiene plan (downstream of a scoped `/renmark:rethink` run) — add a 14-entry artifact-type registry and deterministic budget/placement/ownership validation.
+**Built:** `ArtifactTypeSpec` dataclass + `ARTIFACT_REGISTRY` (14 entries: audits, plans, reviews, state-live, state-scratch, memory, ledger, reports, rethink, roadmap, specs, debug, version-unpacked, version-zip) added to `renmark/hygiene.py`. New CLI subcommands `budget` (read-only count/bytes/age report per type) and `validate` (`validate_registry_compliance` — placement, metadata via `schemas.validate_artifact_metadata`, budget warn/block, canonical-ownership pointer check for the audits/inventory + rethink/survey vs. `project-map.md` overlap). `scan`/`all` gained a safe-deletion predicate for `ephemeral`+regenerable types (age + zero inbound refs + not-newest, all three required).
+**Files changed:**
+- `renmark/hygiene.py` — registry, `budget`/`validate` subcommands, `validate_registry_compliance`, safe-deletion predicate.
+**Do not change:**
+- `scan_artifacts`/`prune_memory`'s existing signatures and dry-run default are unchanged — this is additive only. Existing `.renmark/rethink/*/survey.md` files predate the canonical-ownership rule and are *expected* to fail `validate` until a follow-up backfills their `dependency_refs` — that's an honest finding, not a bug.
+
+## [2026-08-04] — feat: Hermes startup allowlist for skill_preamble
+**Request:** Task 6 of the `.renmark` artifact-lifecycle hygiene plan — turn `skill_preamble()`'s already-narrow file-read behavior into an enforced, documented invariant ahead of a future lightweight "Hermes" startup mode.
+**Built:** `HERMES_STARTUP_ALLOWLIST` frozenset added to `renmark/lifecycle/preamble.py`, code-verified by tracing `skill_preamble`'s actual call graph (not copied from the rethink proposal, which had the wrong file list and was missing `.renmark/memory/routing.md` entirely).
+**Files changed:**
+- `renmark/lifecycle/preamble.py` — new `HERMES_STARTUP_ALLOWLIST` constant, no function bodies touched.
+**Do not change:**
+- The allowlist documents `skill_preamble`'s real read surface (`last-skill.json`, `delivery.json`, `mode.json`, `agency.json`, `config.json`, `compact_checkpoint.json`, `memory/routing.md`) — do not add `lifecycle.json`/`program.json`/`tasks.json`/`memory/INDEX.md`, which are read by other Step-0 calls outside `skill_preamble`, not by it.
+
 ## [2026-08-04] — feat: rethink Release 7 (final) — skillmeta-completeness lint gate
 **Request:** The last item on the rethink roadmap (flagged optional/stretch, scheduled last per its own recommendation): extend `plan_lint.py` to BLOCK on a `plugin/skills/<name>/` directory with a `SKILL.md` but no `skillmeta.SKILLS` entry, instead of `domain_of()` silently defaulting it to `"build"` (classification.md item 5).
 **Built:** New Check 13 (`_check_skillmeta_registered`) scans `plugin/skills/*/` for directories containing `SKILL.md`, cross-references each against `skillmeta.SKILLS`, and BLOCKs on any miss. No-op when `plugin/skills/` doesn't exist (e.g. a non-renmark repo). 3 new fixture tests: unregistered dir BLOCKs, a real registered dir (`plan`) lints clean, and no `plugin/skills/` dir at all is a safe no-op. Confirmed zero drift exists today — full suite already green before and after (30 existing skill dirs, 30 registered `SKILL` entries, exact match). Ran the actual acceptance-scenario demo: created an intentionally unregistered skill dir in a scratch repo, confirmed `lint_plan` returns `BLOCK` with the exact expected message.

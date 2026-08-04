@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-08-02 @ f20da05 -->
+<!-- Last refreshed: 2026-08-04 @ 495962d -->
 
 # Project map — renmark
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `renmark-execute (renmark.cli:main)`, `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=190
+**Languages:** python=199
 
 ## Directory tree
 
@@ -22,27 +22,27 @@ renmark/
 
 | Path | Purpose | Key symbols |
 |---|---|---|
-| `renmark/lifecycle.py` | Lifecycle state for renmark features — enforces G12 (lifecycle persistence) and  | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `tests/test_lifecycle.py` | Unit tests for renmark.lifecycle (G12 — lifecycle persistence). | `test_read_lifecycle_none_when_missing`, `test_write_then_read_lifecycle`, `test_stage_transitions_track_completed`, `test_begin_feature_writes_identity`, `test_begin_feature_resets_prior_feature_state`, `test_unknown_stage_rejected` |
 | `renmark/init.py` | Project-map generator — renmark's analog to Claude Code's native /init. | `FileInfo`, `RepoScan`, `scan_repo`, `render_stub`, `render_full_map`, `MarkerNotFoundError` |
 | `renmark/behavior.py` | Behavioral test harness — two honestly-labelled tiers (P8-v2). | `BehaviorConfigError`, `LiveRunnerUnavailable`, `DeterministicSpec`, `EvalSpec`, `Case`, `Result` |
 | `renmark/scan.py` | The v1 engine for the REQ-14 read-only scheduled QA proposer lane (``/renmark:sc | `Finding`, `finding_key_from_parts`, `finding_key`, `content_fingerprint`, `make_finding`, `ScanReport` |
+| `renmark/lifecycle/stage.py` | Lifecycle state for renmark features — enforces G12 (lifecycle persistence) and  | `skill_class`, `LifecycleBloatError`, `LifecycleState`, `read_lifecycle`, `write_lifecycle`, `clear_lifecycle` |
 | `renmark/dispatch.py` | Wave-based parallel dispatcher. | `TaskResult`, `WaveResult`, `group_tasks_by_wave`, `validate_wave`, `dispatch_wave`, `WaveScopeViolation` |
 | `renmark/program_driver.py` | Staged-program DRIVER — the deterministic stage-sequencing state machine that si | `RepairPackagePointer`, `MilestoneDecision`, `StopReason`, `is_hard_stop`, `next_stage`, `evaluate_stop` |
 | `renmark/release.py` | Version-file drift detection — Layer 1 guardrail. | `VersionFile`, `package_basename`, `build_package`, `build_version_snapshot`, `current_version`, `check_drift` |
+| `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | `validate_milestone_document`, `validate_lifecycle`, `validate_pipeline`, `validate_delivery_state`, `validate_subagent_output`, `validate_artifact_metadata` |
 | `renmark/program.py` | Staged-program data model + persistence — the single source of truth for "where  | `ProgramStateError`, `program_json_path`, `program_md_path`, `TaskNode`, `StageNode`, `Program` |
 | `renmark/analytics.py` | Analytics event ledgers + Python aggregation (REQ-15). | `analytics_dir`, `read_jsonl`, `record_event`, `record_task_run`, `record_feature_run`, `close_feature_disposition` |
-| `renmark/schemas.py` | JSON-shape validators for renmark's canonical state files and artifact payloads. | `validate_milestone_document`, `validate_lifecycle`, `validate_pipeline`, `validate_delivery_state`, `validate_subagent_output`, `validate_artifact_metadata` |
 | `tests/test_plan_lint.py` | --- artifact_type: renmark_task_output schema_version: 1 created_at: 2026-06-11T | `test_valid_plan_pass`, `test_valid_plan_cli_exit_0`, `test_missing_verifier_block`, `test_too_many_tasks_block`, `test_duplicate_target_same_group_block`, `test_same_target_different_groups_pass` |
 | `renmark/doctor.py` | renmark.doctor — diagnose Claude Code and Codex plugin install health. | `Check`, `DoctorReport`, `check_cli_on_path`, `check_python_package`, `check_version_file`, `check_plugin_manifest` |
 | `renmark/health.py` | Dev-standards scanning and health-gap detection for renmark. | `Standard`, `Gap`, `StandardsScan`, `evaluate_health`, `scan_standards`, `render_dev_gates_line` |
 | `renmark/loop.py` | Loop Mode state machine — the deterministic core of renmark's bounded, verified, | `LoopState`, `loop_id`, `loop_dir`, `read_loop`, `write_loop`, `parse_budget` |
 | `renmark/audit.py` | Deterministic plugin/registry audit engine — the zero-LLM core of ``/renmark:aud | `CommandEntry`, `build_inventory`, `registry_sync`, `no_raw_jsonl`, `disclaimer_present`, `shim_thinness` |
+| `renmark/hygiene.py` | Lifecycle hygiene — artifact GC + memory pruning + CLI. | `ArtifactTypeSpec`, `ScanReport`, `PruneReport`, `BudgetEntry`, `compute_budget_report`, `validate_registry_compliance` |
 | `renmark/memory.py` | Persistent project memory at `.renmark/memory/`. | `memory_dir`, `template_dir`, `ensure_memory`, `log_feature`, `log_bug`, `log_decision` |
 | `renmark/delivery_state.py` | Delivery-run aggregate state persisted to ``.renmark/state/delivery.json``. | `DeliveryStateBloatError`, `DeliveryReadReport`, `DeliveryProvenanceEvent`, `WorkPackageSummary`, `DeliveryState`, `delivery_state_path` |
 | `renmark/cli/_engine.py` | renmark-execute CLI: orchestrates plan execution via Codex and Claude agents. | `Config`, `execute_plan`, `main` |
-| `renmark/cli/_codex_runner.py` | Codex execution helpers: git rollback, lane-checking, and codex task dispatch. | — |
-| `tests/test_loop.py` | Unit tests for renmark.loop (Loop Mode state machine). | — |
+| `renmark/plan_lint.py` | Deterministic plan-validation engine shared by /renmark:check-plan and /renmark: | — |
 
 ## Commands (user-facing)
 
