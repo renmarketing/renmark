@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-03 — Rethink Release 4 (partial 2/3): extract renmark/cli/_run_lifecycle.py
+
+**Files:** `renmark/cli/_engine.py`, `renmark/cli/_run_lifecycle.py`
+
+Extracted the run-bookkeeping cluster (_setup_resume_state, _begin_run_state, _complete_clean_run, _handle_run_exit, _print_run_summary) into a new _run_lifecycle.py module. Clean dispatch this time (checkpoint discipline held); independently re-verified before commit. Full suite unchanged (1936/31). _wave_loop.py extraction remains.
+
+---
+
 ### 2026-08-03 — Rethink Release 4 (partial 1/3): extract renmark/cli/_dispatch_flags.py
 
 **Files:** `renmark/cli/_engine.py`, `renmark/cli/_dispatch_flags.py`
