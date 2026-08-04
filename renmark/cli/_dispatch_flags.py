@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from renmark import hygiene, lifecycle as _lifecycle
+from renmark import hygiene
+from renmark import lifecycle as _lifecycle
 
 from .commands import (
     cmd_analytics,

@@ -167,7 +167,7 @@ def test_validate_registry_compliance_flags_unregistered_files(tmp_path: Path) -
 
     issues = validate_registry_compliance(tmp_path)
 
-    assert f"no registry entry: unregistered/rogue.md" in issues
+    assert "no registry entry: unregistered/rogue.md" in issues
 
 
 def test_validate_registry_compliance_requires_project_map_pointer_for_inventory_files(
@@ -195,8 +195,8 @@ def test_validate_registry_compliance_requires_project_map_pointer_for_inventory
 
     issues = validate_registry_compliance(tmp_path)
 
-    assert f"no project-map.md pointer: .renmark/audits/inventory-missing.md" in issues
-    assert f"no project-map.md pointer: .renmark/audits/inventory-ok.md" not in issues
+    assert "no project-map.md pointer: .renmark/audits/inventory-missing.md" in issues
+    assert "no project-map.md pointer: .renmark/audits/inventory-ok.md" not in issues
 
 
 def test_safe_delete_gate_requires_age_inbound_refs_and_not_newest(tmp_path: Path) -> None:
