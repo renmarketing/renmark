@@ -51,24 +51,15 @@ from .program import (
     stable_milestone_id_for_stage,
     stable_work_package_id_for_task,
 )
+from .schemas import STAGES
 from .state.pipeline import PipelineState, read_pipeline_state
 from .summary import is_stale, read_metadata
 
 # ── Stage taxonomy ────────────────────────────────────────────────────────────
 
 # Canonical stages in order. Skills update lifecycle.json with one of these.
-STAGES: list[str] = [
-    "init",  # lifecycle created, no work yet
-    "brainstorm-complete",  # spec written
-    "plan-drafted",  # plan written, not yet validated
-    "plan-validated",  # check-plan PASS
-    "created",  # orchestrate complete
-    "verified",  # verify PASS
-    "reviewed",  # codereview + (optional) secure complete
-    "documented",  # document complete
-    "ready-to-release",  # finish flipped the marker
-    "released",  # release tagged + zip built
-]
+# Owned by renmark.schemas (the shared leaf module); imported above so
+# `from renmark.lifecycle import STAGES` keeps working unchanged.
 
 # Skills that actually have a `plugin/skills/<name>/SKILL.md`. Stages that
 # point at anything outside this set are routed through a manual-hint fallback
@@ -412,8 +403,12 @@ def write_lifecycle(
         )
 
     # Writer-side validation (never a hard gate at readers): a writer producing
-    # structurally-invalid lifecycle state is a bug. Function-local import
-    # avoids the schemas ↔ lifecycle circular import (schemas imports STAGES).
+    # structurally-invalid lifecycle state is a bug. Historically a
+    # function-local import to dodge a schemas ↔ lifecycle cycle (schemas
+    # used to import STAGES from here); that cycle no longer exists — STAGES
+    # now flows the other way, schemas owns it and this module imports it at
+    # the top. Left function-local since nothing else in this module needs
+    # the schemas module at import time.
     from renmark import schemas
 
     issues = schemas.validate_lifecycle(json.loads(payload))

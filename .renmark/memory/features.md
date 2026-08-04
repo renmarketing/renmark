@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-03 — Rethink Release 3 (partial): reverse schemas.py inverted dependency for STAGES/SUBAGENT_OUTPUT_*
+
+**Files:** `renmark/schemas.py`, `renmark/lifecycle.py`, `renmark/dispatch.py`
+
+Moved STAGES (lifecycle.py) and SUBAGENT_OUTPUT_* (dispatch.py) into schemas.py; both re-import from schemas.py now, breaking the two circular-import workarounds. delivery_state.py portion deliberately NOT done: its module docstring declares it stdlib-only and intentionally self-contained, conflicting with the roadmap migration note. Flagged in CHANGELOG for Owner decision rather than silently overridden.
+
+---
+
 ### 2026-08-03 — Rethink Release 2: remove context_budget_hint dead code
 
 **Files:** `renmark/state/skills.py`, `CLAUDE.md`, `AGENTS.md`, `plugin/skills/.shared/agency-delivery.md`

@@ -49,13 +49,60 @@ from renmark.delivery_state import (
 from renmark.delivery_state import (
     SCHEMA_VERSION as DELIVERY_SCHEMA_VERSION,
 )
-from renmark.dispatch import (
-    SUBAGENT_OUTPUT_COMPLETION_STATES,
-    SUBAGENT_OUTPUT_CONFIDENCE_VALUES,
-    SUBAGENT_OUTPUT_FIELDS,
-    SUBAGENT_OUTPUT_STATUS_VALUES,
+
+# -- Shared contract constants ------------------------------------------------
+# schemas.py is the sole owner of the STAGES / SUBAGENT_OUTPUT_* constants —
+# lifecycle.py and dispatch.py import them back from here rather than the
+# reverse (both previously required function-local workaround imports of
+# schemas.py to dodge the resulting cycle; see their history/comments).
+#
+# The delivery_state.py-owned constants directly above (CONTRACT_VERSION,
+# SCHEMA_VERSION, *_CAP, SUMMARY_TEXT_LIMIT, stable_milestone_id/
+# stable_work_package_id) are DELIBERATELY NOT moved here: delivery_state.py's
+# module docstring declares it "stdlib-only and intentionally self-contained"
+# — an explicit, documented architectural invariant. Reversing that direction
+# would require delivery_state.py to import renmark.schemas, breaking that
+# invariant. This is a real conflict between the rethink roadmap's generic
+# migration note and an existing documented design decision — surfaced to the
+# Owner rather than silently overridden; see CHANGELOG.md 2026-08-04 entry.
+
+# Canonical stages in order — see renmark.lifecycle for the full taxonomy
+# comments (skill routing, etc.); this list is the shared source of truth.
+STAGES: list[str] = [
+    "init",  # lifecycle created, no work yet
+    "brainstorm-complete",  # spec written
+    "plan-drafted",  # plan written, not yet validated
+    "plan-validated",  # check-plan PASS
+    "created",  # orchestrate complete
+    "verified",  # verify PASS
+    "reviewed",  # codereview + (optional) secure complete
+    "documented",  # document complete
+    "ready-to-release",  # finish flipped the marker
+    "released",  # release tagged + zip built
+]
+
+# Public SubagentOutput schema: these are the ONLY fields the orchestrator
+# considers (G11 isolation contract) — see renmark.dispatch.IsolationViolation.
+SUBAGENT_OUTPUT_FIELDS = frozenset(
+    {
+        "status",
+        "artifact_path",
+        "touched_files",
+        "sha",
+        "summary_lines",
+        "dependency_notes",
+        "token_count",
+        "completion_state",
+        "confidence",
+        "retry_count",
+        "validation_status",
+        "parser_success",
+        "schema_compliance",
+    }
 )
-from renmark.lifecycle import STAGES
+SUBAGENT_OUTPUT_STATUS_VALUES = {"PASS", "FAIL", "SKIP"}
+SUBAGENT_OUTPUT_COMPLETION_STATES = {"complete", "partial", "failed"}
+SUBAGENT_OUTPUT_CONFIDENCE_VALUES = {"low", "medium", "high"}
 
 # -- Milestone package plans -------------------------------------------------
 

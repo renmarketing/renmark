@@ -27,6 +27,12 @@ from pathlib import Path
 from . import fast_path
 from .parser import Task
 from .providers import claude_agent
+from .schemas import (
+    SUBAGENT_OUTPUT_COMPLETION_STATES,
+    SUBAGENT_OUTPUT_CONFIDENCE_VALUES,
+    SUBAGENT_OUTPUT_FIELDS,
+    SUBAGENT_OUTPUT_STATUS_VALUES,
+)
 
 # ── R-0.0 baseline tracing (opt-in, additive, disabled by default) ────────────
 #
@@ -413,30 +419,9 @@ class IsolationViolation(RuntimeError):
     """
 
 
-# Public schema: these are the ONLY fields the orchestrator considers.
-SUBAGENT_OUTPUT_FIELDS = frozenset(
-    {
-        "status",
-        "artifact_path",
-        "touched_files",
-        "sha",
-        "summary_lines",
-        "dependency_notes",
-        "token_count",
-        "completion_state",
-        "confidence",
-        "retry_count",
-        # G9 transparency triplet — emitted by cmd_task (renmark-execute --task)
-        # and accepted here so executor outputs can expose all six G9 fields.
-        "validation_status",
-        "parser_success",
-        "schema_compliance",
-    }
-)
-
-SUBAGENT_OUTPUT_STATUS_VALUES = {"PASS", "FAIL", "SKIP"}
-SUBAGENT_OUTPUT_COMPLETION_STATES = {"complete", "partial", "failed"}
-SUBAGENT_OUTPUT_CONFIDENCE_VALUES = {"low", "medium", "high"}
+# SUBAGENT_OUTPUT_FIELDS/STATUS_VALUES/COMPLETION_STATES/CONFIDENCE_VALUES are
+# owned by renmark.schemas (imported above) — this module and renmark.schemas
+# both validate against the same shared source of truth.
 SUBAGENT_OUTPUT_VALIDATION_STATUSES = {"validated", "unvalidated", "failed"}
 
 # G3 caps — kept in sync with renmark.summary.MAX_SUMMARY_LINES /
@@ -603,8 +588,12 @@ def parse_subagent_response(response: dict[str, Any] | str) -> SubagentOutput:
     # Structural validation AFTER the G11 leakage + required-field checks above
     # (those raise their own contract-pinned messages first). This catches
     # wrong-typed / out-of-enum fields the dataclass __post_init__ would only
-    # partially cover. Function-local import avoids the schemas ↔ dispatch
-    # circular import (schemas imports dispatch).
+    # partially cover. Historically a function-local import to dodge a
+    # schemas ↔ dispatch cycle (schemas used to import the SUBAGENT_OUTPUT_*
+    # constants from here); that cycle no longer exists — those constants now
+    # flow the other way, schemas owns them and this module imports them at
+    # the top. Left function-local since nothing else in this module needs
+    # the schemas module at import time.
     from renmark import schemas
 
     issues = schemas.validate_subagent_output(filtered)
