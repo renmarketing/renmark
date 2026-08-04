@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 5 complete: renmark/lifecycle.py split into a 5-file package
+
+**Files:** `renmark/lifecycle/stage.py`, `renmark/lifecycle/next_steps.py`, `renmark/lifecycle/preamble.py`, `renmark/lifecycle/reconciliation.py`, `renmark/lifecycle/__init__.py`
+
+Split the 1747-line renmark/lifecycle.py into lifecycle/stage.py + next_steps.py + preamble.py + reconciliation.py + __init__.py, isolating the reconciliation staleness hotspot (3+ prior bugs) to one 297-line file. Full pytest -q stayed at 1936/31 across all 5 steps. Host-parity (claude/codex skill_preamble output) confirmed byte-identical. Discovered and solved a monkeypatch-forwarding requirement via a ModuleType subclass in __init__.py.
+
+---
+
 ### 2026-08-04 — Rethink Release 5 (step 4/5): extract lifecycle/reconciliation.py
 
 **Files:** `renmark/lifecycle/reconciliation.py`, `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`
