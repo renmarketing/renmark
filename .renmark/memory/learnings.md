@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-04, .renmark/reviews/2026-08-04-713dfee3.verification.md) model `verify`: **verify-renmark-artifact-lifecycle** — 8/8 behaviors verified; failed: none; regressions: 0
+
 - (2026-08-03, .renmark/reviews/2026-08-03-e261fb8.verification.md) model `verify`: **verify-rethink-release-1-baseline-compat-coverage** — 2/2 behaviors verified; failed: none; regressions: 0
 
 - (2026-08-02, .renmark/reviews/2026-08-02-6c92037.verification.md) model `verify`: **verify-orchestration-baseline-controls** — 4/4 behaviors verified; failed: none; regressions: 1 (no file overlap, skipped); full suite 1931 passed, 31 skipped
