@@ -356,13 +356,16 @@ def _handle_dry_run(tasks: list[Task], done: set[int], repo: Path) -> int:
     model call and writes nothing to disk.
     """
     from .. import capabilities as _caps
+    from .. import cost as _cost
     from .. import dispatch as _d
     from .. import subagent_gate as _sg
 
     waves = _d.group_tasks_by_wave(tasks)
     _print(f"\n[DRY RUN] {len(tasks)} tasks in {len(waves)} wave(s):\n")
     # Cost estimates per executor — approximate $/kT (output tokens).
-    cost_per_kt = {"haiku": 0.0001, "codex": 0.05, "sonnet": 0.003, "opus": 0.015, "fable": 0.030}
+    # Single source of truth: renmark.cost.PRICE_PER_KTOK (was a hand-duplicated
+    # local dict that had drifted from it — codex was 0.05 here vs 0.03 there).
+    cost_per_kt = _cost.PRICE_PER_KTOK
     total_tokens = 0
     total_cost = 0.0
     for w_idx, w in enumerate(waves, 1):

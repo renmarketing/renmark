@@ -20,21 +20,17 @@ from pathlib import Path
 from typing import Any
 
 from . import program
+from .cost import PRICE_PER_KTOK as _PRICE_PER_KTOK
 from .init import _git_short_sha
 from .state import RENMARK_DIR_NAME, read_usage
 
 # Approximate per-token costs (USD per 1k tokens) for cost estimates.
-# Opus Agent calls DO consume Anthropic billing (not "in-context free") — they
-# go through the user's Claude Code quota. Same for haiku/sonnet. Update as
-# pricing shifts.
-COST_PER_KT = {
-    "haiku": 0.0001,
-    "codex": 0.05,
-    "sonnet": 0.003,
-    "opus": 0.015,  # Anthropic output pricing, rough rule-of-thumb
-    "fable": 0.030,  # 2x opus — Fable 5 lists at $10/$50 per MTok vs Opus's $5/$25
-    "nim": 0.0,  # legacy: NIM removed in v0.2.0
-}
+# Single source of truth: renmark.cost.PRICE_PER_KTOK (was a hand-duplicated
+# local dict that had drifted from it — codex was 0.05 here vs 0.03 there).
+# "nim" is kept as a local legacy addition (NIM removed in v0.2.0, no longer
+# priced in cost.py) purely so any stale "nim"-tagged commit still resolves
+# to a defined (zero) rate instead of KeyError.
+COST_PER_KT = {**_PRICE_PER_KTOK, "nim": 0.0}
 
 # Per-Agent-call overhead: every haiku/sonnet/opus task receives ~10k tokens of
 # system prompt + task spec on TOP of its output. Sized to match the plan

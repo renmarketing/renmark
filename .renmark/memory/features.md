@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 6 (scoped): centralize executor pricing on cost.PRICE_PER_KTOK
+
+**Files:** `renmark/cli/_engine.py`, `renmark/roadmap.py`, `tests/test_roadmap.py`
+
+Found and fixed a live pricing-drift bug: 3 independent copies of the executor cost-per-token table existed (cost.py, cli/_engine.py, roadmap.py), and codex had drifted to /bin/bash.05 in two of them vs the canonical /bin/bash.03. Centralized on cost.py as sole source of truth. Owner scoped Release 6 down from the blueprints full 3-way routing-decision merge (model tier/role/codex dispatch) to just this genuine duplication after inspection showed the 3 decision functions serve different purposes.
+
+---
+
 ### 2026-08-04 — Rethink Release 5 complete: renmark/lifecycle.py split into a 5-file package
 
 **Files:** `renmark/lifecycle/stage.py`, `renmark/lifecycle/next_steps.py`, `renmark/lifecycle/preamble.py`, `renmark/lifecycle/reconciliation.py`, `renmark/lifecycle/__init__.py`

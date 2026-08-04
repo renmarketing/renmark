@@ -100,8 +100,10 @@ def test_write_roadmap_md(tmp_path: Path) -> None:
     assert out.is_file()
     text = out.read_text()
     assert "# Roadmap" in text
-    # codex pricing is approx $0.05/kT, so 1500 tokens ≈ $0.075
-    assert "$0.075" in text
+    # codex pricing is renmark.cost.PRICE_PER_KTOK["codex"] == 0.03/kT,
+    # so 1500 tokens ≈ $0.045 (was incorrectly asserting $0.075 / 0.05-per-kT
+    # before Release 6 fixed COST_PER_KT's drift from the canonical table).
+    assert "$0.045" in text
 
 
 def test_cost_estimate_zero_for_nim(tmp_path: Path) -> None:
