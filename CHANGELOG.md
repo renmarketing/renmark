@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-04] — test: --artifact-hygiene CLI flag tests (final task, hygiene plan complete)
+**Request:** Task 9 (final) of the `.renmark` artifact-lifecycle hygiene plan — end-to-end CLI coverage for `renmark-execute --artifact-hygiene`.
+**Built:** 3 tests in `tests/test_cli_artifact_hygiene.py` covering dry-run output/no-filesystem-change, the `--artifact-hygiene-apply` requires `--artifact-hygiene` guard, and a live apply-mode deletion through the full CLI path.
+**Files changed:**
+- `tests/test_cli_artifact_hygiene.py` — new, 3 tests.
+**Do not change:**
+- Independently re-verified (`pytest -q`, 3 passed) before trusting codex's low-confidence report, per this plan's established pattern.
+
+**Plan complete: all 10 tasks of `.renmark/plans/2026-08-04-renmark-artifact-lifecycle.plan.md` PASS.** First migration step (RETIRE-UNPACKED-VERSION-TREES) landed with metadata preserved as `.meta` sidecars; registry/CLI/gate/allowlist machinery all shipped and tested.
+
 ## [2026-08-04] — feat: wire --artifact-hygiene into renmark-execute
 **Request:** Task 4 of the `.renmark` artifact-lifecycle hygiene plan — expose the hygiene registry/budget/validate machinery through the `renmark-execute` CLI surface.
 **Built:** `--artifact-hygiene` (dry-run) and `--artifact-hygiene-apply` (requires `--artifact-hygiene`) added to `renmark/cli/_engine.py`'s argparse parser and handler chain, dispatching to `_dispatch_artifact_hygiene_flags`. Verified live: `renmark-execute --artifact-hygiene --repo .` runs and prints the validate report; `--artifact-hygiene-apply` alone correctly exits 2.
