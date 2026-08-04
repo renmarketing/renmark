@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 from renmark.finish_lanes import (
@@ -24,6 +26,83 @@ def _make_renmark_repo(root: Path) -> Path:
     skill.parent.mkdir(parents=True, exist_ok=True)
     skill.write_text("# finish\n", encoding="utf-8")
     return root
+
+
+def _write_artifact(path: Path, *, artifact_type: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                f"artifact_type: {artifact_type}",
+                "schema_version: 1",
+                "created_at: 2026-08-04T00:00:00Z",
+                "source_sha: unknown",
+                "related_plan: null",
+                "generator: codex",
+                "stale_after: null",
+                "dependency_refs: []",
+                "completion_state: complete",
+                "confidence: medium",
+                "validation_status: unvalidated",
+                "retry_count: 0",
+                "parser_success: true",
+                "schema_compliance: true",
+                "---",
+                "",
+                "body",
+                "",
+                "## Summary",
+                "",
+                "- fixture",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_versioned_repo(root: Path, *, memory_files: int = 1, stray_file: bool = False) -> Path:
+    repo = _make_renmark_repo(root)
+    version = "1.0.0"
+
+    (repo / "VERSION").write_text(f"{version}\n", encoding="utf-8")
+    (repo / "pyproject.toml").write_text(f'[project]\nversion = "{version}"\n', encoding="utf-8")
+    (repo / "renmark" / "__init__.py").write_text(f'__version__ = "{version}"\n', encoding="utf-8")
+    (repo / "plugin" / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    (repo / "plugin" / ".codex-plugin").mkdir(parents=True, exist_ok=True)
+    (repo / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    (repo / "plugin" / ".claude-plugin" / "plugin.json").write_text(
+        json.dumps({"name": "fixture", "version": version}),
+        encoding="utf-8",
+    )
+    (repo / "plugin" / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps({"name": "fixture", "version": version}),
+        encoding="utf-8",
+    )
+    (repo / ".claude-plugin" / "marketplace.json").write_text(
+        json.dumps(
+            {
+                "metadata": {"version": version},
+                "plugins": [{"name": "fixture", "version": version}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (repo / "README.md").write_text(f"# renmark v{version}\n", encoding="utf-8")
+
+    _write_artifact(repo / ".renmark" / "memory" / "project-map.md", artifact_type="memory")
+    for idx in range(memory_files - 1):
+        _write_artifact(repo / ".renmark" / "memory" / f"extra-{idx}.md", artifact_type="memory")
+    if stray_file:
+        (repo / ".renmark" / "rogue.txt").write_text("stray\n", encoding="utf-8")
+
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "codex@example.com"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "Codex"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "fixture"], cwd=repo, check=True, capture_output=True, text=True)
+    return repo
 
 
 def test_lane_registry_fields_and_fixed_profiles() -> None:
@@ -250,3 +329,41 @@ def test_release_readiness_never_raises_on_bad_repo() -> None:
     assert report.ready is False
     assert len(report.gates) >= 1
     assert all(isinstance(g, GateResult) for g in report.gates)
+
+
+def test_artifact_budget_passes_for_clean_or_warn_only_renmark_tree(tmp_path: Path) -> None:
+    clean_repo = _write_versioned_repo(tmp_path / "clean")
+    clean_report = release_readiness(clean_repo)
+    clean_gate = next(g for g in clean_report.gates if g.name == "artifact_budget")
+    assert clean_gate.passed is True
+    assert clean_gate.detail == "ok — 0 issues"
+
+    warn_repo = _write_versioned_repo(tmp_path / "warn", stray_file=True)
+    warn_report = release_readiness(warn_repo)
+    warn_gate = next(g for g in warn_report.gates if g.name == "artifact_budget")
+    assert warn_gate.passed is True
+    assert warn_gate.detail == "1 WARN, 0 BLOCK"
+
+
+def test_release_readiness_keeps_artifact_budget_in_informational_gates_and_ready_true_when_it_fails(
+    tmp_path: Path,
+) -> None:
+    """REQ-30: artifact_budget is informational only and must not add an Owner gate."""
+    from renmark.finish_lanes import _INFORMATIONAL_GATES
+
+    repo = _write_versioned_repo(tmp_path / "blocked", memory_files=17)
+    report = release_readiness(repo)
+    artifact_gate = next(g for g in report.gates if g.name == "artifact_budget")
+
+    assert "artifact_budget" in _INFORMATIONAL_GATES
+    assert artifact_gate.passed is False
+    assert report.ready is True
+
+
+def test_artifact_budget_detail_mentions_issue_count_for_unregistered_file(tmp_path: Path) -> None:
+    repo = _write_versioned_repo(tmp_path / "detail", stray_file=True)
+    gate = next(g for g in release_readiness(repo).gates if g.name == "artifact_budget")
+
+    assert gate.detail
+    assert "1" in gate.detail
+    assert gate.detail == "1 WARN, 0 BLOCK"
