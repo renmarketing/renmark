@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-08-02
+last_reviewed: 2026-08-04
 status: draft
 ---
 
@@ -1155,3 +1155,29 @@ owner directly, in response to a second Stop-hook rejection identifying that
 the fix for the first rejection still did not name the live host tools as
 the actual requirement-1 mechanism; reviewed and explicitly approved by the
 project owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+**Revision note (2026-08-04, human-approved diff):** Pre-authorizes the
+rethink-architecture roadmap's Release 6 (`cost.resolve_executor(task)` —
+centralizing the ~12 scattered model/executor-routing call sites in `cli/`,
+`dispatch.py`, `plan_lint.py`, `codex_routing.py`, `subagent_profiles.py`,
+and others behind one seam in `cost.py`) as an exception under REQ-30(i)'s
+"any change to orchestration routing... requires an explicit PRD change and
+Owner approval" clause, and REQ-30's regression-protection exception path
+("quantified evidence, explicit Owner approval, a documented benefit, and a
+rollback path"). Documented benefit: a new executor tier drops from 4+
+uncoordinated touch points to one provider adapter + one branch in
+`cost.resolve_executor`. Quantified evidence required before any call site
+is migrated: a golden before/after routing-decision test proving
+byte-identical tier selection for a representative task sample, run before
+and after each migrated call site, plus the standing full-suite
+compatibility guarantee (currently 1936 passed/31 skipped). `cost.py`
+remains a leaf — `resolve_executor` reads only `config`/`hosts`-level
+arguments, never imports `dispatch`/`_engine`/`subagent_profiles`, so
+callers depend on `cost.py`, not the reverse (no new cycle). Rollback:
+revert per-call-site commit; `cost.py`'s pre-existing routing functions are
+untouched until each caller is proven byte-identical and migrated. REQ-2's
+routed executor set (Haiku/Codex/Sonnet/Opus/Fable) and REQ-30's Owner-gate/
+dispatch-count/context guarantees are unaffected — this is a call-graph
+consolidation, not a policy change. Proposed by the renmark-architecture
+rethink roadmap's Release 6; reviewed and explicitly approved by the
+project owner on 2026-08-04 via the `/renmark:prd` UPDATE gate.
