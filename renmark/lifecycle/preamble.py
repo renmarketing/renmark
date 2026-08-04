@@ -27,6 +27,18 @@ from .stage import (
     domain_of,
 )
 
+# Documents skill_preamble()'s actual (traced) file-read surface, not an
+# aspirational list.
+HERMES_STARTUP_ALLOWLIST: frozenset[str] = frozenset({
+    ".renmark/state/last-skill.json",
+    ".renmark/state/delivery.json",
+    ".renmark/state/mode.json",
+    ".renmark/state/agency.json",
+    ".renmark/config.json",
+    ".renmark/state/compact_checkpoint.json",
+    ".renmark/memory/routing.md",
+})
+
 
 def preamble_tier(skill: str) -> str:
     """Return the preamble tier for a skill ('minimal' | 'standard' | 'full').
