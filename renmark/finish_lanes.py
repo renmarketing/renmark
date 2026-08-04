@@ -311,7 +311,7 @@ class ReadinessReport:
 
 
 # Gates that are reported but do NOT gate the overall ``ready`` decision.
-_INFORMATIONAL_GATES = frozenset({"tests_present"})
+_INFORMATIONAL_GATES = frozenset({"tests_present", "artifact_budget"})
 
 
 def _gate_version_consistent(repo: Path) -> GateResult:
@@ -398,6 +398,23 @@ def _gate_tests_present(repo: Path) -> GateResult:
         return GateResult("tests_present", False, f"check error: {exc}")
 
 
+def _gate_artifact_budget(repo: Path) -> GateResult:
+    """Optional check: run ``hygiene.validate_registry_compliance`` and
+    summarize WARN/BLOCK counts. Never blocks ``ready`` — informational only.
+    """
+    try:
+        from renmark import hygiene
+
+        issues = hygiene.validate_registry_compliance(repo)
+        block_count = sum(1 for issue in issues if issue.startswith("BLOCK"))
+        warn_count = len(issues) - block_count
+        passed = block_count == 0
+        detail = "ok — 0 issues" if not issues else f"{warn_count} WARN, {block_count} BLOCK"
+        return GateResult("artifact_budget", passed, detail)
+    except Exception as exc:
+        return GateResult("artifact_budget", False, f"check error: {exc}")
+
+
 def release_readiness(repo: str | Path = ".") -> ReadinessReport:
     """Aggregate deterministic release-readiness checks for *repo*.
 
@@ -433,6 +450,7 @@ def release_readiness(repo: str | Path = ".") -> ReadinessReport:
             _gate_tree_clean(root),
             _gate_package_buildable(root),
             _gate_tests_present(root),
+            _gate_artifact_budget(root),
         ]
     except Exception as exc:  # honor the "never raises" contract
         return ReadinessReport(

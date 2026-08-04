@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-04] — feat: finish-time artifact-budget gate
+**Request:** Task 5 of the `.renmark` artifact-lifecycle hygiene plan — surface budget/placement violations at finish-time without adding a new Owner gate.
+**Built:** `_gate_artifact_budget(repo)` added to `renmark/finish_lanes.py`, calling `hygiene.validate_registry_compliance`. Added to `_INFORMATIONAL_GATES` (reported, never blocks `release_readiness().ready`) and wired into `release_readiness()`'s gate list. Verified live: today's tree reports `406 WARN, 6 BLOCK` (dominated by pre-existing audits/reviews over budget and rethink survey files missing the project-map pointer) yet correctly does NOT affect `ready` — `ready=False` today is due to `tree_clean` (mid-orchestration uncommitted work), not this gate.
+**Files changed:**
+- `renmark/finish_lanes.py` — `_gate_artifact_budget`, `_INFORMATIONAL_GATES` entry, gate-list wiring.
+**Do not change:**
+- `artifact_budget` must stay in `_INFORMATIONAL_GATES` — REQ-30 requires this feature add zero new Owner gates.
+
 ## [2026-08-04] — feat: --artifact-hygiene CLI dispatch handler
 **Request:** Task 3 of the `.renmark` artifact-lifecycle hygiene plan — CLI entry point for the new registry/budget/validate machinery.
 **Built:** `_dispatch_artifact_hygiene_flags(args, repo)` added to `renmark/cli/_dispatch_flags.py`, mirroring `_dispatch_compact_flags`. Runs `hygiene.main(["all", ...])` (dry-run unless `--artifact-hygiene-apply`), then `budget` and `validate` subcommands.
