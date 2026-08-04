@@ -93,6 +93,7 @@ from ._dispatch_flags import (
 )
 from ._dispatch_flags import (
     _dispatch_agency_flags,
+    _dispatch_artifact_hygiene_flags,
     _dispatch_compact_flags,
     _dispatch_handoff_flags,
     _dispatch_mode_read_flags,
@@ -697,6 +698,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     ap.add_argument(
+        "--artifact-hygiene",
+        action="store_true",
+        help="run the .renmark/ artifact-lifecycle hygiene report (dry-run by default)",
+    )
+    ap.add_argument(
+        "--artifact-hygiene-apply",
+        action="store_true",
+        help="with --artifact-hygiene: apply safe ephemeral-artifact cleanup instead of dry-run",
+    )
+    ap.add_argument(
         "--set-compact-gate-tokens",
         metavar="TOKENS",
         type=int,
@@ -757,6 +768,9 @@ def main(argv: list[str] | None = None) -> int:
     if (args.accept or args.judge) and not args.behavior:
         print("--accept/--judge require --behavior", file=sys.stderr)
         return 2
+    if args.artifact_hygiene_apply and not args.artifact_hygiene:
+        print("--artifact-hygiene-apply requires --artifact-hygiene", file=sys.stderr)
+        return 2
 
     repo = Path(args.repo).resolve()
 
@@ -766,6 +780,7 @@ def main(argv: list[str] | None = None) -> int:
         lambda: _dispatch_agency_flags(args, repo),
         lambda: _dispatch_mode_read_flags(args, ap, repo),
         lambda: _dispatch_compact_flags(args, repo),
+        lambda: _dispatch_artifact_hygiene_flags(args, repo),
         lambda: _dispatch_handoff_flags(args, ap, repo),
     ):
         _result = _handler()  # type: ignore[no-untyped-call]

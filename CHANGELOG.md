@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-08-04] — feat: wire --artifact-hygiene into renmark-execute
+**Request:** Task 4 of the `.renmark` artifact-lifecycle hygiene plan — expose the hygiene registry/budget/validate machinery through the `renmark-execute` CLI surface.
+**Built:** `--artifact-hygiene` (dry-run) and `--artifact-hygiene-apply` (requires `--artifact-hygiene`) added to `renmark/cli/_engine.py`'s argparse parser and handler chain, dispatching to `_dispatch_artifact_hygiene_flags`. Verified live: `renmark-execute --artifact-hygiene --repo .` runs and prints the validate report; `--artifact-hygiene-apply` alone correctly exits 2.
+**Files changed:**
+- `renmark/cli/_engine.py` — two new flags, one handler-chain entry.
+**Do not change:**
+- Same codex low-confidence-report caveat as Task 3/8 — independently re-verified before trusting.
+
+## [2026-08-04] — test: finish-lanes artifact_budget gate coverage
+
+- Request: cover clean/WARN-only pass behavior, informational-gate readiness, and issue-count detail reporting.
+- Built: added a reusable fixture repo builder plus three deterministic tests in `tests/test_finish_lanes.py`.
+- Files changed: `tests/test_finish_lanes.py`.
+- Do not change: keep `artifact_budget` in `_INFORMATIONAL_GATES`; it must never become a release-blocking Owner gate.
+
 ## [2026-08-04] — test: Hermes allowlist enforcement (runtime instrumentation)
 **Request:** Task 7 of the `.renmark` artifact-lifecycle hygiene plan — prove `skill_preamble()` never reads outside `HERMES_STARTUP_ALLOWLIST` and never lists a directory, via runtime tracing rather than a static grep (a grep of `preamble.py` alone can't see reads inside the 5 helper modules it calls into).
 **Built:** `tests/test_preamble_allowlist.py` monkeypatches `Path.open`/`read_text`/`write_text` (record) and `Path.rglob`/`glob`/`iterdir` (forbid) around live `skill_preamble()` calls for `debug`, `feature`, and a `SYNTHESIS_SKILLS` member (exercising the `routing.md` read path). Red-capability self-verified during the task (temporarily narrowed the allowlist, confirmed 3 failures naming the offending path, then reverted).
