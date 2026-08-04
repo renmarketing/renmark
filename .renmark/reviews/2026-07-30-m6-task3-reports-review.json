@@ -1,0 +1,24 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": ".renmark/plans/2026-07-30-m6-migration-golden-release-readiness.plan.md",
+  "generator": "reviewer",
+  "dependency_refs": ["renmark/reports.py", "tests/test_reports_analytics.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "PASS",
+  "findings": [],
+  "checks": {
+    "delivery_identity_verbatim": "PASS",
+    "legacy_task_id_retained": "PASS",
+    "no_index_or_transcript_inference": "PASS",
+    "bounded_report_shape": "PASS",
+    "focused_verifier": "PASS: 13 passed"
+  }
+}

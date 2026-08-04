@@ -1,0 +1,28 @@
+{
+  "artifact_type": "renmark_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": null,
+  "related_plan": "debug-agency-handoff",
+  "generator": "reviewer",
+  "stale_after": null,
+  "dependency_refs": ["renmark/agency.py", "tests/test_agency.py"],
+  "status": "PASS",
+  "touched_files": [],
+  "sha": null,
+  "summary_lines": [
+    "PASS: approved active Agency activation persists the Orchestrator handoff.",
+    "PASS: existing run, packages, evidence, refs, and provenance are retained; handoff appends provenance.",
+    "PASS: fresh handoff keeps review_status unknown; inactive and unapproved states raise.",
+    "PASS: legacy delivery summary is exercised as read-only by the scoped test.",
+    "Verification: diff --check passed; pytest is unavailable in this environment."
+  ],
+  "dependency_notes": "M6 behavioral trajectory remains compatible; its explicit second handoff only appends another bounded provenance event.",
+  "token_count": 0,
+  "completion_state": "complete",
+  "confidence": "high",
+  "retry_count": 0,
+  "validation_status": "validated",
+  "parser_success": true,
+  "schema_compliance": true
+}

@@ -1,0 +1,20 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": "1.0",
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "working-tree",
+  "related_plan": null,
+  "generator": "reviewer",
+  "dependency_refs": [
+    "renmark/cli/_engine.py",
+    "tests/test_state_pipeline.py"
+  ],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "unvalidated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "PASS",
+  "findings": []
+}

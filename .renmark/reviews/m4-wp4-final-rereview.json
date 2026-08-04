@@ -1,0 +1,24 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": "M4 WP-M4-4",
+  "generator": "reviewer",
+  "dependency_refs": ["renmark/lifecycle.py", "tests/test_lifecycle.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "high",
+      "location": "renmark/lifecycle.py:592",
+      "title": "Active Agency milestone is not used to scope signoff evidence",
+      "detail": "When no delivery.json is present, an active AgencyState current_milestone is ignored, leaving active_milestone empty and allowing same-HEAD unscoped or differently-scoped evidence to unlock signoff."
+    }
+  ]
+}

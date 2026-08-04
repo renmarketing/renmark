@@ -1,0 +1,28 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": "1.0",
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": "",
+  "generator": "reviewer",
+  "dependency_refs": ["renmark/cli/_engine.py", "tests/test_state_pipeline.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "location": "renmark/cli/_engine.py:446",
+      "summary": "A needs-agent run exits 0 without a pause, while its pipeline wave counter can reach wave_total and become non-resumable even though required work remains."
+    },
+    {
+      "severity": "P2",
+      "location": "renmark/cli/_engine.py:513",
+      "summary": "A clean executor run preserves a prior review_status such as clean, although its newly executed work has not received an independent review; review should become pending."
+    }
+  ]
+}

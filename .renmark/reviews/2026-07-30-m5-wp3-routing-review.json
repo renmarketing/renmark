@@ -1,0 +1,17 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": "M5 WP3",
+  "generator": "reviewer",
+  "dependency_refs": ["plugin/skills/start/SKILL.md", "plugin/skills/feature/SKILL.md", "renmark/init.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "PASS",
+  "findings": []
+}

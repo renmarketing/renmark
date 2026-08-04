@@ -1,0 +1,35 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00-04:00",
+  "source_sha": null,
+  "related_plan": ".renmark/plans/2026-07-30-m6-migration-golden-release-readiness.plan.md",
+  "generator": "reviewer",
+  "dependency_refs": [
+    "renmark/behavior.py",
+    "tests/behavioral/selector_codex.behavior.json"
+  ],
+  "status": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/behavior.py",
+      "line": 926,
+      "description": "The advertised cross-host loop semantic-equivalence field compares complete host payloads, including different persisted_path strings, so a live run returns false even when the persisted loop state transitions match.",
+      "suggestion": "Compare only host-neutral loop semantics (created/resumed state, decisions, stop reason, and normalized packet semantics), or omit host-specific paths before comparing; add an assertion that this parity result is true."
+    },
+    {
+      "severity": "Minor",
+      "file": "renmark/behavior.py",
+      "line": 70,
+      "description": "asdict is imported but unused, which fails the repository's Ruff lint gate.",
+      "suggestion": "Remove the unused import."
+    }
+  ],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true
+}

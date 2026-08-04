@@ -1,0 +1,39 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": "1.0",
+  "created_at": "2026-07-30T00:00:00-04:00",
+  "source_sha": "working-tree",
+  "related_plan": null,
+  "generator": "codex-reviewer",
+  "stale_after": null,
+  "dependency_refs": ["renmark/lifecycle.py", "tests/test_lifecycle.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/lifecycle.py",
+      "symbol": "_has_fresh_milestone_evidence",
+      "line": 655,
+      "summary": "Readiness accepts any current-HEAD *.qa.md or *.review.md without checking that it belongs to the milestone being signed off, so unrelated evidence from the same commit can unlock a different Agency milestone.",
+      "suggested_fix": "Pass a milestone/plan identity into the predicate and require matching artifact metadata; add a regression test with only unrelated same-HEAD evidence."
+    },
+    {
+      "severity": "Major",
+      "file": "renmark/lifecycle.py",
+      "symbol": "_has_fresh_milestone_evidence",
+      "line": 667,
+      "summary": "The review check treats any non-empty generator other than verify-qa and an absent negative token as a clean independent review, allowing an unrecognized producer or a review with no explicit passing verdict to grant Agency signoff.",
+      "suggested_fix": "Require the approved independent review generator/verdict contract (or a structured PASS field) and add negative tests for unknown generators and missing verdicts."
+    }
+  ],
+  "verification": {
+    "command": "pytest -q tests/test_lifecycle.py -k 'milestone_signoff or milestone_release or direct_readiness or persisted_agency_boundary'",
+    "result": "not run: pytest is unavailable in the environment"
+  }
+}

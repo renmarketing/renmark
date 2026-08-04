@@ -1,0 +1,29 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "working-tree",
+  "related_plan": "M4 WP-M4-2",
+  "generator": "reviewer",
+  "dependency_refs": [
+    "renmark/program_driver.py",
+    "tests/test_program_driver.py"
+  ],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/program_driver.py",
+      "line": 390,
+      "title": "Paused failed verification emits a repair package",
+      "evidence": "evaluate_stop_for_stage prioritizes VERIFY_FAILED over PAUSED, so fresh partial/failed metadata with budget_status=exhausted reaches the repair-emission branch.",
+      "recommendation": "Check resumable pause signals before the verifier-failure repair branch and add the combined failed-plus-budget regression test."
+    }
+  ]
+}

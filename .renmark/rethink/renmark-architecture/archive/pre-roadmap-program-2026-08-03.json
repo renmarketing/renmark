@@ -1,0 +1,469 @@
+{
+  "feature": "renmark-prd-program",
+  "mode": "staged",
+  "created_at": "2026-06-14T16:54:51.490019+00:00",
+  "source_sha": "bbb8f07",
+  "stages": [
+    {
+      "id": "stage-1",
+      "title": "Build plain-English guided pipeline entry",
+      "serves": "REQ-1",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-1",
+          "title": "Implement /renmark:start adaptive entry (1 question + max 2 follow-ups)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-2",
+          "title": "Wire start \u2192 plan|brainstorm routing",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-3",
+          "title": "Hide Loop Mode behind start for vibe coders",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-2",
+      "title": "Implement multi-LLM cost-aware routing",
+      "serves": "REQ-2",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-4",
+          "title": "Route each task to cheapest capable model (Haiku/Codex/Sonnet/Opus/Fable)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-5",
+          "title": "Emit cost preview before spend; reflect Fable $10/$50 pricing",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-6",
+          "title": "Add declared-capability top_tier: fable layer with Opus single-retry fallback",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-7",
+          "title": "Deterministically forbid Fable on mechanical/bulk work in plan validation",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-3",
+      "title": "Make multi-step workflows resumable",
+      "serves": "REQ-3",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-8",
+          "title": "Persist lifecycle.json + pipeline.json on every stage transition",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-9",
+          "title": "Implement /renmark:resume cold-start recovery (zero LLM)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-4",
+      "title": "Establish human-owned PRD source of truth",
+      "serves": "REQ-4",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-10",
+          "title": "Author /renmark:prd CREATE/UPDATE with human-gated diff approval",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-5",
+      "title": "Enforce orchestrator context hygiene",
+      "serves": "REQ-5",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-11",
+          "title": "Bound orchestrator-visible output to summaries/paths/metadata (\u22645 lines)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-12",
+          "title": "Aggregate per-wave summaries; never load code/diffs/bodies",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-6",
+      "title": "Confine all artifacts inside the project",
+      "serves": "REQ-6",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-13",
+          "title": "Write all renmark output under .renmark/; keep global plugin read-only",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-7",
+      "title": "Validate plans and verify features goal-backward",
+      "serves": "REQ-7",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-14",
+          "title": "Implement /renmark:check-plan deterministic validation (PASS/WARN/BLOCK)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-15",
+          "title": "Implement /renmark:verify goal-backward smoke + --qa/--deep-qa modes",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-8",
+      "title": "Enable non-destructive adoption and diagnosis",
+      "serves": "REQ-8",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-16",
+          "title": "Implement /renmark:init front door (scaffold + merge rule blocks)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-17",
+          "title": "Implement /renmark:doctor install-health diagnosis + --fix",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-18",
+          "title": "Keep /renmark:setup as thin rule-block-refresh alias",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-9",
+      "title": "Build bounded, cost-previewed Loop Mode",
+      "serves": "REQ-9",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-19",
+          "title": "Implement /renmark:loop bounded by budget AND max-iterations with cost preview",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-10",
+      "title": "Persist and recover loop state",
+      "serves": "REQ-10",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-20",
+          "title": "Persist loop state under .renmark/loops/<id>/; recover via /renmark:resume",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-11",
+      "title": "Decide loop iterations goal-backward from evidence",
+      "serves": "REQ-11",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-21",
+          "title": "Drive each loop iteration from fresh verification evidence only (bounded reads)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-12",
+      "title": "Gate destructive loop actions on human approval",
+      "serves": "REQ-12",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-22",
+          "title": "Require approval before loop edits PRD/merges/releases/escalates budget",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-13",
+      "title": "Build backlog intake + approval buffer",
+      "serves": "REQ-13",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-23",
+          "title": "Implement /renmark:backlog interactive list + detail view",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-24",
+          "title": "Approve-and-build launches bounded Loop (cap 5) on managed branch",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-25",
+          "title": "Record one disposition per branch; no orphan branches; persist item state",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-14",
+      "title": "Reserve scheduled QA read-only proposer lane",
+      "serves": "REQ-14",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-26",
+          "title": "Design scheduled read-only proposer lane (propose backlog items, never execute)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-15",
+      "title": "Build local-only reporting and analytics",
+      "serves": "REQ-15",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-27",
+          "title": "Write task/loop/backlog/feature/release reports under .renmark/reports/",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-28",
+          "title": "Aggregate rolling analytics under .renmark/analytics/ (stdlib JSON/JSONL)",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-29",
+          "title": "Implement /renmark:usage and /renmark:analytics bounded status views",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-30",
+          "title": "Label all account-limit output as observed-local unless provider-sourced",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-16",
+      "title": "Pause safely on usage/quota limits",
+      "serves": "REQ-16",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-31",
+          "title": "Persist pause_reason=usage_limit with reset/fallback; resume later, no polling",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-17",
+      "title": "Provide read-only self-audit surface",
+      "serves": "REQ-17",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-32",
+          "title": "Implement /renmark:audit (lint/modularity/version/registry/parity) advisory-only",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-33",
+          "title": "Implement /renmark:inventory alias writing under .renmark/audits/",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-18",
+      "title": "Centralize approval granting in /renmark:approve",
+      "serves": "REQ-18",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-34",
+          "title": "Make /renmark:approve sole setter of human_review_completed; consumers clear gate",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    },
+    {
+      "id": "stage-19",
+      "title": "Add optional Playwright browser layer",
+      "serves": "REQ-19",
+      "status": "done",
+      "pipeline_phases": [],
+      "tasks": [
+        {
+          "id": "task-35",
+          "title": "Implement opt-in Playwright layer with persisted storageState in .renmark/",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        },
+        {
+          "id": "task-36",
+          "title": "Fall back to Chrome DevTools MCP channel when Playwright absent",
+          "status": "done",
+          "retry_count": 0,
+          "pipeline_phases": [],
+          "summary": null
+        }
+      ]
+    }
+  ],
+  "stage_completion_sha": {},
+  "current_stage_id": null
+}

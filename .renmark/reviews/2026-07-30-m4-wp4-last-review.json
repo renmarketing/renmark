@@ -1,0 +1,25 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": "M4 WP-M4-4",
+  "generator": "reviewer",
+  "dependency_refs": ["renmark/lifecycle.py", "tests/test_lifecycle.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "failed",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "file": "renmark/lifecycle.py",
+      "line": 593,
+      "title": "Loaded delivery state with an empty milestone unbinds active Agency evidence",
+      "detail": "Agency fallback is limited to a non-loaded delivery report. A valid loaded delivery.json with active_milestone_id empty therefore leaves active_milestone empty and accepts unscoped same-HEAD evidence, despite active Agency state naming a milestone. Fall back to agency_state.current_milestone whenever the loaded delivery state has no usable milestone, and add that case to the tests."
+    }
+  ]
+}

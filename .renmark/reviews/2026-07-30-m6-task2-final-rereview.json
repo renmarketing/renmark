@@ -1,0 +1,44 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": "M6 Task 2 bounded repair",
+  "generator": "reviewer",
+  "stale_after": null,
+  "dependency_refs": [
+    "renmark/behavior.py",
+    "tests/behavioral/selector_codex.behavior.json",
+    "renmark/interaction.py",
+    "tests/test_selector_contract.py"
+  ],
+  "status": "FAIL",
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/behavior.py:639",
+      "description": "_render_selector_codex renders only Codex Plan and Default payloads; it neither invokes the Claude renderer nor compares semantic payloads, so the selector_codex deterministic case cannot prove the claimed Claude-native/Codex semantic parity.",
+      "suggestion": "Render the Claude surface in this parity adapter and assert equality of the normalized semantic choice set, recommendation, and refusal choice across all three surfaces."
+    },
+    {
+      "severity": "Major",
+      "file": "renmark/behavior.py:671",
+      "description": "The More/Back/Cancel/invalid checks call stateless continue_selector on freshly rendered dictionaries and never write, reload, or bound any continuation state, so they do not prove persisted loop pause/resume behavior despite the fixture contract claiming it.",
+      "suggestion": "Exercise the actual persisted continuation/pipeline-state path (including reload and bounded termination), or narrow the contract to the stateless continuation behavior that is actually tested."
+    }
+  ],
+  "summary_lines": [
+    "FAIL: focused tests pass, but the deterministic adapter does not establish Claude-to-Codex semantic parity.",
+    "FAIL: continuation coverage is stateless and does not prove bounded persisted pause/resume.",
+    "PASS: Codex Plan selector, Codex Default fallback, overflow, cancel, and invalid-input rendering are exercised without claiming Codex clickability.",
+    "Verification: .venv/bin/python -m pytest -q tests/test_behavior.py tests/test_interaction.py tests/test_selector_contract.py (35 passed); .venv/bin/python -m renmark --behavior (6/6 passed)."
+  ],
+  "token_count": 0,
+  "completion_state": "complete",
+  "confidence": "high",
+  "retry_count": 0,
+  "validation_status": "validated",
+  "parser_success": true,
+  "schema_compliance": true
+}

@@ -1,103 +1,46 @@
 ---
 artifact_type: program
 schema_version: 1
-created_at: 2026-06-14T16:54:51.490019+00:00
-source_sha: bbb8f07
+created_at: 2026-08-03T11:28:22+00:00
+source_sha: c6741856f7603aac3e01f324fbaa4b7e6478155e
 ---
 
-# Program — renmark-prd-program
+# Program — renmark-architecture-rethink-roadmap
 
-_mode: staged · Stage 1/19 · task 3/3 done · current: Build plain-English guided pipeline entry_
+_mode: staged · Stage 1/7 · task 1/2 done · current: Release 1: Baseline and compatibility coverage_
 
-## ● Build plain-English guided pipeline entry — serves REQ-1
+## ○ Release 1: Baseline and compatibility coverage — serves REQ-30 **(current)**
+_phases: plan → build → verify → review → release_
 
-- [x] Implement /renmark:start adaptive entry (1 question + max 2 follow-ups)
-- [x] Wire start → plan|brainstorm routing
-- [x] Hide Loop Mode behind start for vibe coders
+- [x] Turn Stage-2 baseline into runnable compatibility tests — Value: durable, runnable proof of current behavior (lifecycle STAGES order, 1KB byte-budget guard, host-capability table, artifact-home convention) instead of a point-in-time doc. PRD: advances REQ-3/REQ-6/REQ-20/REQ-23 verification; unblocks REQ-2/7/9-14/16/18/24/31 (currently unverified — needs live pytest). Compat guarantee: full `pytest -q` stays >= 1931 passed/31 skipped (baseline.md's last recorded figure), zero new skips/xfails. Migration: add tests only, no production code moves; verify via fresh `pytest -q` + `renmark-execute --behavior`. Rollback: revert the test-only commit; zero runtime blast radius.
+- [ ] Measure REQ-30's unmeasured numeric baseline (tokens/wall-clock/dispatch count) — Value: replaces orchestration-baseline.md's 'not yet measured' gap with real numbers for Start/Feature-Fix/Orchestrate/Rethink. PRD: satisfies REQ-30 row + AC-3 (untestable-as-written today); resolves classification.md item 10's blocking prerequisite. Compat: measurement-only, no dispatch/routing behavior change. Observability: updates .renmark/memory/orchestration-baseline.md with real figures; unblocks the 15%-regression check for releases 4-6 below. Owner acceptance: Owner sees real numbers replace 'not yet measured' in orchestration-baseline.md and a green compat suite.
 
-## ● Implement multi-LLM cost-aware routing — serves REQ-2
+## ○ Release 2: Remove context_budget_hint dead code — serves REQ-5
+_phases: plan → build → verify → review → release_
 
-- [x] Route each task to cheapest capable model (Haiku/Codex/Sonnet/Opus/Fable)
-- [x] Emit cost preview before spend; reflect Fable $10/$50 pricing
-- [x] Add declared-capability top_tier: fable layer with Opus single-retry fallback
-- [x] Deterministically forbid Fable on mechanical/bulk work in plan validation
+- [x] Delete unreferenced context_budget_hint + its test and doc mentions — Value: removes dead scaffolding masquerading as enforcement (classification.md item 7, re-verified 2026-08-03). PRD: flips REQ-5 from partial toward met (zero production callers confirmed by repeated grep). Compat: full pytest -q stays green; release-1's grep-based compat test must show zero remaining call sites post-removal. Migration: delete function + tests/test_state_skills.py case; update CLAUDE.md/AGENTS.md/CHANGELOG references. Rollback: single-commit git revert; no downstream caller exists to break. Owner acceptance: grep shows zero hits repo-wide.
 
-## ● Make multi-step workflows resumable — serves REQ-3
+## ● Release 3: Reverse schemas.py's inverted dependency — serves new
+_phases: plan → build → verify → review → release_
 
-- [x] Persist lifecycle.json + pipeline.json on every stage transition
-- [x] Implement /renmark:resume cold-start recovery (zero LLM)
+- [x] Make schemas.py/contracts.py the sole owner of shared contract constants — STAGES + SUBAGENT_OUTPUT_* moved into schemas.py (lifecycle.py/dispatch.py import back), breaking both circular-import workarounds. delivery_state.py stays stdlib-only permanently (Owner decision 2026-08-04) — roadmap scope revised accordingly, not deferred work.
 
-## ● Establish human-owned PRD source of truth — serves REQ-4
+## ● Release 4: Split renmark/cli/_engine.py into a sub-package — serves REQ-30
+_phases: plan → build → verify → review → release_
 
-- [x] Author /renmark:prd CREATE/UPDATE with human-gated diff approval
+- [x] Extract cli/_dispatch_flags.py, cli/_run_lifecycle.py, cli/_wave_loop.py — All 3 extractions done: _dispatch_flags.py (437L), _run_lifecycle.py (271L), _wave_loop.py (569L). _engine.py: 1698 -> 788 lines. Full suite green throughout (1936/31), each step independently re-verified, live renmark-execute --dry-run smoke test passed. No protected areas touched.
 
-## ● Enforce orchestrator context hygiene — serves REQ-5
+## ● Release 5: Split renmark/lifecycle.py into a sub-package — serves REQ-30
+_phases: plan → build → verify → review → release_
 
-- [x] Bound orchestrator-visible output to summaries/paths/metadata (≤5 lines)
-- [x] Aggregate per-wave summaries; never load code/diffs/bodies
+- [x] Extract lifecycle/stage.py, next_steps.py, preamble.py, reconciliation.py — All 5 steps done: lifecycle.py (1747L) -> lifecycle/ package (stage.py 1057L, next_steps.py 175L, preamble.py 324L, reconciliation.py 297L, __init__.py 129L). Full suite green throughout (1936/31). STAGES + LIFECYCLE_JSON_BYTE_BUDGET byte-for-byte unchanged. Host-parity (claude/codex) confirmed identical for skill_preamble. No protected areas touched.
 
-## ● Confine all artifacts inside the project — serves REQ-6
+## ● Release 6: Centralize routing behind cost.resolve_executor — serves REQ-2
+_phases: plan → build → verify → review → release_
 
-- [x] Write all renmark output under .renmark/; keep global plugin read-only
+- [x] Add cost.resolve_executor and migrate the 12-file scattered call sites — Scoped down per Owner decision: only the genuinely duplicated executor pricing table was centralized (3 copies -> 1, on renmark.cost.PRICE_PER_KTOK), fixing a live drift bug (codex priced 0.03 vs 0.05). The full 3-way resolve_executor() merge (model tier / role / codex dispatch) was NOT done -- kept as separate functions per Owner decision. Full suite green (1936/31).
 
-## ● Validate plans and verify features goal-backward — serves REQ-7
+## ● Release 7: Skillmeta-completeness lint gate — serves new
+_phases: plan → build → verify → review → release_
 
-- [x] Implement /renmark:check-plan deterministic validation (PASS/WARN/BLOCK)
-- [x] Implement /renmark:verify goal-backward smoke + --qa/--deep-qa modes
-
-## ● Enable non-destructive adoption and diagnosis — serves REQ-8
-
-- [x] Implement /renmark:init front door (scaffold + merge rule blocks)
-- [x] Implement /renmark:doctor install-health diagnosis + --fix
-- [x] Keep /renmark:setup as thin rule-block-refresh alias
-
-## ● Build bounded, cost-previewed Loop Mode — serves REQ-9
-
-- [x] Implement /renmark:loop bounded by budget AND max-iterations with cost preview
-
-## ● Persist and recover loop state — serves REQ-10
-
-- [x] Persist loop state under .renmark/loops/<id>/; recover via /renmark:resume
-
-## ● Decide loop iterations goal-backward from evidence — serves REQ-11
-
-- [x] Drive each loop iteration from fresh verification evidence only (bounded reads)
-
-## ● Gate destructive loop actions on human approval — serves REQ-12
-
-- [x] Require approval before loop edits PRD/merges/releases/escalates budget
-
-## ● Build backlog intake + approval buffer — serves REQ-13
-
-- [x] Implement /renmark:backlog interactive list + detail view
-- [x] Approve-and-build launches bounded Loop (cap 5) on managed branch
-- [x] Record one disposition per branch; no orphan branches; persist item state
-
-## ● Reserve scheduled QA read-only proposer lane — serves REQ-14
-
-- [x] Design scheduled read-only proposer lane (propose backlog items, never execute)
-
-## ● Build local-only reporting and analytics — serves REQ-15
-
-- [x] Write task/loop/backlog/feature/release reports under .renmark/reports/
-- [x] Aggregate rolling analytics under .renmark/analytics/ (stdlib JSON/JSONL)
-- [x] Implement /renmark:usage and /renmark:analytics bounded status views
-- [x] Label all account-limit output as observed-local unless provider-sourced
-
-## ● Pause safely on usage/quota limits — serves REQ-16
-
-- [x] Persist pause_reason=usage_limit with reset/fallback; resume later, no polling
-
-## ● Provide read-only self-audit surface — serves REQ-17
-
-- [x] Implement /renmark:audit (lint/modularity/version/registry/parity) advisory-only
-- [x] Implement /renmark:inventory alias writing under .renmark/audits/
-
-## ● Centralize approval granting in /renmark:approve — serves REQ-18
-
-- [x] Make /renmark:approve sole setter of human_review_completed; consumers clear gate
-
-## ● Add optional Playwright browser layer — serves REQ-19
-
-- [x] Implement opt-in Playwright layer with persisted storageState in .renmark/
-- [x] Fall back to Chrome DevTools MCP channel when Playwright absent
+- [x] Extend plan_lint.py to fail on an unregistered plugin/skills/<name>/ dir — Check 13 added to plan_lint.py: BLOCKs on an unregistered plugin/skills/<name>/ dir. 3 fixture tests + live acceptance-scenario demo confirmed. Zero drift found in current repo (30/30 match). Full suite green (1939/31, +3 new tests). Roadmap complete.

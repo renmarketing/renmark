@@ -1,0 +1,33 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00-04:00",
+  "source_sha": null,
+  "related_plan": "M6 package 1",
+  "generator": "reviewer",
+  "dependency_refs": [
+    "renmark/behavior.py",
+    "tests/behavioral/agency.behavior.json"
+  ],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/behavior.py",
+      "line": 528,
+      "description": "The Agency branch manually constructs and writes DeliveryState, then calls update_active_milestone; it never invokes the canonical Agency approval-to-Orchestrator delivery/lifecycle path, so the assertions can pass even if that path is broken.",
+      "suggestion": "Drive the persisted Agency state through the production approval/delivery transition and assert its persisted result; use an observable production entry for the direct path to prove discovery was not started."
+    }
+  ],
+  "verification": {
+    "command": "python3 -m renmark.behavior --case tests/behavioral/agency.behavior.json",
+    "exit_code": 0,
+    "json_parses": true
+  }
+}

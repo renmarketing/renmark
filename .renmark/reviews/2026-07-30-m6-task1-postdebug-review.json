@@ -1,0 +1,26 @@
+{
+  "artifact_type": "renmark_code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "e1ace9f",
+  "related_plan": ".renmark/plans/2026-07-30-m6-migration-golden-release-readiness.plan.md",
+  "generator": "reviewer",
+  "stale_after": null,
+  "dependency_refs": [
+    "renmark/agency.py",
+    "renmark/behavior.py",
+    "tests/behavioral/agency.behavior.json"
+  ],
+  "status": "PASS",
+  "findings": [],
+  "verification": {
+    "command": ".venv/bin/python -m pytest -q tests/test_agency.py tests/test_behavior.py",
+    "result": "36 passed"
+  },
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true
+}

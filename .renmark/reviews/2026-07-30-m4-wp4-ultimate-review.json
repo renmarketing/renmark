@@ -1,0 +1,26 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "uncommitted",
+  "related_plan": "M4 WP-M4-4",
+  "generator": "reviewer",
+  "dependency_refs": ["renmark/lifecycle.py", "tests/test_lifecycle.py"],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "failed",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/lifecycle.py",
+      "line": 599,
+      "title": "Corrupt delivery state loosens Agency milestone binding",
+      "detail": "When delivery.json is corrupt, its default DeliveryState has no active milestone and the Agency fallback is deliberately restricted to report.state == missing; active_milestone therefore remains empty and matching is skipped, so same-HEAD unscoped evidence can satisfy Agency signoff despite a persisted current_milestone.",
+      "suggestion": "For active Agency signoff, preserve a binding to the persisted Agency current_milestone (or fail closed) whenever delivery state cannot supply a trustworthy active milestone, including corrupt/read-error cases; add a corrupt-delivery regression test."
+    }
+  ]
+}

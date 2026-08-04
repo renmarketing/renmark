@@ -1,0 +1,20 @@
+{
+  "status": "FAIL",
+  "artifact_path": "/home/renmark/projects/ai-system/.renmark/reviews/2026-07-30-debug-agency-handoff-review.json",
+  "touched_files": [],
+  "sha": null,
+  "summary_lines": [
+    "MAJOR renmark/agency.py:253 replaces the existing canonical delivery aggregate with default state, discarding run, work-package, source, and provenance data at the Agency-to-Orchestrator transition.",
+    "MAJOR renmark/agency.py:257 marks independent review approved solely from owner approval; this fabricates a review outcome and can incorrectly satisfy downstream readiness consumers.",
+    "Coverage only asserts milestone ID after auto-handoff; it does not prove preservation, rejection for inactive/unapproved states, handoff fields, or lifecycle summary read-only behavior.",
+    "Focused tests: .venv/bin/pytest -q tests/test_agency.py tests/test_behavior.py — 34 passed."
+  ],
+  "dependency_notes": "No recursion observed. The behavior fixture calls the transition twice because activate now auto-handoffs; it is idempotent only because each call reconstructs default state, which is the data-loss defect above.",
+  "token_count": 0,
+  "completion_state": "complete",
+  "confidence": "high",
+  "retry_count": 0,
+  "validation_status": "validated",
+  "parser_success": true,
+  "schema_compliance": true
+}

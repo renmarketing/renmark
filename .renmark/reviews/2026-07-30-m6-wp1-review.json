@@ -1,0 +1,35 @@
+{
+  "artifact_type": "code_review",
+  "schema_version": 1,
+  "created_at": "2026-07-30T00:00:00Z",
+  "source_sha": "727221d+uncommitted",
+  "related_plan": "M6 package 1",
+  "generator": "reviewer",
+  "dependency_refs": [
+    "renmark/behavior.py",
+    "tests/behavioral/agency.behavior.json"
+  ],
+  "completion_state": "complete",
+  "confidence": "high",
+  "validation_status": "validated",
+  "retry_count": 0,
+  "parser_success": true,
+  "schema_compliance": true,
+  "gate": "FAIL",
+  "findings": [
+    {
+      "severity": "Major",
+      "file": "renmark/behavior.py",
+      "line": 535,
+      "description": "The Agency branch only projects legacy Agency state and then calls milestone_executor(), which is a constant-return helper; it never persists or reads the canonical delivery aggregate nor invokes the Agency-to-Orchestrator handoff path. The assertions can therefore pass if the actual approved-milestone delegation regresses or is absent.",
+      "fix": "Exercise the real approved-milestone transition that writes/reads canonical delivery state and assert its persisted executor/approval fields, rather than projecting state and asserting a constant helper."
+    },
+    {
+      "severity": "Major",
+      "file": "renmark/behavior.py",
+      "line": 551,
+      "description": "The direct-path defined_goal evidence is a hard-coded payload literal, not derived from the defined-goal input or persisted state, so this test cannot prove that Orchestrator starts from a defined goal.",
+      "fix": "Pass a concrete defined goal through the production direct-entry surface and assert the resulting state/trajectory derives from it while Agency discovery remains inactive."
+    }
+  ]
+}
