@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 5 (step 2/5): extract lifecycle/next_steps.py
+
+**Files:** `renmark/lifecycle/next_steps.py`, `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`
+
+Extracted NextSteps/next_steps/next_recommended/_resolve_next/_gates_not_run from stage.py into next_steps.py. Updated _IMPL_MODULES. Caught an import-ordering trap (module name shadows function name). Full suite unchanged (1936/31).
+
+---
+
 ### 2026-08-04 — Rethink Release 5 (step 1/5): lifecycle.py -> lifecycle/ package (mechanical)
 
 **Files:** `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`
