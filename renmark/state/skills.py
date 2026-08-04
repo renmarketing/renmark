@@ -11,43 +11,6 @@ from typing import Any, cast
 
 from ._core import LAST_SKILL_FILE, now_iso, state_dir
 
-# Absolute context-token thresholds for context_budget_hint.
-# These COMPLEMENT the existing 60%/80% self-monitored budget rules in CLAUDE.md
-# (which the orchestrator self-monitors) and the cross-domain /clear hint produced
-# by context_budget_check — none of those are altered here.
-CTX_SUMMARIZE = 100_000
-CTX_COMPACT = 120_000
-CTX_CHECKPOINT = 150_000
-
-
-def context_budget_hint(tokens: int) -> str | None:
-    """Return a human-readable budget hint for the given absolute token count.
-
-    Returns None when tokens is below CTX_SUMMARIZE or invalid (non-int, bool,
-    negative).  Never raises.
-
-    These absolute tiers COMPLEMENT the existing 60%/80% self-monitored budget
-    rule and the cross-domain /clear hint from context_budget_check — neither of
-    those is altered by this helper.
-
-    Tiers:
-      CTX_SUMMARIZE (100k) — summarize the current stage.
-      CTX_COMPACT   (120k) — recommend /compact before the next skill.
-      CTX_CHECKPOINT(150k) — strongly recommend /compact or a checkpoint.
-    """
-    # Guard: booleans are ints in Python; treat them as invalid.
-    if not isinstance(tokens, int) or isinstance(tokens, bool):
-        return None
-    if tokens < 0:
-        return None
-    if tokens < CTX_SUMMARIZE:
-        return None
-    if tokens < CTX_COMPACT:
-        return "≈100k context — summarize the current stage before continuing."
-    if tokens < CTX_CHECKPOINT:
-        return "≈120k context — recommend `/compact` before the next skill."
-    return "≈150k context — strongly recommend `/compact` or a checkpoint before continuing."
-
 
 def _last_skill_path(repo_root: str | Path) -> Path:
     return state_dir(repo_root) / LAST_SKILL_FILE

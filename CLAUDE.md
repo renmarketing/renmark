@@ -218,7 +218,7 @@ Cross-domain transition always triggers the clear gate on hosts whose capabiliti
 <!-- END:context-budget-rule -->
 <!-- BEGIN:context-thresholds-rule -->
 ## Context thresholds (absolute token counts)
-Complement the %-based budget above with absolute hard stops (see `renmark.state.skills.context_budget_hint`):
+Complement the %-based budget above with absolute hard stops (self-monitored — no dedicated helper function; the orchestrator tracks its own token count):
 - **100k tokens:** summarize in-flight reasoning; prefer artifact pointers over inline output.
 - **120k tokens** (configurable via `compact_gate_tokens` in `.renmark/config.json`): surface `/compact` suggestion — do NOT auto-run.
 - **150k tokens:** checkpoint to `.renmark/state/`; on hosts with manual context controls, refuse new long skills until `/compact` or `/clear`; on Codex continue using persisted state and host-managed context handling.

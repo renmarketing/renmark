@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-03 — Rethink Release 2: remove context_budget_hint dead code
+
+**Files:** `renmark/state/skills.py`, `CLAUDE.md`, `AGENTS.md`, `plugin/skills/.shared/agency-delivery.md`
+
+Removed unreferenced renmark.state.skills.context_budget_hint + its constants/test; updated CLAUDE.md/AGENTS.md/agency-delivery.md pointers to describe the thresholds as self-monitored prose rules (REQ-5). Done inline after the subagent gate correctly flagged the drafted 5-task plan as unjustified for dispatch.
+
+---
+
 ### 2026-08-03 — Rethink Release 1: baseline/compatibility test coverage
 
 **Files:** `tests/test_artifact_home_and_baseline_compat.py`

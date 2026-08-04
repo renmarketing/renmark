@@ -82,7 +82,7 @@ Agency Mode does not duplicate cost infrastructure — it delegates to existing 
 
 - **Finish lane selection:** `renmark.finish_lanes.recommend_lane` / `resolve_lane` (see `finish-lanes.md`).
 - **Cost preview:** `renmark.cost.estimate_cost` / `requires_escalation` — labels each phase task deterministic or model-driven before the owner approves the milestone plan.
-- **Context budget:** `renmark.state.skills.context_budget_hint` (100k summarize / 120k compact / 150k checkpoint).
+- **Context budget:** self-monitored absolute thresholds, 100k summarize / 120k compact / 150k checkpoint (see `CLAUDE.md` § `context-thresholds-rule`).
 - **Milestone-boundary checkpoint:** when the agent driving Agency Mode calls `renmark.agency.activate(repo, signoff_status="approved", ...)` at a genuine milestone approval, pass its own self-monitored context estimate as `estimated_tokens=<self-reported count>` (the same number it already tracks for the 60%/80% compact-gate rule above — no new measurement, just threading the existing self-report through). Omitting it is safe and is the default — `renmark.lifecycle.milestone_context_checkpoint` only recommends a checkpoint when a real estimate crosses `config.compact_gate_tokens`, and never fabricates one on its own (ORCHESTRATION-BASELINE-2026-08 audit: no host-exposed context-size API exists, so this self-report is the only real signal source available today).
 - **Subagent profiles:** role field in every dispatch packet; ledger tracks by role (see `subagent-profiles.md`).
 - **Model routing:** cheapest capable executor per task type (see `model-routing.md`).
@@ -117,6 +117,6 @@ Owner gates were earlier scattered across individual skill prompts: `/renmark:st
 
 When citing this contract in a SKILL.md or subagent dispatch, write:
 
-> *Honor the agency delivery contract in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`: discovery → PRD → stack signoff → roadmap/milestones → build → demo/feedback → verification → final signoff → finish. Ask owner-level questions only (goal, users, constraints, risks, success, signoff). Milestone checkpoints pause for owner review — they do not pass automatically when tests pass. Background agents handle implementation; main agent coordinates and reads bounded summaries. Delegate cost infra to finish_lanes / cost.py / context_budget_hint / subagent-profiles — do not inline those rules.*
+> *Honor the agency delivery contract in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md`: discovery → PRD → stack signoff → roadmap/milestones → build → demo/feedback → verification → final signoff → finish. Ask owner-level questions only (goal, users, constraints, risks, success, signoff). Milestone checkpoints pause for owner review — they do not pass automatically when tests pass. Background agents handle implementation; main agent coordinates and reads bounded summaries. Delegate cost infra to finish_lanes / cost.py / subagent-profiles — do not inline those rules.*
 
 Do not paste the delivery loop or gate table into the calling SKILL.md — cite this file.
