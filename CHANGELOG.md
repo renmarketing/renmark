@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-08-04] — feat: --artifact-hygiene CLI dispatch handler
+**Request:** Task 3 of the `.renmark` artifact-lifecycle hygiene plan — CLI entry point for the new registry/budget/validate machinery.
+**Built:** `_dispatch_artifact_hygiene_flags(args, repo)` added to `renmark/cli/_dispatch_flags.py`, mirroring `_dispatch_compact_flags`. Runs `hygiene.main(["all", ...])` (dry-run unless `--artifact-hygiene-apply`), then `budget` and `validate` subcommands.
+**Files changed:**
+- `renmark/cli/_dispatch_flags.py` — new `_dispatch_artifact_hygiene_flags`, `hygiene` import added.
+**Do not change:**
+- Codex dispatched this task (per project executor-dispatch rule); its own structured report came back low-confidence/partial, so it was independently re-verified (`py_compile` + direct import) before being trusted — do not treat a codex PASS status alone as sufficient evidence.
+
+## [2026-08-04] — test: registry + validator coverage for hygiene.py
+**Request:** Task 8 of the `.renmark` artifact-lifecycle hygiene plan — test coverage for Task 2's registry/budget/validate additions.
+**Built:** 21 new tests in `tests/test_hygiene.py` covering registry shape, budget ok/warn/block thresholds, placement/metadata/ownership validation issues, and the ephemeral safe-deletion predicate's three-condition gate.
+**Files changed:**
+- `tests/test_hygiene.py` — 21 new tests.
+**Do not change:**
+- Same independent-verification note as above: codex's own report was low-confidence; `pytest -q tests/test_hygiene.py` (21 passed) was run directly before trusting it.
+
 ## [2026-08-04] — feat: .renmark artifact-lifecycle registry + budget/validate CLI
 **Request:** Task 2 of the `.renmark` artifact-lifecycle hygiene plan (downstream of a scoped `/renmark:rethink` run) — add a 14-entry artifact-type registry and deterministic budget/placement/ownership validation.
 **Built:** `ArtifactTypeSpec` dataclass + `ARTIFACT_REGISTRY` (14 entries: audits, plans, reviews, state-live, state-scratch, memory, ledger, reports, rethink, roadmap, specs, debug, version-unpacked, version-zip) added to `renmark/hygiene.py`. New CLI subcommands `budget` (read-only count/bytes/age report per type) and `validate` (`validate_registry_compliance` — placement, metadata via `schemas.validate_artifact_metadata`, budget warn/block, canonical-ownership pointer check for the audits/inventory + rethink/survey vs. `project-map.md` overlap). `scan`/`all` gained a safe-deletion predicate for `ephemeral`+regenerable types (age + zero inbound refs + not-newest, all three required).

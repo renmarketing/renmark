@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from renmark import hygiene, lifecycle as _lifecycle
+
 from .commands import (
     cmd_analytics,
     cmd_heartbeat,
@@ -384,8 +386,6 @@ def _dispatch_mode_read_flags(
 def _dispatch_compact_flags(args: argparse.Namespace, repo: Path) -> int | None:
     """Handle --compact-checkpoint/--get-compact-gate-tokens/--set-compact-gate-tokens."""
     if args.compact_checkpoint:
-        from renmark import lifecycle as _lifecycle
-
         _lifecycle.persist_compact_checkpoint(repo, skill="manual", reason="compact")
         print("Compact checkpoint written to .renmark/state/compact_checkpoint.json.")
         print("Run these commands to safely reduce context:")
@@ -416,6 +416,21 @@ def _dispatch_compact_flags(args: argparse.Namespace, repo: Path) -> int | None:
             print("compact_gate_tokens set to 0 (gate disabled)")
         else:
             print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
+        return 0
+    return None
+
+
+def _dispatch_artifact_hygiene_flags(
+    args: argparse.Namespace, repo: Path
+) -> int | None:
+    """Handle --artifact-hygiene/--artifact-hygiene-apply."""
+    if args.artifact_hygiene:
+        hygiene.main(
+            ["all", "--repo", str(repo)]
+            + (["--apply"] if args.artifact_hygiene_apply else [])
+        )
+        hygiene.main(["budget", "--repo", str(repo)])
+        hygiene.main(["validate", "--repo", str(repo)])
         return 0
     return None
 
