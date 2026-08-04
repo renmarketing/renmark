@@ -787,3 +787,48 @@ def test_python_verifier_bound_shapes(tmp_path):
     assert _warns_of(lint_plan(_one_task_plan(tmp_path, "node check.js")))
     assert not _warns_of(lint_plan(_one_task_plan(tmp_path, "python3 -m py_compile a.py")))
     assert not _warns_of(lint_plan(_one_task_plan(tmp_path, "python -m pytest -q 2>&1 | tail -1")))
+
+
+def test_skillmeta_unregistered_skill_dir_blocks(tmp_path: Path) -> None:
+    """Check 13 (rethink Release 7): a plugin/skills/<name>/ dir with a
+    SKILL.md but no skillmeta.SKILLS entry BLOCKs instead of silently
+    defaulting domain_of() to 'build'."""
+    import unittest.mock as mock
+
+    skills_dir = tmp_path / "plugin" / "skills" / "totally-unregistered-skill"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("---\nname: totally-unregistered-skill\n---\n", encoding="utf-8")
+
+    plan = _one_task_plan(tmp_path, "true")
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert report.verdict == "BLOCK"
+    assert any("totally-unregistered-skill" in issue and "skillmeta.SKILLS" in issue for issue in report.issues)
+
+
+def test_skillmeta_registered_skill_dirs_lint_clean(tmp_path: Path) -> None:
+    """A registered skill dir (present in skillmeta.SKILLS) must not trip Check 13."""
+    import unittest.mock as mock
+
+    skills_dir = tmp_path / "plugin" / "skills" / "plan"  # "plan" is a real registered skill
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("---\nname: plan\n---\n", encoding="utf-8")
+
+    plan = _one_task_plan(tmp_path, "true")
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert not any("skillmeta.SKILLS" in issue for issue in report.issues)
+
+
+def test_skillmeta_no_plugin_skills_dir_is_noop(tmp_path: Path) -> None:
+    """No plugin/skills/ directory at all (e.g. a non-renmark repo) must not
+    error or BLOCK — the check is a no-op absent that directory."""
+    import unittest.mock as mock
+
+    plan = _one_task_plan(tmp_path, "true")
+    with mock.patch("renmark.plan_lint.Path.cwd", return_value=tmp_path):
+        report = lint_plan(plan)
+
+    assert not any("skillmeta.SKILLS" in issue for issue in report.issues)

@@ -418,6 +418,38 @@ def _check_escalation_justified(tasks: list[Task]) -> list[tuple[str, str]]:
     return issues
 
 
+def _check_skillmeta_registered(repo_root: Path) -> list[tuple[str, str]]:
+    """Check 13 — every `plugin/skills/<name>/` dir with a SKILL.md must be
+    registered in `skillmeta.SKILLS` → BLOCK.
+
+    An unregistered skill directory doesn't fail loud today — `domain_of()`
+    silently falls back to `"build"` for any unknown skill name (classification.md
+    item 5, rethink Release 7). This check makes the gap visible at lint time
+    instead of leaving it a silent default.
+    """
+    from . import skillmeta as _skillmeta
+
+    skills_dir = repo_root / "plugin" / "skills"
+    if not skills_dir.is_dir():
+        return []
+    issues: list[tuple[str, str]] = []
+    for entry in sorted(skills_dir.iterdir()):
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        if not (entry / "SKILL.md").is_file():
+            continue  # not a skill dir (e.g. a shared-fragment folder with no SKILL.md)
+        if entry.name not in _skillmeta.SKILLS:
+            issues.append(
+                (
+                    "BLOCK",
+                    f"plugin/skills/{entry.name}/ has a SKILL.md but is not registered "
+                    "in skillmeta.SKILLS — domain_of() would silently default it to "
+                    "'build'. Add an entry to renmark/skillmeta.py.",
+                )
+            )
+    return issues
+
+
 def _check_sanity_extras(tasks: list[Task]) -> list[tuple[str, str]]:
     """Sanity extras — all WARN only, never BLOCK (behaviour-preserving)."""
     issues: list[tuple[str, str]] = []
@@ -599,6 +631,7 @@ def lint_plan(path: str | Path) -> PlanLintReport:
     raw.extend(_check_fable_mechanical(tasks))
     raw.extend(_check_role_profiles(tasks))
     raw.extend(_check_escalation_justified(tasks))
+    raw.extend(_check_skillmeta_registered(repo_root))
     raw.extend(_check_sanity_extras(tasks))
 
     verdict = _derive_verdict(raw)

@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 7 (final): skillmeta-completeness lint gate
+
+**Files:** `renmark/plan_lint.py`, `tests/test_plan_lint.py`
+
+Added plan_lint.py Check 13: BLOCKs when a plugin/skills/<name>/ dir has a SKILL.md but no skillmeta.SKILLS entry, instead of domain_of() silently defaulting to build. 3 fixture tests plus a live scratch-repo demo confirming the exact acceptance scenario. This closes out the 7-release renmark-architecture rethink roadmap.
+
+---
+
 ### 2026-08-04 — Rethink Release 6 (scoped): centralize executor pricing on cost.PRICE_PER_KTOK
 
 **Files:** `renmark/cli/_engine.py`, `renmark/roadmap.py`, `tests/test_roadmap.py`
