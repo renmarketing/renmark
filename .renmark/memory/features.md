@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-03 — Rethink Release 4 complete: renmark/cli/_engine.py split into 4 modules
+
+**Files:** `renmark/cli/_engine.py`, `renmark/cli/_dispatch_flags.py`, `renmark/cli/_run_lifecycle.py`, `renmark/cli/_wave_loop.py`
+
+Split the 1698-line renmark/cli/_engine.py into a 788-line thin shell plus _dispatch_flags.py (437L), _run_lifecycle.py (271L), _wave_loop.py (569L, the execute_plan dispatch-loop body). Behavior-preserving structural extraction, REQ-30 exempt per intake.md. Full pytest -q stayed at 1936 passed/31 skipped throughout all 3 extractions; each independently re-verified (not just trusted from subagent reports) including a live renmark-execute --dry-run CLI smoke test after the final piece.
+
+---
+
 ### 2026-08-03 — Rethink Release 4 (partial 2/3): extract renmark/cli/_run_lifecycle.py
 
 **Files:** `renmark/cli/_engine.py`, `renmark/cli/_run_lifecycle.py`

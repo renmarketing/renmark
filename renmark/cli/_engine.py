@@ -9,18 +9,17 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from dotenv import load_dotenv
 
 from .. import __version__
-from .. import task_tracking as _task_tracking
-from ..ledger import DispatchIndependenceError as _DispatchIndependenceError
-from ..ledger import WorkOrder as _LedgerWorkOrder
-from ..ledger import WorkResult as _LedgerWorkResult
-from ..ledger import append_ledger_event as _append_ledger_event
-from ..ledger import check_dispatch_independence as _check_dispatch_independence
-from ..ledger import emit_inspection_verdict as _emit_inspection_verdict
+from .. import task_tracking as _task_tracking  # noqa: F401  (re-export)
+from ..ledger import DispatchIndependenceError as _DispatchIndependenceError  # noqa: F401
+from ..ledger import WorkOrder as _LedgerWorkOrder  # noqa: F401
+from ..ledger import WorkResult as _LedgerWorkResult  # noqa: F401
+from ..ledger import append_ledger_event as _append_ledger_event  # noqa: F401
+from ..ledger import check_dispatch_independence as _check_dispatch_independence  # noqa: F401
+from ..ledger import emit_inspection_verdict as _emit_inspection_verdict  # noqa: F401
 from ..parser import PlanError, Task, parse_plan
 from ..providers.codex import codex_available as codex_available
 
@@ -33,15 +32,16 @@ from ..state import (
 from ..state import (
     clear_pause,
     new_run_id,
-    now_iso,
     state_dir,
-    write_pipeline_state,
 )
 from ..state import (
     clear_pipeline_state as clear_pipeline_state,
 )
 from ..state import (
     completed_task_indices as completed_task_indices,
+)
+from ..state import (
+    now_iso as now_iso,
 )
 from ..state import (
     read_pause as read_pause,
@@ -55,13 +55,15 @@ from ..state import (
 from ..state import (
     write_pause as write_pause,
 )
-from ..verifier import run_verifier as _run_verifier
+from ..state import (
+    write_pipeline_state as write_pipeline_state,
+)
+from ..verifier import run_verifier as _run_verifier  # noqa: F401
 from ._codex_runner import (
     _classify_and_rollback as _classify_and_rollback,
 )
 from ._codex_runner import (
     _execute_task_codex,
-    _record_escalation,
 )
 from ._codex_runner import (
     _judge_lane_and_rollback as _judge_lane_and_rollback,
@@ -108,6 +110,32 @@ from ._run_lifecycle import (
 )
 from ._run_lifecycle import (
     _complete_clean_run as _complete_clean_run,
+)
+from ._wave_loop import (
+    _INSPECTOR_DISPATCH_IDENTITY as _INSPECTOR_DISPATCH_IDENTITY,
+)
+from ._wave_loop import (
+    _create_parent_task,
+    _prepare_waves,
+    _run_waves,
+)
+from ._wave_loop import (
+    _emit_work_order as _emit_work_order,
+)
+from ._wave_loop import (
+    _emit_work_result as _emit_work_result,
+)
+from ._wave_loop import (
+    _inspect_and_track as _inspect_and_track,
+)
+from ._wave_loop import (
+    _process_wave_results as _process_wave_results,
+)
+from ._wave_loop import (
+    _track_worker_dispatch as _track_worker_dispatch,
+)
+from ._wave_loop import (
+    _WaveRunOutcome as _WaveRunOutcome,
 )
 
 
@@ -195,14 +223,6 @@ def _git_tag(cwd: Path, name: str) -> None:
 # commits per wave, in task-index order, after the wave finishes.
 _NO_COMMIT_MODE = False
 
-# R-0.4/WP-4: fixed dispatch identity for the deterministic verifier-derived
-# inspector wired below. It is a constant precisely because it names a
-# subsystem (this module's own verifier pass/fail check), not a per-task
-# executor invocation — every real WorkResult's `dispatch_identity` varies
-# by executor+order_id (see `_runner`), so the two can never coincidentally
-# collide and `check_dispatch_independence` has a real structural distinction
-# to enforce, not a coincidental one.
-_INSPECTOR_DISPATCH_IDENTITY = "renmark-verifier"
 
 
 def _git_commit(cwd: Path, target: str, message: str, trailer: str) -> str:
@@ -455,22 +475,10 @@ def execute_plan(
         return _handle_dry_run(tasks, done, repo)
 
     deadline = time.monotonic() + (cfg.max_minutes_per_run * 60)
-    tokens_used = 0
-    passed: list[int] = []
-    failed_task: Task | None = None
-    failure_kind: str | None = None
-    skipped: list[int] = []
 
-    # Group tasks into waves for parallel execution. Tasks sharing a
-    # `parallel_group` run concurrently; defaults to one wave per task.
-    from .. import dispatch as _dispatch
-
-    try:
-        waves = _dispatch.group_tasks_by_wave(tasks)
-        for w in waves:
-            _dispatch.validate_wave(w)
-    except ValueError as e:
-        _print(f"ERROR: plan has invalid wave: {e}")
+    waves, wave_error = _prepare_waves(tasks)
+    if waves is None:
+        _print(f"ERROR: plan has invalid wave: {wave_error}")
         return 2
 
     # Persist the execution anchor only after the plan is fully validated, but
@@ -481,327 +489,43 @@ def execute_plan(
     _git_tag(repo, f"renmark-run-{run_id}-start")
     clear_pause(repo)
 
-    # REQ-31: one native parent task per milestone (this plan run). Reused
-    # unchanged on resume — create_or_reuse_task is idempotent by task_id.
-    # Best-effort: a tracking-layer failure must never block a real dispatch.
-    parent_task_id = f"run-{run_id}"
-    try:
-        _task_tracking.create_or_reuse_task(
-            repo,
-            parent_task_id,
-            title=f"Execute plan {plan_path}",
-            role="orchestrator",
-            scope=plan_path,
-            verification_expectation="every dispatched task independently verified",
-        )
-        _task_tracking.mark_in_progress(repo, parent_task_id)
-    except Exception:
-        pass
+    parent_task_id = _create_parent_task(repo, run_id, plan_path)
 
-    needs_agent: list[int] = []  # tasks executor=opus/sonnet, skill must dispatch
-    r008_warned: list[int] = []  # tasks that dispatched with missing R-008 fields
-
-    # Holder for the current wave's task list, set per-wave below so the
-    # runner can compute each task's sibling targets (for rollback isolation).
-    current_wave: list[Task] = []
-
-    def _runner(task: Task, _repo: Path) -> _dispatch.TaskResult:
-        """Adapter: existing _execute_task tuple → dispatch.TaskResult."""
-        # R-008 pre-dispatch checklist (lenient — warn, never block). This is
-        # the real per-task dispatch call site: every task reaching _runner is
-        # about to be handed to a live executor (_execute_task → codex).
-        if _r008_precheck(task):
-            r008_warned.append(task.index)
-        sibling_targets = [t.target for t in current_wave if t.index != task.index]
-
-        # R-0.3/WP-4: real WorkOrder emission point. This is the actual moment
-        # a task is handed to a live executor (below, via _execute_task →
-        # codex); order_id is `{run_id}-{task_index}` since tasks have no
-        # pre-existing dispatch uuid. A ledger write failure must never block
-        # the real dispatch, so it's best-effort/never-raising, same as the
-        # R-0.0 baseline-trace convention this module already follows.
-        order_id = f"{run_id}-{task.index}"
-        # `work_result_dispatch_identity` only depends on already-known
-        # values (executor + order_id), so it's safe to compute here, before
-        # dispatch, for the native worker task's `dispatch_identity` field —
-        # the same identity the WorkResult ledger event below records.
-        work_result_dispatch_identity = f"{task.executor or 'unknown'}:{order_id}"
-        worker_task_id = f"task-{order_id}"
-        verify_task_id = f"task-{order_id}-verify"
-        try:
-            _append_ledger_event(
-                _repo,
-                _LedgerWorkOrder(
-                    order_id=order_id,
-                    task=task.spec or task.title,
-                    role=task.role or task.executor,
-                    file_scope=[task.target, *task.context_files],
-                    verifier=task.verifier,
-                ),
-                ts=now_iso(),
-            )
-        except Exception:
-            pass
-
-        # REQ-31: one native task per dispatch, reused unchanged on resume.
-        # `mark_in_progress` fires immediately before the real dispatch call
-        # below — never after. Best-effort: tracking must never block
-        # dispatch.
-        try:
-            _task_tracking.create_or_reuse_task(
-                _repo,
-                worker_task_id,
-                title=task.title or task.spec or f"task {task.index}",
-                role=task.role or task.executor or "unknown",
-                scope=task.target,
-                verification_expectation=task.verifier,
-                parent_id=parent_task_id,
-                dispatch_identity=work_result_dispatch_identity,
-            )
-            _task_tracking.mark_in_progress(_repo, worker_task_id)
-        except Exception:
-            pass
-
-        ok, reason, used, sha = _execute_task(
-            task=task,
-            repo=_repo,
-            run_id=run_id,
-            cfg=cfg,
-            remaining_token_budget=max(0, cfg.max_tokens_per_run - tokens_used),
-            total=len(tasks),
-            sibling_targets=sibling_targets,
-        )
-
-        # R-0.3/WP-4: real WorkResult emission point — the return from the
-        # live executor call above, matched to the WorkOrder by order_id.
-        # R-0.4/WP-2: `dispatch_identity` records which real dispatch produced
-        # this result (executor + order_id, unique per task/run) so a later
-        # inspector can prove independence rather than assume it.
-        # (identity computed above, before dispatch, for the native task record)
-        try:
-            _append_ledger_event(
-                _repo,
-                _LedgerWorkResult(
-                    order_id=order_id,
-                    status="complete" if ok else "failed",
-                    summary=reason,
-                    touched_files=[task.target] if ok else [],
-                    dispatch_identity=work_result_dispatch_identity,
-                ),
-                ts=now_iso(),
-            )
-        except Exception:
-            pass
-
-        # R-0.4/WP-4b (bounded repair): real InspectionReport emission point.
-        # The verdict is now derived from a FRESH, independently-rerun
-        # `task.verifier` execution (a genuinely separate subprocess call,
-        # decoupled from the Worker's own verifier run inside
-        # `_execute_task`/`_execute_task_codex`) rather than from the
-        # Worker's own already-known `ok`/`reason` variables — see
-        # 2026-08-01-r-0.4-wp6-independent-review.md Finding 3. This is a
-        # deterministic, read-only-by-convention re-check (this codebase's
-        # verifier commands are check/test commands, e.g. pytest/py_compile,
-        # not mutating ones), dispatched under a fixed deterministic-verifier
-        # identity that is structurally distinct from
-        # `work_result_dispatch_identity` (which always carries the task's
-        # own executor + order_id). The independence check runs UNWRAPPED so
-        # a genuine `DispatchIndependenceError` is a real, visible rejection
-        # — never silently swallowed. Only the ledger *write* is best-effort
-        # / never-raising, matching the WorkOrder/WorkResult convention above
-        # (a disk/IO failure must never block the pipeline).
-        try:
-            _check_dispatch_independence(
-                _repo,
-                work_result_dispatch_identity,
-                _INSPECTOR_DISPATCH_IDENTITY,
-            )
-        except _DispatchIndependenceError as exc:
-            _print(
-                f"WARNING: inspection verdict rejected for {order_id} "
-                f"(dispatch independence check failed): {exc}"
-            )
-            try:
-                _task_tracking.record_blocker(
-                    _repo, worker_task_id, f"dispatch independence check failed: {exc}"
-                )
-            except Exception:
-                pass
-        else:
-            fresh_result = _run_verifier(
-                task.verifier,
-                cwd=_repo,
-                timeout_s=task.verifier_timeout_s,
-            )
-            try:
-                _emit_inspection_verdict(
-                    _repo,
-                    work_result_id=order_id,
-                    work_order_id=order_id,
-                    verdict="pass" if fresh_result.ok else "fail",
-                    evidence=[fresh_result.tail] if fresh_result.tail else [],
-                    inspector_dispatch_identity=_INSPECTOR_DISPATCH_IDENTITY,
-                    work_result_dispatch_identity=work_result_dispatch_identity,
-                    ts=now_iso(),
-                )
-            except Exception:
-                pass
-
-            # REQ-31: the native verification task is completed from the
-            # SAME fresh, independently-rerun verifier result the ledger's
-            # InspectionReport above uses — never from the worker's own
-            # `ok`. Only once that verification task is `completed` does
-            # `complete_worker_task` allow the worker task to complete; this
-            # is the mechanical no-self-approval enforcement (REQ-31 rule 5),
-            # reusing the same dispatch-identity independence check the
-            # ledger's InspectionReport already relies on.
-            try:
-                _task_tracking.create_or_reuse_task(
-                    _repo,
-                    verify_task_id,
-                    title=f"Verify task {task.index}",
-                    role="inspector",
-                    scope=task.target,
-                    verification_expectation=task.verifier,
-                    parent_id=parent_task_id,
-                    depends_on=(worker_task_id,),
-                    dispatch_identity=_INSPECTOR_DISPATCH_IDENTITY,
-                )
-                _task_tracking.mark_in_progress(_repo, verify_task_id)
-                _task_tracking.complete_task(
-                    _repo,
-                    verify_task_id,
-                    artifact_path=f".renmark/state/wave-summaries/{run_id}",
-                    result_summary="pass" if fresh_result.ok else "fail",
-                )
-                if fresh_result.ok:
-                    _task_tracking.complete_worker_task(
-                        _repo,
-                        worker_task_id,
-                        verification_task_id=verify_task_id,
-                        artifact_path=sha or task.target,
-                        result_summary=reason,
-                    )
-                else:
-                    _task_tracking.record_failure(
-                        _repo, worker_task_id, "independent verifier rerun failed"
-                    )
-            except Exception:
-                pass
-
-        return _dispatch.TaskResult(
-            task_index=task.index,
-            executor=task.executor,
-            status="passed" if ok else "failed",
-            sha=sha,
-            tokens_out=used,
-            note=reason,
-        )
-
-    # Set when a wave-level budget/deadline gate trips. Unlike a per-task
-    # failure, this is not tied to one task — it means "stop, out of budget".
-    budget_kind: str | None = None
-
-    def _skip_all_remaining(from_wave_idx: int) -> None:
-        """Mark every not-done, not-yet-run task from this wave onward skipped.
-
-        Without this the run only recorded the CURRENT wave's tasks as skipped,
-        silently dropping later waves from the count and the pause state.
-        """
-        for later in waves[from_wave_idx:]:
-            for t in later:
-                if t.index in done or t.index in passed or t.index in skipped:
-                    continue
-                skipped.append(t.index)
-
-    for wave_idx, wave in enumerate(waves):
-        # Already-committed tasks (from --resume) just emit DONE lines.
-        for t in wave:
-            if t.index in done:
-                _print(
-                    _format_status_line(
-                        t.index,
-                        len(tasks),
-                        t.title,
-                        "DONE",
-                        0.0,
-                        0,
-                        "(prev run)",
-                    )
-                )
-                if t.index not in passed:
-                    passed.append(t.index)
-
-        runnable = [t for t in wave if t.index not in done]
-        if not runnable or failed_task is not None:
-            continue
-
-        # Wave-level budget gates. Trip → record EVERY remaining task (this wave
-        # and all later waves) as skipped, then break to the budget-pause path.
-        if tokens_used >= cfg.max_tokens_per_run:
-            budget_kind = "token_budget"
-            _skip_all_remaining(wave_idx)
-            break
-        if time.monotonic() > deadline:
-            budget_kind = "time_budget"
-            _skip_all_remaining(wave_idx)
-            break
-
-        # Dispatch the wave. codex/haiku run in parallel; opus/sonnet are
-        # marked `needs_agent` for the skill to handle via Agent tool.
-        # Publish the wave so _runner can derive each task's sibling targets.
-        current_wave = runnable
-        try:
-            wave_result = _dispatch.dispatch_wave(
-                runnable,
-                repo=repo,
-                run_task=_runner,
-            )
-        except Exception as exc:  # pragma: no cover — defense in depth
-            import traceback as _tb
-
-            tb = _tb.format_exc()
-            _print(f"ERROR dispatching wave: {type(exc).__name__}: {str(exc)[:100]}")
-            for t in runnable:
-                _record_escalation(
-                    repo,
-                    t,
-                    run_id,
-                    _choose_model(t, cfg),
-                    base_prompt="(wave dispatch failed)",
-                    response="",
-                    verifier_log=tb,
-                    retry_count=0,
-                    prompt_tokens=0,
-                    completion_tokens=0,
-                )
-            failed_task = runnable[0]
-            failure_kind = "wave_dispatch_failed"
-            break
-
-        # Process results in task-index order so the log reads naturally.
-        tokens_delta, failed_task, failure_kind = _process_wave_results(
-            wave_result, runnable, tasks, repo, run_id, passed, needs_agent
-        )
-        tokens_used += tokens_delta
-        for task_index in passed:
-            write_pipeline_state(repo, add_completed_task=task_index)
-        if failed_task is not None:
-            write_pipeline_state(repo, add_failed_task=failed_task.index)
-        elif needs_agent:
-            # Do not advance past a host-agent handoff: pipeline_is_resumable
-            # requires this wave to remain pending, including when it is the
-            # final wave of the plan.
-            write_pipeline_state(repo, current_phase="paused", wave_index=wave_idx)
-            break
-        else:
-            write_pipeline_state(repo, wave_index=wave_idx + 1)
+    outcome = _run_waves(
+        waves=waves,
+        tasks=tasks,
+        done=done,
+        repo=repo,
+        run_id=run_id,
+        cfg=cfg,
+        deadline=deadline,
+        parent_task_id=parent_task_id,
+    )
 
     # End-of-run summary.
-    _print_run_summary(passed, failed_task, budget_kind, needs_agent, tasks, tokens_used, cfg, repo, skipped, waves)
+    _print_run_summary(
+        outcome.passed,
+        outcome.failed_task,
+        outcome.budget_kind,
+        outcome.needs_agent,
+        tasks,
+        outcome.tokens_used,
+        cfg,
+        repo,
+        outcome.skipped,
+        waves,
+    )
 
     return _handle_run_exit(
-        failed_task, budget_kind, failure_kind, needs_agent, skipped, run_id, plan_path, repo, tasks
+        outcome.failed_task,
+        outcome.budget_kind,
+        outcome.failure_kind,
+        outcome.needs_agent,
+        outcome.skipped,
+        run_id,
+        plan_path,
+        repo,
+        tasks,
     )
 
 
@@ -822,53 +546,6 @@ def _execute_task(
     )
 
 
-
-
-def _process_wave_results(
-    wave_result: Any,  # _dispatch.WaveResult — imported lazily inside execute_plan
-    runnable: list[Task],
-    tasks: list[Task],
-    repo: Path,
-    run_id: str,
-    passed: list[int],
-    needs_agent: list[int],
-) -> tuple[int, Task | None, str | None]:
-    """Process task results from a dispatched wave.
-
-    Mutates ``passed`` and ``needs_agent`` in-place.
-    Returns ``(tokens_delta, failed_task, failure_kind)``.
-    """
-    tokens_delta = 0
-    failed_task: Task | None = None
-    failure_kind: str | None = None
-
-    for r in sorted(wave_result.tasks, key=lambda x: x.task_index):
-        task_obj = next(t for t in runnable if t.index == r.task_index)
-        if r.status == "passed":
-            passed.append(r.task_index)
-            tokens_delta += r.tokens_out
-            _memory_log_outcome(repo, task_obj, "passed", run_id)
-        elif r.status == "needs_agent":
-            needs_agent.append(r.task_index)
-            _print(
-                _format_status_line(
-                    r.task_index,
-                    len(tasks),
-                    task_obj.title,
-                    "NEEDS-AGENT",
-                    0.0,
-                    0,
-                    f"executor={r.executor} — orchestrate skill must dispatch via Agent tool",
-                )
-            )
-        else:  # failed
-            failed_task = task_obj
-            failure_kind = r.note or "task_failed"
-            tokens_delta += r.tokens_out
-            _memory_log_outcome(repo, task_obj, "failed", run_id, note=r.note)
-            break  # stop wave processing; outer loop also breaks via failed_task check
-
-    return tokens_delta, failed_task, failure_kind
 
 
 def main(argv: list[str] | None = None) -> int:
