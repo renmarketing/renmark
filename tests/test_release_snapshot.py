@@ -368,3 +368,70 @@ def test_snapshot_stale_symlink_target_no_raise(tmp_path: Path):
     result = release.build_version_snapshot(str(tmp_path), now="2026-06-09T00:00:00")
     assert Path(result["snapshot_dir"]).is_dir()
     assert not Path(result["snapshot_dir"]).is_symlink()
+
+
+def test_snapshot_compacts_previous_version_dir(tmp_path: Path):
+    """Building a new version's snapshot must retire the PRIOR version's full
+    unpacked dir down to a slim <ver>.meta/ dir — this is the regression test
+    for the bug where .renmark/version/<old-ver>/ accumulated full source
+    trees forever because no release-time step ever compacted them."""
+    repo = _make_snapshot_repo(tmp_path, version="1.2.3")
+    release.build_version_snapshot(str(repo), now="2026-06-09T00:00:00")
+    version_dir = repo / ".renmark" / "version"
+    assert (version_dir / "v1.2.3").is_dir()
+
+    # Bump to a new version and build again.
+    (repo / "VERSION").write_text("1.2.4\n")
+    result = release.build_version_snapshot(str(repo), now="2026-06-10T00:00:00")
+
+    # New version stays a full unpacked tree.
+    assert result["version"] == "1.2.4"
+    assert (version_dir / "v1.2.4").is_dir()
+    assert (version_dir / "v1.2.4" / "renmark" / "foo.py").exists()
+
+    # Prior version is compacted: full dir gone, slim .meta/ dir left with
+    # exactly the four metadata files.
+    assert not (version_dir / "v1.2.3").exists()
+    meta_dir = version_dir / "v1.2.3.meta"
+    assert meta_dir.is_dir()
+    assert {p.name for p in meta_dir.iterdir()} == set(release.SNAPSHOT_META_FILES)
+    assert result["compacted"] == "v1.2.3"
+
+
+def test_snapshot_does_not_compact_current_or_already_meta_dirs(tmp_path: Path):
+    """A second build of the SAME version must not compact itself, and an
+    already-compacted .meta/ sibling must be left untouched (not re-touched
+    or expanded back out)."""
+    repo = _make_snapshot_repo(tmp_path, version="1.2.3")
+    release.build_version_snapshot(str(repo), now="2026-06-09T00:00:00")
+    version_dir = repo / ".renmark" / "version"
+
+    # Rebuild the SAME version twice in a row.
+    result = release.build_version_snapshot(str(repo), now="2026-06-09T00:00:01")
+    assert result["compacted"] == ""
+    assert (version_dir / "v1.2.3").is_dir()
+
+    # Bump forward once to produce a real .meta/ sibling, then bump again —
+    # the already-compacted dir must not appear in "compacted" a second time.
+    (repo / "VERSION").write_text("1.2.4\n")
+    release.build_version_snapshot(str(repo), now="2026-06-10T00:00:00")
+    assert (version_dir / "v1.2.3.meta").is_dir()
+
+    (repo / "VERSION").write_text("1.2.5\n")
+    result = release.build_version_snapshot(str(repo), now="2026-06-11T00:00:00")
+    assert result["compacted"] == "v1.2.4"
+    assert (version_dir / "v1.2.3.meta").is_dir()
+    assert {p.name for p in (version_dir / "v1.2.3.meta").iterdir()} == set(release.SNAPSHOT_META_FILES)
+
+
+def test_compact_snapshot_dir_missing_meta_file_no_raise(tmp_path: Path):
+    """compact_snapshot_dir must not raise if one of the four expected
+    metadata files is missing — it just copies whichever ones exist."""
+    snap = tmp_path / "v9.9.9"
+    snap.mkdir()
+    (snap / "manifest.json").write_text("{}")
+    (snap / "extra-file.py").write_text("print('hi')")
+    meta_dir = release.compact_snapshot_dir(snap)
+    assert meta_dir == tmp_path / "v9.9.9.meta"
+    assert {p.name for p in meta_dir.iterdir()} == {"manifest.json"}
+    assert not snap.exists()

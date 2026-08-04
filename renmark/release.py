@@ -453,6 +453,60 @@ def _rmtree_robust(target: Path) -> None:
         shutil.rmtree(target, onerror=_on_error)
 
 
+SNAPSHOT_META_FILES = ("manifest.json", "release.md", "verification.md", "files-changed.txt")
+
+
+def compact_snapshot_dir(snap: Path) -> Path:
+    """Retire one full unpacked snapshot dir down to a slim ``<name>.meta/`` dir.
+
+    Copies only ``SNAPSHOT_META_FILES`` out of ``snap`` into a sibling
+    ``<snap.name>.meta/`` dir, then removes the original full tree. Returns the
+    new ``.meta`` dir path. Never raises: a missing meta file is skipped (the
+    resulting ``.meta`` dir simply has fewer than 4 files) rather than
+    aborting the compaction.
+    """
+    meta_dir = snap.parent / f"{snap.name}.meta"
+    if meta_dir.exists() or meta_dir.is_symlink():
+        _rmtree_robust(meta_dir)
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    for name in SNAPSHOT_META_FILES:
+        src = snap / name
+        if src.is_file():
+            shutil.copy2(src, meta_dir / name)
+    _rmtree_robust(snap)
+    return meta_dir
+
+
+def compact_previous_snapshots(repo: Path | str = ".", *, keep: str, dest_dir: Path | str | None = None) -> list[str]:
+    """Compact every full unpacked snapshot dir under the version dir except ``keep``.
+
+    ``keep`` is the current snapshot dir's name (e.g. ``v0.42.0`` or a custom
+    ``archive_stem``) — left untouched. Every sibling directory that (a) is
+    not ``keep``, (b) does not already end in ``.meta``, and (c) contains a
+    ``manifest.json`` (identifying it as one of our snapshot dirs, so
+    unrelated directories are never touched) is compacted via
+    ``compact_snapshot_dir``. Returns the list of compacted dir names (pre-
+    compaction). Never raises — an OSError while scanning degrades to an
+    empty list.
+    """
+    base = Path(dest_dir).expanduser() if dest_dir is not None else Path(repo) / VERSION_SUBDIR
+    compacted: list[str] = []
+    try:
+        candidates = sorted(base.iterdir())
+    except OSError:
+        return compacted
+    for entry in candidates:
+        if not entry.is_dir() or entry.is_symlink():
+            continue
+        if entry.name == keep or entry.name.endswith(".meta"):
+            continue
+        if not (entry / "manifest.json").is_file():
+            continue
+        compact_snapshot_dir(entry)
+        compacted.append(entry.name)
+    return compacted
+
+
 def build_version_snapshot(
     repo: Path | str = ".",
     *,
@@ -483,6 +537,12 @@ def build_version_snapshot(
       and top-level folder; also names the unpacked dir under ``dest_dir``.
     - ``verification_path`` — explicit verification artifact to embed; see
       ``_latest_verification`` for the full selection order.
+
+    Every OTHER full unpacked snapshot dir under ``base`` (any prior
+    version/stem) is retired via ``compact_previous_snapshots`` immediately
+    after this snapshot is written — compacted down to a slim ``<name>.meta/``
+    dir holding only the four metadata files. This is what keeps
+    ``.renmark/version/`` from accumulating a full source tree per release.
 
     Reuses ``build_package`` / ``package_basename`` / ``current_version`` /
     ``PACKAGE_EXCLUDES`` / ``_is_excluded``. Never raises on git/verification/
@@ -536,12 +596,15 @@ def build_version_snapshot(
     (snap / "verification.md").write_text(_latest_verification(repo, ver, verification_path), encoding="utf-8")
     (snap / "files-changed.txt").write_text(_files_changed(repo, ver), encoding="utf-8")
 
+    compacted = compact_previous_snapshots(repo, keep=snap_name, dest_dir=base)
+
     return {
         "version": ver,
         "zip": str(zip_path),
         "snapshot_dir": str(snap),
         "manifest": str(snap / "manifest.json"),
         "file_count": str(file_count),
+        "compacted": ",".join(compacted),
     }
 
 

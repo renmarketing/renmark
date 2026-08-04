@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-04 — Release snapshot never compacted the previous version tree
+
+**Severity:** medium
+**Symptom:** .renmark/version/<ver>/ accumulates full unpacked source trees forever; only v0.39.7/v0.40.0 had ever been manually compacted to .meta form, v0.41.0 was still a full 740KB tree after v0.42.0 released.
+**Root cause:** renmark/release.py::build_version_snapshot wrote a fresh full unpacked snapshot on every release but no function anywhere ever retired a prior version snapshot to a slim form, and no call site invoked such a step.
+**Fix:** Added release.compact_snapshot_dir() + release.compact_previous_snapshots(); build_version_snapshot() now calls compact_previous_snapshots(keep=<current snap name>) at the end of every build, retiring every other full snapshot dir under the version dir to <name>.meta/ (manifest.json, release.md, verification.md, files-changed.txt only). Retroactively compacted v0.41.0 -> v0.41.0.meta/ in the live repo. 4 new regression tests added.
+**Lesson:** When a release/build step creates a versioned artifact, always pair it with a retirement step for the artifact it superseded in the SAME function -- a one-off manual cleanup does not prevent recurrence.
+
+---
+
 ### 2026-07-30 — Persist approved Agency handoff
 
 **Severity:** major

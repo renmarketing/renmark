@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-04, bug) **Release snapshot never compacted the previous version tree** — When a release/build step creates a versioned artifact, always pair it with a retirement step for the artifact it superseded in the SAME function -- a one-off manual cleanup does not prevent recurrence.
+
 - (2026-08-04, .renmark/reviews/2026-08-04-713dfee3.verification.md) model `verify`: **verify-renmark-artifact-lifecycle** — 8/8 behaviors verified; failed: none; regressions: 0
 
 - (2026-08-03, .renmark/reviews/2026-08-03-e261fb8.verification.md) model `verify`: **verify-rethink-release-1-baseline-compat-coverage** — 2/2 behaviors verified; failed: none; regressions: 0
