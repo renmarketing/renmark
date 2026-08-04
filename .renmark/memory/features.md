@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-03 — Rethink Release 1: baseline/compatibility test coverage
+
+**Files:** `tests/test_artifact_home_and_baseline_compat.py`
+
+Added tests/test_artifact_home_and_baseline_compat.py covering the artifact-home convention; part of the Owner-approved renmark-architecture rethink roadmap Release 1 (REQ-30). r1-req30-baseline-measurement remains pending (requires live pipeline runs).
+
+---
+
 ### 2026-07-16 — Claude Code / Codex host parity (v0.38.0)
 
 **Files:** `plugin/`, `renmark/hosts.py`, `renmark/interaction.py`, `renmark/dispatch.py`, `renmark/codex_routing.py`, installers, host rule templates, and parity tests

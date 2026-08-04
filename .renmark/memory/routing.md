@@ -35,6 +35,8 @@ Opus and Fable are escalation-only executors — never default them for finish, 
 
 ## Learned overrides
 
+- (2026-08-03) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260804-011722-4061)
+
 - (2026-08-02) `target=orchestration-baseline.md, complexity=simple` → **haiku** (passed, run=orch-baseline-controls-fixes)
 
 - (2026-08-02) `target=renmark/analytics.py, complexity=medium` → **sonnet** (passed, run=orch-baseline-controls-fixes)
