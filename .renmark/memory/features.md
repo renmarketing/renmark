@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-03 — Rethink Release 4 (partial 1/3): extract renmark/cli/_dispatch_flags.py
+
+**Files:** `renmark/cli/_engine.py`, `renmark/cli/_dispatch_flags.py`
+
+Extracted 437 lines (_cmd_behavior + 6 _dispatch_*_flags helpers) from renmark/cli/_engine.py into a new _dispatch_flags.py module, re-exported for backward compat. Subagent dispatch was interrupted mid-task leaving a broken intermediate state; fixed directly with a coverage-inventory grep before wiring the re-export. Full suite unchanged (1936/31). _run_lifecycle.py and _wave_loop.py extractions remain.
+
+---
+
 ### 2026-08-03 — Rethink Release 3 (partial): reverse schemas.py inverted dependency for STAGES/SUBAGENT_OUTPUT_*
 
 **Files:** `renmark/schemas.py`, `renmark/lifecycle.py`, `renmark/dispatch.py`
