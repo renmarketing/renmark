@@ -4,6 +4,14 @@ Running log. Newest at top within each section. Updated by `/renmark:orchestrate
 
 ## Shipped
 
+### 2026-08-04 — Rethink Release 5 (step 4/5): extract lifecycle/reconciliation.py
+
+**Files:** `renmark/lifecycle/reconciliation.py`, `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`
+
+Extracted the reconciliation staleness-hotspot logic (milestone_signoff_readiness, read_legacy_delivery_summary, _project_workflow_delivery, _workflow_drift_notes) from stage.py into its own reconciliation.py file, per target-blueprint.md Stage 5 finding on 3+ prior CHANGELOG bugs. Logic relocated verbatim, not audited/fixed. Full suite unchanged (1936/31), independently re-verified after another truncated subagent report.
+
+---
+
 ### 2026-08-04 — Rethink Release 5 (step 3/5): extract lifecycle/preamble.py
 
 **Files:** `renmark/lifecycle/preamble.py`, `renmark/lifecycle/stage.py`, `renmark/lifecycle/__init__.py`

@@ -2,8 +2,8 @@
 
 Split from a single 1747-line module (`renmark/lifecycle.py`) into a package.
 Stage/state primitives live in `stage.py`, next-step routing in
-`next_steps.py`, and skill-preamble/context-checkpoint helpers in
-`preamble.py`; a later step splits out `reconciliation.py` per
+`next_steps.py`, skill-preamble/context-checkpoint helpers in `preamble.py`,
+and read-only cross-store reconciliation in `reconciliation.py`, per
 `.renmark/rethink/renmark-architecture/target-blueprint.md` §1.2.
 
 This package re-exports the prior surface so `from renmark.lifecycle import X`
@@ -22,6 +22,7 @@ from types import ModuleType as _ModuleType
 
 from . import next_steps as _next_steps_mod
 from . import preamble as _preamble_mod
+from . import reconciliation as _reconciliation_mod
 from . import stage as _stage
 from .next_steps import *  # noqa: F403
 from .next_steps import (  # noqa: F401
@@ -40,6 +41,15 @@ from .preamble import (  # noqa: F401
     persist_compact_checkpoint,
     preamble_tier,
     skill_preamble,
+)
+from .reconciliation import *  # noqa: F403
+from .reconciliation import (  # noqa: F401
+    _project_workflow_delivery,
+    _workflow_drift_notes,
+    legacy_delivery_summary,
+    milestone_signoff_readiness,
+    read_delivery_summary_from_legacy_state,
+    read_legacy_delivery_summary,
 )
 from .stage import *  # noqa: F403
 from .stage import (  # noqa: F401
@@ -67,19 +77,22 @@ from .stage import (  # noqa: F401
     _normalize_mode_note,
     _now,
     _program_milestone,
-    _project_workflow_delivery,
     _read_raw_mode_token,
     _safe_read_program,
     _signoff_milestone_id,
     _state_dir,
     _validate_one_artifact,
     _work_package_summaries_for_stage,
-    _workflow_drift_notes,
 )
 
 #: Implementation modules that own the re-exported names, in resolution order.
 #: Extended as `stage.py` is split into the blueprint's four modules.
-_IMPL_MODULES: tuple[_ModuleType, ...] = (_stage, _next_steps_mod, _preamble_mod)
+_IMPL_MODULES: tuple[_ModuleType, ...] = (
+    _stage,
+    _next_steps_mod,
+    _preamble_mod,
+    _reconciliation_mod,
+)
 
 
 class _LifecyclePackage(_ModuleType):
