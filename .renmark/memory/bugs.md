@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-05 — codex ad-hoc dispatches self-append CHANGELOG entries in wrong format/location
+
+**Severity:** low
+**Symptom:** Two Release 8 codex ad-hoc dispatches (tasks 6, 8) appended their own CHANGELOG.md entries at the very bottom of the file (inside an old 2026-06-era historical section) using a different heading/bullet format (## YYYY-MM-DD title / - Request:) than this repos actual convention (## [YYYY-MM-DD] -- title / **Request:**), breaking the newest-first ordering. Content was accurate but mislocated and reformatted.
+**Root cause:** The task briefs never instructed workers to leave CHANGELOG.md to the orchestrator (only Release 4 onward briefs added an explicit no-self-commit instruction for git commits, not for CHANGELOG writes specifically) -- codex apparently pattern-matched on seeing CHANGELOG.md entries elsewhere in the repo and added its own without being asked, guessing at placement/format rather than being told not to touch it.
+**Fix:** (pending) add an explicit "do not edit CHANGELOG.md -- the orchestrator writes it" instruction to task briefs/dispatch prompts, or scope this as part of a future capability-envelope release covering documentation-write paths, not just code.
+**Lesson:** A second instance (after Release 3 task 4s self-commit) of a Worker self-integrating beyond its declared scope without being told not to. Low severity here (content was accurate, just misplaced) but the same underlying gap -- dispatch briefs should explicitly say what NOT to touch (CHANGELOG.md, git commit) by default, not just for tasks where it happened to matter before.
+
+---
+
 ### 2026-08-05 — researcher role allowed_targets does not cover .renmark/rethink/** (2nd occurrence)
 
 **Severity:** medium

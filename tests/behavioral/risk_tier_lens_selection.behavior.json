@@ -1,0 +1,19 @@
+{
+  "skill": "plan",
+  "prompt": "Classify dispatch risk tier and select the matching lens at the plan/orchestrate boundary.",
+  "deterministic": {
+    "call": "ledger.work_order_for_task",
+    "assertions": [
+      "contains:high",
+      "contains:critical",
+      "contains:skeptical_user",
+      "contains:low",
+      "contains:maintainer",
+      "not_contains:unguarded"
+    ]
+  },
+  "eval": {
+    "contract": "A dispatch that touches a critical module is classified as high or critical and receives the skeptical_user lens. A low-risk dispatch is classified as low and receives the maintainer lens.",
+    "golden_ref": "risk_tier_lens_selection.golden"
+  }
+}

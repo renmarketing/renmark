@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 8 tasks 5-8 (governed-orchestration-assurance) — full test coverage, Release 8 complete
+**Request:** Tasks 5-8 of 8, Release 8 — test coverage for the risk classifier, lens policy, InspectionContract wiring, and a behavioral-eval fixture for Release 15.
+**Built:** `tests/test_ledger_risk_tier.py` (11 tests — `classify_risk_tier` boundaries + `RISK_TIERS` membership + `VERDICTS` guard). `tests/test_subagent_gate_lens.py` (5 tests — `resolve_lens_for` policy across all tier cases). `tests/test_ledger_inspection_contract.py` (5 tests — `InspectionContract` defaults, auto-population via `work_order_for_task`, `auto_contract=False` opt-out, `InspectionReport.contract_ref` round-trip, `allowed_verdicts`/`VERDICTS` identity guard). `tests/behavioral/risk_tier_lens_selection.behavior.json` — fixture authored for Release 15, not wired into `renmark/behavior.py`'s registries yet (out of scope per roadmap). Full suite: 2028 passed, 31 skipped (up from 2007, +21 net new tests, no regressions).
+**Files changed:**
+- `tests/test_ledger_risk_tier.py` — new.
+- `tests/test_subagent_gate_lens.py` — new.
+- `tests/test_ledger_inspection_contract.py` — new.
+- `tests/behavioral/risk_tier_lens_selection.behavior.json` — new.
+**Do not change:**
+- Do not wire the behavioral fixture into `renmark/behavior.py`'s `DeterministicSpec`/`EvalSpec` registry yet — that's Release 15's job.
+**Process note:** two of these codex ad-hoc dispatches (tasks 6, 8) self-appended their own CHANGELOG entries at the bottom of the file in a different format, breaking the newest-first convention — removed and replaced by this properly-placed, properly-formatted entry. Not a code defect, but a repeat of the "Workers should not self-integrate" pattern seen earlier this program (Release 3 task 4's self-commit) — logged as further evidence for Release 6-class enforcement to eventually cover documentation writes too, not just code paths.
+**Release 8 complete.** Risk-tier spike (25% disagreement, one Owner-directed re-spike used, v3 coded with 4 named fixes) → RiskTier classifier → lens policy → InspectionContract (pre-dispatch plan, distinct from InspectionReport) → full test coverage. AC-5 (Req 5) closed for Claude Code; `ledger.VERDICTS` unchanged throughout.
+
 ## [2026-08-05] — feat: rethink Release 8 task 4 (governed-orchestration-assurance) — InspectionContract (pre-dispatch plan, distinct from InspectionReport)
 **Request:** Task 4 of 8, Release 8 — the versioned, pre-dispatch `InspectionContract`, distinct from the post-dispatch `InspectionReport`, linked only by a reference field.
 **Built:** `InspectionContract` (contract_id, version, risk_tier, lenses, deterministic_gates, semantic_rubric_ref, independent_judge_required, evidence_required, allowed_verdicts defaulting to `VERDICTS`). `WorkOrder.inspection_contract: InspectionContract | None`. `InspectionReport.contract_ref: str | None` (validated via existing `_check_opt_str`). `work_order_for_task` gains `auto_contract: bool = True`, building a contract via a never-raising helper (`risk_tier` from `classify_risk_tier`, `lenses` from `resolve_lens_for`, `independent_judge_required` for high/critical) unless the caller opts out or supplies one explicitly. `VERDICTS` untouched. Fixed an existing test's exact-field-list assertion that any additive `WorkOrder` field would have broken regardless of placement. Full suite: 2007 passed, 31 skipped — no regression.
@@ -4357,9 +4370,3 @@ Changes vs. ai-inference v0.2.0:
 - CLI references `renmark-execute` / `.renmark/state/` in user-facing strings
 
 Phase 1 (next): the five `/renmark:*` skills, `plugin/plugin.json`, dispatch layer, memory module, empty-folder bootstrap. See `PLAN.md`.
-
-## 2026-08-05 capability-envelope prototype test
-- Request: add a pytest module for `.claude/hooks/capability_envelope_prototype.py` covering allow, deny, and defer paths.
-- Built: created `tests/test_capability_envelope_prototype.py` with three subprocess-based tests using `Path(__file__).resolve().parents[1]`.
-- Files changed: `tests/test_capability_envelope_prototype.py`, `CHANGELOG.md`.
-- Do not change: keep the hook protocol JSON-based and preserve the defer/no-output behavior for non-Write tools.
