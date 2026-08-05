@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 4 tasks 1+3 (governed-orchestration-assurance) — order_id binding + selector enforced mode
+**Request:** Tasks 1 and 3 of 6, Release 4 — bind task-tracker records to `WorkOrder.order_id` and add an enforced-selector mode that catches a caller suppressing an available native picker.
+**Built:** Task 1: `TaskRecord.order_id: str = ""` (new field, next to `dispatch_identity`); `create_or_reuse_task(..., order_id="")` threads it to new-record construction only — resume-reuse contract untouched, an existing record's `order_id` is never overwritten by a later call. Task 3: `interaction.SelectorBypassError(ChoiceError)` + `build_selector(..., enforce_native=False)` — when `enforce_native=True` and the caller passed `tool_available=False` while the host genuinely has a native picker (checked via a raw, un-overridden `capabilities_for` call), raises `SelectorBypassError` instead of silently falling back; every other legitimate fallback reason (single-choice, multi-option requirement, host capacity) is unaffected; default `enforce_native=False` path is byte-for-byte unchanged, preserving the roadmap's named rollback path. Named after the real 2026-06-14 "Hand-off picker not re-rendered on continuation turns" incident.
+**Files changed:**
+- `renmark/task_tracking.py` — order_id field + param.
+- `renmark/interaction.py` — SelectorBypassError + enforce_native.
+**Do not change:**
+- Do not touch `complete_worker_task`/`_require_task`/the independence-check call in this release — task creation binds to order_id, the no-self-approval gate itself is untouched (compat #6).
+- `enforce_native` must default to `False` and leave `build_selector`'s existing behavior byte-for-byte unchanged when omitted — that's the release's own named rollback path.
+
 ## [2026-08-05] — test: rethink Release 3 tasks 3-5 (governed-orchestration-assurance) — close interim fallout + wiring test
 **Request:** Tasks 3-5 of 5, Release 3 — close the interim `RepairWorkOrder.order_id` rename fallout and add the cross-entry-point work-order funnel test.
 **Built:** Task 3: `delivery_state.log_repair_work_order` now reads `work_order.order_id` (was `.work_order_id`) — `tests/test_wp8_repair_wiring.py` (5 tests) green again. Task 4: `tests/test_repair_work_order.py` updated for the same rename (3 edits: 1 assertion, 2 `RepairWorkOrder(...)` constructor kwargs); the unrelated `build_repair_work_order(..., work_order_id=...)` factory-function calls were correctly left untouched. Task 5 (codex): new `tests/test_work_order_funnel_wiring.py` proving `build_subagent_input` calls `ledger.work_order_for_task` exactly once per dispatch, guarding `SubagentInput`'s public shape, and asserting every Release 3 `WorkOrder` field is present with its documented default. Full suite green.

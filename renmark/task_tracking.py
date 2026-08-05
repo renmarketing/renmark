@@ -124,7 +124,10 @@ class TaskRecord:
     ``history`` is a short, append-only log of dated one-line notes — the
     mechanism that satisfies "preserve the history of the decision" (REQ-31
     requirement 8) without a separate event-sourced ledger: every mutating
-    call appends exactly one line here before returning.
+    call appends exactly one line here before returning. ``order_id`` is an
+    optional dispatch-correlation field (alongside ``dispatch_identity``)
+    that lets a caller tie this task record back to an external order/batch
+    identifier.
     """
 
     task_id: str = ""
@@ -136,6 +139,7 @@ class TaskRecord:
     parent_id: str | None = None
     depends_on: tuple[str, ...] = ()
     dispatch_identity: str = ""
+    order_id: str = ""
     verified_by: str | None = None
     blocker: str | None = None
     retry_count: int = 0
@@ -214,6 +218,7 @@ def create_or_reuse_task(
     parent_id: str | None = None,
     depends_on: tuple[str, ...] = (),
     dispatch_identity: str = "",
+    order_id: str = "",
 ) -> TaskRecord:
     """Create a task, or return the existing one unchanged (resume-reuse).
 
@@ -221,7 +226,10 @@ def create_or_reuse_task(
     unconditionally, every time, without checking "does this already
     exist?" first — a resumed run naturally reuses the prior record instead
     of recreating it, satisfying REQ-31's "reload and reuse existing tasks"
-    rule without extra caller-side branching.
+    rule without extra caller-side branching. ``order_id`` is recorded on
+    the newly-created record only — like every other field, a resumed call
+    with a different ``order_id`` does not overwrite an already-created
+    record.
     """
     tasks = read_tasks(repo)
     existing = tasks.get(task_id)
@@ -237,6 +245,7 @@ def create_or_reuse_task(
         parent_id=parent_id,
         depends_on=tuple(depends_on),
         dispatch_identity=dispatch_identity,
+        order_id=order_id,
     )
     rec._note(f"created (role={role})")
     tasks[task_id] = rec

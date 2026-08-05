@@ -26,6 +26,10 @@ class ChoiceError(ValueError):
     """Raised when a choice set cannot satisfy the interaction contract."""
 
 
+class SelectorBypassError(ChoiceError):
+    """Raised when a caller suppresses a native picker that genuinely exists."""
+
+
 @dataclass(frozen=True)
 class Choice:
     """One stable action shown in a host selector or numbered fallback."""
@@ -152,12 +156,17 @@ def build_selector(
     dangerous: bool = False,
     page: int = 0,
     render_surface: str | None = None,
+    enforce_native: bool = False,
 ) -> dict[str, Any]:
     """Build a host-native selector request plus a complete visible fallback.
 
     ``tool_available=False`` selects the numbered fallback, but deliberately
     says nothing about whether the session is headless. The caller must use
-    :mod:`renmark.headless` for that separate decision.
+    :mod:`renmark.headless` for that separate decision. ``enforce_native=True``
+    raises :class:`SelectorBypassError` instead of silently falling back when
+    the caller itself suppresses a native picker that genuinely exists for
+    this host (the 2026-06-14 "Hand-off picker not re-rendered on
+    continuation turns" bug class).
     """
     decision = build_choice_set(
         question,
@@ -185,6 +194,14 @@ def build_selector(
             reason="single_choice_requires_fallback",
         )
     if caps.selector_tool is None:
+        if enforce_native and tool_available is False:
+            raw_caps = capabilities_for(selected_host, render_surface=render_surface)
+            if raw_caps.selector_tool is not None:
+                raise SelectorBypassError(
+                    "caller suppressed an available native selector "
+                    f"(tool_available=False) for host {selected_host.value!r} "
+                    "with enforce_native=True"
+                )
         return _fallback_payload(
             decision,
             selected_host,
