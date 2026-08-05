@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 5 task 2 (governed-orchestration-assurance) — prototype integration test
+**Request:** Task 2 of 3, Release 5 — prove the PreToolUse prototype hook can both pass an allowed target and block a disallowed one.
+**Built:** `tests/test_capability_envelope_prototype.py` — 3 tests: allowed-target passes (`allow`), disallowed-target blocks (`deny`), non-Write/Edit tool defers (empty stdout, exit 0). Drives the real prototype script via subprocess, not a mock. 3/3 passed.
+**Files changed:**
+- `tests/test_capability_envelope_prototype.py` — new integration test.
+**Do not change:**
+- (none — additive test only)
+
 ## [2026-08-05] — feat: rethink Release 5 tasks 1+3 (governed-orchestration-assurance) — PreToolUse prototype + spike finding
 **Request:** Tasks 1 and 3 of 3, Release 5 — a bounded, 1-session, prototype-only spike answering whether pre-action, hook-time, metadata-driven allow/deny enforcement is feasible on both Claude Code and Codex, ahead of Release 6's production wiring.
 **Built:** `.claude/hooks/capability_envelope_prototype.py` — standalone stdlib-only PreToolUse hook prototype judging Write/Edit calls against `PROFILES["code-implementer"].allowed_targets` via `fnmatch`; not wired into the live `.claude/settings.json` (an inert `.settings.example.json` documents the intended wiring only). `release-5-finding.md` — written finding: Claude Code's PreToolUse hook genuinely blocks pre-action (confirmed); Codex has real OS-level sandbox enforcement but no per-profile glob matcher, so full metadata-driven parity across both hosts needs new wrapper work Release 6 doesn't currently scope. Stop-condition result: partial proceed — Release 6 proceeds on Claude Code as designed, Codex stays post-action-only (existing Layer-B) unless the Owner explicitly approves new Codex wrapper scope.
@@ -4241,3 +4249,9 @@ Changes vs. ai-inference v0.2.0:
 - CLI references `renmark-execute` / `.renmark/state/` in user-facing strings
 
 Phase 1 (next): the five `/renmark:*` skills, `plugin/plugin.json`, dispatch layer, memory module, empty-folder bootstrap. See `PLAN.md`.
+
+## 2026-08-05 capability-envelope prototype test
+- Request: add a pytest module for `.claude/hooks/capability_envelope_prototype.py` covering allow, deny, and defer paths.
+- Built: created `tests/test_capability_envelope_prototype.py` with three subprocess-based tests using `Path(__file__).resolve().parents[1]`.
+- Files changed: `tests/test_capability_envelope_prototype.py`, `CHANGELOG.md`.
+- Do not change: keep the hook protocol JSON-based and preserve the defer/no-output behavior for non-Write tools.
