@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 12/16 · task 0/2 done · current: Release 12: Context/memory governance extension + state-fragmentation spike (#22)_
+_mode: staged · Stage 13/16 · task 0/5 done · current: Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -93,13 +93,13 @@ _phases: plan → build → verify → review → release_
 - [x] Bounded 1-pass spike: read global_routing.py and codex_routing.py fully, produce a one-page overlap finding — 'No overlap, boundary is X' or 'overlap found at Y, recommend merging into Z'; a recommended merge becomes its own scoped item, not decided here.
 - [x] Extend dispatch_wave/group_tasks_by_wave with risk-tier, quota/provider-availability, max-parallelism, and rework-budget-aware scheduling — Must demonstrate it stays under release 7's measured overhead budget before shipping.
 
-## ○ Release 12: Context/memory governance extension + state-fragmentation spike (#22) — serves AC-10 (REQ-10) **(current)**
+## ● Release 12: Context/memory governance extension + state-fragmentation spike (#22) — serves AC-10 (REQ-10)
 _phases: plan → build → verify → review → release_
 
-- [ ] Bounded 1-pass spike: confirm the current authoritative state-file set vs. CLAUDE.md's documented set — Update CLAUDE.md if stale; flag anything requiring a code change as its own future item.
-- [ ] Extend hygiene.py's pruning criteria toward the proposal's 7-way category split — Stable preferences / canonical artifacts / lifecycle state / bounded task context / failure-rule registry / receipts / ephemeral conversation. Reuses checkpoint-before-compaction; once release 10 lands, fold a periodic constraint-registry re-verification sweep into /renmark:hygiene per Tier-3 Recommendation 5.
+- [x] Bounded 1-pass spike: confirm the current authoritative state-file set vs. CLAUDE.md's documented set — Update CLAUDE.md if stale; flag anything requiring a code change as its own future item.
+- [x] Extend hygiene.py's pruning criteria toward the proposal's 7-way category split — Stable preferences / canonical artifacts / lifecycle state / bounded task context / failure-rule registry / receipts / ephemeral conversation. Reuses checkpoint-before-compaction; once release 10 lands, fold a periodic constraint-registry re-verification sweep into /renmark:hygiene per Tier-3 Recommendation 5.
 
-## ○ Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation — serves AC-11 (REQ-11)
+## ○ Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation — serves AC-11 (REQ-11) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-session spike: self-benchmark resume/recovery correctness against deliberately-interrupted runs — Reuse heartbeat.py's usage-limit-pause path as the test harness; produce a scenario table (pass/fail on no-duplicate/no-orphan).
