@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 7/16 · task 0/3 done · current: Release 7: REQ-30 update release (measure + PRD gate)_
+_mode: staged · Stage 8/16 · task 0/5 done · current: Release 8: Risk-tier spike (#10b) + risk-tiered InspectionContract + lenses_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -53,14 +53,14 @@ _phases: plan → build → verify → review → release_
 - [x] If release 5's spike confirmed feasibility, wire the PreToolUse hook to path/command dimensions — One source of truth, two enforcement moments; if not feasible, document the fallback and escalate per the spike's stop condition.
 - [x] Author 'capability-envelope denial' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 7: REQ-30 update release (measure + PRD gate) — serves REQ-30 **(current)**
+## ● Release 7: REQ-30 update release (measure + PRD gate) — serves REQ-30
 _phases: plan → build → verify → review → release_
 
-- [ ] Measure real current per-dispatch baseline overhead across the 4 representative scenarios — Reuse release 1's captured numbers where still fresh, re-measure where stale.
-- [ ] Run /renmark:prd's UPDATE gate to name the Critical-tier gate as a REQ-30 allowed gate + set a measured overhead budget — Releases 8-16 must demonstrate they stay under this budget before shipping.
-- [ ] Absorbed: close the renmark-architecture rethink's lingering r1-req30-baseline-measurement task — Carried over from the prior, closed renmark-architecture-rethink-roadmap program (archived at .renmark/rethink/renmark-architecture/archive/closed-program-final-2026-08-04.json), whose Release 1 task r1-req30-baseline-measurement was never marked done. This release's own baseline-overhead measurement (r7-measure-baseline-overhead) satisfies it; not treated as a new ask.
+- [x] Measure real current per-dispatch baseline overhead across the 4 representative scenarios — Reuse release 1's captured numbers where still fresh, re-measure where stale.
+- [x] Run /renmark:prd's UPDATE gate to name the Critical-tier gate as a REQ-30 allowed gate + set a measured overhead budget — Releases 8-16 must demonstrate they stay under this budget before shipping.
+- [x] Absorbed: close the renmark-architecture rethink's lingering r1-req30-baseline-measurement task — Carried over from the prior, closed renmark-architecture-rethink-roadmap program (archived at .renmark/rethink/renmark-architecture/archive/closed-program-final-2026-08-04.json), whose Release 1 task r1-req30-baseline-measurement was never marked done. This release's own baseline-overhead measurement (r7-measure-baseline-overhead) satisfies it; not treated as a new ask.
 
-## ○ Release 8: Risk-tier spike (#10b) + risk-tiered InspectionContract + lenses — serves AC-5 (REQ-5)
+## ○ Release 8: Risk-tier spike (#10b) + risk-tiered InspectionContract + lenses — serves AC-5 (REQ-5) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-session spike: hand-validate a deterministic risk-tier classifier against 15-20 real past dispatches — Design and validate against .renmark/analytics/task-runs.jsonl / ledger history; document disagreement rate against a human-assigned tier. Stop condition: Owner-acceptable disagreement rate, or one re-spike if criteria redefined.
