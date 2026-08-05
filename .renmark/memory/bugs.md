@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-05 — researcher role allowed_targets does not cover .renmark/rethink/** (2nd occurrence)
+
+**Severity:** medium
+**Symptom:** check_capability_envelope pre-dispatch denies role=researcher writing to .renmark/rethink/<slug>/*.md (Release 7 task 1, Release 8 task 1) because ProfileSpec.allowed_targets for researcher is scoped to .renmark/research/**/*.md only -- but this repos own REQ-28 rethink pipeline convention writes ALL its stage artifacts (survey, baseline, prd-acceptance-map, external-benchmark, modularity-assessment, classification, target-blueprint, roadmap, spike findings) under .renmark/rethink/<slug>/, never under .renmark/research/. Every rethink-stage researcher dispatch in this program has needed a manual role reassignment to docs-editor to pass the envelope check.
+**Root cause:** subagent_profiles.py PROFILES["researcher"].allowed_targets was set to .renmark/research/**/*.md without cross-checking it against REQ-28/the rethink SKILL.md file-conventions table, which predates Release 6s enforcement wiring and has always written under .renmark/rethink/, not .renmark/research/ -- the two directories serve genuinely different purposes (.renmark/research/ = ad-hoc external research artifacts from renmark:researcher role in feature/plan work; .renmark/rethink/ = the rethink pipelines own staged transformation artifacts) but researcher role was only ever scoped for the former.
+**Fix:** (pending) either broaden researcher.allowed_targets to include .renmark/rethink/**/*.md, or -- likely the more correct fix -- have the rethink skill dispatch its stage/spike-finding tasks with a role better scoped for that convention (a new rethink-artifact-writer role, or reuse docs-editor as already done twice now) rather than researcher. Scope to a future governed-orchestration-assurance release (Release 12, context/memory governance, or a small standalone fix), not fixed inline here.
+**Lesson:** Live dogfooding caught the same capability-envelope gap twice in a row (Release 7 task 1, Release 8 task 1) -- a real, systemic role/target mismatch for this repos own rethink pipeline, not a one-off plan authoring mistake. When check_capability_envelope denies a path twice for the same role across different releases, treat it as a profile-definition bug, not a per-task fix.
+
+---
+
 ### 2026-08-05 — enforce_host_agent_dispatch_scope has no bookkeeping-path allowlist
 
 **Severity:** medium
