@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-05 — docs-editor allowed_targets glob (**/*.md) never matches root-level .md files
+
+**Severity:** medium
+**Symptom:** check_capability_envelope(role="docs-editor", paths=["CLAUDE.md"]) returns path passed=False even though docs-editor is clearly the correct role for editing root-level project markdown (CLAUDE.md, AGENTS.md, README.md). Confirmed live: fnmatch.fnmatch("CLAUDE.md", "**/*.md") is False -- Pythons stdlib fnmatch has no globstar semantics; ** is treated as literal repeated *, and the pattern still requires a literal / character to appear in the tested string, which a root-level filename never has.
+**Root cause:** subagent_profiles.py docs-editor.allowed_targets = "**/*.md, plugin/skills/**/*.md, docs/**" was written assuming shell-style globstar ("** matches zero or more directories, including none"), but Release 6 (Task 3) wired check_capability_envelope to use Pythons plain fnmatch.fnmatch, which has no such semantics -- this is the 4th occurrence this session of a capability-envelope path-matching gap (after researcher x2, audit-reader x1), but the first that is a genuine glob-syntax defect rather than a role/target mismatch.
+**Fix:** (pending) either add an explicit root-level pattern ("*.md") to docs-editor.allowed_targets, or replace the fnmatch-based matcher in subagent_gate.py/the prototype hook with a matcher that supports real globstar semantics (e.g. pathlib.Path.match with proper ** handling, or a small custom translator). Scope to a future release, not fixed inline -- this run works around it by dispatching CLAUDE.md/AGENTS.md edits under role=general-purpose instead of docs-editor.
+**Lesson:** 4 occurrences of the same underlying capability-envelope coverage gap across Releases 7, 8, 11, 12 -- worth a dedicated remediation pass rather than continuing to patch role assignments one dispatch at a time. Also a reminder that ** in Python fnmatch is NOT shell globstar -- any allowed_targets pattern using ** should be verified with a real fnmatch.fnmatch() call, not assumed.
+
+---
+
 ### 2026-08-05 — codex ad-hoc dispatches self-append CHANGELOG entries in wrong format/location
 
 **Severity:** low
