@@ -23,10 +23,11 @@ _phases: plan → build → verify → review → release_
 ## ○ Release 3: Canonical work-order reconciliation — serves AC-1 (REQ-1)
 _phases: plan → build → verify → review → release_
 
-- [ ] Add risk_tier/capability_envelope_ref/lens/schema_version to ledger.WorkOrder — Additive fields only; pytest -q count stays green except for new additions.
+- [ ] Add risk_tier (untyped placeholder), capability_envelope_ref, lens, schema_version, and full RenmarkWorkOrder contract fields to ledger.WorkOrder — Additive fields only, pytest -q count stays green except for new additions. risk_tier is str|None (design decision, Gap 1): Release 8 defines the real RiskTier enum per modularity-assessment.md sec6's module-boundary lean. Also adds correlation_id, idempotency_key, dependencies, scope, budget, routing, constraints, interaction_policy as additive placeholders (enforcement deferred per field table in roadmap.md).
 - [ ] Add ledger.work_order_for_task(task, role, ...) -> WorkOrder and call it from dispatch.build_subagent_input — One funnel all 6 dispatch call sites already use; SubagentInput public field names stay stable (REQ-20 metadata-only).
 - [ ] Rename RepairWorkOrder.work_order_id to order_id, require it resolves to a real WorkOrder — Keep severity/source_inspection_id/description/acceptance_criteria unchanged.
 - [ ] Add wiring test asserting all 6 dispatch call sites produce a WorkOrder via the shared funnel — Fast-path, feature, debug, orchestrate, rethink, resume — no bespoke path.
+- [ ] Add schema test asserting every RenmarkWorkOrder contract field is present with the stated default/optional type — Covers the field-added-now vs enforcement-deferred table in roadmap.md's revised Release 3 section.
 
 ## ○ Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard — serves AC-3, AC-4 (REQ-3, REQ-4)
 _phases: plan → build → verify → review → release_
@@ -44,9 +45,13 @@ _phases: plan → build → verify → review → release_
 ## ○ Release 6: Capability-envelope enforcement wiring — serves AC-2 (REQ-2)
 _phases: plan → build → verify → review → release_
 
-- [ ] Add subagent_gate.check_capability_envelope(role, requested_scope) -> EnvelopeVerdict — Same shape as existing SubagentVerdict, never raises; called from the same pre-dispatch funnel subagent_gate's justification check already runs from.
-- [ ] Wire dispatch_wave() to actually call enforce_wave_dispatch_scopes — Currently never called in production — closes F1.
-- [ ] If release 5's spike confirmed feasibility, wire the PreToolUse hook to allowed_targets — One source of truth, two enforcement moments; if not feasible, document the fallback and escalate per the spike's stop condition.
+- [ ] Expand subagent_gate.check_capability_envelope(role, requested_scope) -> EnvelopeVerdict to cover path/command/network_domain/git_action/external_action/spend_timeout dimensions — Same shape as existing SubagentVerdict, never raises; called from the same pre-dispatch funnel subagent_gate's justification check already runs from.
+- [ ] Wire dispatch_wave() to actually call enforce_wave_dispatch_scopes (path dimension) — Currently never called in production — closes F1. Becomes 'enforced' status this release.
+- [ ] Add subagent_profiles.ProfileSpec.allowed_commands, enforced at the pre-dispatch funnel — Mirrors allowed_targets; host-independent Python check, 'enforced' this release (Gap 2).
+- [ ] Wire a hard per-dispatch spend/timeout ceiling check into the pre-dispatch funnel, reusing cost.py — Host-independent, 'enforced' this release (Gap 2).
+- [ ] Add EnvelopeControlStatus structure/table: per-control per-host status (enforced/verified_after/advisory/unsupported) — Gap 2 honesty requirement — network-domain, git-action, external-action restrictions recorded advisory/unsupported this release, not claimed enforced; full enforcement rolled to a named follow-up.
+- [ ] If release 5's spike confirmed feasibility, wire the PreToolUse hook to path/command dimensions — One source of truth, two enforcement moments; if not feasible, document the fallback and escalate per the spike's stop condition.
+- [ ] Author 'capability-envelope denial' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
 ## ○ Release 7: REQ-30 update release (measure + PRD gate) — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -59,8 +64,10 @@ _phases: plan → build → verify → review → release_
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-session spike: hand-validate a deterministic risk-tier classifier against 15-20 real past dispatches — Design and validate against .renmark/analytics/task-runs.jsonl / ledger history; document disagreement rate against a human-assigned tier. Stop condition: Owner-acceptable disagreement rate, or one re-spike if criteria redefined.
-- [ ] Add RiskTier enum + lens: str | None as additive fields to ledger.InspectionReport — VERDICTS stays the only ledger-legal verdict vocabulary.
-- [ ] Add resolve_lens_for(work_order) -> LensName policy function — In the subagent_profiles.py/subagent_gate.py orbit; explicitly not cost.requires_escalation.
+- [ ] Define the real RiskTier enum; migrate WorkOrder.risk_tier from Release 3's str|None placeholder to the typed enum — Additive-compatible type narrowing, not a rename. Add lens: str|None to InspectionReport. VERDICTS stays the only ledger-legal verdict vocabulary.
+- [ ] Build InspectionContract: versioned, pre-dispatch object (risk_tier, lenses, deterministic_gates, semantic_rubric_ref, independent_judge_required, evidence_required, allowed_verdicts) attached to WorkOrder before inspection runs — Gap 3 fix — distinct from InspectionReport (post-dispatch record). InspectionReport gains contract_ref so every report cites the contract version it was graded against.
+- [ ] Add resolve_lens_for(work_order) -> LensName policy function; also constructs the InspectionContract — In the subagent_profiles.py/subagent_gate.py orbit; explicitly not cost.requires_escalation.
+- [ ] Author 'risk-tier/lens selection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
 ## ○ Release 9: Calibrated blind LLM-judge (3-state + bias controls) — serves AC-6 (REQ-6)
 _phases: plan → build → verify → review → release_
@@ -73,9 +80,12 @@ _phases: plan → build → verify → review → release_
 ## ○ Release 10: Failure-derived constraint registry — serves AC-7 (REQ-7)
 _phases: plan → build → verify → review → release_
 
-- [ ] Add recurrence.active_guards_for(task_context) -> list[Guard] — Read-side accessor over existing durable_guard entries; no new store, no new schema.
-- [ ] Wire subagent_gate.py to consume active_guards_for from the pre-dispatch funnel — Same funnel release 6 added check_capability_envelope to.
-- [ ] Write the ADR distinguishing Req 7 (constraint registry) from REQ-24 (recurrence.py's existing per-run/fingerprint role) — Flagged as needed 'before Release E' by prd-acceptance-map.
+- [ ] Write the ADR distinguishing Req 7 (curated cross-run failure-rule registry) from REQ-24 (recurrence.py's per-run/fingerprint role) — precondition for the rest of this release — Flagged as needed 'before Release E' by prd-acceptance-map.md (Gap 4).
+- [ ] Add a genuinely new FailureRule structure inside recurrence.py (rule_id, status, trigger, applicability, required_behavior, prohibited_failure, source_evidence, enforcement, regression_test_ref, created_at, last_triggered_at, review_after) — No new top-level module. Distinct from DurableGuard/durable_guard, not a wrapper over it (Gap 4).
+- [ ] Wire recurrence.py's existing durable_guard entries as ONE input signal that can seed a FailureRule's source_evidence — Never treated as the registry itself.
+- [ ] Add dedup/contradiction detection over FailureRule entries and a review_after-driven review mechanism via /renmark:hygiene — Lifecycle: proposed -> active -> deprecated. Reuses release 12's hygiene extension point.
+- [ ] Wire subagent_gate.py to consume only status:active FailureRule entries from the pre-dispatch funnel, populating WorkOrder.constraints — Same funnel release 6 added check_capability_envelope to; consumes release 3's WorkOrder.constraints placeholder field.
+- [ ] Author 'failure-rule injection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
 ## ○ Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling — serves AC-9 (REQ-9)
 _phases: plan → build → verify → review → release_
@@ -92,9 +102,11 @@ _phases: plan → build → verify → review → release_
 ## ○ Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation — serves AC-11 (REQ-11)
 _phases: plan → build → verify → review → release_
 
-- [ ] Bounded 1-session spike: self-benchmark resume/recovery correctness against deliberately-interrupted runs — Reuse heartbeat.py's usage-limit-pause path as the test harness; produce a scenario table (pass/fail on no-duplicate/no-orphan). Stop condition: table produced; gaps become a scoped Improve item.
-- [ ] Add schema_version and attempt_id/correlation_id fields to the 4 existing ledger event kinds — Additive only.
+- [ ] Bounded 1-session spike: self-benchmark resume/recovery correctness against deliberately-interrupted runs — Reuse heartbeat.py's usage-limit-pause path as the test harness; produce a scenario table (pass/fail on no-duplicate/no-orphan).
+- [ ] Fix any orphan-detection/duplicate-integration gap the benchmark surfaces, bounded to 2 sessions total; escalate anything over budget as a scoped Owner follow-up — Gap 5 fix — AC-11 closes only once gaps are fixed-in-budget or explicitly Owner-acknowledged as a follow-up; no indefinite deferral.
+- [ ] Add schema_version and attempt_id/correlation_id fields to the 4 existing ledger event kinds — Additive only; correlation_id ties back to Release 3's WorkOrder.correlation_id placeholder.
 - [ ] Reconcile analytics.py to read from ledger.py as its source for guardrail metrics — Instead of maintaining a second parallel event system.
+- [ ] Author 'retry/rework survives resume' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
 ## ○ Release 14: Guardrail metrics — serves AC-13 (REQ-13)
 _phases: plan → build → verify → review → release_
@@ -104,7 +116,9 @@ _phases: plan → build → verify → review → release_
 ## ○ Release 15: 20-case behavioral eval suite authorship — serves AC-8 (REQ-8)
 _phases: plan → build → verify → review → release_
 
-- [ ] Author the 20 named behavioral-eval fixtures against renmark/behavior.py's existing deterministic/eval-tier split — Fast-path accept/reject, worker replan-refusal, inspector-can't-repair, judge-can't-override-deterministic-fail, blind-judge-input-exclusion, lens-triggering, task-tracker transitions, retry/rework survives resume, etc. Fixture authorship only, no new infrastructure; deterministic tier stays CI-safe (no model call, no network, no spend by default).
+- [ ] Author remaining behavioral-eval fixtures not claimed by an earlier release (worker replan-refusal, inspector-can't-repair, judge-can't-override-deterministic-fail, etc.) — Gap 6 fixture-split — fast-path (R1), task-tracker (R4), capability-envelope (R6), risk-tier/lens (R8), judge (R9), failure-rule (R10), retry/rework-resume (R13) authored alongside their own releases; only the remainder lands here.
+- [ ] Wire the full 20-case suite together against renmark/behavior.py's existing deterministic/eval-tier split — Combines fixtures authored in releases 1, 4, 6, 8, 9, 10, 13 with this release's own.
+- [ ] Make the deterministic tier CI-gating (hard requirement, not merely green) — Eval tier remains opt-in via RENMARK_EVAL_RUNNER_CMD, unchanged. Deterministic tier stays CI-safe: no model call, no network, no spend by default.
 
 ## ○ Release 16: /renmark:rethink self-upgrade — serves AC-12 (REQ-12)
 _phases: plan → build → verify → review → release_

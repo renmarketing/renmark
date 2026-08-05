@@ -2,6 +2,7 @@
 artifact_type: rethink-roadmap
 schema_version: 1
 created_at: 2026-08-04T00:00:00Z
+revised_at: 2026-08-05T00:00:00Z
 source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 related_plan: null
 generator: sonnet
@@ -38,6 +39,28 @@ check-in decision (prd-acceptance-map.md):
 The 7 Unknown-needs-a-spike classification items are folded in as their own
 budget-boxed spike tasks (never open-ended) inside the release whose design
 question they answer, per classification.md's stop conditions.
+
+---
+
+## Stage 8 revision — 2026-08-05
+
+An independent peer review of the full 16-release roadmap (performed after the
+Execution Gate approved it and after Release 1 ran, partially — see
+`.renmark/reviews/2026-08-05-8ea7b27.verification.md`, corrected to
+`completion_state: partial`) found 6 specific, credible gaps in Releases 3,
+6, 8, 10, 13, and 15. This revision fixes those 6 releases in place, reusing
+Stages 1-7's artifacts (`intake.md`, `survey.md`, `baseline.md`,
+`prd-acceptance-map.md`, `external-benchmark.md`, `modularity-assessment.md`,
+`classification.md`, `target-blueprint.md`) unchanged — Stages 1-7 were not
+rerun. **Releases 1 and 2 were not flagged and were not touched**, with one
+narrow exception required by Gap 6 below: Gap 6 (test sequencing) itself
+names small, additive edits to the "Migration steps" bullet of Releases 1, 4,
+and 9 (adding one fixture-authorship line each, and correcting one piece of
+Release 1's compat-guarantee prose to match the test file's actual floor
+semantics) — no other content in Releases 1, 2, 4, 9 changed. All 16 release
+numbers, their ordering, and the release-sequence table are unchanged. The
+6 gaps and this release's fixes are summarized inline in each affected
+release's section below.
 
 ---
 
@@ -120,9 +143,14 @@ Req12→R16, Req13→R14.
 - **AC-ids satisfied/advanced**: none of AC-1..13 directly (this release is
   the prerequisite substrate); unblocks REQ-30's numeric baseline that
   release 7 depends on.
-- **Compatibility guarantee**: all 9 baseline.md checks turned into
-  executable assertions (1: `pytest -q` == 1970 passed/31 skipped pinned;
-  2: `classify_fast_path` 5-signal contract; 3: `verify_worker_scope` Layer-B
+- **Compatibility guarantee** *(prose corrected 2026-08-05 — peer-review
+  Gap 6a: this bullet described the count as pinned, stricter than what the
+  actual test asserts)*: all 9 baseline.md checks turned into executable
+  assertions (1: `pytest -q` >= 1970 passed — a floor/no-regression
+  assertion, matching `tests/test_governed_orchestration_baseline_compat.py`
+  's `assert passed >= 1970`, not a pinned-exact count; 31 skipped is the
+  baseline figure, also not itself pinned exact; 2: `classify_fast_path`
+  5-signal contract; 3: `verify_worker_scope` Layer-B
   git-diff semantics; 4: `check_dispatch_independence` raise conditions;
   5: `VERDICTS` vocabulary closed-set; 6: `complete_worker_task` no-self-
   approval gate; 7: `assert_metadata_only`; 8: REQ-30 qualitative guarantees
@@ -136,6 +164,9 @@ Req12→R16, Req13→R14.
   Orchestrate, Rethink) into `.renmark/memory/orchestration-baseline.md`'s
   currently-unpopulated table (real token/wall-clock/dispatch-count spend —
   requires its own cost-preview + Owner go-ahead per that file's own flag).
+  Per Gap 6's fixture-split (2026-08-05), also author the "fast-path
+  accept/reject" behavioral-eval fixture(s) against `classify_fast_path`'s
+  contract here, for Release 15 to wire into the full 20-case suite.
 - **Observability hook**: `.renmark/memory/orchestration-baseline.md` gets
   real numbers in place of "not yet measured"; the 9 checks become part of
   the standard `pytest -q` run so any future release's compat claim is
@@ -174,12 +205,32 @@ Req12→R16, Req13→R14.
 
 ### Release 3 — Canonical work-order reconciliation
 
+*(Revised 2026-08-05 — peer-review Gap 1: this section was too thin and
+forward-referenced an undefined `RiskTier` type; see the design decision and
+expanded scope below.)*
+
 - **Value**: the three independently-shaped "work order" dataclasses
   (`ledger.WorkOrder`, `dispatch.SubagentInput`, `dispatch.RepairWorkOrder`)
   become one canonical anchor + two projections, closing the field-name
   drift (`order_id` vs `work_order_id`) that blocks every downstream
-  governance capability from having one thing to reference.
+  governance capability from having one thing to reference — and the anchor
+  now carries schema room for the full accepted `RenmarkWorkOrder` contract,
+  not just 4 fields, so later releases aren't retrofitting the schema.
 - **AC-ids**: AC-1 (Req 1) — target-blueprint.md's Release B.
+- **Design decision — `risk_tier` typing (Gap 1)**: Release 3 adds
+  `risk_tier` as an **untyped placeholder** (`risk_tier: str | None`), not a
+  `RiskTier` enum. Release 8 defines the real `RiskTier` enum and migrates
+  the field's type. Chosen over "Release 3 defines a minimal `RiskTier` stub"
+  because modularity-assessment.md §6 explicitly places the `RiskTier` enum
+  inside the "lens selection (risk-tiered inspection)" extension point —
+  "a thin wrapper `RiskTier` enum consumed by `emit_inspection_verdict`'s
+  caller" — which is Release 8's module-boundary seam
+  (`subagent_profiles.py`/`ledger.InspectionReport` orbit), not Release 3's
+  work-order-anchor seam (§5). Defining the enum here would put type
+  ownership in the wrong module relative to that stated boundary; the
+  placeholder keeps Release 3 additive-only while Release 8 owns the real
+  vocabulary (an additive-compatible type narrowing, not a rename, when it
+  lands).
 - **Compatibility guarantee**: #1 (`pytest -q` count, only additive fields);
   #7 (REQ-20 metadata-only — `SubagentInput`'s public field names
   `task_spec`/`required_files`/`verifier_expectations` stay stable, only
@@ -187,25 +238,52 @@ Req12→R16, Req13→R14.
   files (`test_dispatch.py`, `test_dispatch_isolation.py`,
   `test_dispatch_scope_generalization.py`, `test_cross_host_dispatch_e2e.py`,
   `test_r0_2_dispatch_regression_baseline.py`) must stay green unmodified in
-  their assertions on field names.
-- **Migration steps**: (a) add additive fields to `ledger.WorkOrder`
-  (`risk_tier`, `capability_envelope_ref`, `lens`, `schema_version`); (b) add
+  their assertions on field names; all newly-added fields below are
+  additive (`Optional`/default-empty), so no existing `WorkOrder`
+  construction site breaks.
+- **Migration steps**: (a) add additive fields to `ledger.WorkOrder` —
+  `risk_tier: str | None` (placeholder, see design decision above),
+  `capability_envelope_ref`, `lens: str | None`, `schema_version`, and, to
+  cover more of the accepted `RenmarkWorkOrder` contract now rather than
+  retrofitting later: `correlation_id: str | None`, `idempotency_key:
+  str | None`, `dependencies: list[str]` (default empty), `scope: dict |
+  None` (or a minimal `WorkOrderScope` stub), `budget: dict | None`,
+  `routing: dict | None`, `constraints: dict | None`, `interaction_policy:
+  dict | None` — present in the schema, not necessarily wired to real
+  enforcement yet (see the field table below); (b) add
   `ledger.work_order_for_task(task, role, ...) -> WorkOrder`; (c) call it
   once inside `dispatch.build_subagent_input` (the one funnel all 6 dispatch
   call sites already use); (d) rename `RepairWorkOrder.work_order_id` to
   `order_id`, require it to resolve to a real `WorkOrder.order_id` emitted
   by `work_order_for_task`; keep `severity`/`source_inspection_id`/
   `description`/`acceptance_criteria` unchanged (repair-specific, legitimate).
+- **Schema fields added now vs. enforcement deferred to which release**:
+
+  | Field | Schema lands | Real enforcement/consumption lands in |
+  |---|---|---|
+  | `risk_tier` (placeholder `str\|None`) | Release 3 | Release 8 (typed `RiskTier` enum + classifier) |
+  | `capability_envelope_ref` | Release 3 | Release 6 (envelope enforcement) |
+  | `lens` | Release 3 | Release 8 (lens vocabulary + `resolve_lens_for`) |
+  | `schema_version` | Release 3 | Release 3 (self-contained) |
+  | `correlation_id` / `idempotency_key` | Release 3 | Release 13 (durable-events field completeness) |
+  | `dependencies` | Release 3 | Release 11 (dispatch scheduling) |
+  | `scope` | Release 3 | Release 6 (capability-envelope wiring) |
+  | `budget` / `routing` | Release 3 | Release 11 (policy-aware dispatch scheduling) |
+  | `constraints` | Release 3 | Release 10 (failure-rule registry injection) |
+  | `interaction_policy` | Release 3 | Release 4 (selector-bypass guard) |
+
 - **Observability hook**: a new cross-entry-point wiring test asserting
   every one of the 6 dispatch call sites (fast-path, feature, debug,
   orchestrate, rethink, resume) produces a `WorkOrder` via the shared
-  funnel, not a bespoke path.
+  funnel, not a bespoke path; a schema test asserting every field in the
+  table above is present with the stated default/optional type.
 - **Rollback path**: revert the commit; `SubagentInput`'s public shape is
   unchanged so no caller-side rollback is needed.
 - **Owner acceptance scenario**: Owner triggers a repair dispatch and
   confirms its `RepairWorkOrder.order_id` resolves to a real, ledger-visible
   `WorkOrder` — closing the "repair-work-order emission is prose-invoked
-  only" (F2) residual.
+  only" (F2) residual — and reviews the field table above to confirm which
+  fields are schema-only today vs. already enforced.
 
 ### Release 4 — Task tracker bound to `WorkOrder.order_id` + selector bypass guard
 
@@ -223,7 +301,10 @@ Req12→R16, Req13→R14.
   fallback where `hosts.capabilities_for` reports a native picker available
   — same `ChoiceSet`/fallback dataclasses, no new module; (c) cosmetic
   "concise displayed list" format for Role/worker+model/Budget/Verification
-  deferred to this release per prd-acceptance-map's own deferral note.
+  deferred to this release per prd-acceptance-map's own deferral note; (d)
+  per Gap 6's fixture-split (2026-08-05), author the "task-tracker
+  transitions" behavioral-eval fixture(s) against this release's
+  `order_id`-bound task records, for Release 15 to wire in.
 - **Observability hook**: a `bugs.md`-style regression test named after the
   2026-06-14 "Hand-off picker not re-rendered on continuation turns"
   incident, proving the enforced-mode guard catches that exact failure mode.
@@ -262,42 +343,100 @@ Req12→R16, Req13→R14.
 
 ### Release 6 — Capability-envelope enforcement wiring
 
-- **Value**: closes AC-2's `failed` status — `subagent_profiles.
+*(Revised 2026-08-05 — peer-review Gap 2: this section originally only
+covered path enforcement; Req 2 also requires command allowlists,
+network-domain, git-action, and external-action restrictions, spend/timeout
+restrictions, and honest per-control status reporting. See the expanded
+migration steps and the new status table below.)*
+
+- **Value**: closes AC-2's `failed` status across all of Req 2's control
+  dimensions, not paths alone — `subagent_profiles.
   ProfileSpec.allowed_targets` stops being "informational for now" prose and
   becomes a real, enforced check; `fast_path.verify_worker_scope`/
   `dispatch.enforce_wave_dispatch_scopes` (fully built, fully tested, never
-  called in production) gets a real production caller (closes F1).
-- **AC-ids**: AC-2 (Req 2) — target-blueprint.md's Release C; explicitly
-  named BLOCKING PRD debt in prd-acceptance-map.md ("Any release sequencing
+  called in production) gets a real production caller (closes F1); command,
+  spend/timeout, network, git-action, and external-action controls get an
+  honest per-control enforcement-status record rather than an implied
+  blanket "enforced" claim.
+- **AC-ids**: **AC-2 partially advanced (Req 2)** — paths, commands, and
+  spend/timeout become mechanically enforced this release; network-domain,
+  git-action, and external-action restrictions remain `advisory`/
+  `unsupported` pending a scoped follow-up (see status table below). Per the
+  cross-cutting acceptance-tracing requirement, this release does not claim
+  AC-2 fully "met." Still target-blueprint.md's Release C; still the
+  BLOCKING PRD debt named in prd-acceptance-map.md ("Any release sequencing
   must land Release C before claims of Worker/Architect/Inspector
-  containment are made").
+  containment are made") — that debt is resolved for the path/command/
+  spend dimensions this release, not for network/git/external-action.
 - **Compatibility guarantee**: #3 (Layer-B git-diff semantics stay the
   authoritative post-action check — the new hook, if release 5's spike
   succeeded, is additive defense-in-depth, never a replacement); #9
   (`renmark:inspector` stays read-only — the envelope reads
-  `allowed_targets`, it does not grant new write targets).
-- **Migration steps**: (a) add
+  `allowed_targets`/the new control fields, it does not grant new write
+  targets); the new control dimensions are additive checks on the same
+  `EnvelopeVerdict` shape, not a second verdict type.
+- **Migration steps**: (a) expand
   `subagent_gate.check_capability_envelope(role, requested_scope) ->
-  EnvelopeVerdict` (same shape as existing `SubagentVerdict`, never raises),
-  called from the same pre-dispatch funnel `subagent_gate`'s existing
-  justification check already runs from — one function addition, not an
-  N-call-site rewrite; (b) wire `dispatch_wave()` to actually call
-  `enforce_wave_dispatch_scopes` (currently never called — the concrete F1
-  fix); (c) if release 5's spike confirmed hook feasibility, wire the
-  `PreToolUse` hook to read the same `allowed_targets` field, as a second,
+  EnvelopeVerdict` (same shape as existing `SubagentVerdict`, never raises)
+  to accept a control dimension — `path`, `command`, `network_domain`,
+  `git_action`, `external_action`, `spend_timeout` — called from the same
+  pre-dispatch funnel `subagent_gate`'s existing justification check already
+  runs from; (b) wire `dispatch_wave()` to actually call
+  `enforce_wave_dispatch_scopes` for the `path` dimension (currently never
+  called — the concrete F1 fix; becomes `enforced` this release); (c)
+  **command allowlist**: extend `subagent_profiles.ProfileSpec` with an
+  `allowed_commands` field (mirrors `allowed_targets`), enforced at the same
+  pre-dispatch funnel — `enforced` this release, host-independent (pure
+  Python check); (d) **spend/timeout restriction**: wire a hard per-dispatch
+  spend/timeout ceiling check into the same funnel, reusing `cost.py`'s
+  existing budget/tier machinery as the enforcement backend — `enforced`
+  this release, host-independent; (e) **network-domain / git-action /
+  external-action restrictions**: no OS-level or hook-level mechanism is
+  confirmed to exist on either host today (release 5's spike only prototyped
+  the path dimension); this release does NOT claim mechanical enforcement of
+  these three — they are recorded `advisory` (a constraints-object statement
+  in the dispatch packet, no code-level block) or `unsupported` where even
+  that isn't wired yet, and full enforcement is rolled to an explicitly
+  named, Owner-visible follow-up (not yet a numbered release in this
+  program); (f) if release 5's spike confirmed `PreToolUse` hook
+  feasibility, wire it for the `path`/`command` dimensions as a second,
   pre-action enforcement moment (one source of truth, two enforcement
   moments — not three competing envelope definitions); if not, document the
-  fallback and escalate per the spike's stop condition.
+  fallback per the spike's stop condition; (g) per Gap 6's fixture-split,
+  author the "capability-envelope denial" behavioral-eval fixture(s) against
+  this release's own denial paths, for Release 15 to wire into the full
+  20-case suite.
+- **Per-control status table (new deliverable — Gap 2)**: committed as part
+  of this release regardless of which dimensions remain advisory/unsupported
+  — either as a small `EnvelopeControlStatus` structure consumed by
+  `check_capability_envelope`'s callers, or a documented table in this
+  release's own record. Status vocabulary: `enforced` / `verified_after` /
+  `advisory` / `unsupported`.
+
+  | Control | Claude Code | Codex |
+  |---|---|---|
+  | Path/target scope | `enforced` (pre-dispatch + post-action Layer-B) | `verified_after` (post-action only; no pre-dispatch code path confirmed) |
+  | Command allowlist | `enforced` | `enforced` |
+  | Spend/timeout ceiling | `enforced` | `enforced` |
+  | Network-domain restriction | `advisory` | `advisory` |
+  | Git-action restriction | `advisory` | `advisory` |
+  | External-action restriction | `unsupported` | `unsupported` |
+
 - **Observability hook**: new hook-level (if wired) + pre-dispatch-verdict
   integration tests demonstrating pre-action and pre-dispatch denial for an
-  out-of-envelope tool call/scope.
+  out-of-envelope tool call/scope/command/spend; a test asserting the status
+  table's claims match what the code actually does (no `enforced` claim
+  without a passing denial-integration test backing it).
 - **Rollback path**: revert the wiring commit; `check_capability_envelope`
   is additive so reverting drops enforcement back to today's post-action-
   only state, not a broken state.
 - **Owner acceptance scenario**: Owner attempts an out-of-envelope dispatch
-  (e.g. a Worker role targeting a path outside its `allowed_targets`) and
-  sees it denied before or immediately after the action, with a structured
-  challenge/verdict, not a silent pass.
+  (e.g. a Worker role targeting a path outside its `allowed_targets`, or
+  running a disallowed command, or exceeding its spend ceiling) and sees it
+  denied before or immediately after the action, with a structured
+  challenge/verdict, not a silent pass; Owner also reviews the per-control
+  status table and confirms which dimensions are genuinely enforced today
+  vs. advisory/unsupported.
 
 ### Release 7 — REQ-30 update release (measure + PRD gate)
 
@@ -333,35 +472,72 @@ Req12→R16, Req13→R14.
 
 ### Release 8 — Risk-tier spike (#10b) + risk-tiered `InspectionContract` + lenses
 
+*(Revised 2026-08-05 — peer-review Gap 3: this section originally only added
+`risk_tier`/`lens` fields to `ledger.InspectionReport`, an after-the-fact
+record. The proposal's actual ask is a versioned, PRE-DISPATCH
+`InspectionContract` that governs what inspection SHOULD happen, distinct
+from `InspectionReport`, which records what DID happen. See the new
+migration step (c) below.)*
+
 - **Value**: `ledger.InspectionReport` gains a real `risk_tier`/`lens`
-  vocabulary and a deterministic (no-model-call) risk classifier, closing
-  AC-5's `missing/failed` status — genuinely new capability, not a rewiring.
-- **AC-ids**: AC-5 (Req 5) — target-blueprint.md's Release E; gated on
-  release 7 closing per the binding REQ-30 sequencing.
+  vocabulary and a deterministic (no-model-call) risk classifier; a real,
+  versioned, pre-dispatch `InspectionContract` is attached to every
+  meaningful work order BEFORE inspection runs — closing AC-5's
+  `missing/failed` status with genuinely new capability, not a rewiring.
+- **AC-ids**: **AC-5 partially advanced (Req 5)** — target-blueprint.md's
+  Release E; gated on release 7 closing per the binding REQ-30 sequencing.
+  This release ships the pre-dispatch `InspectionContract` and deterministic
+  risk classifier; the Critical-tier mandatory Owner gate (part of Req 5's
+  full ask) remains the separately-flagged EXCEPTION-CANDIDATE in
+  prd-acceptance-map.md, resolved through Release 7's REQ-30 update gate,
+  not claimed complete here.
 - **Compatibility guarantee**: #5 (`ledger.VERDICTS = ("pass", "fail",
   "escalate")` stays the only ledger-legal `InspectionReport.verdict`
-  vocabulary — `risk_tier`/`lens` are additive fields, never a second
-  verdict enum).
+  vocabulary — `risk_tier`/`lens`/the new contract-reference field are
+  additive fields, never a second verdict enum).
 - **Migration steps (spike, then build)**: (a) bounded spike (1 session,
   no production wiring): design and hand-validate a deterministic risk-tier
   classifier (file scope, target module, wave size) against 15-20 real past
   dispatches from `.renmark/analytics/task-runs.jsonl`/ledger history,
   documented disagreement rate against a human-assigned tier; stop
   condition: Owner-acceptable disagreement rate, or one re-spike if criteria
-  are redefined; (b) add `RiskTier` enum + `lens: str | None` as additive
-  fields to `ledger.InspectionReport`; (c) add
-  `resolve_lens_for(work_order) -> LensName` policy function in the
-  `subagent_profiles.py`/`subagent_gate.py` orbit (mirrors `cost.py`'s
-  policy-not-mechanism role; explicitly NOT the same function as
-  `cost.requires_escalation`, which stays scoped to model-tier routing).
+  are redefined; (b) add the real `RiskTier` enum (Release 3 left this as an
+  untyped `str | None` placeholder on `WorkOrder`; this release defines the
+  enum and migrates that field's type — additive-compatible, existing
+  placeholder string values remain valid enum-value strings) + `lens:
+  str | None` as additive fields to `ledger.InspectionReport`; (c) **NEW —
+  build the actual `InspectionContract`**: a versioned, PRE-DISPATCH object
+  (`risk_tier`, `lenses: list[LensName]`, `deterministic_gates: list[str]`,
+  `semantic_rubric_ref: str | None`, `independent_judge_required: bool`,
+  `evidence_required: list[str]`, `allowed_verdicts: tuple[str, ...]`)
+  attached to the Release-3-reconciled `WorkOrder` (a new
+  `inspection_contract: InspectionContract | None` field, populated by
+  `work_order_for_task` via `resolve_lens_for`) BEFORE inspection runs.
+  `InspectionContract` = the pre-dispatch plan for what inspection SHOULD
+  happen; `InspectionReport` (already existing) = the post-dispatch record
+  of what DID happen. `InspectionReport` gains a `contract_ref` (contract
+  id + version) field so every report cites which contract version it was
+  graded against; (d) add `resolve_lens_for(work_order) -> LensName` policy
+  function in the `subagent_profiles.py`/`subagent_gate.py` orbit (mirrors
+  `cost.py`'s policy-not-mechanism role; explicitly NOT the same function as
+  `cost.requires_escalation`, which stays scoped to model-tier routing), now
+  also responsible for constructing the `InspectionContract` given the
+  classified risk tier; (e) per Gap 6's fixture-split, author the
+  "risk-tier/lens selection" behavioral-eval fixture(s) against this
+  release's classifier and contract, for Release 15 to wire in.
 - **Observability hook**: the classifier's disagreement-rate table, kept as
-  a committed artifact for future recalibration.
+  a committed artifact for future recalibration; a new test proving an
+  `InspectionReport` cites the `InspectionContract` version/ref it was
+  graded against, and that the contract is attached before dispatch (not
+  synthesized after the fact).
 - **Rollback path**: revert the commit; `InspectionReport`'s existing
   `verdict` vocabulary and callers are unaffected (additive fields only).
 - **Owner acceptance scenario**: Owner reviews a sample Medium/High-risk
-  dispatch's `InspectionReport` and sees a `risk_tier` + `lens` name
-  attached, with the classifier's disagreement-rate evidence available on
-  request.
+  dispatch and sees BOTH the pre-dispatch `InspectionContract` (attached to
+  its `WorkOrder`, naming required lenses/gates/judge requirement before the
+  work ran) and the post-dispatch `InspectionReport` citing that exact
+  contract version, with the classifier's disagreement-rate evidence
+  available on request.
 
 ### Release 9 — Calibrated blind LLM-judge (3-state + bias controls)
 
@@ -387,7 +563,9 @@ Req12→R16, Req13→R14.
   comparison calls gain order-randomization, recorded per call; (d) add
   `InspectionReport.judge_evidence: JudgeEvidenceRef | None` — attachment,
   not a merge; `judge.py` and `ledger.py` keep their current module
-  boundary.
+  boundary; (e) per Gap 6's fixture-split (2026-08-05), author the "judge
+  input-isolation / 3-state outcome" behavioral-eval fixture(s) against
+  this release's redaction and `Outcome` change, for Release 15 to wire in.
 - **Observability hook**: new judge unit tests for input-isolation,
   independence-recording, and order-randomization; existing eval-tier
   (`renmark-execute --behavior --judge`) usage of the same module gets the
@@ -404,33 +582,69 @@ Req12→R16, Req13→R14.
 
 ### Release 10 — Failure-derived constraint registry
 
-- **Value**: `recurrence.py`'s existing `durable_guard` entries become real,
-  consulted constraints at dispatch time, closing AC-7's `missing` status
-  without a new store — the proposal's registry IS `recurrence.py`'s
-  existing data, read back.
+*(Revised 2026-08-05 — peer-review Gap 4: this section wrongly conflated the
+registry with `recurrence.py`'s existing `durable_guard` entries, despite
+prd-acceptance-map.md explicitly flagging Req 7 and REQ-24 as distinct
+concepts. See the ADR requirement and the real `FailureRule` structure
+below.)*
+
+- **Value**: a genuinely new `FailureRule` registry structure — distinct
+  from, but able to consume, `recurrence.py`'s existing `durable_guard`
+  entries as one input signal — becomes real, consulted constraints at
+  dispatch time, closing AC-7's `missing` status.
 - **AC-ids**: AC-7 (Req 7) — target-blueprint.md's Release E; gated on
-  release 7.
+  release 7. prd-acceptance-map.md's Part B (REQ-24 row) and its DEFERRABLE
+  spec debt section state Req 7 and REQ-24/`recurrence.py` are "distinct...
+  do not conflate" and require "an explicit ADR before Release E" — this
+  release is that Release E deliverable.
 - **Compatibility guarantee**: #7 (constraint text still only reaches a
   subagent through the existing `dispatch.build_subagent_input` funnel —
-  `active_guards_for` is consumed by `subagent_gate.py`'s pre-dispatch
-  check, which decides pass/challenge/block; it does not itself compose
-  prompt text — no second prompt-composition pathway).
-- **Migration steps**: (a) add `recurrence.active_guards_for(task_context)
-  -> list[Guard]`, a read-side accessor over existing `durable_guard`
-  entries — no new store, no new schema; (b) `subagent_gate.py` consumes it
-  from the same pre-dispatch funnel release 6 added
-  `check_capability_envelope` to; (c) write the ADR distinguishing Req 7
-  from REQ-24 (recurrence.py's existing per-run/fingerprint recurrence-
-  prevention role, unchanged) that prd-acceptance-map flags as needed
-  "before Release E."
-- **Observability hook**: dedup/contradiction-detection test cases, plus a
-  test proving `active_guards_for` reads only `durable_guard`-classified
-  entries, never `patch`-classified ones.
+  rule consumption is consulted by `subagent_gate.py`'s pre-dispatch check,
+  which decides pass/challenge/block; it does not itself compose prompt
+  text — no second prompt-composition pathway).
+- **Migration steps**: (a) **NEW, precondition for (b)-(d)**: write the ADR
+  distinguishing Req 7 (a curated, versioned, cross-run failure-derived
+  constraint registry) from REQ-24/`recurrence.py` (a per-run/fingerprint-
+  scoped recurrence-prevention mechanism that stops a 3rd equivalent
+  attempt) — commit under `.renmark/memory/decisions.md` (or equivalent),
+  referenced by this release's design; (b) add a genuinely new `FailureRule`
+  structure **inside `recurrence.py`** (no new top-level module — honors
+  the roadmap's non-goals section and modularity-assessment §6's preference
+  to extend `recurrence.py` rather than create a sibling module) with
+  fields: `rule_id`, `status` (`proposed`/`active`/`deprecated`), `trigger`,
+  `applicability`, `required_behavior`, `prohibited_failure`,
+  `source_evidence`, `enforcement` (`prompt`/`validator`/
+  `capability_policy`), `regression_test_ref`, `created_at`,
+  `last_triggered_at`, `review_after` — a distinct structure from
+  `DurableGuard`/`durable_guard`, not a wrapper over it; (c)
+  `recurrence.py`'s existing `durable_guard` entries become ONE input signal
+  that can seed a `FailureRule`'s `source_evidence` (a durable guard
+  observed 3+ times is a legitimate trigger for proposing a rule) — never
+  treated as the registry itself; (d) add dedup/contradiction detection over
+  `FailureRule` entries (colliding `rule_id`/`trigger`, or two `active`
+  rules with conflicting `required_behavior`/`prohibited_failure` for
+  overlapping `applicability`) and a `review_after`-driven review mechanism
+  (a rule past its `review_after` date surfaces in `/renmark:hygiene`'s
+  existing pruning sweep, reusing release 12's extension point); (e)
+  `subagent_gate.py` consumes ONLY `status: active` rules from the same
+  pre-dispatch funnel release 6 added `check_capability_envelope` to,
+  matched against the dispatch's `applicability` and populated into
+  `WorkOrder.constraints` (release 3's placeholder field); (f) per Gap 6's
+  fixture-split, author the "failure-rule injection" behavioral-eval
+  fixture(s) against this release's `FailureRule` consumption, for
+  Release 15 to wire in.
+- **Observability hook**: dedup/contradiction-detection test cases; a
+  lifecycle test (`proposed`→`active`→`deprecated`); a test proving rule
+  consumption reads only `FailureRule.status == "active"` entries; a
+  separate test proving a bare `durable_guard` entry with no promoted
+  `FailureRule` is NOT treated as an active constraint.
 - **Rollback path**: revert the commit; `recurrence.py`'s existing
-  fingerprinting/REQ-24 behavior is untouched (additive reader only).
-- **Owner acceptance scenario**: Owner triggers a dispatch matching a
-  known `durable_guard` entry and sees `subagent_gate` cite it as an active
-  constraint in its verdict, without any new prompt-injection surface.
+  fingerprinting/REQ-24 behavior is untouched — the new `FailureRule`
+  structure is additive.
+- **Owner acceptance scenario**: Owner reviews the ADR distinguishing Req 7
+  from REQ-24, then triggers a dispatch matching an `active` `FailureRule`
+  and sees `subagent_gate` cite the specific `rule_id` in its verdict — not
+  a bare `durable_guard` entry.
 
 ### Release 11 — Routing-overlap spike (#18) + policy-aware dispatch scheduling
 
@@ -494,36 +708,60 @@ Req12→R16, Req13→R14.
 
 ### Release 13 — Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation
 
+*(Revised 2026-08-05 — peer-review Gap 5: this section originally left
+benchmark-surfaced gaps as "an unspecified future item," meaning AC-11 could
+stay open indefinitely. See the new bounded, committed implementation step
+(a2) below.)*
+
 - **Value**: `ledger.py`'s 4 event kinds gain finer-grained lifecycle
   fields (`schema_version`, `attempt_id`/`correlation_id`); self-benchmarks
-  resume/recovery correctness against deliberately-interrupted runs;
-  reconciles `analytics.py` as a read-only consumer of `ledger.py` instead
-  of a second parallel "durable record" system.
+  resume/recovery correctness against deliberately-interrupted runs and
+  commits to fixing what it finds, bounded; reconciles `analytics.py` as a
+  read-only consumer of `ledger.py` instead of a second parallel "durable
+  record" system.
 - **AC-ids**: AC-11 (Req 11) — target-blueprint.md's Release G portion;
-  gated only on release 3 (needs the reconciled `WorkOrder` schema as the
-  field-addition target).
+  gated only on release 3 (needs the reconciled `WorkOrder` schema, including
+  its `correlation_id`/`idempotency_key` placeholders, as the field-addition
+  target). This release now owns a real path to AC-11 closure, not an
+  indefinite benchmark-only deferral.
 - **Compatibility guarantee**: #1 (`pytest -q` count); #8 (the JSONL
   append-only mechanism itself is a Keep item — no database/broker
   introduced, per modularity-assessment §9's explicit rejection).
 - **Migration steps**: (a) bounded spike (1 session, no new production
-  orphan-detection code): self-benchmark renmark's own resume/recovery
+  orphan-detection code yet): self-benchmark renmark's own resume/recovery
   correctness against a handful of deliberately-interrupted real or
   simulated runs, reusing `heartbeat.py`'s existing usage-limit-pause path
   as the test harness; produce a scenario table (pass/fail on "no
-  duplicate, no orphan"); stop condition: table produced — gaps become a
-  scoped Improve item, not open-ended further work; (b) add `schema_version`
-  and `attempt_id`/`correlation_id` fields to the 4 existing ledger event
-  kinds (additive); (c) `analytics.py` reads from `ledger.py` as its
-  reconciled source for guardrail metrics (release 14) instead of
-  maintaining a second parallel event system.
+  duplicate, no orphan"); (a2) **NEW — bounded, committed implementation
+  step**: any orphan-detection or duplicate-integration gap the benchmark
+  surfaces gets fixed inside this same release, budget-capped at 2 sessions
+  total across all surfaced gaps. A gap whose fix would exceed that 2-session
+  budget is NOT silently left open — it is escalated to the Owner as its own
+  scoped follow-up release proposal, with the scenario-table evidence
+  attached, rather than an indefinite deferral. AC-11 is marked closed in
+  this release's completion record only once either (i) no gaps were found,
+  (ii) all found gaps were fixed within budget, or (iii) remaining gaps are
+  Owner-acknowledged as an explicit, evidence-backed follow-up; (b) add
+  `schema_version` and `attempt_id`/`correlation_id` fields to the 4
+  existing ledger event kinds (additive; `correlation_id` also ties back to
+  release 3's placeholder `WorkOrder.correlation_id` field); (c)
+  `analytics.py` reads from `ledger.py` as its reconciled source for
+  guardrail metrics (release 14) instead of maintaining a second parallel
+  event system; (d) per Gap 6's fixture-split, author the "retry/rework
+  survives resume" behavioral-eval fixture(s) against this release's
+  interrupt/resume evidence, for Release 15 to wire in.
 - **Observability hook**: the interrupt-and-resume scenario table, kept
-  committed as regression evidence; `analytics.py`'s reconciled read path.
+  committed as regression evidence; `analytics.py`'s reconciled read path;
+  whatever fix(es) landed under (a2) get their own regression test named
+  after the specific interrupted-run scenario they close.
 - **Rollback path**: revert the field-addition/reconciliation commit;
   existing `_setup_resume_state`/`_cross_check_skip_list` behavior at the
-  plan-task level is untouched.
+  plan-task level is untouched; each bounded fix under (a2) gets its own
+  revert path noted at commit time.
 - **Owner acceptance scenario**: Owner reviews the interrupt-and-resume
-  scenario table and confirms no duplicate/orphan case was found (or sees
-  the documented gap and its follow-up item).
+  scenario table and confirms found gaps were either fixed-and-tested in
+  this release or explicitly escalated with evidence — never silently
+  absent from the scenario table's conclusion.
 
 ### Release 14 — Guardrail metrics
 
@@ -551,33 +789,58 @@ Req12→R16, Req13→R14.
   the new guardrail metrics (scope-violation rate, false-pass rate, etc.)
   reported with renmark's own measured baseline, not a borrowed target.
 
-### Release 15 — 20-case behavioral eval suite authorship
+### Release 15 — Remaining behavioral eval fixtures + full 20-case suite wiring (CI-gating)
 
-- **Value**: authors the proposal's 20 named behavioral-eval fixtures
-  (fast-path accept/reject, worker replan-refusal, inspector-can't-repair,
-  judge-can't-override-deterministic-fail, blind-judge-input-exclusion,
-  lens-triggering, task-tracker transitions, retry/rework survives resume,
-  etc.) against the ALREADY-EXISTING tiered-eval mechanism
-  (`renmark/behavior.py`, CLAUDE.md's P8 tier) — fixture authorship, not new
-  infrastructure.
+*(Revised 2026-08-05 — peer-review Gap 6: authoring all 20 fixtures in one
+end-of-program release meant most of the behavior they test had already
+shipped, unverified, releases earlier. Fixtures now split across the release
+that builds the capability they exercise, authored alongside that release;
+Release 15's scope shrinks accordingly. See the split table below.)*
+
+- **Value**: authors any REMAINING behavioral-eval fixtures not naturally
+  tied to an earlier release, wires the full 20-case suite together against
+  the ALREADY-EXISTING tiered-eval mechanism (`renmark/behavior.py`,
+  CLAUDE.md's P8 tier), and makes the deterministic tier CI-gating — fixture
+  authorship + suite wiring, not new infrastructure.
 - **AC-ids**: AC-8 (Req 8) — target-blueprint.md's Release F; depends on
-  releases 3 (work order), 6 (capability envelope), 8 (lenses), 9 (judge),
-  10 (constraint registry) actually existing, since several of the 20
-  fixtures exercise those specific behaviors.
+  releases 1, 4, 6, 8, 9, 10, 13 having each already authored their own
+  tied fixtures per the split below.
 - **Compatibility guarantee**: #1 (deterministic tier stays CI-safe, no
   model call, no network, no token spend by default — fixture authorship
-  does not change that contract).
-- **Migration steps**: author 20 fixtures against `renmark/behavior.py`'s
-  existing deterministic/eval-tier split; deterministic tier proves
-  scaffolding shape (`lifecycle.next_steps`/`skill_preamble`/`plan_lint`-
-  style contract checks per fixture), the eval tier remains opt-in via
-  `RENMARK_EVAL_RUNNER_CMD` for the live-judge proof.
+  does not change that contract; making it CI-gating enforces the contract
+  more strictly, it does not relax it).
+- **Fixture split (Gap 6)**: each fixture that exercises a capability from a
+  specific earlier release is authored ALONGSIDE that release, not held
+  until Release 15:
+
+  | Fixture group | Authored in |
+  |---|---|
+  | Fast-path accept/reject | Release 1 |
+  | Task-tracker transitions | Release 4 |
+  | Capability-envelope denial | Release 6 |
+  | Risk-tier/lens selection | Release 8 |
+  | Judge input-isolation / 3-state outcome | Release 9 |
+  | Failure-rule injection | Release 10 |
+  | Retry/rework survives resume | Release 13 |
+  | Remaining (e.g. worker replan-refusal, inspector-can't-repair, judge-can't-override-deterministic-fail) | Release 15 |
+
+- **Migration steps**: (a) author any fixtures not claimed by an earlier
+  release per the split table above, against `renmark/behavior.py`'s
+  existing deterministic/eval-tier split; (b) wire the full 20-case suite
+  together (fixtures authored here plus those authored in releases 1, 4, 6,
+  8, 9, 10, 13); (c) make the deterministic tier CI-gating — a hard
+  requirement, not merely "green": CI must fail on a deterministic-tier
+  fixture regression; the eval tier remains opt-in via
+  `RENMARK_EVAL_RUNNER_CMD` for the live-judge proof, unchanged.
 - **Observability hook**: `renmark-execute --behavior` output showing all
-  20 cases present and green on the deterministic tier.
-- **Rollback path**: revert the fixture-authoring commit; no runtime
-  behavior change either way (fixtures are test data).
+  20 cases present and green on the deterministic tier, PLUS the
+  deterministic tier wired into CI as a blocking check.
+- **Rollback path**: revert the fixture-authoring/CI-wiring commit; no
+  runtime behavior change either way (fixtures are test data; CI-gating
+  reverts to advisory-only).
 - **Owner acceptance scenario**: Owner runs `renmark-execute --behavior`
-  and sees all 20 named cases present and green.
+  and sees all 20 named cases present and green, and confirms CI fails when
+  a deterministic-tier fixture regresses.
 
 ### Release 16 — `/renmark:rethink` self-upgrade (last, per Discovery Direction Gate)
 
