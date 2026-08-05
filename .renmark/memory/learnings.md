@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, .renmark/reviews/2026-08-05-b370c1c.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-8** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2028 passed (up from 2007 baseline); AC-5 closed for Claude Code
+
+- (2026-08-05, bug) **codex ad-hoc dispatches self-append CHANGELOG entries in wrong format/location** — A second instance (after Release 3 task 4s self-commit) of a Worker self-integrating beyond its declared scope without being told not to. Low severity here (content was accurate, just misplaced) but the same underlying gap -- dispatch briefs should explicitly say what NOT to touch (CHANGELOG.md, git commit) by default, not just for tasks where it happened to matter before.
+
 - (2026-08-05, bug) **researcher role allowed_targets does not cover .renmark/rethink/** (2nd occurrence)** — Live dogfooding caught the same capability-envelope gap twice in a row (Release 7 task 1, Release 8 task 1) -- a real, systemic role/target mismatch for this repos own rethink pipeline, not a one-off plan authoring mistake. When check_capability_envelope denies a path twice for the same role across different releases, treat it as a profile-definition bug, not a per-task fix.
 
 - (2026-08-05, .renmark/reviews/2026-08-05-60d2a4c.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-7-task-1** — 3/3 measurement behaviors verified; failed: none; regressions: 0; Release 7 still needs the /renmark:prd amendment step to be complete
