@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 5 tasks 1+3 (governed-orchestration-assurance) — PreToolUse prototype + spike finding
+**Request:** Tasks 1 and 3 of 3, Release 5 — a bounded, 1-session, prototype-only spike answering whether pre-action, hook-time, metadata-driven allow/deny enforcement is feasible on both Claude Code and Codex, ahead of Release 6's production wiring.
+**Built:** `.claude/hooks/capability_envelope_prototype.py` — standalone stdlib-only PreToolUse hook prototype judging Write/Edit calls against `PROFILES["code-implementer"].allowed_targets` via `fnmatch`; not wired into the live `.claude/settings.json` (an inert `.settings.example.json` documents the intended wiring only). `release-5-finding.md` — written finding: Claude Code's PreToolUse hook genuinely blocks pre-action (confirmed); Codex has real OS-level sandbox enforcement but no per-profile glob matcher, so full metadata-driven parity across both hosts needs new wrapper work Release 6 doesn't currently scope. Stop-condition result: partial proceed — Release 6 proceeds on Claude Code as designed, Codex stays post-action-only (existing Layer-B) unless the Owner explicitly approves new Codex wrapper scope.
+**Files changed:**
+- `.claude/hooks/capability_envelope_prototype.py` — prototype hook (not live).
+- `.claude/hooks/capability_envelope_prototype.settings.example.json` — inert documentation of intended wiring.
+- `.renmark/rethink/governed-orchestration-assurance/release-5-finding.md` — spike finding.
+**Do not change:**
+- Do not merge the example hooks block into the live `.claude/settings.json` — this prototype is evidence-gathering only, not production wiring; that decision belongs to Release 6 with explicit Owner sign-off on the Codex-parity gap.
+
 ## [2026-08-05] — test: rethink Release 4 task 5 retry (governed-orchestration-assurance) — end-to-end order_id wiring test
 **Request:** Task 5 of 6, Release 4 — end-to-end proof that `_wave_loop.py`'s order_id wiring (task 2) lands on the real worker `TaskRecord`, not just the unit-level function param.
 **Built:** `test_worker_task_record_carries_the_wave_loop_order_id` added to `tests/test_task_tracking_engine_wiring.py`, running the real `_engine.execute_plan` (no live LLM call) and asserting the worker `TaskRecord.order_id` matches `_wave_loop.py`'s real scheme, derived from actual post-run state (no hardcoded strings). 6/6 passed (was 5). Full suite: 1980 passed, 31 skipped (up from 1974, +6 net new tests this release, no regressions).

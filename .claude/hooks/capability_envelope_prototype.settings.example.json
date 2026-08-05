@@ -1,0 +1,16 @@
+{
+  "_comment": "PROTOTYPE / SPIKE ONLY — documentation of intended wiring for the capability-envelope PreToolUse hook (Release 5 of the governed-orchestration-assurance roadmap). This file is NOT read by Claude Code and does NOT affect .claude/settings.json. To try it, merge the 'hooks' block below into .claude/settings.json manually.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/capability_envelope_prototype.py"
+          }
+        ]
+      }
+    ]
+  }
+}
