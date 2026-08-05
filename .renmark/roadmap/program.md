@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 11/16 · task 2/2 done · current: Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling_
+_mode: staged · Stage 12/16 · task 0/2 done · current: Release 12: Context/memory governance extension + state-fragmentation spike (#22)_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -87,13 +87,13 @@ _phases: plan → build → verify → review → release_
 - [x] Wire subagent_gate.py to consume only status:active FailureRule entries from the pre-dispatch funnel, populating WorkOrder.constraints — Same funnel release 6 added check_capability_envelope to; consumes release 3's WorkOrder.constraints placeholder field.
 - [x] Author 'failure-rule injection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ◑ Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling — serves AC-9 (REQ-9) **(current)**
+## ◑ Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling — serves AC-9 (REQ-9)
 _phases: plan → build → verify → review → release_
 
 - [x] Bounded 1-pass spike: read global_routing.py and codex_routing.py fully, produce a one-page overlap finding — 'No overlap, boundary is X' or 'overlap found at Y, recommend merging into Z'; a recommended merge becomes its own scoped item, not decided here.
 - [x] Extend dispatch_wave/group_tasks_by_wave with risk-tier, quota/provider-availability, max-parallelism, and rework-budget-aware scheduling — Must demonstrate it stays under release 7's measured overhead budget before shipping.
 
-## ○ Release 12: Context/memory governance extension + state-fragmentation spike (#22) — serves AC-10 (REQ-10)
+## ○ Release 12: Context/memory governance extension + state-fragmentation spike (#22) — serves AC-10 (REQ-10) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-pass spike: confirm the current authoritative state-file set vs. CLAUDE.md's documented set — Update CLAUDE.md if stale; flag anything requiring a code change as its own future item.
