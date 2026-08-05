@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, CHANGELOG.md 2026-08-05 rethink Release 4 task 5 retry) model `orchestrate`: **codex-task-ad-hoc-file-corruption** — renmark-execute --task <brief> --output <file> (codex ad-hoc single-task path) twice produced a bogus YAML-frontmatter artifact-report document instead of real code when the task was to EXTEND an existing file — once masked by an accidental docstring wrap (release-3 task 5), once a genuine SyntaxError self-reported as PASS despite the report admitting the verifier never ran (release-4 task 5). The whole-plan codex wave path (renmark-execute <plan>, no --task/--output) has not shown this failure mode. Recommendation: prefer sonnet Agent-tool dispatch over the ad-hoc --task/--output codex path for extend-existing-file tasks; always independently re-run the verifier rather than trusting self-reported status/PASS.
+
 - (2026-08-04, .renmark/reviews/2026-08-05-57dc1e9.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-3** — 5/5 behaviors verified; failed: none; regressions: 0; full suite 1974 passed (up from 1970 baseline)
 
 - (2026-08-04, .renmark/reviews/2026-08-05-2f5cb8a.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-2** — 2/2 behaviors verified; failed: none; regressions: 0

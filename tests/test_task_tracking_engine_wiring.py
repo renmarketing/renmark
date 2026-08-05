@@ -180,3 +180,39 @@ def test_task_tracking_failure_never_blocks_real_dispatch(tmp_path, monkeypatch)
     # The real dispatch/commit must still succeed even though every
     # task_tracking call raises.
     assert rc == 0
+
+
+def test_worker_task_record_carries_the_wave_loop_order_id(tmp_path, monkeypatch):
+    """End-to-end proof of Release 4 task 2's wiring: after a real
+    ``_engine.execute_plan`` run, the worker ``TaskRecord`` in
+    ``.renmark/state/tasks.json`` carries a non-empty ``order_id`` matching
+    the same ``f"{run_id}-{task.index}"`` scheme ``_wave_loop.py`` already
+    uses for the ledger ``WorkOrder``/``WorkResult`` events — not merely
+    that the unit-level ``create_or_reuse_task(order_id=...)`` parameter
+    works in isolation."""
+    _init_repo(tmp_path)
+    plan = _write_plan(tmp_path)
+
+    monkeypatch.setattr(_engine, "codex_available", lambda: True)
+    monkeypatch.setattr(
+        _engine, "_execute_task", lambda **kwargs: (True, "task 1 done", 100, "deadbeef")
+    )
+
+    rc = _engine.execute_plan(str(plan), repo=tmp_path)
+    assert rc == 0
+
+    tasks = tt.read_tasks(tmp_path)
+    worker_id = next(
+        tid for tid in tasks if tid.startswith("task-") and not tid.endswith("-verify")
+    )
+    parent_id = next(tid for tid in tasks if tid.startswith("run-"))
+    run_id = parent_id[len("run-"):]
+
+    worker = tasks[worker_id]
+    # The plan defines a single "### Task 1" entry, so its 1-based parser
+    # index is 1 — the same index `_wave_loop.py` folds into `order_id`.
+    expected_order_id = f"{run_id}-1"
+
+    assert worker_id == f"task-{expected_order_id}"
+    assert worker.order_id != ""
+    assert worker.order_id == expected_order_id
