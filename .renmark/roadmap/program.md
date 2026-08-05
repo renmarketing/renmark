@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 8/16 · task 0/5 done · current: Release 8: Risk-tier spike (#10b) + risk-tiered InspectionContract + lenses_
+_mode: staged · Stage 9/16 · task 0/4 done · current: Release 9: Calibrated blind LLM-judge (3-state + bias controls)_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -60,16 +60,16 @@ _phases: plan → build → verify → review → release_
 - [x] Run /renmark:prd's UPDATE gate to name the Critical-tier gate as a REQ-30 allowed gate + set a measured overhead budget — Releases 8-16 must demonstrate they stay under this budget before shipping.
 - [x] Absorbed: close the renmark-architecture rethink's lingering r1-req30-baseline-measurement task — Carried over from the prior, closed renmark-architecture-rethink-roadmap program (archived at .renmark/rethink/renmark-architecture/archive/closed-program-final-2026-08-04.json), whose Release 1 task r1-req30-baseline-measurement was never marked done. This release's own baseline-overhead measurement (r7-measure-baseline-overhead) satisfies it; not treated as a new ask.
 
-## ○ Release 8: Risk-tier spike (#10b) + risk-tiered InspectionContract + lenses — serves AC-5 (REQ-5) **(current)**
+## ● Release 8: Risk-tier spike (#10b) + risk-tiered InspectionContract + lenses — serves AC-5 (REQ-5)
 _phases: plan → build → verify → review → release_
 
-- [ ] Bounded 1-session spike: hand-validate a deterministic risk-tier classifier against 15-20 real past dispatches — Design and validate against .renmark/analytics/task-runs.jsonl / ledger history; document disagreement rate against a human-assigned tier. Stop condition: Owner-acceptable disagreement rate, or one re-spike if criteria redefined.
-- [ ] Define the real RiskTier enum; migrate WorkOrder.risk_tier from Release 3's str|None placeholder to the typed enum — Additive-compatible type narrowing, not a rename. Add lens: str|None to InspectionReport. VERDICTS stays the only ledger-legal verdict vocabulary.
-- [ ] Build InspectionContract: versioned, pre-dispatch object (risk_tier, lenses, deterministic_gates, semantic_rubric_ref, independent_judge_required, evidence_required, allowed_verdicts) attached to WorkOrder before inspection runs — Gap 3 fix — distinct from InspectionReport (post-dispatch record). InspectionReport gains contract_ref so every report cites the contract version it was graded against.
-- [ ] Add resolve_lens_for(work_order) -> LensName policy function; also constructs the InspectionContract — In the subagent_profiles.py/subagent_gate.py orbit; explicitly not cost.requires_escalation.
-- [ ] Author 'risk-tier/lens selection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
+- [x] Bounded 1-session spike: hand-validate a deterministic risk-tier classifier against 15-20 real past dispatches — Design and validate against .renmark/analytics/task-runs.jsonl / ledger history; document disagreement rate against a human-assigned tier. Stop condition: Owner-acceptable disagreement rate, or one re-spike if criteria redefined.
+- [x] Define the real RiskTier enum; migrate WorkOrder.risk_tier from Release 3's str|None placeholder to the typed enum — Additive-compatible type narrowing, not a rename. Add lens: str|None to InspectionReport. VERDICTS stays the only ledger-legal verdict vocabulary.
+- [x] Build InspectionContract: versioned, pre-dispatch object (risk_tier, lenses, deterministic_gates, semantic_rubric_ref, independent_judge_required, evidence_required, allowed_verdicts) attached to WorkOrder before inspection runs — Gap 3 fix — distinct from InspectionReport (post-dispatch record). InspectionReport gains contract_ref so every report cites the contract version it was graded against.
+- [x] Add resolve_lens_for(work_order) -> LensName policy function; also constructs the InspectionContract — In the subagent_profiles.py/subagent_gate.py orbit; explicitly not cost.requires_escalation.
+- [x] Author 'risk-tier/lens selection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 9: Calibrated blind LLM-judge (3-state + bias controls) — serves AC-6 (REQ-6)
+## ○ Release 9: Calibrated blind LLM-judge (3-state + bias controls) — serves AC-6 (REQ-6) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Change judge.py's Outcome to Literal['pass','fail','uncertain'] — Breaking, compile-time-visible; every caller pattern-matching on Outcome must add the third arm.
