@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, .renmark/reviews/2026-08-05-eff47f3.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-9** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2038 passed (up from 2028 baseline); AC-6 closed, breaking change landed clean
+
 - (2026-08-05, .renmark/reviews/2026-08-05-b370c1c.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-8** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2028 passed (up from 2007 baseline); AC-5 closed for Claude Code
 
 - (2026-08-05, bug) **codex ad-hoc dispatches self-append CHANGELOG entries in wrong format/location** — A second instance (after Release 3 task 4s self-commit) of a Worker self-integrating beyond its declared scope without being told not to. Low severity here (content was accurate, just misplaced) but the same underlying gap -- dispatch briefs should explicitly say what NOT to touch (CHANGELOG.md, git commit) by default, not just for tasks where it happened to matter before.
