@@ -238,6 +238,28 @@ def test_judge_mode_errors_when_eval_golden_is_missing(tmp_path: Path) -> None:
     judge_behavior.assert_not_called()
 
 
+def test_judge_mode_marks_unreadable_eval_golden_as_uncertain(tmp_path: Path) -> None:
+    case = _case(
+        assertions=["contains:missing from current output"],
+        golden_ref="invalid-golden",
+        source=tmp_path / "invalid.behavior.json",
+    )
+    _write_golden(case, "Golden transcript with the required behavior.")
+    snapshot = case.source.parent / "snapshots" / f"{case.eval.golden_ref}.json"
+    snapshot.write_text("{ invalid json", encoding="utf-8")
+
+    with patch("renmark.judge.judge_behavior", autospec=True) as judge_behavior:
+        verdict = behavior._escalate_to_judge(
+            tmp_path,
+            case,
+            current="Current transcript with the required behavior.",
+            subagent_runner=None,
+        )
+
+    assert verdict["outcome"] == "uncertain"
+    judge_behavior.assert_not_called()
+
+
 def test_assertion_miniformat_uses_real_plan_lint_output() -> None:
     case = _case(
         call="plan_lint",

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 9 tasks 4-7 (governed-orchestration-assurance) — full test coverage, Release 9 complete
+**Request:** Tasks 4-7 of 7, Release 9 — test coverage for the 3-state Outcome, redaction, order-randomization, JudgeEvidenceRef, the behavior.py fix, and the ledger.py non-goal enforcement.
+**Built:** `tests/test_judge.py` (+7 tests — parse-failure-vs-real-fail distinction, legitimate uncertain round-trip, JudgeUnavailable/exception paths return uncertain, redaction proof, order-randomization proof, JudgeEvidenceRef round-trip). `tests/test_eval_agent_turn.py` — garbage-response assertion flipped, test renamed to `test_parse_judge_verdict_returns_unvalidated_uncertain_on_garbage`. `tests/test_behavior.py` (+1 test — unreadable-golden fallback returns uncertain, previously unexercised). `tests/test_ledger.py` (+3 tests — judge_evidence attach/round-trip never touches verdict, validate_inspection_report dict-or-null check, source-grep guard that ledger.py never imports judge.py + VERDICTS unchanged). Full suite: 2038 passed, 31 skipped (up from 2028, +10 net new tests, no regressions).
+**Files changed:**
+- `tests/test_judge.py`, `tests/test_eval_agent_turn.py`, `tests/test_behavior.py`, `tests/test_ledger.py`.
+**Do not change:**
+- Do not weaken the ledger.py non-goal guard test (source-grep for `judge` imports) — it's the enforcement mechanism for keeping the two leaf modules decoupled.
+**Release 9 complete.** 3-state Outcome (breaking, all real callers found and updated) → redaction → order-randomization → JudgeEvidenceRef → behavior.py fix → ledger.py attachment → full coverage. AC-6 (Req 6) closed. `judge.py` and `ledger.py` remain two separate leaf modules, connected only by reference.
+
 ## [2026-08-05] — feat: rethink Release 9 tasks 2+3 (governed-orchestration-assurance) — behavior.py fix + ledger.py judge_evidence
 **Request:** Tasks 2 and 3 of 7, Release 9 — flip `behavior.py`'s hardcoded fail-as-uncertain-proxy fallbacks to real `uncertain`, and add `InspectionReport.judge_evidence` as additive, reference-only evidence.
 **Built:** `behavior.py`'s `_escalate_to_judge` — both defensive fallback dicts (unreadable golden; golden is `None`) now report `outcome: "uncertain"` instead of `"fail"`; `validation_status` stays `unvalidated`. `ledger.py`'s `InspectionReport.judge_evidence: "JudgeEvidenceRef | None" = None` — bare forward-ref, zero import of `judge.py` (confirmed via grep), with an explicit non-goal sentence in the docstring: never overrides `verdict`. `validate_inspection_report` gains a dict-or-null check for the new field. 23/23 ledger tests pass.

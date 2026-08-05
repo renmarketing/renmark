@@ -1,4 +1,17 @@
-"""Unit tests for renmark.ledger (R-0.3 WP-1/WP-2/WP-3)."""
+"""
+---
+artifact_type: test_suite
+schema_version: 1
+created_at: 2026-08-05T00:00:00-04:00
+source_sha: b63a9eaf2b52e721da110ebd27f829cc9bfacd98
+related_plan: Task 7: test_ledger.py
+generator: codex
+dependency_refs:
+  - renmark/ledger.py
+---
+
+Unit tests for renmark.ledger (R-0.3 WP-1/WP-2/WP-3).
+"""
 
 from __future__ import annotations
 
@@ -53,6 +66,27 @@ def test_validate_inspection_report_happy_path() -> None:
         generator="codereview",
     )
     assert ledger.validate_inspection_report(asdict(event)) == []
+
+
+def test_inspection_report_judge_evidence_round_trip_preserves_verdict() -> None:
+    from dataclasses import asdict
+
+    judge_evidence = {
+        "outcome": "uncertain",
+        "confidence": "low",
+        "validation_status": "unvalidated",
+        "rationale": "ambiguous",
+        "subject_ref": "x",
+    }
+    event = ledger.InspectionReport(
+        subject_ref="x",
+        verdict="pass",
+        judge_evidence=judge_evidence,
+    )
+    serialized = asdict(event)
+
+    assert serialized["verdict"] == "pass"
+    assert serialized["judge_evidence"] == judge_evidence
 
 
 def test_validate_escalation_happy_path() -> None:
@@ -117,6 +151,36 @@ def test_validate_inspection_report_rejects_bad_findings_type() -> None:
         {"subject_ref": "x", "verdict": "pass", "findings": "not-a-list"}
     )
     assert issues
+
+
+def test_validate_inspection_report_accepts_and_rejects_judge_evidence_variants() -> None:
+    from dataclasses import asdict
+
+    base_event = ledger.InspectionReport(
+        subject_ref="x",
+        verdict="pass",
+        findings=[],
+        generator="codereview",
+        judge_evidence={
+            "outcome": "uncertain",
+            "confidence": "low",
+            "validation_status": "unvalidated",
+            "rationale": "ambiguous",
+            "subject_ref": "x",
+        },
+    )
+    data = asdict(base_event)
+
+    assert ledger.validate_inspection_report(data) == []
+
+    data_none = dict(data)
+    data_none["judge_evidence"] = None
+    assert ledger.validate_inspection_report(data_none) == []
+
+    data_bad = dict(data)
+    data_bad["judge_evidence"] = "not-a-dict"
+    issues = ledger.validate_inspection_report(data_bad)
+    assert any("judge_evidence" in str(issue) for issue in issues)
 
 
 def test_append_ledger_event_rejects_malformed_work_result(repo: Path) -> None:
@@ -270,3 +334,23 @@ def test_check_dispatch_independence_allows_empty_worker_identity_only(
     # pre-R-0.4 WorkResult with no recorded identity) does not by itself fail
     # the check — only an empty *inspector* identity is disqualifying.
     ledger.check_dispatch_independence(repo, "", "renmark-verifier")  # must not raise
+
+
+def test_ledger_module_has_no_judge_import_and_verdicts_unchanged() -> None:
+    source = (Path(__file__).resolve().parents[1] / "renmark" / "ledger.py").read_text(
+        encoding="utf-8"
+    )
+    assert "import judge" not in source
+    assert "from renmark.judge" not in source
+    assert "from .judge" not in source
+    assert "renmark.judge" not in source
+    assert ledger.VERDICTS == ("pass", "fail", "escalate")
+
+
+"""
+## Summary
+- Added a judge_evidence round-trip check that keeps verdict unchanged.
+- Added validator coverage for valid, null, and malformed judge_evidence values.
+- Added a source-grep guard to keep renmark/ledger.py decoupled from renmark.judge.
+- Added a regression guard for the VERDICTS tuple.
+"""
