@@ -41,6 +41,12 @@ from ..state import (
     completed_task_indices as completed_task_indices,
 )
 from ..state import (
+    completed_task_titles as completed_task_titles,
+)
+from ..state import (
+    normalize_task_title as normalize_task_title,
+)
+from ..state import (
     now_iso as now_iso,
 )
 from ..state import (
@@ -274,6 +280,7 @@ def _task_signature(task: Task) -> str:
 def _cross_check_skip_list(
     done: set[int],
     tasks: list[Task],
+    done_titles: dict[int, set[str]] | None = None,
 ) -> tuple[set[int], set[int]]:
     """Validate the resume skip-list against the CURRENT plan's task set.
 
@@ -292,18 +299,36 @@ def _cross_check_skip_list(
       ``(task N)``-suffix side-commit).  Return it in the ``ambiguous`` set so
       the caller can warn and NOT silently skip real tasks.
 
+    Index matching alone is NOT sufficient.  ``completed_task_indices`` scans
+    the FULL unbounded git history, so any prior plan that ever numbered a task
+    ``N`` makes index ``N`` look "done" forever.  When ``done_titles`` is
+    supplied, an index is only safe to skip when some historical commit for
+    that index ALSO carried the current plan's task title (normalized).  A
+    same-index/different-title hit is a cross-plan false positive and is
+    routed to ``ambiguous`` so the caller re-runs it.
+
     Args:
         done:  Indices the git-log scan reported as completed.
         tasks: Tasks from the current live plan (parse_plan result).
+        done_titles: Optional ``{index: {normalized_title, ...}}`` from
+            ``completed_task_titles``.  When omitted, the check degrades to the
+            legacy index-only comparison (kept for backward compatibility).
 
     Returns:
         (safe_to_skip, ambiguous) — two disjoint subsets of ``done``.
     """
-    plan_indices = {t.index for t in tasks}
+    plan_titles = {t.index: normalize_task_title(t.title) for t in tasks}
     safe_to_skip: set[int] = set()
     ambiguous: set[int] = set()
     for idx in done:
-        if idx in plan_indices:
+        if idx in plan_titles:
+            if done_titles is not None:
+                observed = done_titles.get(idx, set())
+                if plan_titles[idx] not in observed:
+                    # Same index, different title: the commit belongs to a
+                    # DIFFERENT plan.  Re-run rather than silently skip.
+                    ambiguous.add(idx)
+                    continue
             safe_to_skip.add(idx)
         else:
             # This index has no counterpart in the current plan; treating it as

@@ -14,6 +14,10 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, bug) **renmark-execute --resume never consults the ledger, so dangling work_order events are invisible** — Surfaced by Release 13s orphan-detection spike; deferrable, not blocking. Ledger-resume reconciliation is exactly the kind of gap this program (governed-orchestration-assurance) exists to close -- good candidate for a dedicated future release if it recurs.
+
+- (2026-08-05, bug) **renmark-execute --resume has no pre-flight working-tree cleanup** — Surfaced by Release 13s orphan-detection spike; deferrable, not blocking (unlike Finding A).
+
 - (2026-08-05, .renmark/reviews/2026-08-05-0937869.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-12** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2059 passed (up from 2057 baseline); AC-10 closed
 
 - (2026-08-05, bug) **summary.is_stale crashes on naive-vs-aware datetime compare against this repos real .renmark tree** — Found via live dogfooding of Release 12s hygiene.py extension -- the additive change itself is correct and isolated, but running it against the real repo surfaced a genuine pre-existing defect in a function outside this releases scope. Logged rather than silently fixed inline, per this programs own out-of-scope-finding convention.

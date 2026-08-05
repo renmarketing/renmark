@@ -15,7 +15,7 @@ from ..state import (
     PauseState,
     clear_pause,
     clear_pipeline_state,
-    completed_task_indices,
+    completed_task_titles,
     now_iso,
     read_pause,
     usage_this_month,
@@ -51,17 +51,22 @@ def _setup_resume_state(repo: Path, tasks: list[Task]) -> set[int]:
         _print("note: no PAUSED state found; running from start")
     else:
         _print(f"resuming run {pause.run_id}; last attempted task: {pause.last_task_index}")
-    raw_done = completed_task_indices(repo)
+    # Capture index AND commit title: the git-log scan is unbounded over the
+    # whole repo history, so a bare index match proves nothing — any prior plan
+    # that ever numbered a task N makes index N look "done" forever.
+    done_titles = completed_task_titles(repo)
+    raw_done = set(done_titles)
     # Cross-check: a git-log scan may include indices from a DIFFERENT plan
     # (reused task numbers, ``(task N)``-suffix side commits, etc.).
     # Silently skipping tasks that don't exist in the current plan is the
     # single most expensive observed failure — the ledger and git log must
-    # be trusted, but ONLY for indices that unambiguously belong to THIS plan.
-    done, ambiguous = _get_engine()._cross_check_skip_list(raw_done, tasks)
+    # be trusted, but ONLY for indices whose index AND title unambiguously
+    # belong to THIS plan.
+    done, ambiguous = _get_engine()._cross_check_skip_list(raw_done, tasks, done_titles)
     if ambiguous:
         _print(
             f"warning: skip-list cross-check found {len(ambiguous)} orphaned "
-            f"index(es) {sorted(ambiguous)} not in current plan "
+            f"index(es) {sorted(ambiguous)} not matching current plan "
             f"({len(tasks)} tasks).  These will NOT be silently skipped — "
             f"re-running to avoid false completions.  "
             f"(Likely cause: reused task numbers or commits from a different plan.)"

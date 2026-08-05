@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-08-05] — fix: rethink Release 13 (governed-orchestration-assurance) — skip-list identity check closes real cross-plan resume bug
+**Request:** Bounded, capped fix for the orphan-detection spike's blocking Finding A — `--resume`'s skip-list checked task INDEX only, not identity, so a cross-plan reused index could silently skip real work with zero warning. Confirmed live: this repo's own git history has dozens of `[renmark] task N: ...` commits across many plans, making the false-positive condition realistic, not theoretical.
+**Built:** `state/commits.py` gains `completed_task_titles(repo) -> dict[int, set[str]]` (capturing commit-subject titles per index; `dict[int, set[str]]` rather than a single title, since an index legitimately recurs with different titles across different plans, and any-title-match is the safe read) + `normalize_task_title()`. `completed_task_indices()` unchanged (still `set[int]`, kept for its existing callers). `_cross_check_skip_list` gains an OPTIONAL third arg — omitted is byte-identical legacy behavior; supplied, an index only counts as `safe_to_skip` when BOTH index and normalized title match, otherwise it correctly routes to `ambiguous` (the existing warn-and-re-run path, untouched). `_setup_resume_state` wires the strengthened check. A pre-existing test fixture writing a fake commit subject format was corrected to match the real `[renmark] task N: <title>` shape the title check exposed as wrong. Full suite: 2066 passed, 32 skipped (up from 2059, +7 net new tests, no regressions).
+**Files changed:**
+- `renmark/state/commits.py` — completed_task_titles + normalize_task_title.
+- `renmark/state/__init__.py` — export.
+- `renmark/cli/_engine.py` — _cross_check_skip_list strengthened (optional, backward-compatible).
+- `renmark/cli/_run_lifecycle.py` — wires titles through.
+- `tests/test_engine_resume_crosscheck.py` — regression tests + fixture fix.
+**Do not change:**
+- `_cross_check_skip_list`'s third arg must stay optional — omitting it must remain byte-identical to pre-fix behavior for any other caller.
+- Never weaken the ambiguous-routing direction — when in doubt about identity, the safe outcome is re-run, never silent skip.
+**Behavior note:** the first `--resume` after this fix may re-run some already-completed idempotent tasks whose historical commit titles aren't captured (e.g. pre-fix runs) — this is the safe direction (re-run, not silent skip), not a regression.
+
+## [2026-08-05] — docs: rethink Release 13 task 1 (governed-orchestration-assurance) — orphan-detection spike, blocking finding
+**Request:** Task 1 of 5, Release 13 — self-benchmark resume/recovery correctness against deliberately-interrupted scenarios; report findings, do not fix in this task.
+**Built:** 5 scenarios probed via disposable scratch-repo simulation (never the real `.renmark/state`). Finding A (blocking, fixed in the commit above): `_cross_check_skip_list` checked index membership only, not task identity. Finding B (deferrable, logged): no pre-flight working-tree cleanup on `--resume`. Finding C (deferrable, logged): the ledger is never consulted during resume, so dangling `work_order` events are invisible. Scenarios 1/3 passed cleanly; `heartbeat.auto_resume` is a clean delegation that inherits Findings A/B.
+**Files changed:**
+- `.renmark/rethink/governed-orchestration-assurance/release-13-orphan-detection-spike-finding.md` — new.
+**Do not change:**
+- (none — evidence-only artifact)
+
 ## [2026-08-05] — test: rethink Release 12 tasks 4-5 (governed-orchestration-assurance) — full coverage + skill doc, Release 12 complete
 **Request:** Tasks 4-5 of 5, Release 12 — test coverage for the 7-way categorization + review sweep, and documenting the new hygiene stdout lines.
 **Built:** `tests/test_hygiene_release12_categorization.py` (3 tests — every `ARTIFACT_REGISTRY` entry classified into exactly one of 7 categories, a seeded due-for-review rule surfaces in `scan` output without mutating its status, `context.py`'s `assert_metadata_only`/`ContextKind` byte-unchanged guard). `plugin/skills/hygiene/SKILL.md` — one sentence documenting `CATEGORIES`/`FAILURE-RULES` as part of the existing relay-verbatim contract. Full suite: 2059 passed, 32 skipped (up from 2057 passed/31 skipped, net +3 tests, no failures).

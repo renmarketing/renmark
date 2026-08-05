@@ -40,7 +40,7 @@ from ._core import (
     rotate_dir,
     state_dir,
 )
-from .commits import completed_task_indices
+from .commits import completed_task_indices, completed_task_titles, normalize_task_title
 from .logs import (
     append_log,
     logs_dir,
@@ -115,6 +115,7 @@ __all__ = [
     "clear_pipeline_state",
     # commits
     "completed_task_indices",
+    "completed_task_titles",
     "context_budget_check",
     "escalation_dir",
     "handoffs_dir",
@@ -124,6 +125,7 @@ __all__ = [
     # logs
     "logs_dir",
     "new_run_id",
+    "normalize_task_title",
     "now_iso",
     "open_log",
     "pipeline_is_resumable",

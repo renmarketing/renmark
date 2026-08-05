@@ -51,12 +51,21 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "-C", str(path), "commit", "-q", "-m", "init"], check=True)
 
 
-def _commit_task(path: Path, index: int, message_suffix: str = "") -> None:
-    """Commit a dummy file with a renmark-style subject so git-log picks it up."""
+def _commit_task(
+    path: Path, index: int, message_suffix: str = "", title: str | None = None
+) -> None:
+    """Commit a dummy file with a renmark-style subject so git-log picks it up.
+
+    The subject mirrors what ``_codex_runner`` really writes:
+    ``[renmark] task <index>: <task title>`` — the title matters now that the
+    resume cross-check compares it against the current plan.
+    """
+    subject = f"[renmark] task {index}: {title or f'task {index}'}{message_suffix}"
     f = path / f"dummy_{index}.txt"
-    f.write_text(f"task {index}")
+    # Content varies with the subject so repeated commits for the same index
+    # (different plans) are never empty commits.
+    f.write_text(subject)
     subprocess.run(["git", "-C", str(path), "add", str(f)], check=True)
-    subject = f"[renmark] task {index}: dummy task {index}{message_suffix}"
     subprocess.run(
         ["git", "-C", str(path), "commit", "-q", "-m", subject], check=True
     )
@@ -145,6 +154,77 @@ def test_crosscheck_disjoint_sets():
     assert ambiguous == {6, 9}
 
 
+# ── Title-aware cross-check (cross-plan reused-index false positive) ──────────
+
+
+def test_crosscheck_title_match_still_safe():
+    """Same plan, same index AND same title → still safe_to_skip (unchanged)."""
+    tasks = [_make_task(1), _make_task(2), _make_task(3)]
+    done_titles = {1: {"task 1"}, 2: {"task 2"}}
+    safe, ambiguous = _engine._cross_check_skip_list({1, 2}, tasks, done_titles)
+    assert safe == {1, 2}
+    assert ambiguous == set()
+
+
+def test_crosscheck_title_mismatch_is_ambiguous():
+    """REGRESSION: cross-plan reused index (same N, different title) must NOT skip.
+
+    The git-log scan is unbounded over the whole repo history, so an unrelated
+    older plan's "[renmark] task 1: something else" made task 1 of the CURRENT
+    plan look already-done.  It must land in ``ambiguous`` and be re-run.
+    """
+    tasks = [_make_task(1), _make_task(2)]
+    done_titles = {1: {"wire up the old exporter"}, 2: {"task 2"}}
+    safe, ambiguous = _engine._cross_check_skip_list({1, 2}, tasks, done_titles)
+    assert safe == {2}, "only the genuine index+title match may be skipped"
+    assert ambiguous == {1}, "reused index with a foreign title must be re-run"
+
+
+def test_crosscheck_title_match_is_case_and_whitespace_insensitive():
+    """Titles are compared normalized — minor formatting drift must not re-run."""
+    tasks = [_make_task(1)]
+    done_titles = {1: {"  TASK   1 "}}
+    from renmark.state import normalize_task_title
+
+    safe, ambiguous = _engine._cross_check_skip_list(
+        {1}, tasks, {1: {normalize_task_title("  TASK   1 ")}}
+    )
+    assert safe == {1}
+    assert ambiguous == set()
+    assert normalize_task_title(next(iter(done_titles[1]))) == "task 1"
+
+
+def test_crosscheck_missing_title_entry_is_ambiguous():
+    """An index with no recorded title cannot be proven — prefer re-running."""
+    tasks = [_make_task(1)]
+    safe, ambiguous = _engine._cross_check_skip_list({1}, tasks, {})
+    assert safe == set()
+    assert ambiguous == {1}
+
+
+def test_crosscheck_multiple_titles_for_index_matches_any():
+    """A repo may hold many commits for index N; one correct title is enough."""
+    tasks = [_make_task(1)]
+    done_titles = {1: {"an old unrelated task", "task 1"}}
+    safe, ambiguous = _engine._cross_check_skip_list({1}, tasks, done_titles)
+    assert safe == {1}
+    assert ambiguous == set()
+
+
+def test_completed_task_titles_captures_index_and_title(tmp_path):
+    """completed_task_titles() returns normalized titles keyed by index."""
+    from renmark.state import completed_task_indices, completed_task_titles
+
+    _init_repo(tmp_path)
+    _commit_task(tmp_path, 1, title="Build The Thing")
+    _commit_task(tmp_path, 1, title="a different plan's task 1")
+
+    titles = completed_task_titles(tmp_path)
+    assert titles == {1: {"build the thing", "a different plan's task 1"}}
+    # Backward compatibility: the index-only API is unchanged.
+    assert completed_task_indices(tmp_path) == {1}
+
+
 # ── Integration: execute_plan --resume emits warning for orphaned index ───────
 
 
@@ -182,6 +262,41 @@ def test_resume_warns_on_orphaned_skip_entry(tmp_path, monkeypatch, capsys):
     # the safe set is empty, so that exact line must never appear.
     assert "skipping already-committed tasks: [5]" not in out, (
         "orphaned index 5 was wrongly included in the resume skip-list"
+    )
+
+
+def test_resume_does_not_skip_cross_plan_reused_index(tmp_path, monkeypatch, capsys):
+    """REGRESSION (Finding A): an unrelated older plan's ``[renmark] task 1: ...``
+    commit must not mark task 1 of the CURRENT plan as already-done.
+
+    Index 1 exists in the current plan, so the old index-only cross-check
+    passed it straight into the skip-list.  With the title cross-check it must
+    be flagged and re-run instead.
+    """
+    _init_repo(tmp_path)
+    # A commit from a DIFFERENT, long-gone plan that also numbered a task 1.
+    _commit_task(tmp_path, 1, title="port the legacy exporter")
+    # Task 2 genuinely completed for THIS plan.
+    _commit_task(tmp_path, 2)
+
+    plan = _write_plan(tmp_path, 3)
+
+    def unavailable(*_args, **_kwargs):
+        raise CodexError("codex unavailable in test")
+
+    monkeypatch.setattr(_codex_runner, "run_codex_task", unavailable)
+
+    _engine.execute_plan(str(plan), repo=tmp_path, resume=True)
+
+    out = capsys.readouterr().out
+    assert "skipping already-committed tasks: [2]" in out, (
+        f"only the genuine index+title match may be skipped, got:\n{out}"
+    )
+    assert "orphaned" in out.lower() or "cross-check" in out.lower(), (
+        f"expected a cross-check warning for the reused index, got:\n{out}"
+    )
+    assert "[1]" in out or "[1," in out or "(es) [1]" in out, (
+        f"the reused index 1 must be named in the warning, got:\n{out}"
     )
 
 
