@@ -47,8 +47,67 @@ def test_disallowed_target_blocks() -> None:
 
 def test_non_write_tool_defers() -> None:
     payload = {
+        "tool_name": "Grep",
+        "tool_input": {"pattern": "ls"},
+        "cwd": str(REPO_ROOT),
+    }
+
+    result = run_hook(payload)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+def test_bash_allowed_command_passes() -> None:
+    payload = {
         "tool_name": "Bash",
-        "tool_input": {"command": "ls"},
+        "tool_input": {"command": "pytest tests/"},
+        "renmark_role": "code-implementer",
+        "cwd": str(REPO_ROOT),
+    }
+
+    result = run_hook(payload)
+
+    assert result.returncode == 0
+    parsed = json.loads(result.stdout)
+    assert parsed["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+def test_bash_disallowed_command_blocks() -> None:
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "rm -rf /"},
+        "renmark_role": "code-implementer",
+        "cwd": str(REPO_ROOT),
+    }
+
+    result = run_hook(payload)
+
+    assert result.returncode == 0
+    parsed = json.loads(result.stdout)
+    assert parsed["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "allowed_commands" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_bash_role_with_no_restrictions_always_allows() -> None:
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "rm -rf /"},
+        "renmark_role": "general-purpose",
+        "cwd": str(REPO_ROOT),
+    }
+
+    result = run_hook(payload)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+def test_bash_missing_command_defers() -> None:
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {},
+        "renmark_role": "code-implementer",
         "cwd": str(REPO_ROOT),
     }
 
