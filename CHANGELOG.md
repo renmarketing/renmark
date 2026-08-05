@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — PRD updated: REQ-30 clause (j) + governed-orchestration-assurance overhead budget
+**Request:** Amend REQ-30 for the governed-orchestration-assurance program's Release 7 — formally name its Critical-tier gate as an allowed named gate and record a measured overhead-budget methodology, per the 2026-08-04 exception check-in decision.
+**Built:** Reconciled REQ-30 of PRD.md. New clause (j): a rethink-approved transformation program may name its own Execution-Gate-approved Critical-tier gate as an allowed named gate, scoped to that program's own releases. New "Governed-orchestration-assurance overhead budget" bullet: `AGENT_OVERHEAD_TOKENS = 10,000` has zero drift since the pin but is unvalidated for ~35% of dispatch volume (codex, token-blind); comparisons must either restrict to non-codex executors or record codex spend as `unknown`. Releases 8-16 must each demonstrate compliance before shipping. Bumped `last_reviewed` to 2026-08-05.
+**Files changed:**
+- `PRD.md` — REQ-30 clause (j) + overhead-budget bullet + revision note.
+**Do not change:**
+- The overhead-budget methodology is scoped strictly to the governed-orchestration-assurance program — it does not relax REQ-30's 15% regression cap or gate-frequency rule for any other pipeline or feature.
+
 ## [2026-08-05] — docs: rethink Release 7 task 1 (governed-orchestration-assurance) — REQ-30 overhead measurement
 **Request:** Task 1 of 1, Release 7 — mine real current per-dispatch overhead numbers across the 4 representative scenarios, honestly compared against the pinned ORCHESTRATION-BASELINE-2026-08.
 **Built:** New `## REQ-30 overhead measurement — 2026-08-05` section in `.renmark/memory/orchestration-baseline.md`. Rethink Releases 1-6 re-measured (26 tasks, executor mix codex9/haiku3/opus2/sonnet12, 24 ledger rows, 0 fresh Owner gates beyond Stage 9). Feature/Fix and Orchestrate carried forward unchanged (no fresher data). Start reconfirmed unknown. `AGENT_OVERHEAD_TOKENS=10,000` confirmed unchanged since the `d9cccc5` pin — no drift. Honest finding: a full like-for-like measured comparison against the pin isn't computable (the pin predates any numeric baseline; codex stays token-blind for ~35% of Rethink dispatches) — named as a real gap, no fabricated percentage. One recommended overhead-budget line written for the REQ-30 PRD amendment to cite. `PRD.md` untouched — out of scope for this task, amended separately via `/renmark:prd`'s own UPDATE gate.

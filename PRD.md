@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-08-04
+last_reviewed: 2026-08-05
 status: draft
 ---
 
@@ -606,7 +606,13 @@ first-class hosts for the same product workflow, not separate product forks.
       orchestration routing, context limits, dispatch policy, model
       escalation, Owner-gate frequency, or artifact-reuse behavior requires
       an explicit PRD change and Owner approval through `/renmark:prd`'s
-      UPDATE gate — it is never a side effect of an unrelated feature.
+      UPDATE gate — it is never a side effect of an unrelated feature; (j)
+      a rethink-approved transformation program MAY name its own
+      Execution-Gate-approved Critical-tier inspection gate (per that
+      program's own Req 5) as an additional allowed named gate under
+      clause (f) — it must be recorded here by program name and release,
+      and stays scoped to that program's own numbered releases, never a
+      blanket exception.
     - **Named baseline.** The release tagged `v0.39.7`
       (commit `d9cccc5`, 2026-08-02) is the reference point for this
       requirement, named **`ORCHESTRATION-BASELINE-2026-08`**, recorded at
@@ -631,6 +637,25 @@ first-class hosts for the same product workflow, not separate product forks.
       quantified evidence, explicit Owner approval, a documented benefit, and
       a rollback path — new functionality alone never justifies an
       efficiency regression.
+    - **Governed-orchestration-assurance overhead budget (2026-08-05).**
+      `ORCHESTRATION-BASELINE-2026-08` predates any numeric per-dispatch
+      capture, so no full like-for-like "actual vs. 10,000-token pin"
+      percentage exists system-wide; per
+      `.renmark/memory/orchestration-baseline.md`'s "REQ-30 overhead
+      measurement — 2026-08-05" section, `AGENT_OVERHEAD_TOKENS = 10,000`
+      remains unchanged with zero drift, but is unvalidated against real
+      spend for ~35% of this program's dispatch volume (codex, which
+      reports no tokens). For the `governed-orchestration-assurance`
+      program, any Regression-protection comparison MUST either (a)
+      restrict its actual-vs-pin claim to non-codex executors and disclose
+      the excluded share, or (b) record codex dispatches as a documented
+      `unknown`-cost line item rather than assume they track the pin.
+      Release 8 of this program is hereby named as an allowed Critical-tier
+      gate under clause (j) above. Every later release in this program
+      (8 through 16) must demonstrate compliance with this comparison
+      methodology in its own verification artifact before it ships — a
+      checklist item on the program's own release-verification convention,
+      not a code change.
     - *Acceptance:* done when orchestrator-visible summaries stay bounded
       (≤5 lines / ≤300 tokens) and artifact-linked on every task; done when
       an interrupted run resumes from durable state without repeating a
@@ -1086,6 +1111,27 @@ feature that doesn't realize it's touching orchestration. Proposed by the
 project owner directly, motivated by observed token/latency savings from the
 current dispatch discipline; reviewed and explicitly approved by the project
 owner on 2026-08-02 via the `/renmark:prd` UPDATE gate.
+
+
+**Revision note (2026-08-05, human-approved diff):** Added REQ-30 clause
+(j), allowing a rethink-approved transformation program to name its own
+Execution-Gate-approved Critical-tier inspection gate as an allowed named
+gate, scoped strictly to that program's own numbered releases. Added the
+"Governed-orchestration-assurance overhead budget" bullet, recording that
+`AGENT_OVERHEAD_TOKENS = 10,000` has zero measured drift since the
+`ORCHESTRATION-BASELINE-2026-08` pin but is unvalidated against real spend
+for the ~35% of that program's dispatch volume routed to codex (which
+reports no tokens) — per the real measurement at
+`.renmark/memory/orchestration-baseline.md`'s "REQ-30 overhead measurement
+— 2026-08-05" section — and requiring every later release in that program
+(8-16) to demonstrate compliance with the resulting comparison methodology
+before shipping. This is the binding prerequisite the
+`governed-orchestration-assurance` rethink's Release 7 and its 2026-08-04
+exception check-in decision required before Release 8 (Critical-tier gate)
+or Release 11 (dispatch scheduling) could proceed. Proposed by Release 7 of
+that program (an automated pipeline stage), grounded in the real overhead
+measurement task's output; reviewed and explicitly approved by the project
+owner on 2026-08-05 via the `/renmark:prd` UPDATE gate.
 
 
 **Revision note (2026-08-02, human-approved diff):** Added REQ-31 (native
