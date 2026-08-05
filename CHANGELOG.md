@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 12 tasks 4-5 (governed-orchestration-assurance) — full coverage + skill doc, Release 12 complete
+**Request:** Tasks 4-5 of 5, Release 12 — test coverage for the 7-way categorization + review sweep, and documenting the new hygiene stdout lines.
+**Built:** `tests/test_hygiene_release12_categorization.py` (3 tests — every `ARTIFACT_REGISTRY` entry classified into exactly one of 7 categories, a seeded due-for-review rule surfaces in `scan` output without mutating its status, `context.py`'s `assert_metadata_only`/`ContextKind` byte-unchanged guard). `plugin/skills/hygiene/SKILL.md` — one sentence documenting `CATEGORIES`/`FAILURE-RULES` as part of the existing relay-verbatim contract. Full suite: 2059 passed, 32 skipped (up from 2057 passed/31 skipped, net +3 tests, no failures).
+**Files changed:**
+- `tests/test_hygiene_release12_categorization.py` — new.
+- `plugin/skills/hygiene/SKILL.md` — documented new stdout lines.
+**Do not change:**
+- `context.py`'s taxonomy/`assert_metadata_only` must stay byte-unchanged — guarded by test.
+**Release 12 complete.** State-fragmentation spike → CLAUDE.md/AGENTS.md correction (mirrored) → hygiene.py 7-way categorization + review sweep → full coverage + skill doc. AC-10 (Req 10) closed. A pre-existing, out-of-scope `summary.is_stale` datetime bug was found and logged, not fixed inline.
+
 ## [2026-08-05] — feat: rethink Release 12 task 3 (governed-orchestration-assurance) — hygiene.py 7-way categorization + failure-rule review sweep
 **Request:** Task 3 of 5, Release 12 — extend `hygiene.py` toward the proposal's 7-way category split, and surface Release 10's `failure_rules_due_for_review` in hygiene output.
 **Built:** `SEVEN_WAY_CATEGORIES`/`categorize_seven_way`/`compute_seven_way_report` map all 14 `ARTIFACT_REGISTRY` entries into 7 categories (verified 14-in/14-out, no drops/dupes). `budget` subcommand gains a non-breaking `CATEGORIES` line; `scan`/`all` gain a `FAILURE-RULES due_for_review=<n>` line (read-only, never mutates rule status, degrades to 0 on any error). 24/24 hygiene tests pass; `context.py` and existing registry/deletion logic untouched.

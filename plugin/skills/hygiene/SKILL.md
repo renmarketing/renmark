@@ -38,7 +38,7 @@ Subcommands: `scan` (artifacts), `prune` (memory logs), `all` (both).
 
 ### 2. Relay the result
 
-Pass the bounded stdout through to the user unchanged. The script emits one or two status lines — `HYGIENE …` always, and `MEMORY …` only when pruning ran — plus an `ERRORS …` line only on `--apply` failures. Do not paraphrase or expand — the format is the contract.
+Pass the bounded stdout through to the user unchanged. The script emits one or two status lines — `HYGIENE …` always, and `MEMORY …` only when pruning ran — plus an `ERRORS …` line only on `--apply` failures. On `scan`/`all`, output may also include a `CATEGORIES …` line (7-way categorization) and a `FAILURE-RULES due_for_review=<n>` line — both part of the same relay-verbatim contract. Do not paraphrase or expand — the format is the contract.
 
 ## Flags
 

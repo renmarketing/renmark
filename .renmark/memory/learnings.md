@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, bug) **summary.is_stale crashes on naive-vs-aware datetime compare against this repos real .renmark tree** — Found via live dogfooding of Release 12s hygiene.py extension -- the additive change itself is correct and isolated, but running it against the real repo surfaced a genuine pre-existing defect in a function outside this releases scope. Logged rather than silently fixed inline, per this programs own out-of-scope-finding convention.
+
 - (2026-08-05, bug) **docs-editor allowed_targets glob (**/*.md) never matches root-level .md files** — 4 occurrences of the same underlying capability-envelope coverage gap across Releases 7, 8, 11, 12 -- worth a dedicated remediation pass rather than continuing to patch role assignments one dispatch at a time. Also a reminder that ** in Python fnmatch is NOT shell globstar -- any allowed_targets pattern using ** should be verified with a real fnmatch.fnmatch() call, not assumed.
 
 - (2026-08-05, .renmark/reviews/2026-08-05-cc77fee.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-11** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2057 passed (up from 2051 baseline); scheduling capability shipped but not yet wired into any live caller
