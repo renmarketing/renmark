@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 9/16 · task 0/4 done · current: Release 9: Calibrated blind LLM-judge (3-state + bias controls)_
+_mode: staged · Stage 10/16 · task 0/6 done · current: Release 10: Failure-derived constraint registry_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -69,15 +69,15 @@ _phases: plan → build → verify → review → release_
 - [x] Add resolve_lens_for(work_order) -> LensName policy function; also constructs the InspectionContract — In the subagent_profiles.py/subagent_gate.py orbit; explicitly not cost.requires_escalation.
 - [x] Author 'risk-tier/lens selection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 9: Calibrated blind LLM-judge (3-state + bias controls) — serves AC-6 (REQ-6) **(current)**
+## ● Release 9: Calibrated blind LLM-judge (3-state + bias controls) — serves AC-6 (REQ-6)
 _phases: plan → build → verify → review → release_
 
-- [ ] Change judge.py's Outcome to Literal['pass','fail','uncertain'] — Breaking, compile-time-visible; every caller pattern-matching on Outcome must add the third arm.
-- [ ] Add a redaction step to compose_judge_prompt before string composition — Redacts Worker self-assessment/confidence/identity at data-assembly time.
-- [ ] Add order-randomization to pairwise/comparison calls, recorded per call
-- [ ] Add InspectionReport.judge_evidence: JudgeEvidenceRef | None — Attachment, not a merge; never overrides InspectionReport.verdict.
+- [x] Change judge.py's Outcome to Literal['pass','fail','uncertain'] — Breaking, compile-time-visible; every caller pattern-matching on Outcome must add the third arm.
+- [x] Add a redaction step to compose_judge_prompt before string composition — Redacts Worker self-assessment/confidence/identity at data-assembly time.
+- [x] Add order-randomization to pairwise/comparison calls, recorded per call
+- [x] Add InspectionReport.judge_evidence: JudgeEvidenceRef | None — Attachment, not a merge; never overrides InspectionReport.verdict.
 
-## ○ Release 10: Failure-derived constraint registry — serves AC-7 (REQ-7)
+## ○ Release 10: Failure-derived constraint registry — serves AC-7 (REQ-7) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Write the ADR distinguishing Req 7 (curated cross-run failure-rule registry) from REQ-24 (recurrence.py's per-run/fingerprint role) — precondition for the rest of this release — Flagged as needed 'before Release E' by prd-acceptance-map.md (Gap 4).
