@@ -291,6 +291,13 @@ class InspectionReport:
     was graded against — e.g. ``"task-3-contract:1"``. It is the ONLY link
     between the pre-dispatch contract and this post-dispatch record; the
     two shapes stay separate on purpose.
+
+    ``judge_evidence`` (additive, Release 9) is an optional reference-only
+    pointer at a ``judge.JudgeEvidenceRef`` — the evidence produced by the
+    live LLM-as-judge eval tier. It is attached to this report, never
+    merged into it, and it does NOT override ``verdict``: ``VERDICTS``
+    remains the sole verdict vocabulary, and ``judge_evidence`` cannot set
+    or change a report's ``verdict`` value.
     """
 
     subject_ref: str = ""  # what was inspected (order_id, file, artifact path)
@@ -301,6 +308,7 @@ class InspectionReport:
     risk_tier: str | None = None
     lens: str | None = None
     contract_ref: str | None = None  # "contract_id:version" graded against
+    judge_evidence: "JudgeEvidenceRef | None" = None  # reference-only, never overrides verdict
 
 
 @dataclass
@@ -413,6 +421,12 @@ def validate_inspection_report(data: dict[str, Any]) -> list[str]:
     issues += _check_opt_str(data, "risk_tier")
     issues += _check_opt_str(data, "lens")
     issues += _check_opt_str(data, "contract_ref")
+    if "judge_evidence" in data and data["judge_evidence"] is not None:
+        if not isinstance(data["judge_evidence"], dict):
+            issues.append(
+                f"'judge_evidence' must be a dict or null, got "
+                f"{type(data['judge_evidence']).__name__}"
+            )
     return issues
 
 

@@ -1107,8 +1107,9 @@ def _escalate_to_judge(
 
     Called ONLY when ``run(..., judge=True)``. Reads the recorded eval golden and
     asks :func:`renmark.judge.judge_behavior` whether the with-skill output honors
-    the eval contract. A missing golden yields an unvalidated verdict carrying
-    :data:`ACCEPT_FIRST_HINT` — never a silent pass.
+    the eval contract. A missing golden yields an unvalidated, uncertain verdict
+    carrying :data:`ACCEPT_FIRST_HINT` — never a silent pass, and never a claimed
+    fail when the judge was simply never consulted.
     """
     from dataclasses import asdict
 
@@ -1118,7 +1119,7 @@ def _escalate_to_judge(
         golden = _read_snapshot(_snapshot_path(case, case.eval.golden_ref))
     except (json.JSONDecodeError, OSError, BehaviorConfigError) as exc:
         return {
-            "outcome": "fail",
+            "outcome": "uncertain",
             "confidence": "low",
             "validation_status": "unvalidated",
             "rationale": f"judge could not read golden snapshot: {exc}",
@@ -1126,7 +1127,7 @@ def _escalate_to_judge(
 
     if golden is None:
         return {
-            "outcome": "fail",
+            "outcome": "uncertain",
             "confidence": "low",
             "validation_status": "unvalidated",
             "rationale": f"no recorded eval golden — {ACCEPT_FIRST_HINT}",

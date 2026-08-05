@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 9 tasks 2+3 (governed-orchestration-assurance) — behavior.py fix + ledger.py judge_evidence
+**Request:** Tasks 2 and 3 of 7, Release 9 — flip `behavior.py`'s hardcoded fail-as-uncertain-proxy fallbacks to real `uncertain`, and add `InspectionReport.judge_evidence` as additive, reference-only evidence.
+**Built:** `behavior.py`'s `_escalate_to_judge` — both defensive fallback dicts (unreadable golden; golden is `None`) now report `outcome: "uncertain"` instead of `"fail"`; `validation_status` stays `unvalidated`. `ledger.py`'s `InspectionReport.judge_evidence: "JudgeEvidenceRef | None" = None` — bare forward-ref, zero import of `judge.py` (confirmed via grep), with an explicit non-goal sentence in the docstring: never overrides `verdict`. `validate_inspection_report` gains a dict-or-null check for the new field. 23/23 ledger tests pass.
+**Files changed:**
+- `renmark/behavior.py` — fail-as-uncertain-proxy fix.
+- `renmark/ledger.py` — judge_evidence field.
+**Do not change:**
+- `ledger.py` must never import `renmark.judge` — the forward-ref string annotation is the deliberate mechanism keeping the two leaf modules decoupled.
+
 ## [2026-08-05] — feat: rethink Release 9 task 1 (governed-orchestration-assurance) — judge.py 3-state Outcome (breaking change)
 **Request:** Task 1 of 7, Release 9 — the breaking 2-state → 3-state `Outcome` change, redaction, order-randomization, and `JudgeEvidenceRef`.
 **Built:** `Outcome = Literal["pass", "fail", "uncertain"]`. Every branch in `_parse_response`/`judge_behavior` that previously hardcoded `outcome="fail"` for an untrusted/unparseable/runner-failure case now returns `outcome="uncertain"` — a genuine parsed `"fail"` is the only way to get a validated fail. Prompt text updated to describe all 3 states. `_redact_worker_fields`/`_redact_value`/`_render_payload` strip Worker self-assessment/confidence/identity/preferred-verdict at data-assembly time, before string composition. `swap_order` kwarg + `resolve_swap_order(seed)` (SHA-256-stable when seeded) for pairwise order-randomization, recorded via `JudgeCallRecord`/`JudgeEvidenceRef` — never written into `Verdict.rationale`. `JudgeEvidenceRef` (+ `from_verdict` factory) is the reference type future `InspectionReport.judge_evidence` will point at — `Verdict`'s 4 existing fields and `judge_behavior`'s return type unchanged. `tests/test_judge.py`/`tests/test_eval_agent_turn.py` updated for the new semantics (necessary — the old assertions were testing behavior this release deliberately changed). Full suite: 2028 passed, 31 skipped — no regression.
