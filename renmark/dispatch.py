@@ -11,6 +11,30 @@ and never claims to execute either host tool.
 
 Permission-economy: by accepting a list of tasks per wave call, the user
 sees one Bash prompt per wave instead of one per task.
+
+Two live scheduling paths (read this before "simplifying" anything below)
+------------------------------------------------------------------------
+Release 6/11 review repeatedly mis-identified which function is actually
+live. Both of the following paths are live in production, and BOTH of them
+go through :func:`group_tasks_by_wave` — it is the single shared scheduling
+entry point:
+
+1. **Host-agent path (Claude Code / Codex host tools).** The orchestrating
+   skill groups the plan's tasks with :func:`group_tasks_by_wave` and then
+   builds a pure transport contract via :func:`build_host_dispatch_plan` /
+   :func:`build_host_dispatch_plan_with_scope`. The real Agent/Workflow (or
+   spawn_agent/wait_agent) call happens in the host, OUTSIDE this Python
+   process. :func:`dispatch_wave` is **not** on this path.
+2. **CLI/codex path.** ``renmark/cli/_wave_loop.py`` (via ``_prepare_waves``)
+   and ``renmark/cli/_engine.py`` (dry-run cost preview) call
+   :func:`group_tasks_by_wave`, and ``_wave_loop`` then executes each wave
+   through :func:`dispatch_wave`, which runs non-Claude executors in a local
+   thread pool and marks Claude-model tasks ``needs_agent`` for the host.
+
+Consequence: a scheduling policy added to :func:`group_tasks_by_wave` is
+universally live for both hosts, while a policy added only to
+:func:`dispatch_wave` reaches the CLI/codex path alone. Policy that must
+apply everywhere belongs in :func:`group_tasks_by_wave`.
 """
 
 from __future__ import annotations
@@ -92,18 +116,237 @@ class WaveResult:
         return [t for t in self.tasks if t.status == "needs_agent"]
 
 
-def group_tasks_by_wave(tasks: list[Task]) -> list[list[Task]]:
-    """Split tasks into waves by parallel_group.
+# ── Policy-aware scheduling signals (all opt-in, all default-off) ────────────
+#
+# Every signal below is injected by the caller. `dispatch.py` deliberately
+# imports NOTHING new for them:
+#   * quota  -> the caller passes the dict `renmark.usage.build_usage_view`
+#              already returns; this module only reads its existing keys and
+#              never polls a provider or calls `usage.py` itself.
+#   * rework -> an injected callable (same injection style as
+#              `dispatch_wave`'s `run_task`), so the caller keeps ownership of
+#              whatever recurrence/occurrence data it already tracks.
+#   * risk   -> an injected callable a caller MAY wire to
+#              `ledger.classify_risk_tier(work_order)`; this module never
+#              force-constructs a `WorkOrder` just to obtain a tier.
+#
+# Hard boundary: none of these is a retry-blocking authority.
+# `recurrence.pre_attempt` remains the sole blocking gate. The rework signal
+# here is annotate-only — it never reorders, delays, or drops a task.
+
+# Provider names as used by `usage.build_usage_view`'s `percent` block.
+_QUOTA_PROVIDERS: tuple[str, ...] = ("claude", "codex")
+_QUOTA_PERCENT_KEYS: tuple[str, ...] = ("rolling_5h_tokens", "weekly_tokens")
+
+# Attribute set on a Task when `rework_lookup` reports it at/over budget.
+# Log-only. Dynamic attachment mirrors the established pattern documented on
+# `ledger.classify_risk_tier` (a caller attaches `complexity` dynamically).
+REWORK_NOTE_ATTR = "rework_note"
+
+# Matches `recurrence._is_blocked`'s occurrence threshold, used only when the
+# caller hands back a bare integer count with no explicit blocked/at-budget flag.
+REWORK_OCCURRENCE_BUDGET = 2
+
+# Highest first. Unknown/None tiers rank as `low` so an all-None resolver
+# leaves ordering exactly as it was.
+_RISK_ORDER: dict[str, int] = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def _task_provider(task: Task) -> str | None:
+    """Map a task's executor to a `usage.py` provider name, or None if unknown.
+
+    Unknown executors (e.g. a raw litellm model string) are never throttled —
+    throttling something we cannot attribute would be a guess, not a policy.
+    """
+    try:
+        if claude_agent.is_claude_executor(task.executor):
+            return "claude"
+        if str(task.executor).strip().lower() == "codex":
+            return "codex"
+    except Exception:
+        return None
+    return None
+
+
+def _throttled_providers(quota_view: dict[str, Any] | None) -> frozenset[str]:
+    """Providers whose configured local limit is breached. Never raises.
+
+    Reads only keys `usage.build_usage_view` already produces:
+    `limit_exceeded` (bool) and `percent[provider][rolling_5h_tokens|
+    weekly_tokens]`. When `limit_exceeded` is falsy the result is empty. When
+    it is truthy but no per-provider percent evidence is resolvable, every
+    known provider is throttled — throttling only serializes work (it never
+    drops a task), so the conservative reading is the safe one.
+    """
+    if not quota_view:
+        return frozenset()
+    try:
+        flag = quota_view.get("limit_exceeded")
+        if isinstance(flag, dict):  # defensive: tolerate a per-provider mapping
+            return frozenset(str(k) for k, v in flag.items() if v)
+        if not flag:
+            return frozenset()
+        percent = quota_view.get("percent")
+        breached: set[str] = set()
+        if isinstance(percent, dict):
+            for provider, cells in percent.items():
+                if not isinstance(cells, dict):
+                    continue
+                for key in _QUOTA_PERCENT_KEYS:
+                    value = cells.get(key)
+                    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 100.0:
+                        breached.add(str(provider))
+                        break
+        return frozenset(breached) if breached else frozenset(_QUOTA_PROVIDERS)
+    except Exception:
+        return frozenset()
+
+
+def _rework_at_or_over_budget(value: Any) -> bool:
+    """Duck-type the caller's rework value into "at or over budget". Never raises.
+
+    Accepts, in priority order: None (False); a bool; an object/mapping with a
+    `retry_blocked` (or `another_retry_blocked`) flag — the shape
+    `recurrence.RecurrenceDecision` already exposes; an object/mapping with an
+    `occurrence_count`; a bare int compared against `REWORK_OCCURRENCE_BUDGET`.
+    Anything unrecognized is False — an unreadable signal must not annotate.
+    """
+    try:
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        get = value.get if isinstance(value, dict) else lambda k, d=None: getattr(value, k, d)
+        for flag_key in ("retry_blocked", "another_retry_blocked"):
+            flag = get(flag_key, None)
+            if isinstance(flag, bool):
+                return flag
+        count = get("occurrence_count", None) if not isinstance(value, int) else value
+        if isinstance(count, (int, float)) and not isinstance(count, bool):
+            return count >= REWORK_OCCURRENCE_BUDGET
+    except Exception:
+        return False
+    return False
+
+
+def _risk_rank(task: Task, risk_resolver: Callable[[Task], str | None]) -> int:
+    try:
+        tier = risk_resolver(task)
+    except Exception:
+        return _RISK_ORDER["low"]
+    if not tier:
+        return _RISK_ORDER["low"]
+    return _RISK_ORDER.get(str(tier).strip().lower(), _RISK_ORDER["low"])
+
+
+def _split_wave(wave: list[Task], limit: int | None, throttled: frozenset[str]) -> list[list[Task]]:
+    """Split one wave into consecutive sub-waves, preserving relative order.
+
+    `limit` caps every sub-wave's size (`None`/<=0 means no limit). A provider
+    in `throttled` additionally gets an effective cap of 1 per sub-wave. Tasks
+    are only ever serialized, never dropped or reordered here.
+    """
+    if (limit is None or limit <= 0) and not throttled:
+        return [wave]
+    sub_waves: list[list[Task]] = []
+    current: list[Task] = []
+    seen_throttled: set[str] = set()
+    for task in wave:
+        provider = _task_provider(task)
+        throttle_conflict = provider is not None and provider in throttled and provider in seen_throttled
+        size_conflict = limit is not None and limit > 0 and len(current) >= limit
+        if current and (throttle_conflict or size_conflict):
+            sub_waves.append(current)
+            current = []
+            seen_throttled = set()
+        current.append(task)
+        if provider is not None and provider in throttled:
+            seen_throttled.add(provider)
+    if current:
+        sub_waves.append(current)
+    return sub_waves
+
+
+def group_tasks_by_wave(
+    tasks: list[Task],
+    *,
+    max_parallelism: int | None = None,
+    quota_view: dict[str, Any] | None = None,
+    rework_lookup: Callable[[Task], Any] | None = None,
+    risk_resolver: Callable[[Task], str | None] | None = None,
+) -> list[list[Task]]:
+    """Split tasks into waves by parallel_group, optionally policy-aware.
 
     Tasks without an explicit parallel_group default to their task index
     (= each in its own group = serial). Waves are returned in numerically-
     sorted group order.
+
+    This is the SHARED scheduling entry point for both live paths (see the
+    module docstring): the host-agent path and the CLI/codex `dispatch_wave`
+    path both call it.
+
+    All four keyword arguments are additive and default to `None`. **With none
+    of them supplied the function is a strict no-op** — it returns exactly the
+    same `list[list[Task]]` it always has, via an explicit early return, so no
+    policy code can perturb the legacy result.
+
+    - `max_parallelism`: cap on how many tasks may share one returned wave.
+      An over-sized wave is split into consecutive sub-waves of at most this
+      many tasks, in stable order. `Task.parallel_group` is NOT renumbered —
+      only the returned list-of-lists shape changes — so each sub-wave still
+      reports the original group id through `dispatch_wave`. A value <= 0 is
+      treated as "no limit" (defensive; never raises).
+    - `quota_view`: the dict `renmark.usage.build_usage_view(repo, now=...)`
+      already returns. Only its existing `limit_exceeded` / `percent` keys are
+      read; this module never calls `usage.py` and adds no provider polling.
+      A provider over its configured local limit is throttled to at most one
+      task per sub-wave. Throttling serializes, it never drops a task.
+    - `rework_lookup`: injected callable (mirrors `dispatch_wave`'s `run_task`
+      injection) mapping a Task to whatever rework/occurrence value the caller
+      tracks. A task at/over budget is ANNOTATED only (`Task.rework_note`,
+      see `REWORK_NOTE_ATTR`) — never reordered, delayed, or dropped. This is
+      scheduling awareness, not a second retry-blocking authority;
+      `recurrence.pre_attempt` remains the sole blocking gate.
+    - `risk_resolver`: injected callable mapping a Task to a risk-tier string
+      (a caller with a `WorkOrder` in hand may wire it to
+      `ledger.classify_risk_tier`; this module never constructs a `WorkOrder`
+      itself, and `None` from the resolver is fine). Used ONLY to order tasks
+      that are already in the same wave, highest risk first, stably. It never
+      moves a task across a wave boundary and never affects `validate_wave`'s
+      disjoint-target requirement (that check is set-based and order-free).
     """
     groups: dict[int, list[Task]] = {}
     for t in tasks:
         gid = t.parallel_group if t.parallel_group is not None else t.index
         groups.setdefault(gid, []).append(t)
-    return [groups[k] for k in sorted(groups.keys())]
+    waves = [groups[k] for k in sorted(groups.keys())]
+
+    if max_parallelism is None and quota_view is None and rework_lookup is None and risk_resolver is None:
+        return waves
+
+    if rework_lookup is not None:
+        for wave in waves:
+            for task in wave:
+                try:
+                    if _rework_at_or_over_budget(rework_lookup(task)):
+                        setattr(
+                            task,
+                            REWORK_NOTE_ATTR,
+                            "rework signal at or over budget (log-only; not a retry gate)",
+                        )
+                except Exception:
+                    continue
+
+    if risk_resolver is not None:
+        waves = [sorted(wave, key=lambda t: -_risk_rank(t, risk_resolver)) for wave in waves]
+
+    throttled = _throttled_providers(quota_view)
+    if (max_parallelism is not None) or throttled:
+        split: list[list[Task]] = []
+        for wave in waves:
+            split.extend(_split_wave(wave, max_parallelism, throttled))
+        waves = split
+    return waves
 
 
 def validate_wave(wave: list[Task]) -> None:
@@ -141,12 +384,21 @@ def dispatch_wave(
     repo: Path,
     run_task: Callable[[Task, Path], TaskResult],
     max_workers: int | None = None,
+    max_parallelism: int | None = None,
 ) -> WaveResult:
     """Run all non-Claude tasks in a wave concurrently.
 
     `run_task` is injected (test-friendly). Claude-model tasks (opus/sonnet)
     don't run here — they get `status="needs_agent"` so the skill can issue
     Agent tool calls itself.
+
+    `max_parallelism` is the same policy value `group_tasks_by_wave` accepts,
+    threaded onto the existing `max_workers` path so the CLI/codex loop can
+    apply one cap to both wave shape and local thread-pool width. `max_workers`
+    wins when both are given. Defaults are unchanged: with neither supplied the
+    pool width is still `min(len(runnable), 8)`. A value <= 0 means "no limit"
+    (same defensive reading as `group_tasks_by_wave`), so a nonsensical cap
+    degrades to the default instead of raising out of `ThreadPoolExecutor`.
     """
     if not wave:
         return WaveResult(group_id=0, tasks=[])
@@ -208,7 +460,10 @@ def dispatch_wave(
     if not runnable:
         return result
 
-    workers = max_workers or min(len(runnable), 8)
+    cap = max_workers if max_workers is not None else max_parallelism
+    if cap is None or cap <= 0:
+        cap = 0
+    workers = cap or min(len(runnable), 8)
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
         futures = {ex.submit(_run_one, run_task, t, repo): t for t in runnable}
         for fut in concurrent.futures.as_completed(futures):
