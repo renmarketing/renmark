@@ -124,6 +124,12 @@ class WorkOrder:
     optional caller-attached ``complexity`` duck-typed attribute).
     Existing placeholder string values already stored on this field
     remain valid — this is additive documentation, not a schema change.
+
+    ``inspection_contract`` (Release 8, additive/optional) carries the
+    PRE-dispatch :class:`InspectionContract` for this order — what
+    inspection *should* happen. It stays ``None`` for hand-constructed
+    orders; :func:`work_order_for_task` populates a minimal one by default
+    (opt out with ``auto_contract=False``).
     """
 
     order_id: str = ""
@@ -136,6 +142,7 @@ class WorkOrder:
     risk_tier: str | None = None
     capability_envelope_ref: str | None = None
     lens: str | None = None
+    inspection_contract: InspectionContract | None = None
     schema_version: int = 1
     correlation_id: str | None = None
     idempotency_key: str | None = None
@@ -148,7 +155,12 @@ class WorkOrder:
 
 
 def work_order_for_task(
-    task: Any, role: str, *, order_id: str | None = None, **kwargs: Any
+    task: Any,
+    role: str,
+    *,
+    order_id: str | None = None,
+    auto_contract: bool = True,
+    **kwargs: Any,
 ) -> WorkOrder:
     """Build a :class:`WorkOrder` from a ``renmark.parser.Task``-like object.
 
@@ -175,6 +187,18 @@ def work_order_for_task(
     be supplied via ``**kwargs``; unsupplied ones stay at their
     dataclass defaults. This function only constructs a valid canonical
     ``WorkOrder`` — it performs no enforcement.
+
+    **Auto-contract (Release 8).** Unless the caller supplies
+    ``inspection_contract`` explicitly (or passes ``auto_contract=False``),
+    a minimal :class:`InspectionContract` is attached: ``risk_tier`` comes
+    from the caller's explicit ``risk_tier`` kwarg when present, otherwise
+    from :func:`classify_risk_tier` on the in-progress order; ``lenses``
+    comes from ``subagent_gate.resolve_lens_for``. Contract construction
+    never mutates the order's own ``risk_tier``/``lens`` fields — a caller
+    that passed those explicitly gets exactly those values back — and
+    **never raises**: any failure (import problem, bad classifier output)
+    degrades to ``inspection_contract=None`` so a broken contract path can
+    never break work-order construction itself.
     """
     if order_id is None:
         index = getattr(task, "index", None)
@@ -190,7 +214,7 @@ def work_order_for_task(
     file_scope = [f for f in [target, *context_files] if f]
     verifier = getattr(task, "verifier", "") or ""
 
-    return WorkOrder(
+    order = WorkOrder(
         order_id=order_id,
         task=task_spec,
         role=role,
@@ -198,6 +222,43 @@ def work_order_for_task(
         verifier=verifier,
         **kwargs,
     )
+
+    if auto_contract and kwargs.get("inspection_contract") is None:
+        order.inspection_contract = _auto_inspection_contract(order)
+
+    return order
+
+
+def _auto_inspection_contract(order: WorkOrder) -> InspectionContract | None:
+    """Build the default :class:`InspectionContract` for *order*, or ``None``.
+
+    Never raises — every failure path returns ``None`` (see
+    :func:`work_order_for_task`'s auto-contract contract).
+    """
+    try:
+        from .subagent_gate import resolve_lens_for
+
+        risk_tier = order.risk_tier or classify_risk_tier(order)
+        if risk_tier not in RISK_TIERS:
+            return None
+
+        # Resolve the lens against the EFFECTIVE tier without mutating the
+        # order: a caller-supplied risk_tier/lens must round-trip unchanged.
+        lens_probe = WorkOrder(file_scope=list(order.file_scope), risk_tier=risk_tier)
+        lens = resolve_lens_for(lens_probe)
+
+        return InspectionContract(
+            contract_id=f"{order.order_id}-contract",
+            version=1,
+            risk_tier=risk_tier,
+            lenses=[lens],
+            deterministic_gates=[],
+            semantic_rubric_ref=None,
+            independent_judge_required=risk_tier in ("high", "critical"),
+            evidence_required=[],
+        )
+    except Exception:
+        return None
 
 
 @dataclass
@@ -224,6 +285,12 @@ class InspectionReport:
     ``pass``/``fail``/``escalate`` semantics (:data:`VERDICTS`) unchanged;
     ``risk_tier`` is a separate, orthogonal axis (see :data:`RISK_TIERS` /
     :func:`classify_risk_tier`), not a replacement for it.
+
+    ``contract_ref`` (additive, Release 8) names the
+    ``contract_id:version`` of the :class:`InspectionContract` this report
+    was graded against — e.g. ``"task-3-contract:1"``. It is the ONLY link
+    between the pre-dispatch contract and this post-dispatch record; the
+    two shapes stay separate on purpose.
     """
 
     subject_ref: str = ""  # what was inspected (order_id, file, artifact path)
@@ -233,6 +300,7 @@ class InspectionReport:
     dispatch_identity: str = ""  # who/what dispatch produced this verdict (R-0.4, WP-2)
     risk_tier: str | None = None
     lens: str | None = None
+    contract_ref: str | None = None  # "contract_id:version" graded against
 
 
 @dataclass
@@ -344,6 +412,7 @@ def validate_inspection_report(data: dict[str, Any]) -> list[str]:
     issues += _check_str(data, "dispatch_identity", required=False)
     issues += _check_opt_str(data, "risk_tier")
     issues += _check_opt_str(data, "lens")
+    issues += _check_opt_str(data, "contract_ref")
     return issues
 
 
@@ -533,6 +602,50 @@ def read_ledger_events(
 # picking one).
 
 VERDICTS: tuple[str, ...] = ("pass", "fail", "escalate")
+
+
+# ── Inspection contract (Release 8) ──────────────────────────────────────
+#
+# Declared HERE rather than beside the other dataclasses above because its
+# ``allowed_verdicts`` default is :data:`VERDICTS`, which is defined at this
+# point in the module. ``from __future__ import annotations`` makes the
+# forward reference on ``WorkOrder.inspection_contract`` (declared earlier)
+# a lazy string, so the split placement is safe.
+
+
+@dataclass
+class InspectionContract:
+    """The PRE-dispatch plan for what inspection *should* happen.
+
+    Deliberately separate from :class:`InspectionReport`, which is the
+    POST-dispatch record of what inspection *did* happen (per
+    ``.renmark/rethink/governed-orchestration-assurance/
+    target-blueprint.md`` §3.5 and the Release 8 roadmap revision,
+    peer-review Gap 3). The two shapes are connected only by a reference
+    field — :attr:`InspectionReport.contract_ref` — and are never merged:
+    a contract is versioned and authored before any work is dispatched; a
+    report is evidence produced after the fact.
+
+    ``allowed_verdicts`` defaults to :data:`VERDICTS` and exists so a
+    contract can *narrow* the verdict vocabulary for a given inspection.
+    It must never widen it beyond :data:`VERDICTS` — there is exactly one
+    verdict vocabulary in this module and it is :data:`VERDICTS`.
+
+    Schema-only as of Release 8: no validator is registered in
+    ``_VALIDATOR_BY_KIND`` and this is not a :data:`LedgerEvent` member, so
+    an ``InspectionContract`` is never written to the ledger on its own —
+    it travels nested inside :attr:`WorkOrder.inspection_contract`.
+    """
+
+    contract_id: str = ""
+    version: int = 1
+    risk_tier: str | None = None
+    lenses: list[str] = field(default_factory=list)
+    deterministic_gates: list[str] = field(default_factory=list)
+    semantic_rubric_ref: str | None = None
+    independent_judge_required: bool = False
+    evidence_required: list[str] = field(default_factory=list)
+    allowed_verdicts: tuple[str, ...] = VERDICTS
 
 
 # ── Risk-tier classification (Release 8) ─────────────────────────────────
@@ -796,6 +909,7 @@ __all__ = [
     "VERDICTS",
     "DispatchIndependenceError",
     "Escalation",
+    "InspectionContract",
     "InspectionReport",
     "LedgerEvent",
     "LedgerValidationError",

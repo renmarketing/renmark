@@ -136,6 +136,7 @@ def test_work_order_schema_matches_release_3_defaults() -> None:
         "risk_tier",
         "capability_envelope_ref",
         "lens",
+        "inspection_contract",
         "schema_version",
         "correlation_id",
         "idempotency_key",
@@ -151,6 +152,7 @@ def test_work_order_schema_matches_release_3_defaults() -> None:
     assert order.risk_tier == "triage"
     assert order.capability_envelope_ref is None
     assert order.lens is None
+    assert order.inspection_contract is None
     assert order.schema_version == 1
     assert order.correlation_id is None
     assert order.idempotency_key is None

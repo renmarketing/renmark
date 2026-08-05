@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 8 task 4 (governed-orchestration-assurance) — InspectionContract (pre-dispatch plan, distinct from InspectionReport)
+**Request:** Task 4 of 8, Release 8 — the versioned, pre-dispatch `InspectionContract`, distinct from the post-dispatch `InspectionReport`, linked only by a reference field.
+**Built:** `InspectionContract` (contract_id, version, risk_tier, lenses, deterministic_gates, semantic_rubric_ref, independent_judge_required, evidence_required, allowed_verdicts defaulting to `VERDICTS`). `WorkOrder.inspection_contract: InspectionContract | None`. `InspectionReport.contract_ref: str | None` (validated via existing `_check_opt_str`). `work_order_for_task` gains `auto_contract: bool = True`, building a contract via a never-raising helper (`risk_tier` from `classify_risk_tier`, `lenses` from `resolve_lens_for`, `independent_judge_required` for high/critical) unless the caller opts out or supplies one explicitly. `VERDICTS` untouched. Fixed an existing test's exact-field-list assertion that any additive `WorkOrder` field would have broken regardless of placement. Full suite: 2007 passed, 31 skipped — no regression.
+**Files changed:**
+- `renmark/ledger.py` — InspectionContract + wiring.
+- `tests/test_work_order_funnel_wiring.py` — updated field-list assertion.
+**Do not change:**
+- `InspectionContract` and `InspectionReport` stay two separate dataclasses connected only by `contract_ref` — never merge them; `allowed_verdicts` may only narrow `VERDICTS`, never widen beyond it.
+**Deferred findings (not blocking, for later tasks/releases):** `validate_work_order` doesn't type-check the nested contract dict; every `WorkOrder` via `build_subagent_input` now carries a nested contract dict by default (verified JSON-serializable); `inspection_contract=None` as an explicit kwarg is treated as "not supplied" (only `auto_contract=False` truly opts out); `allowed_verdicts` narrowing isn't enforced anywhere yet; `contract_ref` is schema-only until an inspector call site populates it.
+
 ## [2026-08-05] — feat: rethink Release 8 task 3 (governed-orchestration-assurance) — resolve_lens_for policy
 **Request:** Task 3 of 8, Release 8 — a new, separate policy function selecting a falsification lens for Inspector review, distinct from capability-envelope enforcement.
 **Built:** `LENS_NAMES = ("maintainer", "skeptical_user", "competitor")` (grounded in the original proposal's Requirement 5 vocabulary, per `survey.md`). `resolve_lens_for(work_order) -> str` — duck-typed, never raises, defaults to `"maintainer"`. Policy: `risk_tier in ("high", "critical")` → `skeptical_user`; `risk_tier == "medium"` with multi-file scope → `competitor`; everything else → `maintainer`. Explicitly documented as separate from `check_capability_envelope` and `cost.requires_escalation` — different concerns, not to be merged. 49/49 subagent_gate tests pass.
