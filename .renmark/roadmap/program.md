@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 5/16 · task 0/1 done · current: Release 5: PreToolUse capability-envelope spike (#7)_
+_mode: staged · Stage 6/16 · task 0/7 done · current: Release 6: Capability-envelope enforcement wiring_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -37,12 +37,12 @@ _phases: plan → build → verify → review → release_
 - [x] Deferred cosmetic 'concise displayed list' format for Role/worker+model/Budget/Verification — Per prd-acceptance-map's own deferral note.
 - [x] Add regression test named after the 2026-06-14 'Hand-off picker not re-rendered' incident — Proves the enforced-mode guard catches that exact failure mode.
 
-## ○ Release 5: PreToolUse capability-envelope spike (#7) — serves AC-2 (REQ-2) **(current)**
+## ● Release 5: PreToolUse capability-envelope spike (#7) — serves AC-2 (REQ-2)
 _phases: plan → build → verify → review → release_
 
-- [ ] Bounded 1-session spike: prototype PreToolUse hook for metadata-driven allow/deny — Read Claude Code's PreToolUse hook contract; prototype one hook wired to one agent profile's allowed_targets; confirm Codex's own enforcement mechanism. Evidence: one working hook config + one passing/one blocking integration test. Stop condition: feasible -> proceed to release 6 as specified; not feasible -> release 6 falls back to post-action-only, documented, escalated to Owner.
+- [x] Bounded 1-session spike: prototype PreToolUse hook for metadata-driven allow/deny — Read Claude Code's PreToolUse hook contract; prototype one hook wired to one agent profile's allowed_targets; confirm Codex's own enforcement mechanism. Evidence: one working hook config + one passing/one blocking integration test. Stop condition: feasible -> proceed to release 6 as specified; not feasible -> release 6 falls back to post-action-only, documented, escalated to Owner.
 
-## ○ Release 6: Capability-envelope enforcement wiring — serves AC-2 (REQ-2)
+## ○ Release 6: Capability-envelope enforcement wiring — serves AC-2 (REQ-2) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Expand subagent_gate.check_capability_envelope(role, requested_scope) -> EnvelopeVerdict to cover path/command/network_domain/git_action/external_action/spend_timeout dimensions — Same shape as existing SubagentVerdict, never raises; called from the same pre-dispatch funnel subagent_gate's justification check already runs from.
