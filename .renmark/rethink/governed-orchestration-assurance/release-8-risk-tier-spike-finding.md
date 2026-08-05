@@ -367,3 +367,15 @@ self-approving. A third re-spike is not warranted by this result (the
 roadmap's stop condition allows only one), and is not what this finding
 is asking for — a bounded revision of the same v2 rule, re-verified by
 Task 2's own tests, is.
+
+---
+
+## Owner decision — 2026-08-05
+
+**Decision:** Code v3 with the 4 named fixes now (branch-order fix, add
+`renmark/lifecycle.py` to the critical-module set, extend the pipeline-skill
+exception to `plugin/skills/.shared/*.md`, accept the medium-floor
+over-classification trade-off as a deliberate fail-safer-not-lenient choice).
+No further re-spike — the roadmap allows only one, already used. Task 2
+codes v3 and its own test suite must assert each of the 4 fixes explicitly,
+not just re-run the same aggregate disagreement-rate math.
