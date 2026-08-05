@@ -46,6 +46,35 @@ PRICE_PER_KTOK: dict[str, float] = {
     "fable": 0.030,
 }
 
+# ── Spend/timeout ceilings ───────────────────────────────────────────────────
+
+#: Per-tier default maximum tokens for a single dispatch, used by
+#: :func:`check_spend_timeout_ceiling` when ``budget`` omits ``max_tokens``.
+#: These are conservative, clearly-labeled defaults — not derived from
+#: ``PRICE_PER_KTOK`` — and may be overridden per-dispatch via
+#: ``budget["max_tokens"]``.
+DEFAULT_MAX_TOKENS_PER_DISPATCH: dict[str, int] = {
+    "haiku": 50_000,
+    "sonnet": 100_000,
+    "opus": 150_000,
+    "fable": 150_000,
+    "codex": 200_000,
+}
+
+#: Per-tier default maximum wall-clock seconds for a single dispatch, used by
+#: :func:`check_spend_timeout_ceiling` when ``budget`` omits ``max_timeout_s``.
+#: A flat 600s (10 minutes) is a reasonable default across all tiers — tiers
+#: don't meaningfully differ in wall-clock risk the way they differ in token
+#: cost, so one constant covers all of them; override per-dispatch via
+#: ``budget["max_timeout_s"]``.
+DEFAULT_MAX_TIMEOUT_S: dict[str, int] = {
+    "haiku": 600,
+    "sonnet": 600,
+    "opus": 600,
+    "fable": 600,
+    "codex": 600,
+}
+
 # ── Overhead ─────────────────────────────────────────────────────────────────
 
 #: Extra tokens added per non-codex agent task to account for system-prompt,
@@ -112,6 +141,26 @@ class CostPreview:
     deterministic_tokens: int = 0
     #: Estimated tokens attributed to model-driven items (base tokens only, no agent overhead).
     model_driven_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class SpendTimeoutVerdict:
+    """Result of a check-before-dispatch spend/timeout ceiling check.
+
+    Produced by :func:`check_spend_timeout_ceiling`.  ``max_tokens`` and
+    ``max_timeout_s`` echo back the ceiling that was actually enforced
+    (tier default unless overridden by ``budget``), or ``None`` when no
+    ceiling applied (``budget is None``).
+    """
+
+    #: True iff the declared budget (or the tier default, when unset) is satisfied.
+    passed: bool
+    #: Human-readable reason for the verdict.
+    reason: str
+    #: The token ceiling that was enforced, or None when no budget was declared.
+    max_tokens: int | None = None
+    #: The timeout ceiling (seconds) that was enforced, or None when no budget was declared.
+    max_timeout_s: int | None = None
 
 
 @dataclass(frozen=True)
@@ -365,6 +414,91 @@ def requires_escalation(*, complexity: str | None = None, kind: str | None = Non
         return isinstance(kind, str) and kind.strip().lower() in _ESCALATION_KINDS
     except Exception:
         return False
+
+
+def check_spend_timeout_ceiling(budget: dict | None, *, tier: str = "sonnet") -> SpendTimeoutVerdict:
+    """Check a declared dispatch budget against a per-tier ceiling before dispatch.
+
+    ``budget`` is the same shape as ``ledger.WorkOrder.budget`` — an optional
+    ``dict`` carrying optional ``max_tokens`` (int) and ``max_timeout_s`` (int)
+    keys. This is a check-before-dispatch against a configured max; it is
+    NOT a billing system and performs no accounting of actual spend.
+
+    Behavior:
+
+    - ``budget is None`` → ``passed=True`` — nothing was declared, so there is
+      nothing to enforce (matches the never-silently-deny convention already
+      used elsewhere in this module for empty ``allowed_commands`` /
+      ``allowed_targets`` defaults).
+    - ``budget`` is a dict → resolve the effective ceiling as the per-tier
+      default (:data:`DEFAULT_MAX_TOKENS_PER_DISPATCH` /
+      :data:`DEFAULT_MAX_TIMEOUT_S`), OVERRIDDEN (not added to) by
+      ``budget["max_tokens"]`` / ``budget["max_timeout_s"]`` when present.
+      An unrecognised ``tier`` falls back to the ``"sonnet"`` default.
+    - Malformed ``budget`` (not a dict, or a present ``max_tokens`` /
+      ``max_timeout_s`` that isn't a non-negative ``int``) →
+      ``passed=False, reason="malformed budget — treated as failing, not
+      silently passing"``. This is the one place in this module that fails
+      closed rather than degrading to a lenient default: a budget ceiling's
+      entire purpose is refusing an unverifiable spend.
+
+    **Never raises.**
+    """
+    try:
+        if budget is None:
+            return SpendTimeoutVerdict(
+                passed=True,
+                reason="no budget declared — nothing to enforce",
+                max_tokens=None,
+                max_timeout_s=None,
+            )
+
+        if not isinstance(budget, dict):
+            return SpendTimeoutVerdict(
+                passed=False,
+                reason="malformed budget — treated as failing, not silently passing",
+            )
+
+        normalized_tier = tier.strip().lower() if isinstance(tier, str) and tier.strip() else "sonnet"
+        if normalized_tier not in DEFAULT_MAX_TOKENS_PER_DISPATCH:
+            normalized_tier = "sonnet"
+
+        max_tokens = DEFAULT_MAX_TOKENS_PER_DISPATCH[normalized_tier]
+        max_timeout_s = DEFAULT_MAX_TIMEOUT_S[normalized_tier]
+
+        if "max_tokens" in budget:
+            raw_max_tokens = budget["max_tokens"]
+            if isinstance(raw_max_tokens, bool) or not isinstance(raw_max_tokens, int) or raw_max_tokens < 0:
+                return SpendTimeoutVerdict(
+                    passed=False,
+                    reason="malformed budget — treated as failing, not silently passing",
+                )
+            max_tokens = raw_max_tokens
+
+        if "max_timeout_s" in budget:
+            raw_max_timeout_s = budget["max_timeout_s"]
+            if (
+                isinstance(raw_max_timeout_s, bool)
+                or not isinstance(raw_max_timeout_s, int)
+                or raw_max_timeout_s < 0
+            ):
+                return SpendTimeoutVerdict(
+                    passed=False,
+                    reason="malformed budget — treated as failing, not silently passing",
+                )
+            max_timeout_s = raw_max_timeout_s
+
+        return SpendTimeoutVerdict(
+            passed=True,
+            reason=f"within declared ceiling (max_tokens={max_tokens}, max_timeout_s={max_timeout_s})",
+            max_tokens=max_tokens,
+            max_timeout_s=max_timeout_s,
+        )
+    except Exception:
+        return SpendTimeoutVerdict(
+            passed=False,
+            reason="malformed budget — treated as failing, not silently passing",
+        )
 
 
 # ── Internal helpers ─────────────────────────────────────────────────────────

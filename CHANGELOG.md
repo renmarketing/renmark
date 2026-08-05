@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 6 tasks 1+2 (governed-orchestration-assurance) — allowed_commands field + spend/timeout ceiling
+**Request:** Tasks 1 and 2 of 9, Release 6 — real command allowlists per role and a pure spend/timeout ceiling check, both additive with no consumer wiring yet.
+**Built:** `ProfileSpec.allowed_commands: tuple[str, ...] = ()` on all 10 profiles (empty = no restriction declared, never silently deny). `cost.check_spend_timeout_ceiling(budget, tier=...) -> SpendTimeoutVerdict` + `DEFAULT_MAX_TOKENS_PER_DISPATCH`/`DEFAULT_MAX_TIMEOUT_S` per-tier constants — `budget is None` passes (nothing to enforce), a malformed budget (wrong type, negative, bool) fails closed (the one place in this module that fails closed rather than degrading leniently, since a budget ceiling's purpose is refusing an unverifiable spend). Existing `estimate_cost`/`requires_escalation`/`resolve_profile`/`profile_tier` untouched.
+**Files changed:**
+- `renmark/subagent_profiles.py` — allowed_commands field.
+- `renmark/cost.py` — SpendTimeoutVerdict + check_spend_timeout_ceiling.
+**Do not change:**
+- Empty `allowed_commands`/`budget=None` must never silently deny — matches this release's established never-deny-by-default convention.
+
 ## [2026-08-05] — test: rethink Release 5 task 2 (governed-orchestration-assurance) — prototype integration test
 **Request:** Task 2 of 3, Release 5 — prove the PreToolUse prototype hook can both pass an allowed target and block a disallowed one.
 **Built:** `tests/test_capability_envelope_prototype.py` — 3 tests: allowed-target passes (`allow`), disallowed-target blocks (`deny`), non-Write/Edit tool defers (empty stdout, exit 0). Drives the real prototype script via subprocess, not a mock. 3/3 passed.

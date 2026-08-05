@@ -45,6 +45,11 @@ class ProfileSpec:
         Glob pattern or human-readable description of which file/path targets
         this role is authorized to touch. Informational for now; enforced in
         future Agency Mode.
+    allowed_commands:
+        Command-name allowlist this role may invoke via Bash/exec. Empty
+        tuple = no command restriction declared (informational-only, matches
+        today's ``allowed_targets`` behavior for roles that don't set it —
+        do NOT silently deny everything for an empty tuple).
     output_format:
         Expected output structure (e.g. ``"structured JSON per G11"``).
     stop_condition:
@@ -63,10 +68,14 @@ class ProfileSpec:
     stop_condition: str
     verification: str
     context_scope: str
+    allowed_commands: tuple[str, ...] = ()
 
 
 # ── Profile registry ──────────────────────────────────────────────────────────
 
+# NOTE: ``allowed_commands`` is informational-only today, same as
+# ``allowed_targets`` was before Agency Mode. It becomes REAL enforcement in
+# Release 6 (Task 3 in this same plan).
 
 PROFILES: dict[str, ProfileSpec] = {
     # ── Documentation / markdown edits ───────────────────────────────────────
@@ -78,6 +87,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="all target .md files updated, no code files touched",
         verification="diff contains only .md changes; no .py / .sh touched",
         context_scope="narrow",
+        allowed_commands=(),
     ),
     # ── Core Python / shell implementation ───────────────────────────────────
     "code-implementer": ProfileSpec(
@@ -88,6 +98,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="target file written, py_compile passes, verifier expectation met",
         verification="py_compile clean; no unexpected files outside target scope",
         context_scope="narrow",
+        allowed_commands=("python3", "pytest", "git", "ruff", "mypy"),
     ),
     # ── Test scaffolding / pytest ─────────────────────────────────────────────
     "test-writer": ProfileSpec(
@@ -98,6 +109,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="test file written; pytest -q on the new file passes",
         verification="pytest exit-code 0 on new file; no production code touched",
         context_scope="narrow",
+        allowed_commands=("python3", "pytest"),
     ),
     # ── Code / plan review ────────────────────────────────────────────────────
     "reviewer": ProfileSpec(
@@ -108,6 +120,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="review artifact written to .renmark/reviews/; no production file edited",
         verification="review artifact exists; no production files in touched_files",
         context_scope="narrow",
+        allowed_commands=("git", "python3"),
     ),
     # ── Audit / inventory reads ───────────────────────────────────────────────
     "audit-reader": ProfileSpec(
@@ -118,6 +131,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="audit artifact written; no source files modified",
         verification="only .renmark/audits/ files in touched_files; no .py edits",
         context_scope="narrow",
+        allowed_commands=(),
     ),
     # ── Release / finish lane ─────────────────────────────────────────────────
     "release-manager": ProfileSpec(
@@ -128,6 +142,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="version bumped in pyproject.toml; CHANGELOG entry appended; lifecycle.json updated",
         verification="version string incremented; CHANGELOG entry present; lifecycle stage = ready-to-release",
         context_scope="narrow",
+        allowed_commands=("git", "python3"),
     ),
     # ── Research / web / library lookups ─────────────────────────────────────
     "researcher": ProfileSpec(
@@ -138,6 +153,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="research artifact written with provenance metadata",
         verification="artifact exists at .renmark/research/<topic>.md; no source edits",
         context_scope="narrow",
+        allowed_commands=(),
     ),
     # ── Independent inspection / verdicts (R-0.4) ─────────────────────────────
     "inspector": ProfileSpec(
@@ -148,6 +164,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="InspectionReport verdict emitted to the ledger; no production file edited",
         verification="InspectionReport event appended with dispatch_identity distinct from the Work Result's dispatch_identity; no production files in touched_files",
         context_scope="narrow",
+        allowed_commands=("git", "python3"),
     ),
     # ── Finish-lane specialist (verify + QA + ship gates) ────────────────────
     "finish-lane-specialist": ProfileSpec(
@@ -158,6 +175,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="all finish-lane checks passed; lifecycle gate advanced or blocked with reason",
         verification="lifecycle.json stage advanced; no unreviewed open blockers",
         context_scope="narrow",
+        allowed_commands=("git", "python3", "pytest"),
     ),
     # ── Fallback — do NOT use unless no specialized profile matches ───────────
     "general-purpose": ProfileSpec(
@@ -168,6 +186,7 @@ PROFILES: dict[str, ProfileSpec] = {
         stop_condition="task spec fulfilled",
         verification="verifier expectation met; subagent output valid per G11",
         context_scope="broad",
+        allowed_commands=(),
     ),
 }
 
