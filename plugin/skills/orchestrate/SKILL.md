@@ -239,7 +239,7 @@ renmark-execute <plan>
 **Host-agent dispatch shape.** For non-`codex` (`needs_agent`) tasks, build one pure transport plan before invoking any host tool:
 
 ```python
-host_plan = dispatch.build_host_dispatch_plan(
+host_plan = dispatch.build_host_dispatch_plan_with_scope(
     wave,
     host=<"claude" | "codex">,
     dependency_summaries=dependency_summaries,
@@ -248,9 +248,9 @@ host_plan = dispatch.build_host_dispatch_plan(
 )
 ```
 
-`host_plan.task_packets` is the parity surface: the same `SubagentInput` dicts, in the same order, on both hosts. `build_host_dispatch_plan` performs no model call, state write, ledger write, or verifier run.
+`host_plan.task_packets` is the parity surface: the same `SubagentInput` dicts, in the same order, on both hosts. `build_host_dispatch_plan_with_scope` performs no model call, state write, ledger write, or verifier run.
 
-- **Claude Code:** execute the returned `Agent` call for one task or the returned `Workflow` call for a fan-out. The Workflow branch still follows `${CLAUDE_PLUGIN_ROOT}/skills/.shared/workflow-fanout.md`. A native `subagent_type` is used only when available; `fable` alone receives a `model: "fable"` override.
+- **Claude Code:** execute the returned `Agent` call for one task or the returned `Workflow` call for a fan-out. The Workflow branch still follows `${CLAUDE_PLUGIN_ROOT}/skills/.shared/workflow-fanout.md`. A native `subagent_type` is used only when available; `fable` alone receives a `model: "fable"` override. Immediately before issuing the Agent/`spawn_agent` call for each host-agent task, call `subagent_gate.check_capability_envelope(role=<task.role>, requested_scope={"paths": [task.target], "commands": [], "budget": task.budget if hasattr(task, "budget") else None}, host=<host>)`; if any returned `EnvelopeVerdict.passed` is `False` for the `command` or `spend_timeout` dimensions (the two `enforced`-on-both-hosts controls — `path` is handled separately post-action, below), treat the task as a pre-dispatch DENIAL: do not issue the Agent call, mark the task FAIL with the verdict's `reason`, and do not retry.
 - **Codex:** issue every returned `spawn_agent` call before waiting so independent wave members run concurrently. Each call has `fork_turns: "none"`; never change it to inherit conversation history. Collect completions through `wait_agent`. Use `followup_task` only for one bounded correction such as “return valid SubagentOutput JSON”; never paste a transcript, diff, generated code, or accumulated prior summaries into the follow-up. The Codex route on each call is metadata because the host tool does not expose a per-spawn model override—do not add unsupported arguments or claim that route was selected live.
 
 The canonical prompt comes from `dispatch.render_bounded_subagent_prompt` and carries the complete `SubagentOutput` instruction. It refuses oversized input rather than truncating task intent. Pass the canonical reasoning instruction blockquote from `${CLAUDE_PLUGIN_ROOT}/skills/.shared/reasoning-contract.md` as `reasoning_instruction`; the Claude Workflow adapter loads the same block per its fragment. This requirement applies equally to Codex host-agent calls and `renmark-execute --task` specs.
@@ -299,6 +299,8 @@ Codex tasks are ledgered by `renmark-execute` directly — do NOT call `log_agen
 **3c. Run verifier per task**
 
 For each task that returned PASS status, run its verifier via `summary.verifier_tail(cmd, cwd=repo, tail_lines=3)` (`cwd` is a required keyword-only argument). Orchestrator-visible output is bounded: `exit <code> | <first 3 lines>`. If the verifier fails, downgrade the task to FAIL.
+
+For any task whose Claude Code host-agent dispatch was scoped (i.e. `host_plan.scoped_dispatches` is non-empty for that task's index — this only ever happens on Claude Code, never Codex, per the host-gating in `build_host_dispatch_plan_with_scope`), call `dispatch.enforce_host_agent_dispatch_scope(host_plan, repo, base_sha)` (using the same `base_sha` the wave started from) immediately after that task's changes are committed. If it raises `WaveScopeViolationError`, treat the task as a scope-violation FAIL (downgrade from any earlier PASS) and surface the violation's message verbatim in the task's summary — this must NOT be silently swallowed. This is additive defense-in-depth on top of Layer-B (`fast_path.verify_worker_scope`, unchanged); Layer-B remains the authoritative post-action check on both Claude Code and Codex.
 
 **3c-bis. Observe non-usage failures deterministically**
 

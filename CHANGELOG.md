@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 6 task 9 (governed-orchestration-assurance) — enforcement wired into the live orchestrate flow, Release 6 complete
+**Request:** Task 9 of 9, Release 6 — the task that actually makes tasks 1-8's enforcement code reachable from real dispatches.
+**Built:** `plugin/skills/orchestrate/SKILL.md`'s "Host-agent dispatch shape" now calls `build_host_dispatch_plan_with_scope` instead of `build_host_dispatch_plan`, with a pre-dispatch `check_capability_envelope` denial check (command/spend_timeout dimensions) before any Agent/spawn_agent call. The "3c. Run verifier per task" step now calls `enforce_host_agent_dispatch_scope` post-commit for any scoped Claude Code dispatch, downgrading to FAIL on `WaveScopeViolationError` with the violation surfaced verbatim — never silently swallowed. No new Owner gate added; Layer-B (`fast_path.verify_worker_scope`) stays the authoritative post-action check on both hosts. No step renumbering, no other section touched. Full suite: 2007 passed, 31 skipped.
+**Files changed:**
+- `plugin/skills/orchestrate/SKILL.md` — enforcement wiring.
+**Do not change:**
+- This is routine per-task enforcement inside the existing dispatch flow, not a milestone gate — do not add an Owner-facing prompt here.
+**Release 6 complete.** F1 (R-0.2's residual scope-enforcement-never-called gap) is now genuinely closed: built (R-0.2), tested (task 6), wired (task 8), and reachable (task 9). AC-2 (Req 2) is closed for path/command/spend-timeout on Claude Code; honestly `advisory`/`unsupported` for network/git/external-action on both hosts, and `verified_after`-only for path on Codex, per the Owner's 2026-08-05 scope decision. `.claude/settings.json` remains untouched throughout — going live with the PreToolUse hook stays a separate, explicitly Owner-gated action.
+
 ## [2026-08-05] — feat: rethink Release 6 task 8 (governed-orchestration-assurance) — dispatch.py wiring (F1 fix, not yet reachable)
 **Request:** Task 8 of 9, Release 6 — add `HostDispatchPlan.scoped_dispatches` + `build_host_dispatch_plan_with_scope` + `enforce_host_agent_dispatch_scope` to `dispatch.py`, verified against task 6's baseline tests.
 **Built:** Additive `scoped_dispatches: dict[int, fast_path.WorkerScope]` field on `HostDispatchPlan` (default empty — every existing caller of `build_host_dispatch_plan` is byte-identical). `build_host_dispatch_plan_with_scope` wraps the existing function, populating scope for Claude hosts only (reusing `_maybe_scoped_claude_dispatch`) — Codex leaves the map empty per the Owner's 2026-08-05 decision. `enforce_host_agent_dispatch_scope` reuses `fast_path.verify_worker_scope` and the existing `WaveScopeViolation`/`WaveScopeViolationError` types (no parallel violation types). `dispatch_wave`/`enforce_wave_dispatch_scopes`/`_maybe_scoped_claude_dispatch` bodies untouched. 33/33 verifier tests pass; full suite 2007 passed, 31 skipped.
