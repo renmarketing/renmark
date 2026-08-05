@@ -50,6 +50,26 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-05 — renmark-execute --resume never consults the ledger, so dangling work_order events are invisible
+
+**Severity:** low
+**Symptom:** Release 13 orphan-detection spike Finding C: a ledger work_order event with no matching work_result (e.g. from an interruption between the two) is never surfaced or reconciled during --resume -- the ledger and the resume skip-list are two disconnected sources of truth.
+**Root cause:** (deferred, not investigated in depth this pass) resume logic was built against pipeline.json/skip-list state only, before the ledger (R-0.3/Release 13 itself) existed as a second durable record.
+**Fix:** (pending) have --resume cross-check dangling ledger work_order events against the skip-list and surface (not silently drop) any mismatch. Scope to a future release, capped.
+**Lesson:** Surfaced by Release 13s orphan-detection spike; deferrable, not blocking. Ledger-resume reconciliation is exactly the kind of gap this program (governed-orchestration-assurance) exists to close -- good candidate for a dedicated future release if it recurs.
+
+---
+
+### 2026-08-05 — renmark-execute --resume has no pre-flight working-tree cleanup
+
+**Severity:** low
+**Symptom:** Release 13 orphan-detection spike Finding B: on --resume, renmark-execute does not check/clean the working tree before continuing dispatch, so leftover uncommitted changes from an interrupted run could interact unpredictably with the resumed waves execution.
+**Root cause:** (deferred, not investigated in depth this pass) _setup_resume_state/_cross_check_skip_list focus on task-index bookkeeping, not working-tree state, per the spike finding.
+**Fix:** (pending) add a git status check at the top of --resume, matching this repos own pre-refactor-safety-protocol pattern (confirm clean tree or checkpoint before continuing). Scope to a future release, capped.
+**Lesson:** Surfaced by Release 13s orphan-detection spike; deferrable, not blocking (unlike Finding A).
+
+---
+
 ### 2026-08-05 — summary.is_stale crashes on naive-vs-aware datetime compare against this repos real .renmark tree
 
 **Severity:** medium
