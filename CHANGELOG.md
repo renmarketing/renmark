@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 3 task 2 (governed-orchestration-assurance) — dispatch funnel + RepairWorkOrder rename
+**Request:** Task 2 of 5, Release 3 — wire `dispatch.build_subagent_input` through the new `ledger.work_order_for_task` funnel; rename `RepairWorkOrder.work_order_id` to `order_id`.
+**Built:** `build_subagent_input` now constructs a canonical `WorkOrder` via `ledger.work_order_for_task(task, role)` after role resolution — `SubagentInput`'s public shape (`task_spec`/`required_files`/`verifier_expectations`) unchanged. `RepairWorkOrder.work_order_id` renamed to `order_id` (dataclass field, docstring, `build_repair_work_order`'s construction call); the factory function's own `work_order_id` parameter name is unchanged so existing kwarg callers stay green. Confirmed zero references to the renamed field in the 5 protected dispatch test files (63 tests pass). **Known interim fallout (expected, closed by task 3):** `tests/test_wp8_repair_wiring.py` (5 tests) currently fails — `renmark/delivery_state.py::record_repair_work_order` still reads `.work_order_id`; that's task 3's file, deliberately untouched here per task scope.
+**Files changed:**
+- `renmark/dispatch.py` — funnel call + RepairWorkOrder rename.
+**Do not change:**
+- Do not rename `build_repair_work_order`'s own `work_order_id` parameter — only the `RepairWorkOrder` dataclass field renamed.
+
 ## [2026-08-05] — feat: rethink Release 3 task 1 (governed-orchestration-assurance) — ledger WorkOrder schema
 **Request:** Task 1 of 5, Release 3 of the `governed-orchestration-assurance` program — add the accepted `RenmarkWorkOrder` contract fields to `ledger.WorkOrder` and a canonical construction funnel.
 **Built:** 12 additive/optional fields on `ledger.WorkOrder` (risk_tier as an untyped `str | None` placeholder per the Release 3 design decision — the real `RiskTier` enum is Release 8's job; capability_envelope_ref, lens, schema_version, correlation_id, idempotency_key, dependencies, scope, budget, routing, constraints, interaction_policy), all defaulted so no existing construction site breaks. New `ledger.work_order_for_task(task, role, order_id=None, **kwargs) -> WorkOrder` — duck-typed on the Task-like object, deterministic order_id generation. `validate_work_order` untouched. Full suite: 1972 passed, 31 skipped (no regression vs. the 1970-passed baseline).

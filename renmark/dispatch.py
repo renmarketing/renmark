@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import fast_path
+from . import fast_path, ledger
 from .parser import Task
 from .providers import claude_agent
 from .schemas import (
@@ -636,6 +636,11 @@ def build_subagent_input(
 
         role = subagent_profiles.resolve_profile(task)
 
+    # Construct the canonical WorkOrder for this dispatch (Release 3 wiring).
+    # This is read off the same Task fields the packet below already reads;
+    # it does not add anything to what crosses the SubagentInput boundary.
+    ledger.work_order_for_task(task, role)
+
     return SubagentInput(
         task_spec=task.spec,
         required_files=[task.target, *list(task.context_files or [])],
@@ -989,13 +994,16 @@ class InspectorFinding:
 class RepairWorkOrder:
     """A repair work order routed through the Governor to a Worker role.
 
-    Fields per design doc §4.1: ``work_order_id``, ``source_inspection_id``
+    Fields per design doc §4.1: ``order_id``, ``source_inspection_id``
     (pointer, not content), ``severity``, ``scope``, ``description``,
-    ``acceptance_criteria``. Construction is restricted to major/critical
+    ``acceptance_criteria``. ``order_id`` should be a real
+    ``WorkOrder.order_id`` (e.g. one produced by
+    ``ledger.work_order_for_task``) when a canonical work order is
+    available for the repair. Construction is restricted to major/critical
     severity — ``build_repair_work_order`` is the only sanctioned factory.
     """
 
-    work_order_id: str
+    order_id: str
     source_inspection_id: str  # "<source_file>#<finding_id>"
     severity: Literal["major", "critical"]
     scope: fast_path.WorkerScope
@@ -1041,7 +1049,7 @@ def build_repair_work_order(
 
     scope = fast_path.WorkerScope(allowed_paths=frozenset({finding.target}))
     return RepairWorkOrder(
-        work_order_id=work_order_id,
+        order_id=work_order_id,
         source_inspection_id=f"{finding.source_file}#{finding.finding_id}",
         severity=cast(Literal["major", "critical"], effective_severity),
         scope=scope,
