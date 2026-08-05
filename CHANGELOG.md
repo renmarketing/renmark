@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — docs: rethink Release 10 task 1 (governed-orchestration-assurance) — ADR-051
+**Request:** Task 1 of 5, Release 10 — the mandatory ADR distinguishing the failure-derived constraint registry (Req 7) from `recurrence.py`'s existing REQ-24 fingerprint-based recurrence prevention.
+**Built:** ADR-051 prepended above ADR-050. Names both mechanisms precisely: REQ-24 is a same-run/cross-run fingerprint recurrence detector (retry-throttling on ONE recurring issue key); Req 7 is a curated, versioned, cross-run constraint registry (standing rules with a proposed/active/deprecated lifecycle, dedup/contradiction detection, review-date staleness). States 4 binding decisions: REQ-24's functions/schema stay unchanged; `FailureRule` lives inside `recurrence.py`, not a new module; `durable_guard` becomes read-only evidence input, never the registry; `subagent_gate.py` consumes only `active` rules.
+**Files changed:**
+- `.renmark/memory/decisions.md` — ADR-051.
+**Do not change:**
+- Do not conflate the two mechanisms in later tasks — REQ-24's recurrence prevention and Req 7's constraint registry solve different problems and neither supersedes the other.
+
 ## [2026-08-05] — test: rethink Release 9 tasks 4-7 (governed-orchestration-assurance) — full test coverage, Release 9 complete
 **Request:** Tasks 4-7 of 7, Release 9 — test coverage for the 3-state Outcome, redaction, order-randomization, JudgeEvidenceRef, the behavior.py fix, and the ledger.py non-goal enforcement.
 **Built:** `tests/test_judge.py` (+7 tests — parse-failure-vs-real-fail distinction, legitimate uncertain round-trip, JudgeUnavailable/exception paths return uncertain, redaction proof, order-randomization proof, JudgeEvidenceRef round-trip). `tests/test_eval_agent_turn.py` — garbage-response assertion flipped, test renamed to `test_parse_judge_verdict_returns_unvalidated_uncertain_on_garbage`. `tests/test_behavior.py` (+1 test — unreadable-golden fallback returns uncertain, previously unexercised). `tests/test_ledger.py` (+3 tests — judge_evidence attach/round-trip never touches verdict, validate_inspection_report dict-or-null check, source-grep guard that ledger.py never imports judge.py + VERDICTS unchanged). Full suite: 2038 passed, 31 skipped (up from 2028, +10 net new tests, no regressions).

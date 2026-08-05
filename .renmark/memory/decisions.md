@@ -1,5 +1,68 @@
 # Decisions (ADRs)
 
+## ADR-051 — Failure-derived constraint registry (Req 7) is distinct from recurrence.py's REQ-24 recurrence-prevention
+
+**Date:** 2026-08-05
+**Status:** Accepted
+
+**Context.** This ADR names two mechanisms that must not be conflated.
+REQ-24 is `renmark/recurrence.py`'s existing same-run/cross-run
+**fingerprint-based** recurrence detector, built around four functions —
+`pre_attempt`, `observe_issue`, `acknowledge_issue`, `resolve_issue` —
+persisted to `.renmark/state/recurrences.json`. It tracks one logical issue
+key (`check:rule_id:target`), counts occurrences of that one key, and blocks
+a third equivalent attempt until the issue is acknowledged (`patch` /
+`durable_guard` / `retry_once`) or resolved. It has no concept of a curated
+rule, no lifecycle beyond `open` / `acknowledged` / `resolved` on that single
+issue, and is scoped to the fingerprint sequence of ONE recurring issue, not
+a library of standing constraints. `.renmark/rethink/governed-orchestration-
+assurance/prd-acceptance-map.md`'s AC-7 row states this verbatim: Req 7 is
+"not found as proposal-worded (versioned `FR-...` rules with
+`enforcement.prompt/validator/capability_policy`, `review_after`,
+dedup/contradiction detection)" and that `renmark/recurrence.py` "is a
+*different, narrower* mechanism — a same-run/cross-run fingerprint-based
+recurrence detector (PRD REQ-24) that stops a 3rd equivalent attempt and
+recommends a patch-or-durable-guard, not a curated rule registry injected
+selectively per work order," concluding Req 7 itself is "**missing**
+(REQ-24's recurrence.py is a related-but-distinct capability; do not
+conflate)." The map's REQ-24 row states the same relationship from the other
+direction: REQ-24 is "distinct from proposal Req 7 (failure-rule registry) —
+see AC-7; do not merge the two mechanisms without an explicit design
+decision, since REQ-24 is per-run/fingerprint-scoped while Req 7 is a
+curated cross-run rule library." Req 7 (this release) is that curated,
+versioned, **cross-run constraint registry**: rules are proposed only from
+observed failures, near-misses, or repeated review findings — which MAY
+include a `durable_guard`-classified `recurrence.py` entry as one evidence
+input, never the registry itself — carry a `proposed` / `active` /
+`deprecated` lifecycle, dedup/contradiction detection across rules, and a
+`review_after` staleness mechanism, and, once `active`, are consulted by
+`subagent_gate.py` at dispatch time to populate `WorkOrder.constraints`
+(`renmark/ledger.py`) for matching dispatches. These solve different
+problems — retry-throttling within a recurring-issue sequence vs. a standing
+cross-run constraints library — and neither supersedes the other.
+
+**Decision.** (a) REQ-24's four functions (`pre_attempt`, `observe_issue`,
+`acknowledge_issue`, `resolve_issue`) and their persisted schema in
+`.renmark/state/recurrences.json` are UNCHANGED by this release. (b) The new
+`FailureRule` structure lives inside `recurrence.py` itself, not a new
+top-level module, per roadmap.md's Release 10 design note and its non-goals
+section, which explicitly reject a sibling module in favor of extending
+`recurrence.py`. (c) A `durable_guard` entry — an existing
+`remediation_class` value already recorded on a `recurrence.py` entry —
+becomes one allowed `source_evidence` input for a proposed `FailureRule`;
+reading it never writes to or replaces the `recurrence.py` entry it was
+read from. (d) `subagent_gate.py` consumes only `FailureRule` entries with
+`status == "active"` — never `proposed` or `deprecated` — and cites the
+matched `rule_id` in its verdict rather than composing prompt text itself;
+`dispatch.build_subagent_input` remains the sole prompt-composition path,
+unchanged by this release. Stop condition: ADR accepted; Release 10
+(`release-10-failure-rule-registry`) proceeds against AC-7/Req 7 on this
+distinction — any future change that would fold Req 7 and REQ-24 into one
+mechanism requires its own explicit ADR, not a silent merge inside an
+unrelated change.
+
+---
+
 ## ADR-050 — Role-model altitude for capability-envelope enforcement (Release 2 spike #28)
 
 **Date:** 2026-08-05
