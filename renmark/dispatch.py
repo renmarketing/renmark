@@ -728,6 +728,13 @@ class HostDispatchPlan:
     calls: tuple[HostDispatchCall, ...]
     wait_tool: str | None = None
     followup_tool: str | None = None
+    # R-6/Task-8: populated ONLY by `build_host_dispatch_plan_with_scope`
+    # (never by `build_host_dispatch_plan`, which leaves it empty so every
+    # pre-existing caller is unaffected). Keys are `task_index`; values are
+    # the declared `fast_path.WorkerScope` for that dispatch, consumed
+    # post-hoc by `enforce_host_agent_dispatch_scope`. Empty means "never
+    # opted in" — never "verified clean".
+    scoped_dispatches: dict[int, fast_path.WorkerScope] = field(default_factory=dict)
 
 
 def render_bounded_subagent_prompt(
@@ -833,6 +840,91 @@ def build_host_dispatch_plan(
         wait_tool="wait_agent",
         followup_tool="followup_task",
     )
+
+
+def build_host_dispatch_plan_with_scope(
+    wave: list[Task],
+    *,
+    host: HostName | str,
+    dependency_summaries: list[str] | None = None,
+    upstream_artifact_pointers: list[str] | None = None,
+    reasoning_instruction: str = "",
+) -> HostDispatchPlan:
+    """R-6/Task-8 — `build_host_dispatch_plan` plus declared worker scopes.
+
+    Thin wrapper: it CALLS `build_host_dispatch_plan` (never duplicates its
+    body) and then, for `host == "claude"`, reuses
+    `_maybe_scoped_claude_dispatch` — the same single-Claude-task,
+    `fast_path.classify_fast_path`-eligible gate `dispatch_wave` already
+    uses — to populate `HostDispatchPlan.scoped_dispatches`.
+
+    This exists because the production Claude orchestration path calls
+    `build_host_dispatch_plan` directly and therefore never reached
+    `dispatch_wave`'s scope machinery. Eligibility semantics are identical
+    to `dispatch_wave`'s by construction (same helper, same thresholds).
+
+    `host == "codex"` intentionally leaves `scoped_dispatches` empty — per
+    the Owner's 2026-08-05 scope decision Codex gets no pre-action scoping
+    this release and stays on the `verified_after`, Layer-B-only path.
+
+    Performs no I/O and no dispatch. The returned plan is still a pure
+    transport contract; the real Agent tool call and the subsequent
+    `enforce_host_agent_dispatch_scope` check both happen in the caller.
+    """
+
+    plan = build_host_dispatch_plan(
+        wave,
+        host=host,
+        dependency_summaries=dependency_summaries,
+        upstream_artifact_pointers=upstream_artifact_pointers,
+        reasoning_instruction=reasoning_instruction,
+    )
+    if plan.host != "claude":
+        return plan
+
+    claude_tasks = [task for task in wave if claude_agent.is_claude_executor(task.executor)]
+    # `_maybe_scoped_claude_dispatch` takes a repo only to satisfy
+    # `claude_agent.build_agent_dispatch`'s signature; neither reads the
+    # filesystem (both compose strings only), and this plan-building function
+    # is repo-independent by contract, so a relative placeholder is used
+    # rather than widening the documented signature.
+    scoped = _maybe_scoped_claude_dispatch(claude_tasks, Path("."))
+    if scoped is None:
+        return plan
+    task_index, agent_dispatch = scoped
+    if agent_dispatch.scope is None:  # defensive: helper always sets it
+        return plan
+    plan.scoped_dispatches[task_index] = agent_dispatch.scope
+    return plan
+
+
+def enforce_host_agent_dispatch_scope(
+    host_plan: HostDispatchPlan,
+    repo: Path,
+    base_sha: str,
+) -> None:
+    """Fail-loud post-hoc scope check for a host-agent dispatch plan.
+
+    Mirrors `enforce_wave_dispatch_scopes`'s contract exactly, for the
+    `build_host_dispatch_plan_with_scope` path. Call this AFTER the host's
+    real Agent tool call has completed and the resulting changes are present
+    at HEAD. Raises `WaveScopeViolationError` (carrying the same
+    `WaveScopeViolation` records — no parallel violation types) when any
+    scoped dispatch failed its check.
+
+    A plan with no scoped dispatches (`host_plan.scoped_dispatches` empty —
+    a Codex plan, a multi-task Claude wave, or a target that didn't pass
+    `classify_fast_path`) is a silent no-op, matching the R-0.1 baseline for
+    anything that never opted in. An empty result means "nothing opted in",
+    not "verified clean".
+    """
+    violations: list[WaveScopeViolation] = []
+    for task_index, scope in host_plan.scoped_dispatches.items():
+        scope_verdict = fast_path.verify_worker_scope(scope, repo, base_sha)
+        if not scope_verdict.passed:
+            violations.append(WaveScopeViolation(task_index=task_index, verdict=scope_verdict))
+    if violations:
+        raise WaveScopeViolationError(tuple(violations))
 
 
 def _build_claude_host_calls(
