@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 3/16 · task 0/5 done · current: Release 3: Canonical work-order reconciliation_
+_mode: staged · Stage 4/16 · task 0/4 done · current: Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -20,16 +20,16 @@ _phases: plan → build → verify → review → release_
 
 - [x] Bounded 1-session spike: confirm capability-envelope enforcement altitude — Produce one ADR paragraph confirming per-dispatch-role altitude (subagent_profiles.py) vs project-phase altitude (agency.py) for release 6's capability envelope. Owner/maintainer sign-off required. Stop condition: ADR accepted, no code change unless contradicted.
 
-## ○ Release 3: Canonical work-order reconciliation — serves AC-1 (REQ-1) **(current)**
+## ● Release 3: Canonical work-order reconciliation — serves AC-1 (REQ-1)
 _phases: plan → build → verify → review → release_
 
-- [ ] Add risk_tier (untyped placeholder), capability_envelope_ref, lens, schema_version, and full RenmarkWorkOrder contract fields to ledger.WorkOrder — Additive fields only, pytest -q count stays green except for new additions. risk_tier is str|None (design decision, Gap 1): Release 8 defines the real RiskTier enum per modularity-assessment.md sec6's module-boundary lean. Also adds correlation_id, idempotency_key, dependencies, scope, budget, routing, constraints, interaction_policy as additive placeholders (enforcement deferred per field table in roadmap.md).
-- [ ] Add ledger.work_order_for_task(task, role, ...) -> WorkOrder and call it from dispatch.build_subagent_input — One funnel all 6 dispatch call sites already use; SubagentInput public field names stay stable (REQ-20 metadata-only).
-- [ ] Rename RepairWorkOrder.work_order_id to order_id, require it resolves to a real WorkOrder — Keep severity/source_inspection_id/description/acceptance_criteria unchanged.
-- [ ] Add wiring test asserting all 6 dispatch call sites produce a WorkOrder via the shared funnel — Fast-path, feature, debug, orchestrate, rethink, resume — no bespoke path.
-- [ ] Add schema test asserting every RenmarkWorkOrder contract field is present with the stated default/optional type — Covers the field-added-now vs enforcement-deferred table in roadmap.md's revised Release 3 section.
+- [x] Add risk_tier (untyped placeholder), capability_envelope_ref, lens, schema_version, and full RenmarkWorkOrder contract fields to ledger.WorkOrder — Additive fields only, pytest -q count stays green except for new additions. risk_tier is str|None (design decision, Gap 1): Release 8 defines the real RiskTier enum per modularity-assessment.md sec6's module-boundary lean. Also adds correlation_id, idempotency_key, dependencies, scope, budget, routing, constraints, interaction_policy as additive placeholders (enforcement deferred per field table in roadmap.md).
+- [x] Add ledger.work_order_for_task(task, role, ...) -> WorkOrder and call it from dispatch.build_subagent_input — One funnel all 6 dispatch call sites already use; SubagentInput public field names stay stable (REQ-20 metadata-only).
+- [x] Rename RepairWorkOrder.work_order_id to order_id, require it resolves to a real WorkOrder — Keep severity/source_inspection_id/description/acceptance_criteria unchanged.
+- [x] Add wiring test asserting all 6 dispatch call sites produce a WorkOrder via the shared funnel — Fast-path, feature, debug, orchestrate, rethink, resume — no bespoke path.
+- [x] Add schema test asserting every RenmarkWorkOrder contract field is present with the stated default/optional type — Covers the field-added-now vs enforcement-deferred table in roadmap.md's revised Release 3 section.
 
-## ○ Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard — serves AC-3, AC-4 (REQ-3, REQ-4)
+## ○ Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard — serves AC-3, AC-4 (REQ-3, REQ-4) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Bind task_tracking.create_or_reuse_task to the originating WorkOrder.order_id — Uses release 3's funnel.
