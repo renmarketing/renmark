@@ -20,7 +20,7 @@ def test_fail_finding_produces_repair_work_order_referencing_source() -> None:
 
     assert order is not None
     assert isinstance(order, dispatch.RepairWorkOrder)
-    assert order.work_order_id == "WO-1"
+    assert order.order_id == "WO-1"
     # Pointer back to the source finding: file + id, not full content.
     assert order.source_inspection_id == ".renmark/reviews/2026-08-01-example.review.md#F-001"
     assert order.severity in ("major", "critical")
@@ -103,7 +103,7 @@ def test_repair_work_order_rejects_empty_acceptance_criteria() -> None:
 
     with pytest.raises(ValueError):
         dispatch.RepairWorkOrder(
-            work_order_id="WO-7",
+            order_id="WO-7",
             source_inspection_id="src#F-007",
             severity="major",
             scope=fast_path.WorkerScope(allowed_paths=frozenset({"renmark/x.py"})),
@@ -117,7 +117,7 @@ def test_repair_work_order_rejects_non_major_critical_severity() -> None:
 
     with pytest.raises(ValueError):
         dispatch.RepairWorkOrder(
-            work_order_id="WO-8",
+            order_id="WO-8",
             source_inspection_id="src#F-008",
             severity="minor",  # type: ignore[arg-type]
             scope=fast_path.WorkerScope(allowed_paths=frozenset({"renmark/x.py"})),
