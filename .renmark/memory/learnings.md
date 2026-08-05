@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, .renmark/reviews/2026-08-05-cc77fee.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-11** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2057 passed (up from 2051 baseline); scheduling capability shipped but not yet wired into any live caller
+
 - (2026-08-05, .renmark/reviews/2026-08-05-30eb3c4.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-10** — 4/4 behaviors verified; failed: none; regressions: 0; full suite 2051 passed (up from 2038 baseline); AC-7 closed, REQ-24 unchanged
 
 - (2026-08-05, .renmark/reviews/2026-08-05-eff47f3.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-9** — 6/6 behaviors verified; failed: none; regressions: 0; full suite 2038 passed (up from 2028 baseline); AC-6 closed, breaking change landed clean
