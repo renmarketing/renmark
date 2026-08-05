@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-04, .renmark/reviews/2026-08-05-2f5cb8a.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-2** — 2/2 behaviors verified; failed: none; regressions: 0
+
 - (2026-08-04, .renmark/reviews/2026-08-05-8ea7b27.verification.md) model `verify-correction`: **verify-governed-orchestration-assurance-release-1-correction** — verify smoke checks must match the goal-backward acceptance language in the plan/roadmap, not just presence of a section/heading — a grep-presence check silently overclaimed 3/3 when the actual acceptance criterion (real figures for all 4 scenarios) was only 1/4 satisfied. Peer review caught it, not the original verify pass.
 
 - (2026-08-04, .renmark/reviews/2026-08-05-8ea7b27.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-1** — 3/3 behaviors verified; failed: none; regressions: 0
