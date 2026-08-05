@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 4/16 · task 0/4 done · current: Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard_
+_mode: staged · Stage 5/16 · task 0/1 done · current: Release 5: PreToolUse capability-envelope spike (#7)_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -29,15 +29,15 @@ _phases: plan → build → verify → review → release_
 - [x] Add wiring test asserting all 6 dispatch call sites produce a WorkOrder via the shared funnel — Fast-path, feature, debug, orchestrate, rethink, resume — no bespoke path.
 - [x] Add schema test asserting every RenmarkWorkOrder contract field is present with the stated default/optional type — Covers the field-added-now vs enforcement-deferred table in roadmap.md's revised Release 3 section.
 
-## ○ Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard — serves AC-3, AC-4 (REQ-3, REQ-4) **(current)**
+## ● Release 4: Task tracker bound to WorkOrder.order_id + selector bypass guard — serves AC-3, AC-4 (REQ-3, REQ-4)
 _phases: plan → build → verify → review → release_
 
-- [ ] Bind task_tracking.create_or_reuse_task to the originating WorkOrder.order_id — Uses release 3's funnel.
-- [ ] Add interaction.py enforced mode rejecting numbered fallback when a native picker is available — Same ChoiceSet/fallback dataclasses, no new module; reads hosts.capabilities_for.
-- [ ] Deferred cosmetic 'concise displayed list' format for Role/worker+model/Budget/Verification — Per prd-acceptance-map's own deferral note.
-- [ ] Add regression test named after the 2026-06-14 'Hand-off picker not re-rendered' incident — Proves the enforced-mode guard catches that exact failure mode.
+- [x] Bind task_tracking.create_or_reuse_task to the originating WorkOrder.order_id — Uses release 3's funnel.
+- [x] Add interaction.py enforced mode rejecting numbered fallback when a native picker is available — Same ChoiceSet/fallback dataclasses, no new module; reads hosts.capabilities_for.
+- [x] Deferred cosmetic 'concise displayed list' format for Role/worker+model/Budget/Verification — Per prd-acceptance-map's own deferral note.
+- [x] Add regression test named after the 2026-06-14 'Hand-off picker not re-rendered' incident — Proves the enforced-mode guard catches that exact failure mode.
 
-## ○ Release 5: PreToolUse capability-envelope spike (#7) — serves AC-2 (REQ-2)
+## ○ Release 5: PreToolUse capability-envelope spike (#7) — serves AC-2 (REQ-2) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-session spike: prototype PreToolUse hook for metadata-driven allow/deny — Read Claude Code's PreToolUse hook contract; prototype one hook wired to one agent profile's allowed_targets; confirm Codex's own enforcement mechanism. Evidence: one working hook config + one passing/one blocking integration test. Stop condition: feasible -> proceed to release 6 as specified; not feasible -> release 6 falls back to post-action-only, documented, escalated to Owner.
