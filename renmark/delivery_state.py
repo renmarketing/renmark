@@ -492,7 +492,7 @@ def record_repair_work_order(
         state,
         ts=timestamp,
         kind="repair-work-order-created",
-        detail=f"{work_order.work_order_id} ({work_order.severity}): {work_order.description}",
+        detail=f"{work_order.order_id} ({work_order.severity}): {work_order.description}",
         source="dispatch.build_repair_work_order",
         ref=work_order.source_inspection_id,
     )

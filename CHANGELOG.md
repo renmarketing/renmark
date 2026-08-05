@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 3 tasks 3-5 (governed-orchestration-assurance) — close interim fallout + wiring test
+**Request:** Tasks 3-5 of 5, Release 3 — close the interim `RepairWorkOrder.order_id` rename fallout and add the cross-entry-point work-order funnel test.
+**Built:** Task 3: `delivery_state.log_repair_work_order` now reads `work_order.order_id` (was `.work_order_id`) — `tests/test_wp8_repair_wiring.py` (5 tests) green again. Task 4: `tests/test_repair_work_order.py` updated for the same rename (3 edits: 1 assertion, 2 `RepairWorkOrder(...)` constructor kwargs); the unrelated `build_repair_work_order(..., work_order_id=...)` factory-function calls were correctly left untouched. Task 5 (codex): new `tests/test_work_order_funnel_wiring.py` proving `build_subagent_input` calls `ledger.work_order_for_task` exactly once per dispatch, guarding `SubagentInput`'s public shape, and asserting every Release 3 `WorkOrder` field is present with its documented default. Full suite green.
+**Files changed:**
+- `renmark/delivery_state.py` — order_id rename follow-through.
+- `tests/test_repair_work_order.py` — order_id rename follow-through.
+- `tests/test_work_order_funnel_wiring.py` — new cross-entry-point wiring test.
+**Do not change:**
+- `build_repair_work_order`'s own `work_order_id` parameter name stays as-is — only the `RepairWorkOrder` dataclass field renamed, not the factory function's signature.
+**Process note:** task 4's haiku dispatch self-committed (`c0a27a0`) rather than returning control to the orchestrator for the usual task-index-order commit — a concrete, live example of the exact "Worker cannot integrate" gap this transformation's Release 6 capability-envelope work is meant to close. No scope violation in the committed content itself; flagged for awareness, not reverted.
+
 ## [2026-08-05] — feat: rethink Release 3 task 2 (governed-orchestration-assurance) — dispatch funnel + RepairWorkOrder rename
 **Request:** Task 2 of 5, Release 3 — wire `dispatch.build_subagent_input` through the new `ledger.work_order_for_task` funnel; rename `RepairWorkOrder.work_order_id` to `order_id`.
 **Built:** `build_subagent_input` now constructs a canonical `WorkOrder` via `ledger.work_order_for_task(task, role)` after role resolution — `SubagentInput`'s public shape (`task_spec`/`required_files`/`verifier_expectations`) unchanged. `RepairWorkOrder.work_order_id` renamed to `order_id` (dataclass field, docstring, `build_repair_work_order`'s construction call); the factory function's own `work_order_id` parameter name is unchanged so existing kwarg callers stay green. Confirmed zero references to the renamed field in the 5 protected dispatch test files (63 tests pass). **Known interim fallout (expected, closed by task 3):** `tests/test_wp8_repair_wiring.py` (5 tests) currently fails — `renmark/delivery_state.py::record_repair_work_order` still reads `.work_order_id`; that's task 3's file, deliberately untouched here per task scope.
