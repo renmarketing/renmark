@@ -108,6 +108,18 @@ class WorkOrder:
     ``is_repair`` / ``repairs_finding_ref`` let this shape represent a repair
     work order (F2 — schema-ready, no wiring): a repair order's
     ``repairs_finding_ref`` names the review/verifier finding it addresses.
+
+    The fields below ``repairs_finding_ref`` are additive/optional per
+    ``.renmark/rethink/governed-orchestration-assurance/roadmap.md``
+    Release 3's field table. They are schema-present as of Release 3 but
+    most have their real enforcement/consumption deferred to later
+    releases (Release 4/6/8/10/11/13 per that table) — adding them here
+    only reserves the schema slot; it does not wire enforcement.
+    ``risk_tier`` in particular is an **untyped placeholder** (``str |
+    None``), not an enum — per Release 3's recorded design decision, the
+    real ``RiskTier`` enum is Release 8's responsibility, at the
+    ``subagent_profiles.py``/``ledger.InspectionReport`` "lens selection"
+    module boundary, not this one.
     """
 
     order_id: str = ""
@@ -117,6 +129,71 @@ class WorkOrder:
     verifier: str = ""
     is_repair: bool = False
     repairs_finding_ref: str | None = None
+    risk_tier: str | None = None
+    capability_envelope_ref: str | None = None
+    lens: str | None = None
+    schema_version: int = 1
+    correlation_id: str | None = None
+    idempotency_key: str | None = None
+    dependencies: list[str] = field(default_factory=list)
+    scope: dict | None = None
+    budget: dict | None = None
+    routing: dict | None = None
+    constraints: dict | None = None
+    interaction_policy: dict | None = None
+
+
+def work_order_for_task(
+    task: Any, role: str, *, order_id: str | None = None, **kwargs: Any
+) -> WorkOrder:
+    """Build a :class:`WorkOrder` from a ``renmark.parser.Task``-like object.
+
+    Duck-typed on purpose (reads ``task.spec``/``task.target``/
+    ``task.context_files``/``task.verifier``/``task.index``) rather than
+    importing ``renmark.parser.Task`` at module import time, to avoid an
+    import cycle — this mirrors the pattern
+    ``dispatch.build_subagent_input`` already uses when it reads the same
+    ``Task`` fields to build a ``SubagentInput``.
+
+    ``task`` (the payload string) comes from ``task.spec``, matching what
+    ``build_subagent_input`` uses for its own ``task_spec``. ``file_scope``
+    is ``task.target`` plus ``task.context_files``. ``verifier`` is
+    ``task.verifier``. When ``order_id`` is not supplied it is generated
+    deterministically from ``task.index`` (falling back to ``task.title``
+    when no ``index`` is present) — Release 3's value proposition is
+    closing the ``order_id`` reference gap, so this never leaves
+    ``order_id`` empty.
+
+    Any of the new Release-3 schema-only fields (``risk_tier``,
+    ``capability_envelope_ref``, ``lens``, ``schema_version``,
+    ``correlation_id``, ``idempotency_key``, ``dependencies``, ``scope``,
+    ``budget``, ``routing``, ``constraints``, ``interaction_policy``) can
+    be supplied via ``**kwargs``; unsupplied ones stay at their
+    dataclass defaults. This function only constructs a valid canonical
+    ``WorkOrder`` — it performs no enforcement.
+    """
+    if order_id is None:
+        index = getattr(task, "index", None)
+        if index is not None:
+            order_id = f"task-{index}"
+        else:
+            title = getattr(task, "title", "") or ""
+            order_id = f"task-{title}" if title else "task-unknown"
+
+    task_spec = getattr(task, "spec", "") or ""
+    target = getattr(task, "target", None)
+    context_files = getattr(task, "context_files", None) or []
+    file_scope = [f for f in [target, *context_files] if f]
+    verifier = getattr(task, "verifier", "") or ""
+
+    return WorkOrder(
+        order_id=order_id,
+        task=task_spec,
+        role=role,
+        file_scope=file_scope,
+        verifier=verifier,
+        **kwargs,
+    )
 
 
 @dataclass
@@ -555,4 +632,5 @@ __all__ = [
     "validate_inspection_report",
     "validate_work_order",
     "validate_work_result",
+    "work_order_for_task",
 ]

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 3 task 1 (governed-orchestration-assurance) — ledger WorkOrder schema
+**Request:** Task 1 of 5, Release 3 of the `governed-orchestration-assurance` program — add the accepted `RenmarkWorkOrder` contract fields to `ledger.WorkOrder` and a canonical construction funnel.
+**Built:** 12 additive/optional fields on `ledger.WorkOrder` (risk_tier as an untyped `str | None` placeholder per the Release 3 design decision — the real `RiskTier` enum is Release 8's job; capability_envelope_ref, lens, schema_version, correlation_id, idempotency_key, dependencies, scope, budget, routing, constraints, interaction_policy), all defaulted so no existing construction site breaks. New `ledger.work_order_for_task(task, role, order_id=None, **kwargs) -> WorkOrder` — duck-typed on the Task-like object, deterministic order_id generation. `validate_work_order` untouched. Full suite: 1972 passed, 31 skipped (no regression vs. the 1970-passed baseline).
+**Files changed:**
+- `renmark/ledger.py` — WorkOrder fields + work_order_for_task.
+**Do not change:**
+- Do not define a `RiskTier` type here — that's Release 8's responsibility at the subagent_profiles.py/InspectionReport lens-selection boundary.
+- Do not wire enforcement for any of the new placeholder fields in this task — schema-present only; enforcement lands in Releases 4/6/8/10/11/13 per roadmap.md's field table.
+
 ## [2026-08-05] — docs: rethink Release 2 (governed-orchestration-assurance) — role-model altitude ADR
 **Request:** Release 2 (spike #28) of the `governed-orchestration-assurance` program — confirm whether capability-envelope enforcement (Release 6) belongs at the per-dispatch-role altitude (`subagent_profiles.py`) or the project-phase altitude (`agency.py`), or both.
 **Built:** ADR-050 appended to `.renmark/memory/decisions.md`. Investigation (not a rubber-stamp) confirmed `agency.py` is a pure project-phase/milestone/signoff state machine with no per-dispatch enforcement logic, while `subagent_profiles.py`'s `ProfileSpec.allowed_targets` is the already-documented ("informational for now") seam for per-dispatch enforcement. Roadmap's stated default lean is confirmed correct, not corrected: Release 6 enforces at the per-dispatch-role altitude only; `agency.py`'s phase/signoff gates stay untouched.
