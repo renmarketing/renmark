@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 10 tasks 4-5 (governed-orchestration-assurance) — full test coverage, Release 10 complete
+**Request:** Tasks 4-5 of 5, Release 10 — test coverage for the FailureRule lifecycle/dedup/review/durable_guard bridge and its subagent_gate.py consumption.
+**Built:** `tests/test_recurrence.py` (+16 tests — lifecycle transitions, forward-only enforcement, persistence round-trip, dedup vs. contradiction, deprecated-never-conflicts, review-date surfacing (read-only), durable_guard_seed_candidates read-only proof, and a byte-for-byte REQ-24-unchanged guard). `tests/test_subagent_gate.py` (+25 tests total, incl. new coverage — active-only matching, proposed/deprecated never match, missing-registry graceful degrade, apply_failure_rule_constraints merge-not-replace + no-mutation, a non-goal guard that subagent_gate.py never references `build_subagent_input`). Full suite: 2051 passed, 31 skipped (up from 2038, +13 net new tests, no regressions).
+**Files changed:**
+- `tests/test_recurrence.py`, `tests/test_subagent_gate.py`.
+**Do not change:**
+- Do not weaken the REQ-24-unchanged guard test or the non-goal source-grep guard — they're the enforcement mechanisms for this release's two compatibility guarantees.
+**Release 10 complete.** ADR-051 → FailureRule registry (lifecycle, dedup, review, durable_guard bridge) → subagent_gate.py consumption (active-only) → full coverage. AC-7 (Req 7) closed. REQ-24's recurrence.py behavior fully unchanged throughout.
+
 ## [2026-08-05] — feat: rethink Release 10 task 3 (governed-orchestration-assurance) — subagent_gate.py consumes active FailureRules
 **Request:** Task 3 of 5, Release 10 — a fourth independent pre-dispatch check consuming only `active` FailureRules, alongside (not replacing) the existing three checks.
 **Built:** `FailureRuleVerdict` + `check_failure_rule_constraints(repo, applicability, host=...)` — matches only `status == "active"` rules via case-insensitive whitespace-token overlap; `proposed`/`deprecated` never match. `apply_failure_rule_constraints` returns a new dict (never mutates in place) for attaching to `WorkOrder.constraints`. Neither function composes prompt text — `dispatch.build_subagent_input` stays the sole prompt-composition path. 54/54 subagent_gate tests pass.

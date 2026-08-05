@@ -11,6 +11,10 @@ Proves the deterministic-first gate CHALLENGES a spawn before dispatch:
 
 from __future__ import annotations
 
+from copy import deepcopy
+from pathlib import Path
+
+from renmark import recurrence
 from renmark import subagent_gate as g
 
 # ── per-task justification ────────────────────────────────────────────────────
@@ -200,3 +204,123 @@ def test_role_reason_parses_and_clears_gp_challenge(tmp_path) -> None:
     assert v.role == "general-purpose"
     assert v.challenge is None            # reason cleared the challenge
     assert v.needs_subagent is True
+
+
+def test_active_failure_rule_blocks_matching_applicability(tmp_path: Path) -> None:
+    rule = recurrence.propose_failure_rule(
+        tmp_path,
+        rule_id="R-ACTIVE-001",
+        trigger="dispatch",
+        applicability="aardvark token overlap",
+        required_behavior="tighten the request",
+        prohibited_failure="overbroad dispatch",
+        source_evidence=["spec.md"],
+    )
+    recurrence.activate_failure_rule(tmp_path, rule.rule_id)
+
+    verdict = g.check_failure_rule_constraints(tmp_path, "dispatch with aardvark token")
+
+    assert verdict.passed is False
+    assert verdict.matched_rule_ids == (rule.rule_id,)
+    assert rule.rule_id in verdict.reason
+    assert rule.rule_id in verdict.challenge
+
+
+def test_proposed_failure_rule_is_never_matched(tmp_path: Path) -> None:
+    rule = recurrence.propose_failure_rule(
+        tmp_path,
+        rule_id="R-PROPOSED-001",
+        trigger="dispatch",
+        applicability="aardvark token overlap",
+        required_behavior="tighten the request",
+        prohibited_failure="overbroad dispatch",
+        source_evidence=["spec.md"],
+    )
+
+    verdict = g.check_failure_rule_constraints(tmp_path, "dispatch with aardvark token")
+
+    assert verdict.passed is True
+    assert verdict.matched_rule_ids == ()
+    assert rule.rule_id not in verdict.reason
+
+
+def test_deprecated_failure_rule_is_never_matched(tmp_path: Path) -> None:
+    rule = recurrence.propose_failure_rule(
+        tmp_path,
+        rule_id="R-DEPRECATED-001",
+        trigger="dispatch",
+        applicability="aardvark token overlap",
+        required_behavior="tighten the request",
+        prohibited_failure="overbroad dispatch",
+        source_evidence=["spec.md"],
+    )
+    recurrence.deprecate_failure_rule(tmp_path, rule.rule_id, reason="superseded")
+
+    verdict = g.check_failure_rule_constraints(tmp_path, "dispatch with aardvark token")
+
+    assert verdict.passed is True
+    assert verdict.matched_rule_ids == ()
+    assert rule.rule_id not in verdict.reason
+
+
+def test_check_failure_rule_constraints_without_registry_is_safe(tmp_path: Path) -> None:
+    verdict = g.check_failure_rule_constraints(tmp_path, "dispatch with aardvark token")
+    assert verdict.passed is True
+    assert verdict.matched_rule_ids == ()
+
+
+def test_apply_failure_rule_constraints_merges_matched_rule_details(tmp_path: Path) -> None:
+    rule = recurrence.propose_failure_rule(
+        tmp_path,
+        rule_id="R-MERGE-001",
+        trigger="dispatch",
+        applicability="aardvark token overlap",
+        required_behavior="tighten the request",
+        prohibited_failure="overbroad dispatch",
+        source_evidence=["spec.md"],
+    )
+    recurrence.activate_failure_rule(tmp_path, rule.rule_id)
+    verdict = g.check_failure_rule_constraints(tmp_path, "dispatch with aardvark token")
+
+    existing_constraints = {"alpha": "keep", "nested": {"preserve": True}}
+    original_constraints = deepcopy(existing_constraints)
+    merged = g.apply_failure_rule_constraints(existing_constraints, verdict, [rule])
+
+    assert existing_constraints == original_constraints
+    assert merged is not existing_constraints
+    assert merged["alpha"] == "keep"
+    assert merged["nested"] == {"preserve": True}
+    assert merged["failure_rules"] == [
+        {
+            "rule_id": rule.rule_id,
+            "required_behavior": rule.required_behavior,
+            "prohibited_failure": rule.prohibited_failure,
+        }
+    ]
+
+
+def test_subagent_gate_source_does_not_reference_build_subagent_input() -> None:
+    source = Path(g.__file__).read_text(encoding="utf-8")
+    assert "build_subagent_input(" not in source
+
+
+def test_validate_r008_dispatch_accepts_minimal_valid_spec() -> None:
+    ok, missing = g.validate_r008_dispatch(
+        {
+            "work_order_id": "W-1",
+            "contract": "C-1",
+            "reason": "r",
+            "scope": {"target": "notes.txt"},
+            "expected_artifact": "out.txt",
+            "budget_reservation": "B-1",
+        }
+    )
+    assert ok is True
+    assert missing == []
+
+
+def test_check_capability_envelope_accepts_minimal_scope() -> None:
+    verdicts = g.check_capability_envelope("sonnet", {"target": "notes.txt"})
+    assert isinstance(verdicts, tuple)
+    assert verdicts
+    assert verdicts[0].passed is True
