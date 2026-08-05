@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 13 tasks 4-5 (governed-orchestration-assurance) — full coverage, Release 13 complete
+**Request:** Tasks 4-5 of 5, Release 13 — test coverage for the new ledger event fields and the analytics guardrails aggregation.
+**Built:** `tests/test_ledger_field_completeness.py` (11 tests — new fields present on all 4 event kinds, round-trip through `append_ledger_event`/`read_ledger_events`, old-shape JSONL rows still parse without the new keys, `VERDICTS`/`RISK_TIERS` unchanged). `tests/test_analytics_ledger_guardrails.py` (3 tests — no-ledger degrades to zero/empty, real escalation/inspection events aggregate correctly, malformed ledger lines never raise, existing summary keys unaffected). Full suite: 2080 passed, 32 skipped (up from 2066, +14 net new tests, no regressions).
+**Files changed:**
+- `tests/test_ledger_field_completeness.py` — new.
+- `tests/test_analytics_ledger_guardrails.py` — new.
+**Do not change:**
+- Old-shape ledger JSONL rows (pre-Release-13, missing the new fields) must always continue to parse via `read_ledger_events` — the backward-compat test enforces this.
+**Release 13 complete.** Orphan-detection spike (blocking Finding A fixed same-release, per the Owner-approved roadmap's capped-implementation requirement; Findings B/C deferred and logged) → additive ledger event fields → analytics reconciliation → full coverage. AC-11 (Req 11) closed.
+
 ## [2026-08-05] — feat: rethink Release 13 tasks 2+3 (governed-orchestration-assurance) — ledger event fields + analytics reconciliation
 **Request:** Tasks 2-3 of 5, Release 13 — additive `schema_version`/`attempt_id`/`correlation_id` on the 4 ledger event kinds, and an `analytics.py` read path into `ledger.py`'s escalation/verdict data.
 **Built:** `attempt_id` added to `WorkOrder`; `schema_version`/`attempt_id`/`correlation_id` added to `WorkResult`/`InspectionReport`/`Escalation`. `VERDICTS`/`RISK_TIERS`/`read_ledger_events`/`append_ledger_event` untouched — old JSONL rows still parse fine. `analytics._agg_ledger_guardrails(repo)` — lazy-imports `ledger`, never raises, reads escalation/inspection-report counts (`escalations_total`, `escalations_blocking`, `inspection_verdicts`, `inspection_total`), wired into `aggregate()`'s new `summary["guardrails"]` key and `build_health_report()`/`render_health_md`. Investigation confirmed `analytics.py` and `ledger.py` track genuinely different data (telemetry vs. governance lifecycle) — no duplication to remove, this is additive reconciliation only, per the roadmap's own scoping.
