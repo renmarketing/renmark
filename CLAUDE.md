@@ -141,7 +141,7 @@ Source of truth: `PRD.md` (if present). For new features/changes, dispatch a sub
 ## All renmark output stays inside the project
 Every file renmark generates MUST be written inside this project, under
 `.renmark/` or a project-root doc. Canonical homes: specs→`.renmark/specs/`,
-plans→`.renmark/plans/`, reviews/verification→`.renmark/reviews/`, research→`.renmark/research/`, runtime→`.renmark/state/`, memory→`.renmark/memory/`, logs→`.renmark/logs/`, debug→`.renmark/debug/<session-id>/`, audits→`.renmark/audits/`.
+plans→`.renmark/plans/`, reviews/verification→`.renmark/reviews/`, research→`.renmark/research/`, runtime→`.renmark/state/`, memory→`.renmark/memory/`, logs→`.renmark/logs/`, debug→`.renmark/debug/<session-id>/`, audits→`.renmark/audits/`, analytics→`.renmark/analytics/`, ledger→`.renmark/ledger/`, reports→`.renmark/reports/`, rethink→`.renmark/rethink/`, roadmap→`.renmark/roadmap/`, version→`.renmark/version/`.
 **Never write outside the project** — the global plugin install
 (`~/.claude/plugins/...`, `${CLAUDE_PLUGIN_ROOT}`), `$HOME`, and anything above
 the project root are read-only. Reading FROM the plugin dir is fine.

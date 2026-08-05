@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — docs: rethink Release 12 tasks 1+2 (governed-orchestration-assurance) — state-fragmentation spike + canonical-homes fix
+**Request:** Tasks 1 and 2 of 5, Release 12 — confirm whether CLAUDE.md's documented state-file set is stale relative to what actually exists on disk, and correct it if so.
+**Built:** Spike confirmed CLAUDE.md's "Canonical homes" list was stale — 6 categories already governed by `hygiene.py`'s `ARTIFACT_REGISTRY` and live on disk (`analytics`, `ledger`, `reports`, `rethink`, `roadmap`, `version`) were undocumented. Fixed with a single-sentence, narrow append (not a rewrite) to both `CLAUDE.md` and `AGENTS.md`'s identical "Canonical homes:" list, mirrored in the same commit per this repo's own mirror rule. `.renmark/memory/failure_rules.jsonl` (Release 10) confirmed already covered by the existing `memory→.renmark/memory/` bullet — no separate entry needed.
+**Files changed:**
+- `CLAUDE.md`, `AGENTS.md` — 6 missing canonical-home entries appended.
+**Do not change:**
+- This was a corrective append only — no other line, section, or rule in either file was touched.
+
 ## [2026-08-05] — test: rethink Release 11 tasks 3-4 (governed-orchestration-assurance) — full coverage + REQ-30 measurement, Release 11 complete
 **Request:** Tasks 3-4 of 4, Release 11 — regression/signal-consumption tests for the scheduling extension, and the required REQ-30 overhead measurement.
 **Built:** `tests/test_release11_dispatch_scheduling.py` (6 tests) — legacy no-signal byte-identical compatibility across 3 existing fixture task lists, `max_parallelism` splitting + no-op handling, quota throttling from a literal usage-view-shaped stub (per-provider), `rework_lookup` annotation-only (never blocks/reorders/drops), `risk_resolver` intra-wave prioritization with `None` baseline unchanged. `release-11-overhead-measurement.md` — real measured Python-level overhead: no-signal path 2.48µs/call (byte-identical), max_parallelism+quota_view together ~7.56µs/call (no LLM on this path, token cost 0/n/a). Confirms the deferred finding from tasks 1+2: no live caller (`_wave_loop.py`, `_engine.py`) opts into the new params yet, so real production overhead today is unchanged — 0%. Codex-path overhead recorded `unknown` per Release 7's methodology. Conclusion: well under REQ-30's 15% threshold. Full suite: 2057 passed, 31 skipped (up from 2051, +6 net new tests, no regressions).
