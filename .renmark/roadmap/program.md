@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 6/16 · task 0/7 done · current: Release 6: Capability-envelope enforcement wiring_
+_mode: staged · Stage 7/16 · task 0/3 done · current: Release 7: REQ-30 update release (measure + PRD gate)_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -42,18 +42,18 @@ _phases: plan → build → verify → review → release_
 
 - [x] Bounded 1-session spike: prototype PreToolUse hook for metadata-driven allow/deny — Read Claude Code's PreToolUse hook contract; prototype one hook wired to one agent profile's allowed_targets; confirm Codex's own enforcement mechanism. Evidence: one working hook config + one passing/one blocking integration test. Stop condition: feasible -> proceed to release 6 as specified; not feasible -> release 6 falls back to post-action-only, documented, escalated to Owner.
 
-## ○ Release 6: Capability-envelope enforcement wiring — serves AC-2 (REQ-2) **(current)**
+## ● Release 6: Capability-envelope enforcement wiring — serves AC-2 (REQ-2)
 _phases: plan → build → verify → review → release_
 
-- [ ] Expand subagent_gate.check_capability_envelope(role, requested_scope) -> EnvelopeVerdict to cover path/command/network_domain/git_action/external_action/spend_timeout dimensions — Same shape as existing SubagentVerdict, never raises; called from the same pre-dispatch funnel subagent_gate's justification check already runs from.
-- [ ] Wire dispatch_wave() to actually call enforce_wave_dispatch_scopes (path dimension) — Currently never called in production — closes F1. Becomes 'enforced' status this release.
-- [ ] Add subagent_profiles.ProfileSpec.allowed_commands, enforced at the pre-dispatch funnel — Mirrors allowed_targets; host-independent Python check, 'enforced' this release (Gap 2).
-- [ ] Wire a hard per-dispatch spend/timeout ceiling check into the pre-dispatch funnel, reusing cost.py — Host-independent, 'enforced' this release (Gap 2).
-- [ ] Add EnvelopeControlStatus structure/table: per-control per-host status (enforced/verified_after/advisory/unsupported) — Gap 2 honesty requirement — network-domain, git-action, external-action restrictions recorded advisory/unsupported this release, not claimed enforced; full enforcement rolled to a named follow-up.
-- [ ] If release 5's spike confirmed feasibility, wire the PreToolUse hook to path/command dimensions — One source of truth, two enforcement moments; if not feasible, document the fallback and escalate per the spike's stop condition.
-- [ ] Author 'capability-envelope denial' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
+- [x] Expand subagent_gate.check_capability_envelope(role, requested_scope) -> EnvelopeVerdict to cover path/command/network_domain/git_action/external_action/spend_timeout dimensions — Same shape as existing SubagentVerdict, never raises; called from the same pre-dispatch funnel subagent_gate's justification check already runs from.
+- [x] Wire dispatch_wave() to actually call enforce_wave_dispatch_scopes (path dimension) — Currently never called in production — closes F1. Becomes 'enforced' status this release.
+- [x] Add subagent_profiles.ProfileSpec.allowed_commands, enforced at the pre-dispatch funnel — Mirrors allowed_targets; host-independent Python check, 'enforced' this release (Gap 2).
+- [x] Wire a hard per-dispatch spend/timeout ceiling check into the pre-dispatch funnel, reusing cost.py — Host-independent, 'enforced' this release (Gap 2).
+- [x] Add EnvelopeControlStatus structure/table: per-control per-host status (enforced/verified_after/advisory/unsupported) — Gap 2 honesty requirement — network-domain, git-action, external-action restrictions recorded advisory/unsupported this release, not claimed enforced; full enforcement rolled to a named follow-up.
+- [x] If release 5's spike confirmed feasibility, wire the PreToolUse hook to path/command dimensions — One source of truth, two enforcement moments; if not feasible, document the fallback and escalate per the spike's stop condition.
+- [x] Author 'capability-envelope denial' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 7: REQ-30 update release (measure + PRD gate) — serves REQ-30
+## ○ Release 7: REQ-30 update release (measure + PRD gate) — serves REQ-30 **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Measure real current per-dispatch baseline overhead across the 4 representative scenarios — Reuse release 1's captured numbers where still fresh, re-measure where stale.
