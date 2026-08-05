@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 13 tasks 2+3 (governed-orchestration-assurance) — ledger event fields + analytics reconciliation
+**Request:** Tasks 2-3 of 5, Release 13 — additive `schema_version`/`attempt_id`/`correlation_id` on the 4 ledger event kinds, and an `analytics.py` read path into `ledger.py`'s escalation/verdict data.
+**Built:** `attempt_id` added to `WorkOrder`; `schema_version`/`attempt_id`/`correlation_id` added to `WorkResult`/`InspectionReport`/`Escalation`. `VERDICTS`/`RISK_TIERS`/`read_ledger_events`/`append_ledger_event` untouched — old JSONL rows still parse fine. `analytics._agg_ledger_guardrails(repo)` — lazy-imports `ledger`, never raises, reads escalation/inspection-report counts (`escalations_total`, `escalations_blocking`, `inspection_verdicts`, `inspection_total`), wired into `aggregate()`'s new `summary["guardrails"]` key and `build_health_report()`/`render_health_md`. Investigation confirmed `analytics.py` and `ledger.py` track genuinely different data (telemetry vs. governance lifecycle) — no duplication to remove, this is additive reconciliation only, per the roadmap's own scoping.
+**Files changed:**
+- `renmark/ledger.py` — additive event fields.
+- `renmark/analytics.py` — guardrails aggregation.
+- `tests/test_reports_analytics.py` — updated for the new `guardrails` key.
+- `tests/test_work_order_funnel_wiring.py` — updated exact-field-list assertion for the new `attempt_id` field (same interim-fallout shape seen in earlier releases — a legitimate additive field breaking a strict field-list test, not a regression).
+**Do not change:**
+- `read_ledger_events` must keep parsing old-shape rows without the new fields — no backward-compat break.
+**Release 13 core work complete.** Includes the Finding-A fix from the orphan-detection spike (skip-list identity check), the additive event fields, and analytics reconciliation. Tests (tasks 4-5) still pending.
+
 ## [2026-08-05] — fix: rethink Release 13 (governed-orchestration-assurance) — skip-list identity check closes real cross-plan resume bug
 **Request:** Bounded, capped fix for the orphan-detection spike's blocking Finding A — `--resume`'s skip-list checked task INDEX only, not identity, so a cross-plan reused index could silently skip real work with zero warning. Confirmed live: this repo's own git history has dozens of `[renmark] task N: ...` commits across many plans, making the false-positive condition realistic, not theoretical.
 **Built:** `state/commits.py` gains `completed_task_titles(repo) -> dict[int, set[str]]` (capturing commit-subject titles per index; `dict[int, set[str]]` rather than a single title, since an index legitimately recurs with different titles across different plans, and any-title-match is the safe read) + `normalize_task_title()`. `completed_task_indices()` unchanged (still `set[int]`, kept for its existing callers). `_cross_check_skip_list` gains an OPTIONAL third arg — omitted is byte-identical legacy behavior; supplied, an index only counts as `safe_to_skip` when BOTH index and normalized title match, otherwise it correctly routes to `ambiguous` (the existing warn-and-re-run path, untouched). `_setup_resume_state` wires the strengthened check. A pre-existing test fixture writing a fake commit subject format was corrected to match the real `[renmark] task N: <title>` shape the title check exposed as wrong. Full suite: 2066 passed, 32 skipped (up from 2059, +7 net new tests, no regressions).

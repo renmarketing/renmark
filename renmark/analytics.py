@@ -581,6 +581,49 @@ def _agg_events(rows: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
+def _agg_ledger_guardrails(repo: str | Path) -> dict[str, object]:
+    """Roll up ``ledger.py``'s escalation/inspection events into bounded counts.
+
+    Reads :func:`renmark.ledger.read_ledger_events` for
+    ``KIND_ESCALATION`` and ``KIND_INSPECTION_REPORT`` and returns counts
+    only (no raw rows — G3 summary boundary). This is a READ path into
+    ``ledger.py``'s dispatch-governance data; it does not write to the
+    ledger and does not duplicate any ``analytics.py`` ledger. Never
+    raises — any failure (missing ledger file, import problem, malformed
+    row) degrades to all-zero counts, matching every other ``_agg_*``
+    helper in this module.
+    """
+    escalations_total = 0
+    escalations_blocking = 0
+    inspection_total = 0
+    verdict_c: Counter[str] = Counter()
+    try:
+        from renmark import ledger
+
+        escalation_rows = ledger.read_ledger_events(repo, kind=ledger.KIND_ESCALATION)
+        inspection_rows = ledger.read_ledger_events(repo, kind=ledger.KIND_INSPECTION_REPORT)
+        escalations_total = len(escalation_rows)
+        escalations_blocking = sum(1 for r in escalation_rows if _as_bool(r.get("blocking")))
+        inspection_total = len(inspection_rows)
+        for r in inspection_rows:
+            verdict = _as_str(r.get("verdict")).lower()
+            if verdict in ledger.VERDICTS:
+                verdict_c[verdict] += 1
+    except Exception:
+        return {
+            "escalations_total": 0,
+            "escalations_blocking": 0,
+            "inspection_verdicts": {},
+            "inspection_total": 0,
+        }
+    return {
+        "escalations_total": escalations_total,
+        "escalations_blocking": escalations_blocking,
+        "inspection_verdicts": dict(verdict_c),
+        "inspection_total": inspection_total,
+    }
+
+
 def _agg_usage(repo: str | Path) -> dict[str, object]:
     """Roll up the EXISTING token ledger (read_usage) — never duplicated here."""
     by_provider: Counter[str] = Counter()
@@ -657,12 +700,14 @@ def aggregate(repo: str | Path, *, now: str) -> dict[str, object]:
     loops = _agg_loops(read_jsonl(base / LOOP_RUNS_LEDGER))
     events = _agg_events(read_jsonl(base / EVENTS_LEDGER))
     usage = _agg_usage(repo)
+    guardrails = _agg_ledger_guardrails(repo)
     summary: dict[str, object] = {
         "generated_at": now,
         "source": DEFAULT_SOURCE,
         "features": features,
         "tasks": tasks,
         "loops": loops,
+        "guardrails": guardrails,
         "backlog": {
             "completed": events["backlog_completed"],
             "blocked": events["backlog_blocked"],
@@ -744,6 +789,7 @@ def build_health_report(repo: str | Path, *, now: str) -> dict[str, object]:
         "tokens_by_feature": tokens.get("by_feature", {}),
         "total_tokens": _as_int(tokens.get("total")),
         "common_failure_reasons": tasks.get("common_failure_reasons", []),
+        "guardrails": summary.get("guardrails", {}),
     }
 
 
@@ -770,6 +816,7 @@ def render_health_md(report: dict[str, object]) -> str:
     dispositions = _dict(r.get("branch_dispositions"))
     by_feature = _dict(r.get("tokens_by_feature"))
     failures = _list(r.get("common_failure_reasons"))
+    guardrails = _dict(r.get("guardrails"))
 
     lines: list[str] = ["# renmark analytics"]
     gen = _as_str(r.get("generated_at"))
@@ -801,6 +848,15 @@ def render_health_md(report: dict[str, object]) -> str:
     if failures:
         top = ", ".join(f"{_pair_name(item)} ({_pair_count(item)})" for item in failures[:TOP_FAILURE_REASONS])
         lines.append(f"- Common failures: {top}")
+    if guardrails:
+        verdicts = _dict(guardrails.get("inspection_verdicts"))
+        verdicts_str = ", ".join(f"{k}={_as_int(v)}" for k, v in verdicts.items())
+        lines.append(
+            f"- Guardrails: {_as_int(guardrails.get('escalations_total'))} escalations "
+            f"({_as_int(guardrails.get('escalations_blocking'))} blocking), "
+            f"{_as_int(guardrails.get('inspection_total'))} inspections"
+            + (f" [{verdicts_str}]" if verdicts_str else "")
+        )
 
     return "\n".join(lines) + "\n"
 

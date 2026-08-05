@@ -140,6 +140,7 @@ def test_work_order_schema_matches_release_3_defaults() -> None:
         "schema_version",
         "correlation_id",
         "idempotency_key",
+        "attempt_id",
         "dependencies",
         "scope",
         "budget",

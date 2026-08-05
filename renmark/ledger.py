@@ -146,6 +146,7 @@ class WorkOrder:
     schema_version: int = 1
     correlation_id: str | None = None
     idempotency_key: str | None = None
+    attempt_id: str | None = None
     dependencies: list[str] = field(default_factory=list)
     scope: dict | None = None
     budget: dict | None = None
@@ -271,6 +272,9 @@ class WorkResult:
     touched_files: list[str] = field(default_factory=list)
     artifact_refs: list[str] = field(default_factory=list)
     dispatch_identity: str = ""  # who/what dispatch produced this result (R-0.4, WP-2)
+    schema_version: int = 1
+    attempt_id: str | None = None
+    correlation_id: str | None = None
 
 
 @dataclass
@@ -309,6 +313,9 @@ class InspectionReport:
     lens: str | None = None
     contract_ref: str | None = None  # "contract_id:version" graded against
     judge_evidence: "JudgeEvidenceRef | None" = None  # reference-only, never overrides verdict
+    schema_version: int = 1
+    attempt_id: str | None = None
+    correlation_id: str | None = None
 
 
 @dataclass
@@ -326,6 +333,9 @@ class Escalation:
     blocking: bool = True
     is_replannable: bool = False
     replan_evidence: str | None = None
+    schema_version: int = 1
+    attempt_id: str | None = None
+    correlation_id: str | None = None
 
 
 LedgerEvent = WorkOrder | WorkResult | InspectionReport | Escalation
@@ -407,6 +417,8 @@ def validate_work_result(data: dict[str, Any]) -> list[str]:
     issues += _check_str_list(data, "touched_files")
     issues += _check_str_list(data, "artifact_refs")
     issues += _check_str(data, "dispatch_identity", required=False)
+    issues += _check_opt_str(data, "attempt_id")
+    issues += _check_opt_str(data, "correlation_id")
     return issues
 
 
@@ -421,6 +433,8 @@ def validate_inspection_report(data: dict[str, Any]) -> list[str]:
     issues += _check_opt_str(data, "risk_tier")
     issues += _check_opt_str(data, "lens")
     issues += _check_opt_str(data, "contract_ref")
+    issues += _check_opt_str(data, "attempt_id")
+    issues += _check_opt_str(data, "correlation_id")
     if "judge_evidence" in data and data["judge_evidence"] is not None:
         if not isinstance(data["judge_evidence"], dict):
             issues.append(
@@ -438,6 +452,8 @@ def validate_escalation(data: dict[str, Any]) -> list[str]:
     issues += _check_bool(data, "blocking")
     issues += _check_bool(data, "is_replannable")
     issues += _check_opt_str(data, "replan_evidence")
+    issues += _check_opt_str(data, "attempt_id")
+    issues += _check_opt_str(data, "correlation_id")
     return issues
 
 

@@ -249,6 +249,7 @@ def test_aggregate_and_health_report_cover_seeded_and_empty_projects(tmp_path):
         "branch_dispositions",
         "common_failure_reasons",
         "generated_at",
+        "guardrails",
         "loop_avg_iterations",
         "loop_success_rate",
         "releases_created",
