@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 10 task 2 (governed-orchestration-assurance) — FailureRule registry
+**Request:** Task 2 of 5, Release 10 — the core `FailureRule` registry: types, lifecycle, dedup/contradiction detection, review-date surfacing, and a read-only `durable_guard` evidence bridge.
+**Built:** `FailureRule`/`FailureRuleEnforcement`/`RuleConflict` frozen dataclasses. Storage at `.renmark/memory/failure_rules.jsonl` (curated/versioned, own lock/state pair — distinct from `recurrences.json`'s gitignored runtime state). `load_failure_rules`, `propose_failure_rule`/`activate_failure_rule`/`deprecate_failure_rule` (forward-only lifecycle, raises on unknown id or illegal transition — no silent no-op), `detect_failure_rule_conflicts` (pure, flags never auto-resolves), `failure_rules_due_for_review` (read-only), `durable_guard_seed_candidates` (read-only bridge into `recurrences.json`, never mutates it). REQ-24's existing functions/schema fully unchanged — verified via full pytest run. 11/11 recurrence tests + full suite (2038 passed) green, ruff clean.
+**Files changed:**
+- `renmark/recurrence.py` — FailureRule registry (additive section).
+**Do not change:**
+- Do not wire `failure_rules_due_for_review`/`durable_guard_seed_candidates` into `/renmark:hygiene` or auto-propose rules from them — that's explicitly deferred to a later release.
+- Do not modify any REQ-24 function/dataclass/constant or the `recurrences.json` schema — this release is append-only to `recurrence.py`.
+
 ## [2026-08-05] — docs: rethink Release 10 task 1 (governed-orchestration-assurance) — ADR-051
 **Request:** Task 1 of 5, Release 10 — the mandatory ADR distinguishing the failure-derived constraint registry (Req 7) from `recurrence.py`'s existing REQ-24 fingerprint-based recurrence prevention.
 **Built:** ADR-051 prepended above ADR-050. Names both mechanisms precisely: REQ-24 is a same-run/cross-run fingerprint recurrence detector (retry-throttling on ONE recurring issue key); Req 7 is a curated, versioned, cross-run constraint registry (standing rules with a proposed/active/deprecated lifecycle, dedup/contradiction detection, review-date staleness). States 4 binding decisions: REQ-24's functions/schema stay unchanged; `FailureRule` lives inside `recurrence.py`, not a new module; `durable_guard` becomes read-only evidence input, never the registry; `subagent_gate.py` consumes only `active` rules.

@@ -665,16 +665,445 @@ def _advisory_lock(path: Path) -> Iterator[bool]:
         handle.close()
 
 
+# --- Durable failure-rule registry (additive; not part of REQ-24) ----------
+#
+# This section adds a curated, human-reviewed failure-rule registry.  It is
+# deliberately independent of the recurrence tracking above: it has its own
+# storage location, its own lock/state pair, and its own lifecycle.  Nothing
+# above this marker is modified by this section.
+
+import dataclasses
+
+FailureRuleStatus = Literal["proposed", "active", "deprecated"]
+
+_FAILURE_RULE_MAX_EVIDENCE_ENTRIES = 32
+_FAILURE_RULE_MAX_EVIDENCE_CHARS = 512
+
+
+@dataclass(frozen=True, slots=True)
+class FailureRuleEnforcement:
+    """How a failure rule is enforced, if at all."""
+
+    prompt: str | None = None
+    validator: str | None = None
+    capability_policy: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FailureRule:
+    """A single curated, durable failure-prevention rule."""
+
+    rule_id: str
+    status: FailureRuleStatus
+    trigger: str
+    applicability: str
+    required_behavior: str
+    prohibited_failure: str
+    source_evidence: tuple[str, ...]
+    enforcement: FailureRuleEnforcement
+    regression_test_ref: str
+    created_at: str
+    last_triggered_at: str | None = None
+    review_after: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RuleConflict:
+    """A detected duplicate or contradiction between two failure rules."""
+
+    rule_id_a: str
+    rule_id_b: str
+    kind: Literal["duplicate_trigger", "contradiction"]
+    detail: str
+
+
+def _failure_rule_registry_path(repo: str | os.PathLike[str]) -> Path:
+    """Path to the curated failure-rule registry.
+
+    Unlike ``recurrences.json`` (gitignored, per-run scratch state living
+    under ``.renmark/state/``), this registry lives under
+    ``.renmark/memory/`` because it is curated and versioned like
+    ``decisions.md``: it is meant to survive ``/renmark:hygiene``, to be
+    read and reviewed by a human, and to be committed to the repo — not
+    ephemeral per-run runtime state.
+    """
+
+    return Path(repo) / ".renmark" / "memory" / "failure_rules.jsonl"
+
+
+def _failure_rule_lock_path(repo: str | os.PathLike[str]) -> Path:
+    return Path(repo) / ".renmark" / "memory" / ".failure_rules.jsonl.lock"
+
+
+def _failure_rule_enforcement_to_dict(enforcement: FailureRuleEnforcement) -> dict[str, Any]:
+    return {
+        "prompt": enforcement.prompt,
+        "validator": enforcement.validator,
+        "capability_policy": enforcement.capability_policy,
+    }
+
+
+def _failure_rule_enforcement_from_dict(raw: object) -> FailureRuleEnforcement:
+    if not isinstance(raw, Mapping):
+        return FailureRuleEnforcement()
+    return FailureRuleEnforcement(
+        prompt=_optional_str(raw.get("prompt")),
+        validator=_optional_str(raw.get("validator")),
+        capability_policy=_optional_str(raw.get("capability_policy")),
+    )
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _failure_rule_to_dict(rule: FailureRule) -> dict[str, Any]:
+    return {
+        "rule_id": rule.rule_id,
+        "status": rule.status,
+        "trigger": rule.trigger,
+        "applicability": rule.applicability,
+        "required_behavior": rule.required_behavior,
+        "prohibited_failure": rule.prohibited_failure,
+        "source_evidence": list(rule.source_evidence),
+        "enforcement": _failure_rule_enforcement_to_dict(rule.enforcement),
+        "regression_test_ref": rule.regression_test_ref,
+        "created_at": rule.created_at,
+        "last_triggered_at": rule.last_triggered_at,
+        "review_after": rule.review_after,
+    }
+
+
+def _failure_rule_from_dict(raw: object) -> FailureRule | None:
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        rule_id = str(raw["rule_id"]).strip()
+        status = raw["status"]
+        trigger = str(raw["trigger"])
+        applicability = str(raw["applicability"])
+        required_behavior = str(raw["required_behavior"])
+        prohibited_failure = str(raw["prohibited_failure"])
+        created_at = str(raw["created_at"])
+    except (KeyError, TypeError):
+        return None
+    if not rule_id or status not in ("proposed", "active", "deprecated"):
+        return None
+    raw_evidence = raw.get("source_evidence")
+    source_evidence = (
+        tuple(str(item) for item in raw_evidence) if isinstance(raw_evidence, (list, tuple)) else ()
+    )
+    return FailureRule(
+        rule_id=rule_id,
+        status=status,
+        trigger=trigger,
+        applicability=applicability,
+        required_behavior=required_behavior,
+        prohibited_failure=prohibited_failure,
+        source_evidence=source_evidence,
+        enforcement=_failure_rule_enforcement_from_dict(raw.get("enforcement")),
+        regression_test_ref=str(raw.get("regression_test_ref", "")),
+        created_at=created_at,
+        last_triggered_at=_optional_str(raw.get("last_triggered_at")),
+        review_after=_optional_str(raw.get("review_after")),
+    )
+
+
+def load_failure_rules(repo: str | os.PathLike[str]) -> tuple[FailureRule, ...]:
+    """Load the curated failure-rule registry.
+
+    Tolerant of a missing file (returns ``()``) and of malformed lines
+    (skipped, never raised).
+    """
+
+    path = _failure_rule_registry_path(repo)
+    if not path.exists():
+        return ()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ()
+    rules: list[FailureRule] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rule = _failure_rule_from_dict(raw)
+        if rule is not None:
+            rules.append(rule)
+    return tuple(rules)
+
+
+def _save_failure_rules(repo: str | os.PathLike[str], rules: Sequence[FailureRule]) -> None:
+    """Atomically rewrite the failure-rule registry in full.
+
+    Mirrors ``_write_state``'s tempfile + ``os.replace`` pattern but targets
+    the registry's own path -- this never touches ``recurrences.json`` or
+    its lock.
+    """
+
+    path = _failure_rule_registry_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(rules, key=lambda rule: rule.rule_id)
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = handle.name
+            for rule in ordered:
+                json.dump(_failure_rule_to_dict(rule), handle, sort_keys=True, separators=(",", ":"))
+                handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        _best_effort_sync_directory(path.parent)
+    except OSError as exc:
+        raise RecurrenceStateError(f"unable to persist failure rule registry: {exc}") from exc
+    finally:
+        if temporary is not None:
+            with suppress(FileNotFoundError):
+                os.unlink(temporary)
+
+
+def _find_failure_rule(rules: Sequence[FailureRule], rule_id: str) -> tuple[int, FailureRule]:
+    for index, rule in enumerate(rules):
+        if rule.rule_id == rule_id:
+            return index, rule
+    raise ValueError(f"unknown failure rule id: {rule_id!r}")
+
+
+def propose_failure_rule(
+    repo: str | os.PathLike[str],
+    *,
+    rule_id: str,
+    trigger: str,
+    applicability: str,
+    required_behavior: str,
+    prohibited_failure: str,
+    source_evidence: Sequence[str],
+    enforcement: FailureRuleEnforcement | None = None,
+    regression_test_ref: str = "",
+    review_after: str | None = None,
+    created_at: datetime | str | None = None,
+) -> FailureRule:
+    """Propose a new failure rule with status ``"proposed"``.
+
+    Raises ``ValueError`` if ``rule_id`` already exists in the registry --
+    no silent overwrite of a curated entry.
+    """
+
+    lock_path = _failure_rule_lock_path(repo)
+    with _advisory_lock(lock_path):
+        rules = list(load_failure_rules(repo))
+        if any(rule.rule_id == rule_id for rule in rules):
+            raise ValueError(f"failure rule already exists: {rule_id!r}")
+        rule = FailureRule(
+            rule_id=rule_id,
+            status="proposed",
+            trigger=trigger,
+            applicability=applicability,
+            required_behavior=required_behavior,
+            prohibited_failure=prohibited_failure,
+            source_evidence=tuple(source_evidence),
+            enforcement=enforcement or FailureRuleEnforcement(),
+            regression_test_ref=regression_test_ref,
+            created_at=_normalise_timestamp(created_at),
+            last_triggered_at=None,
+            review_after=review_after,
+        )
+        rules.append(rule)
+        _save_failure_rules(repo, rules)
+    return rule
+
+
+def activate_failure_rule(repo: str | os.PathLike[str], rule_id: str) -> FailureRule:
+    """Activate a proposed failure rule.
+
+    Only legal from ``"proposed"``; the lifecycle is forward-only
+    (proposed -> active -> deprecated), so calling this on an already
+    ``"active"`` or ``"deprecated"`` rule raises ``ValueError``.
+    """
+
+    lock_path = _failure_rule_lock_path(repo)
+    with _advisory_lock(lock_path):
+        rules = list(load_failure_rules(repo))
+        index, rule = _find_failure_rule(rules, rule_id)
+        if rule.status != "proposed":
+            raise ValueError(
+                f"failure rule {rule_id!r} cannot be activated from status {rule.status!r}"
+            )
+        updated = dataclasses.replace(rule, status="active")
+        rules[index] = updated
+        _save_failure_rules(repo, rules)
+    return updated
+
+
+def deprecate_failure_rule(
+    repo: str | os.PathLike[str],
+    rule_id: str,
+    *,
+    reason: str = "",
+) -> FailureRule:
+    """Deprecate a proposed or active failure rule.
+
+    Legal from ``"proposed"`` or ``"active"``.  A non-empty ``reason`` is
+    appended into ``source_evidence`` as a bounded trailing entry so the
+    deprecation rationale is not lost.
+    """
+
+    lock_path = _failure_rule_lock_path(repo)
+    with _advisory_lock(lock_path):
+        rules = list(load_failure_rules(repo))
+        index, rule = _find_failure_rule(rules, rule_id)
+        if rule.status not in ("proposed", "active"):
+            raise ValueError(
+                f"failure rule {rule_id!r} cannot be deprecated from status {rule.status!r}"
+            )
+        evidence = rule.source_evidence
+        if reason:
+            trailing = _bounded_text(reason, _FAILURE_RULE_MAX_EVIDENCE_CHARS)
+            evidence = (*evidence, f"deprecated: {trailing}")[-_FAILURE_RULE_MAX_EVIDENCE_ENTRIES:]
+        updated = dataclasses.replace(rule, status="deprecated", source_evidence=evidence)
+        rules[index] = updated
+        _save_failure_rules(repo, rules)
+    return updated
+
+
+def _normalise_compare(value: str) -> str:
+    return " ".join(str(value or "").split()).casefold()
+
+
+def detect_failure_rule_conflicts(rules: Sequence[FailureRule]) -> tuple[RuleConflict, ...]:
+    """Pairwise-detect duplicate or contradictory failure rules.
+
+    Pure function: it never loads state and never mutates the registry --
+    it only flags conflicts for a human to resolve.  A deprecated rule
+    never conflicts with anything.
+    """
+
+    conflicts: list[RuleConflict] = []
+    live = [rule for rule in rules if rule.status in ("proposed", "active")]
+    for i in range(len(live)):
+        for j in range(i + 1, len(live)):
+            a, b = live[i], live[j]
+            if _normalise_compare(a.trigger) != _normalise_compare(b.trigger):
+                continue
+            if _normalise_compare(a.applicability) != _normalise_compare(b.applicability):
+                continue
+            same_behavior = _normalise_compare(a.required_behavior) == _normalise_compare(
+                b.required_behavior
+            )
+            same_failure = _normalise_compare(a.prohibited_failure) == _normalise_compare(
+                b.prohibited_failure
+            )
+            kind: Literal["duplicate_trigger", "contradiction"] = (
+                "duplicate_trigger" if same_behavior and same_failure else "contradiction"
+            )
+            rule_id_a, rule_id_b = sorted((a.rule_id, b.rule_id))
+            detail = (
+                f"same trigger/applicability; behavior_match={same_behavior}, "
+                f"failure_match={same_failure}"
+            )
+            conflicts.append(
+                RuleConflict(rule_id_a=rule_id_a, rule_id_b=rule_id_b, kind=kind, detail=detail)
+            )
+    return tuple(conflicts)
+
+
+def failure_rules_due_for_review(
+    repo: str | os.PathLike[str],
+    *,
+    as_of: datetime | str | None = None,
+) -> tuple[FailureRule, ...]:
+    """Return active rules whose ``review_after`` has passed.
+
+    Read-only: never changes ``status`` and never touches ``review_after``.
+    This is the read the roadmap's Release 12 ``/renmark:hygiene``
+    pruning-sweep extension point is expected to call; this release adds
+    only the read -- it does not wire the hygiene call site (deferred).
+    """
+
+    cutoff = _normalise_timestamp(as_of)
+    due: list[FailureRule] = []
+    for rule in load_failure_rules(repo):
+        if rule.status != "active" or not rule.review_after:
+            continue
+        if rule.review_after <= cutoff:
+            due.append(rule)
+    return tuple(due)
+
+
+def durable_guard_seed_candidates(
+    repo: str | os.PathLike[str],
+    *,
+    min_occurrences: int = 3,
+) -> tuple[dict[str, Any], ...]:
+    """Surface ``durable_guard`` recurrence entries as evidence candidates.
+
+    This reads ``durable_guard`` entries as evidence; it does not consume,
+    mutate, or replace ``recurrence.py``'s REQ-24 state.  It never
+    constructs or persists a ``FailureRule`` -- it only returns bounded
+    dicts suitable to pass as evidence text in a future
+    ``propose_failure_rule(..., source_evidence=[...])`` call; a human or a
+    future release decides whether to actually make that call.
+    """
+
+    state_path, _ = _state_paths(repo)
+    state, _ = _read_state(state_path)
+    candidates: list[dict[str, Any]] = []
+    for entry in state["entries"].values():
+        if entry.get("remediation_class") != "durable_guard":
+            continue
+        if bool(entry.get("resolved")):
+            continue
+        count = _positive_int(entry.get("occurrence_count"), 0)
+        if count < min_occurrences:
+            continue
+        candidates.append(
+            {
+                "key": entry.get("key"),
+                "occurrence_count": count,
+                "target": entry.get("target"),
+                "last_observed_at": entry.get("last_observed_at"),
+            }
+        )
+    return tuple(candidates)
+
+
 __all__ = [
     "MAX_ENTRIES",
     "AcknowledgementAction",
+    "FailureRule",
+    "FailureRuleEnforcement",
+    "FailureRuleStatus",
     "IssueObservation",
     "RecurrenceDecision",
     "RecurrenceLockError",
     "RecurrenceStateError",
     "RemediationClass",
+    "RuleConflict",
     "acknowledge_issue",
+    "activate_failure_rule",
+    "deprecate_failure_rule",
+    "detect_failure_rule_conflicts",
+    "durable_guard_seed_candidates",
+    "failure_rules_due_for_review",
+    "load_failure_rules",
     "observe_issue",
     "pre_attempt",
+    "propose_failure_rule",
     "resolve_issue",
 ]
