@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-05 — enforce_host_agent_dispatch_scope has no bookkeeping-path allowlist
+
+**Severity:** medium
+**Symptom:** Running enforce_host_agent_dispatch_scope live (first real end-to-end test, Release 7 task 1) against a real orchestrator commit that bundled the dispatched task file (.renmark/memory/orchestration-baseline.md) with routine bookkeeping (CHANGELOG.md, .renmark/plans/*.plan.md, .renmark/reviews/*.verification.md, .renmark/audits/*, .renmark/memory/learnings.md) raised WaveScopeViolationError (8 disallowed changes) even though the dispatched Worker itself never touched anything out of scope -- the violation is entirely orchestrator-added bookkeeping, not Worker misbehavior.
+**Root cause:** enforce_host_agent_dispatch_scope (Release 6 task 8, renmark/dispatch.py) reuses fast_path.verify_worker_scope literal git-diff-vs-allowed_paths semantics with no allowance for known-safe orchestrator bookkeeping paths bundled into the same commit as a task, unlike a hypothetical caller-aware design that would separate Worker-attributable changes from orchestrator-attributable ones.
+**Fix:** (pending) add a configurable bookkeeping-path allowlist (CHANGELOG.md, .renmark/plans/**, .renmark/reviews/**, .renmark/audits/**, .renmark/memory/**) that enforce_host_agent_dispatch_scope (and/or fast_path.verify_worker_scope generally) excludes from violation counting when computing the diff -- scoped to a future governed-orchestration-assurance release, not fixed inline here.
+**Lesson:** Live dogfooding of newly-wired enforcement inside the very program building it caught a real gap on first real use: the orchestrator commit-bundling practice used throughout this whole session (task diff + CHANGELOG + plan + audits in one commit) is incompatible with a strict single-task-scope post-action check as currently written. Test enforcement logic against REAL commit shapes, not just synthetic single-file test fixtures.
+
+---
+
 ### 2026-08-04 — Release snapshot never compacted the previous version tree
 
 **Severity:** medium
