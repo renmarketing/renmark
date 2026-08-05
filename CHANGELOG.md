@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — docs: rethink Release 2 (governed-orchestration-assurance) — role-model altitude ADR
+**Request:** Release 2 (spike #28) of the `governed-orchestration-assurance` program — confirm whether capability-envelope enforcement (Release 6) belongs at the per-dispatch-role altitude (`subagent_profiles.py`) or the project-phase altitude (`agency.py`), or both.
+**Built:** ADR-050 appended to `.renmark/memory/decisions.md`. Investigation (not a rubber-stamp) confirmed `agency.py` is a pure project-phase/milestone/signoff state machine with no per-dispatch enforcement logic, while `subagent_profiles.py`'s `ProfileSpec.allowed_targets` is the already-documented ("informational for now") seam for per-dispatch enforcement. Roadmap's stated default lean is confirmed correct, not corrected: Release 6 enforces at the per-dispatch-role altitude only; `agency.py`'s phase/signoff gates stay untouched.
+**Files changed:**
+- `.renmark/memory/decisions.md` — ADR-050.
+**Do not change:**
+- Do not add capability-envelope enforcement logic to `agency.py` — that altitude is reserved for milestone/signoff state, not per-dispatch scope/command/path/network checks.
+
 ## [2026-08-04] — test: rethink Release 1 (governed-orchestration-assurance) — baseline scenario capture
 **Request:** Task 2 of Release 1 of the `governed-orchestration-assurance` rethink program — record real token/wall-clock/dispatch-count baseline numbers for REQ-30's representative scenarios, mined from data already on disk (no fresh pipeline run authorized for this task).
 **Built:** New dated `## Scenario capture — 2026-08-04` section in `.renmark/memory/orchestration-baseline.md`: Feature/Fix now carries its first real *measured* token figure (502,107 tokens across 12 `measured:true` rows); Rethink is recorded as a partial/in-progress data point (this very transformation, not yet closed) rather than "never invoked"; Start and Orchestrate stay honestly `unknown`/unchanged where no new measured data exists. Provenance block cites every source file read and reaffirms that closing the remaining `unknown` rows needs its own cost-preview + Owner go-ahead.

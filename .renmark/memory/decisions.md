@@ -1,5 +1,66 @@
 # Decisions (ADRs)
 
+## ADR-050 — Role-model altitude for capability-envelope enforcement (Release 2 spike #28)
+
+**Date:** 2026-08-05
+**Status:** Accepted
+
+**Context.** roadmap.md's Release 2 (`release-2-role-altitude-adr`) exists to
+close one open design question before Release 6 (`release-6-capability-
+envelope-wiring`) can be built: does the capability envelope (per-dispatch
+scope/command/path/network enforcement, applied at the moment a subagent is
+dispatched) need to enforce at the per-dispatch-role altitude
+(`subagent_profiles.py`), the project-phase altitude (`agency.py`), or both?
+The roadmap's own migration-steps note states a lean toward "per-dispatch
+role, almost certainly," on the grounds that `agency.py`'s phase gates are "a
+different, milestone-level concern already covered by existing
+lifecycle/agency gates" — but flags it as a spike requiring confirmation, not
+a settled fact. modularity-assessment.md §1 independently observed the same
+seam from the codebase side: `subagent_profiles.py` (410L, near-leaf,
+zero/near-zero `renmark.*` imports) owns `ProfileSpec` and its
+`allowed_targets` field, described in the module's own docstring as
+"informational for now; enforced in [a future] capability envelope" — this is
+the literal seam the proposal targets. `agency.py` (424L, imports only the
+leaf `delivery_state`) owns `AgencyState` — `current_phase`,
+`current_milestone`, `signoff_status`, `cost_lane`, `roadmap_ref` — with
+`activate`/`approve_milestone_for_orchestrator`/`project_agency_state`
+managing project-phase transitions and Owner→GC handoff signoff. The
+assessment explicitly notes these two role notions are "not currently
+unified by one type": a work order's `role` field (`ledger.WorkOrder.role`,
+`dispatch.SubagentInput.role`) is a `subagent_profiles`-level string, while
+`agency.py`'s phase/signoff model operates one level up — "not a bug, but
+worth naming explicitly before a capability envelope is bolted onto one and
+assumed to cover the other."
+
+**Decision.** This investigation reads `agency.py` directly (via Grep across
+`agency_state_path`, `AgencyState`, `activate`, `approve_milestone_for_
+orchestrator`, `project_agency_state`) and confirms it contains no
+per-dispatch scope/command/path/network enforcement logic of any kind — it is
+purely a project-phase/milestone/signoff state machine that reads and writes
+one JSON file per repo and gates Owner→Orchestrator handoff. `subagent_
+profiles.py` is confirmed as the correct, and sufficient, seam: its
+`ProfileSpec.allowed_targets` field already exists per-role, is already
+populated for all 10 profiles (docs-editor, code-implementer, test-writer,
+reviewer, audit-reader, release-manager, researcher, inspector,
+finish-lane-specialist, general-purpose), and is explicitly documented as
+"informational for now; enforced in [capability envelope]" — i.e. the module
+already anticipates this exact extension. The two altitudes are structurally
+distinct (state-machine-over-a-milestone vs. rule-set-per-dispatch-role) and
+serve different moments: `agency.py` gates whether/when a milestone is
+authorized to proceed to Orchestrator at all; the capability envelope gates
+what a single dispatched subagent is allowed to touch once dispatch has
+already been authorized. Release 6's capability envelope therefore enforces
+at the per-dispatch-role altitude only, via `subagent_profiles.py`.
+`agency.py`'s phase/signoff gates remain a separate, milestone-level concern,
+already covered by existing lifecycle/agency gates (`lifecycle.json`'s
+`human_review_required`/`human_review_completed` and `AgencyState.signoff_
+status`), and Release 6 does not need to also touch or extend `agency.py`.
+This confirms, rather than corrects, the roadmap's stated lean. Stop
+condition: ADR accepted; no code change, since the confirmation matches the
+lean rather than contradicting it.
+
+---
+
 ## ADR-049 — Finished feature renmark-artifact-lifecycle
 
 **Date:** 2026-08-04
