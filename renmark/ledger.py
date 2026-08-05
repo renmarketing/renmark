@@ -115,11 +115,15 @@ class WorkOrder:
     most have their real enforcement/consumption deferred to later
     releases (Release 4/6/8/10/11/13 per that table) — adding them here
     only reserves the schema slot; it does not wire enforcement.
-    ``risk_tier`` in particular is an **untyped placeholder** (``str |
-    None``), not an enum — per Release 3's recorded design decision, the
-    real ``RiskTier`` enum is Release 8's responsibility, at the
-    ``subagent_profiles.py``/``ledger.InspectionReport`` "lens selection"
-    module boundary, not this one.
+    ``risk_tier`` stays a plain ``str | None`` (no runtime type change) but
+    is now backed by :data:`RISK_TIERS` and :func:`classify_risk_tier`
+    (Release 8) — valid values are one of ``RISK_TIERS``
+    (``"low"``/``"medium"``/``"high"``/``"critical"``), and
+    :func:`classify_risk_tier` is the deterministic, zero-model-call rule
+    that derives a tier from a ``WorkOrder``'s ``file_scope`` (plus an
+    optional caller-attached ``complexity`` duck-typed attribute).
+    Existing placeholder string values already stored on this field
+    remain valid — this is additive documentation, not a schema change.
     """
 
     order_id: str = ""
@@ -214,6 +218,12 @@ class InspectionReport:
 
     Shape follows the fields already in live use across
     ``.renmark/reviews/*.json`` (verdict/findings/generator).
+
+    ``risk_tier`` / ``lens`` are additive Release 8 fields (schema-only —
+    no enforcement wired here). ``verdict`` keeps its existing
+    ``pass``/``fail``/``escalate`` semantics (:data:`VERDICTS`) unchanged;
+    ``risk_tier`` is a separate, orthogonal axis (see :data:`RISK_TIERS` /
+    :func:`classify_risk_tier`), not a replacement for it.
     """
 
     subject_ref: str = ""  # what was inspected (order_id, file, artifact path)
@@ -221,6 +231,8 @@ class InspectionReport:
     findings: list[str] = field(default_factory=list)
     generator: str = ""
     dispatch_identity: str = ""  # who/what dispatch produced this verdict (R-0.4, WP-2)
+    risk_tier: str | None = None
+    lens: str | None = None
 
 
 @dataclass
@@ -330,6 +342,8 @@ def validate_inspection_report(data: dict[str, Any]) -> list[str]:
     issues += _check_str_list(data, "findings")
     issues += _check_str(data, "generator", required=False)
     issues += _check_str(data, "dispatch_identity", required=False)
+    issues += _check_opt_str(data, "risk_tier")
+    issues += _check_opt_str(data, "lens")
     return issues
 
 
@@ -521,6 +535,172 @@ def read_ledger_events(
 VERDICTS: tuple[str, ...] = ("pass", "fail", "escalate")
 
 
+# ── Risk-tier classification (Release 8) ─────────────────────────────────
+#
+# Deterministic, zero-model-call classifier per
+# ``.renmark/rethink/governed-orchestration-assurance/
+# release-8-risk-tier-spike-finding.md``. That finding hand-validated a
+# rule (v1), found a 25% disagreement rate against hand judgment, revised
+# it (v2), re-spiked v2 against a fresh 20-dispatch sample (also 25%
+# disagreement, different composition), and the Owner then approved
+# coding v3 = v2 + four named fixes (2026-08-05 decision at the bottom of
+# that finding):
+#
+#   1. Branch-order fix — ``is_test`` is checked BEFORE the
+#      ``complexity == "hard"`` short-circuit, so a hard-complexity test
+#      file is floored by its test-ness (never bare "high"/"critical"
+#      just because it's expensive to write).
+#   2. ``renmark/lifecycle.py`` added to the critical-module set (it
+#      gates merge/release/security signoff and was missing from both
+#      v1's and v2's lists — the re-spike's #8 mismatch).
+#   3. The pipeline-skill doc exception is extended to also cover
+#      ``plugin/skills/.shared/*.md`` governance fragments (not just
+#      ``plugin/skills/*/SKILL.md``) — the re-spike's #9 mismatch.
+#   4. The "non-test, non-doc production file floors at 'medium'
+#      regardless of declared complexity" branch is kept AS-IS even
+#      though it over-classifies some trivial changes (re-spike's #19).
+#      This is a deliberate fail-safer-not-lenient design choice, not a
+#      bug: over-classification costs extra review time, never safety,
+#      and both spike passes agreed that direction is the tolerable one.
+
+RiskTier = str
+
+RISK_TIERS: tuple[str, ...] = ("low", "medium", "high", "critical")
+
+#: Fixed critical-module set (Release 8's v3 rule). Originally 6 entries
+#: (Release-8 spike v1), expanded to 9 (v2, adding the three modules
+#: responsible for v1's cluster-1 mismatches:
+#: ``subagent_profiles.py``/``plan_lint.py``/``cli/_wave_loop.py``), then
+#: to 10 (v3 Owner fix #2, adding ``lifecycle.py``).
+_CRITICAL_MODULES: frozenset[str] = frozenset(
+    {
+        "renmark/ledger.py",
+        "renmark/dispatch.py",
+        "renmark/subagent_gate.py",
+        "renmark/fast_path.py",
+        "renmark/cost.py",
+        "renmark/cli/_engine.py",
+        "renmark/subagent_profiles.py",
+        "renmark/plan_lint.py",
+        "renmark/cli/_wave_loop.py",
+        "renmark/lifecycle.py",
+    }
+)
+
+#: Pipeline `SKILL.md` files whose doc-floor exception applies (v2's fix
+#: for v1's cluster-2 mismatch — these are operationally load-bearing
+#: dispatch-behavior contracts, not inert reference prose).
+_PIPELINE_CRITICAL_SKILLS: frozenset[str] = frozenset(
+    {
+        "plugin/skills/orchestrate/SKILL.md",
+        "plugin/skills/finish/SKILL.md",
+        "plugin/skills/debug/SKILL.md",
+        "plugin/skills/feature/SKILL.md",
+        "plugin/skills/rethink/SKILL.md",
+        "plugin/skills/start/SKILL.md",
+    }
+)
+
+#: v3 Owner fix #3 — the `.shared/*.md` governance fragments those
+#: pipeline skills cite normatively get the same doc-floor exception as
+#: the named `SKILL.md` files above, matched by path prefix rather than
+#: an exhaustive list (this class of file grows independently of any one
+#: pipeline).
+_PIPELINE_CRITICAL_SHARED_PREFIX = "plugin/skills/.shared/"
+
+
+def _is_pipeline_critical_doc(path: str) -> bool:
+    """True for a doc exempt from the blanket doc-floor-to-``low`` branch."""
+    if path in _PIPELINE_CRITICAL_SKILLS:
+        return True
+    return path.startswith(_PIPELINE_CRITICAL_SHARED_PREFIX) and path.endswith(".md")
+
+
+def classify_risk_tier(work_order: "WorkOrder") -> str:
+    """Deterministically classify ``work_order`` into one of :data:`RISK_TIERS`.
+
+    Zero-model-call, purely field-based rule (Release 8 spike v3 — see the
+    module-level comment above this function for the rule's provenance
+    and the four Owner-approved v2->v3 fixes). Signals used:
+
+    - ``files`` — ``work_order.file_scope``.
+    - ``complexity`` — read via ``getattr(work_order, "complexity", None)``,
+      duck-typed the same way ``cost.py``/``sizing.py``/``subagent_gate.py``
+      read it off a plan ``Task``. ``WorkOrder`` itself declares no
+      ``complexity`` field (that lives on the plan task, not the dispatch
+      order); a caller that wants complexity to influence the tier attaches
+      it dynamically before calling this function. Missing/unrecognized
+      complexity is treated as unknown, never as "hard".
+
+    **Never raises.** Any missing/malformed input — ``work_order is None``,
+    a missing/non-list/non-string ``file_scope``, or any unexpected
+    exception while inspecting it — degrades to ``"low"``, the
+    conservative default that never over-escalates a broken input. The
+    return value is always validated to be one of :data:`RISK_TIERS`
+    before it is returned; if somehow it were not (defensive-only, should
+    be unreachable given the branches below), this also degrades to
+    ``"low"`` rather than returning an invalid tier.
+    """
+    try:
+        tier = _classify_risk_tier_inner(work_order)
+    except Exception:
+        return "low"
+    return tier if tier in RISK_TIERS else "low"
+
+
+def _classify_risk_tier_inner(work_order: "WorkOrder") -> str:
+    if work_order is None:
+        return "low"
+
+    raw_files = getattr(work_order, "file_scope", None)
+    if not isinstance(raw_files, list) or not raw_files:
+        return "low"
+    files = [f for f in raw_files if isinstance(f, str) and f]
+    if not files:
+        return "low"
+
+    raw_complexity = getattr(work_order, "complexity", None)
+    complexity = raw_complexity.strip().lower() if isinstance(raw_complexity, str) else ""
+
+    hits_critical = any(f in _CRITICAL_MODULES for f in files)
+    is_test = all(f.startswith("tests/") or "/test_" in f or f.startswith("test_") for f in files)
+    is_doc = all(f.endswith((".md", ".json", ".toml", ".gitignore")) for f in files)
+    is_pipeline_critical_doc = is_doc and any(_is_pipeline_critical_doc(f) for f in files)
+
+    if hits_critical and complexity == "hard":
+        return "critical"
+    if hits_critical:
+        return "high"
+
+    # Fix #1 (v3): is_test is checked BEFORE the hard-complexity
+    # short-circuit below, so a hard-complexity test file is floored by
+    # its test-ness rather than bare-returning "high".
+    if is_test:
+        return "medium" if complexity == "hard" else "low"
+
+    if complexity == "hard":
+        return "high"
+
+    if is_doc and not is_pipeline_critical_doc:
+        return "low"
+
+    # Fix #4 (v3, deliberate): any non-test, non-doc production file
+    # floors at "medium" regardless of declared complexity — complexity
+    # is effort, not blast radius. Kept even though it over-classifies
+    # some trivial changes; over-classification costs review time, not
+    # safety.
+    if not is_doc:
+        return "medium"
+
+    # Remaining case: a pipeline-critical doc (SKILL.md / .shared/*.md)
+    # that isn't hard-complexity — resolve by declared complexity.
+    if complexity == "medium":
+        return "medium"
+    if complexity == "simple":
+        return "low"
+    return "medium"  # unknown/unspecified complexity — fail safer, not lenient
+
+
 def emit_inspection_verdict(
     repo: Path | str,
     *,
@@ -612,16 +792,19 @@ __all__ = [
     "KIND_WORK_RESULT",
     "LEDGER_FILE",
     "LEDGER_SUBDIR",
+    "RISK_TIERS",
     "VERDICTS",
     "DispatchIndependenceError",
     "Escalation",
     "InspectionReport",
     "LedgerEvent",
     "LedgerValidationError",
+    "RiskTier",
     "WorkOrder",
     "WorkResult",
     "append_ledger_event",
     "check_dispatch_independence",
+    "classify_risk_tier",
     "emit_inspection_verdict",
     "latest_verdict_for",
     "ledger_dir",

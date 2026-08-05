@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 8 task 2 (governed-orchestration-assurance) — RiskTier + v3 classifier
+**Request:** Task 2 of 8, Release 8 — code the Owner-approved v3 risk-tier rule (v2 + 4 named fixes) as `renmark.ledger.classify_risk_tier`.
+**Built:** `RISK_TIERS = ("low", "medium", "high", "critical")` (mirrors `VERDICTS`'s plain-tuple style). `classify_risk_tier(work_order) -> str` implementing v3: test-check before the hard-complexity short-circuit (fixes the re-spike's branch-order bug), `renmark/lifecycle.py` added to the critical-module set, `plugin/skills/.shared/*.md` exempted from the doc floor alongside `SKILL.md`, and the medium-floor over-classification kept deliberately (documented as fail-safer, not a bug). Never raises — degrades to `"low"` on malformed input. `InspectionReport.risk_tier`/`.lens` added (additive, optional); `VERDICTS`/`verdict` untouched. 23/23 ledger tests pass.
+**Files changed:**
+- `renmark/ledger.py` — RiskTier vocabulary + classifier + InspectionReport fields.
+**Do not change:**
+- Do not touch `VERDICTS` or `InspectionReport.verdict`'s semantics — `risk_tier`/`lens` are additive only, never a second verdict enum.
+**Note:** `classify_risk_tier` duck-types `complexity` via `getattr` since `WorkOrder` has no native field for it — downstream callers wanting complexity to affect the tier must attach it before calling. No dedicated test file yet (out of this task's scope, follow-up task 5+ covers it).
+
 ## [2026-08-05] — docs: rethink Release 8 re-spike (governed-orchestration-assurance) — v2 fresh validation, still 25%
 **Request:** Owner-directed re-spike (the roadmap's one allowed re-spike) — validate v2's risk-tier rule against a fresh, non-overlapping sample before coding it, rather than trusting the circular 0/20 v1 reported.
 **Built:** Appended a "Re-spike — v2 fresh validation" section: 20 fresh dispatches, v2 applied as written, hand-judgment formed blind first. Fresh disagreement rate: 5/20 = 25% — same rate as v1, but different composition (3 over-classifications including a real branch-order bug; 2 new under-classifications — `renmark/lifecycle.py` missing from the critical set, `plugin/skills/.shared/*.md` fragments not covered by the pipeline-skill exception). Verdict: needs further refinement, not acceptable to code as-is — 4 concrete fixes named. Explicitly does not request a third re-spike (the roadmap's stop condition allows only one).
