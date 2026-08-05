@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 2/16 · task 0/1 done · current: Release 2: Role-model altitude ADR (spike #28)_
+_mode: staged · Stage 3/16 · task 0/5 done · current: Release 3: Canonical work-order reconciliation_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -15,12 +15,12 @@ _phases: plan → build → verify → review → release_
 - [x] Turn baseline.md's 9 compatibility checks into runnable tests — Add test-only coverage for the 9 baseline.md checks (pytest count, classify_fast_path, verify_worker_scope, check_dispatch_independence, VERDICTS vocab, complete_worker_task no-self-approval, assert_metadata_only, REQ-30 qualitative guarantees, inspector read-only allowlist). No production code moves. Verify: fresh pytest -q + renmark-execute --behavior.
 - [ ] Record real token/wall-clock/dispatch-count numbers for the 4 representative scenarios — Run and record Start/Feature-Fix/Orchestrate/Rethink scenarios into orchestration-baseline.md's unpopulated table, replacing 'not yet measured'. Requires its own cost-preview + Owner go-ahead per that file's flag.
 
-## ○ Release 2: Role-model altitude ADR (spike #28) — serves REQ-1, REQ-2, REQ-12 **(current)**
+## ● Release 2: Role-model altitude ADR (spike #28) — serves REQ-1, REQ-2, REQ-12
 _phases: plan → build → verify → review → release_
 
-- [ ] Bounded 1-session spike: confirm capability-envelope enforcement altitude — Produce one ADR paragraph confirming per-dispatch-role altitude (subagent_profiles.py) vs project-phase altitude (agency.py) for release 6's capability envelope. Owner/maintainer sign-off required. Stop condition: ADR accepted, no code change unless contradicted.
+- [x] Bounded 1-session spike: confirm capability-envelope enforcement altitude — Produce one ADR paragraph confirming per-dispatch-role altitude (subagent_profiles.py) vs project-phase altitude (agency.py) for release 6's capability envelope. Owner/maintainer sign-off required. Stop condition: ADR accepted, no code change unless contradicted.
 
-## ○ Release 3: Canonical work-order reconciliation — serves AC-1 (REQ-1)
+## ○ Release 3: Canonical work-order reconciliation — serves AC-1 (REQ-1) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Add risk_tier (untyped placeholder), capability_envelope_ref, lens, schema_version, and full RenmarkWorkOrder contract fields to ledger.WorkOrder — Additive fields only, pytest -q count stays green except for new additions. risk_tier is str|None (design decision, Gap 1): Release 8 defines the real RiskTier enum per modularity-assessment.md sec6's module-boundary lean. Also adds correlation_id, idempotency_key, dependencies, scope, budget, routing, constraints, interaction_policy as additive placeholders (enforcement deferred per field table in roadmap.md).
