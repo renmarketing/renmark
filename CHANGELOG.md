@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 9 task 1 (governed-orchestration-assurance) — judge.py 3-state Outcome (breaking change)
+**Request:** Task 1 of 7, Release 9 — the breaking 2-state → 3-state `Outcome` change, redaction, order-randomization, and `JudgeEvidenceRef`.
+**Built:** `Outcome = Literal["pass", "fail", "uncertain"]`. Every branch in `_parse_response`/`judge_behavior` that previously hardcoded `outcome="fail"` for an untrusted/unparseable/runner-failure case now returns `outcome="uncertain"` — a genuine parsed `"fail"` is the only way to get a validated fail. Prompt text updated to describe all 3 states. `_redact_worker_fields`/`_redact_value`/`_render_payload` strip Worker self-assessment/confidence/identity/preferred-verdict at data-assembly time, before string composition. `swap_order` kwarg + `resolve_swap_order(seed)` (SHA-256-stable when seeded) for pairwise order-randomization, recorded via `JudgeCallRecord`/`JudgeEvidenceRef` — never written into `Verdict.rationale`. `JudgeEvidenceRef` (+ `from_verdict` factory) is the reference type future `InspectionReport.judge_evidence` will point at — `Verdict`'s 4 existing fields and `judge_behavior`'s return type unchanged. `tests/test_judge.py`/`tests/test_eval_agent_turn.py` updated for the new semantics (necessary — the old assertions were testing behavior this release deliberately changed). Full suite: 2028 passed, 31 skipped — no regression.
+**Files changed:**
+- `renmark/judge.py` — 3-state Outcome, redaction, order-randomization, JudgeEvidenceRef.
+- `tests/test_judge.py`, `tests/test_eval_agent_turn.py` — updated for new outcome semantics.
+**Do not change:**
+- `judge.py` never imports `ledger.py` (non-goal enforcement — evidence attachment is one-directional, `ledger.py` imports `judge.JudgeEvidenceRef`, never the reverse).
+- Do not write `swapped` into `Verdict.rationale` — record it via `JudgeCallRecord`/`JudgeEvidenceRef` instead.
+**Deferred, not fixed here (flagged for tasks 2/3):** `renmark/behavior.py`'s two hardcoded `{"outcome": "fail"}` fallback dicts (lines ~1121, ~1129) are semantically `uncertain` under the new vocabulary — task 2's job. `InspectionReport.judge_evidence` (task 3) should type as `judge.JudgeEvidenceRef | None`.
+
 ## [2026-08-05] — test: rethink Release 8 tasks 5-8 (governed-orchestration-assurance) — full test coverage, Release 8 complete
 **Request:** Tasks 5-8 of 8, Release 8 — test coverage for the risk classifier, lens policy, InspectionContract wiring, and a behavioral-eval fixture for Release 15.
 **Built:** `tests/test_ledger_risk_tier.py` (11 tests — `classify_risk_tier` boundaries + `RISK_TIERS` membership + `VERDICTS` guard). `tests/test_subagent_gate_lens.py` (5 tests — `resolve_lens_for` policy across all tier cases). `tests/test_ledger_inspection_contract.py` (5 tests — `InspectionContract` defaults, auto-population via `work_order_for_task`, `auto_contract=False` opt-out, `InspectionReport.contract_ref` round-trip, `allowed_verdicts`/`VERDICTS` identity guard). `tests/behavioral/risk_tier_lens_selection.behavior.json` — fixture authored for Release 15, not wired into `renmark/behavior.py`'s registries yet (out of scope per roadmap). Full suite: 2028 passed, 31 skipped (up from 2007, +21 net new tests, no regressions).

@@ -159,10 +159,10 @@ def test_parse_judge_verdict_returns_validated_verdict_for_valid_json() -> None:
     assert verdict.rationale == "The contract is met."
 
 
-def test_parse_judge_verdict_returns_unvalidated_fail_on_garbage() -> None:
+def test_parse_judge_verdict_returns_unvalidated_uncertain_on_garbage() -> None:
     verdict = judge.parse_judge_verdict("not json at all")
 
     assert isinstance(verdict, judge.Verdict)
-    assert verdict.outcome == "fail"
+    assert verdict.outcome == "uncertain"
     assert verdict.confidence == "low"
     assert verdict.validation_status == "unvalidated"

@@ -77,14 +77,16 @@ Judge output:
     assert "Respond with ONLY a JSON object" in captured[0]
 
 
-def test_judge_behavior_marks_unparseable_response_unvalidated_and_failed() -> None:
+def test_judge_behavior_marks_unparseable_response_unvalidated_and_uncertain() -> None:
+    # 3-state Outcome: a response we could not read is "uncertain" (we don't
+    # know), not "fail" (a decision the judge never rendered) — and never a pass.
     verdict = judge_behavior(
         subagent_runner=lambda prompt: "not json at all",
         **_judge_kwargs(),
     )
 
     assert verdict.validation_status == "unvalidated"
-    assert verdict.outcome == "fail"
+    assert verdict.outcome == "uncertain"
     assert verdict.confidence == "low"
     assert "could not parse a JSON object" in verdict.rationale
 
@@ -99,7 +101,7 @@ def test_judge_behavior_marks_malformed_payload_unvalidated_and_not_a_pass() -> 
 
     assert verdict.validation_status == "unvalidated"
     assert verdict.outcome != "pass"
-    assert verdict.outcome == "fail"
+    assert verdict.outcome == "uncertain"
     assert verdict.confidence == "low"
     assert "unrecognized outcome" in verdict.rationale
 
