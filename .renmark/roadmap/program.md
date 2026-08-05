@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 13/16 · task 0/5 done · current: Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation_
+_mode: staged · Stage 14/16 · task 0/1 done · current: Release 14: Guardrail metrics_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -99,7 +99,7 @@ _phases: plan → build → verify → review → release_
 - [x] Bounded 1-pass spike: confirm the current authoritative state-file set vs. CLAUDE.md's documented set — Update CLAUDE.md if stale; flag anything requiring a code change as its own future item.
 - [x] Extend hygiene.py's pruning criteria toward the proposal's 7-way category split — Stable preferences / canonical artifacts / lifecycle state / bounded task context / failure-rule registry / receipts / ephemeral conversation. Reuses checkpoint-before-compaction; once release 10 lands, fold a periodic constraint-registry re-verification sweep into /renmark:hygiene per Tier-3 Recommendation 5.
 
-## ○ Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation — serves AC-11 (REQ-11) **(current)**
+## ● Release 13: Durable-events field completeness + orphan-detection spike (#24) + analytics reconciliation — serves AC-11 (REQ-11)
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-session spike: self-benchmark resume/recovery correctness against deliberately-interrupted runs — Reuse heartbeat.py's usage-limit-pause path as the test harness; produce a scenario table (pass/fail on no-duplicate/no-orphan).
@@ -108,7 +108,7 @@ _phases: plan → build → verify → review → release_
 - [ ] Reconcile analytics.py to read from ledger.py as its source for guardrail metrics — Instead of maintaining a second parallel event system.
 - [ ] Author 'retry/rework survives resume' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 14: Guardrail metrics — serves AC-13 (REQ-13)
+## ○ Release 14: Guardrail metrics — serves AC-13 (REQ-13) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Extend _agg_features/_agg_tasks/_agg_loops/_agg_events/_agg_usage/build_health_report with named guardrail fields — False-pass/reopen rate, scope-violation rate, Owner-interruptions-per-milestone, percentage-of-dispatches-with-unknown-usage, duplicate-artifact rate. Define renmark's own measured baseline per metric; do NOT import the proposal's cited external '43%' figure.

@@ -267,3 +267,16 @@ Each entry: signal, observation, model that caught it, date.
 - (2026-05-29, .renmark/reviews/2026-05-29-729e0ca.verification.md) model `verify`: **verify-lifecycle-hygiene** — 6/6 behaviors verified; failed: none; regressions: 0
 
 - (2026-05-28, run) **task 1 failed on codex** — codex_verifier_failed
+
+### 2026-08-05 — Release 13 verify: skip-list identity fix holds under fresh full suite
+
+Re-ran all Release 13 smoke checks fresh post-commit (not trusting the wave's
+self-reported PASS): title+index skip-list identity check, ledger field
+completeness, analytics guardrails aggregation, and the pre-existing
+ledger/analytics compat suite all green; full suite 2080 passed/32 skipped.
+Confirms Finding A's fix (`completed_task_titles`/`normalize_task_title` in
+`renmark/state/commits.py`, optional third arg to `_cross_check_skip_list`)
+is safe and backward-compatible — the single most severe bug found this
+program (unbounded git-log index-only matching could silently skip real work
+on `--resume` once two plans reused the same task index, which this repo's
+own history now guarantees).

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-08-05] — verify: rethink Release 13 (governed-orchestration-assurance) — 3/3 requirements verified
+**Request:** `/renmark:verify` smoke pass for Release 13.
+**Built:** Re-ran fresh (not trusting self-reported wave PASS): `test_engine_resume_crosscheck.py` (15 passed), `test_ledger_field_completeness.py` (11 passed), `test_analytics_ledger_guardrails.py` (3 passed), `test_ledger.py`+`test_reports_analytics.py` compat (39 passed), full suite (2080 passed, 32 skipped). Wrote `.renmark/reviews/2026-08-05-7f89663.verification.md`, `lifecycle.json` stage=`verified`.
+**Files changed:**
+- `.renmark/reviews/2026-08-05-7f89663.verification.md` — new.
+- `.renmark/memory/learnings.md` — verify-pass note.
+- `.renmark/state/lifecycle.json` — stage advanced.
+**Do not change:**
+- The Finding A fix's backward-compat guarantee (optional third arg to `_cross_check_skip_list`, byte-identical when omitted).
+**Release 13 verified.** Deferred/open, not blocking: spike Findings B/C, Release 11's CLI-wiring gap.
+
 ## [2026-08-05] — test: rethink Release 13 tasks 4-5 (governed-orchestration-assurance) — full coverage, Release 13 complete
 **Request:** Tasks 4-5 of 5, Release 13 — test coverage for the new ledger event fields and the analytics guardrails aggregation.
 **Built:** `tests/test_ledger_field_completeness.py` (11 tests — new fields present on all 4 event kinds, round-trip through `append_ledger_event`/`read_ledger_events`, old-shape JSONL rows still parse without the new keys, `VERDICTS`/`RISK_TIERS` unchanged). `tests/test_analytics_ledger_guardrails.py` (3 tests — no-ledger degrades to zero/empty, real escalation/inspection events aggregate correctly, malformed ledger lines never raise, existing summary keys unaffected). Full suite: 2080 passed, 32 skipped (up from 2066, +14 net new tests, no regressions).
