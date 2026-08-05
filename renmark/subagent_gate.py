@@ -26,6 +26,7 @@ The 4 questions (deterministic-first.md), answered mechanically where possible:
 
 from __future__ import annotations
 
+import fnmatch
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -391,6 +392,299 @@ def enforce_r008_dispatch(dispatch_spec: Any, *, strict: bool = False) -> list[s
     if not valid and strict:
         raise R008DispatchRejected(missing)
     return missing
+
+
+# ── Capability envelope: per-control × per-host enforcement status ───────────
+#
+# The capability envelope answers a different question than the two gates
+# above.  ``justify_task`` answers "should this be a subagent at all";
+# ``validate_r008_dispatch`` answers "does this dispatch carry its six
+# required fields"; :func:`check_capability_envelope` answers "for the scope
+# this dispatch is asking for, which controls are actually ENFORCED on this
+# host, and which are only advisory or verified after the fact".
+#
+# All three are separate, composable, zero-LLM checks a caller runs together
+# in the same pre-dispatch funnel — none calls the others.  A caller runs
+# ``justify_task`` → ``validate_r008_dispatch`` → ``check_capability_envelope``
+# and decides on the combined result; keeping them independent means a caller
+# that only needs one does not pay for the other two, and adding a control
+# dimension here never perturbs the justification or R-008 verdicts.
+#
+# The honesty requirement is the point of this table: a ``passed=True`` on a
+# dimension whose status is ``"advisory"``, ``"unsupported"``, or
+# ``"verified_after"`` is NOT evidence the control was enforced pre-dispatch.
+# Each verdict therefore carries its ``status`` alongside ``passed`` and says
+# so in ``reason``, so no caller can read a pass as an enforcement claim.
+
+#: Per-control × per-host enforcement status.  One of:
+#:   ``"enforced"``       — checked pre-dispatch by code in this repo.
+#:   ``"verified_after"`` — not checked pre-dispatch on this host; the actual
+#:                          check happens post-action (``fast_path.verify_worker_scope``).
+#:   ``"advisory"``       — recorded as a constraints-object statement only;
+#:                          no code-level enforcement mechanism confirmed.
+#:   ``"unsupported"``    — no enforcement mechanism wired at all.
+#: This is the table approved at the dispatch gate for this release — it is a
+#: statement of what is true today, not an aspiration.  Do not upgrade a
+#: status here without landing the mechanism that backs it.
+ENVELOPE_CONTROL_STATUS: dict[str, dict[str, str]] = {
+    "path": {"claude": "enforced", "codex": "verified_after"},
+    "command": {"claude": "enforced", "codex": "enforced"},
+    "spend_timeout": {"claude": "enforced", "codex": "enforced"},
+    "network_domain": {"claude": "advisory", "codex": "advisory"},
+    "git_action": {"claude": "advisory", "codex": "advisory"},
+    "external_action": {"claude": "unsupported", "codex": "unsupported"},
+}
+
+#: Stable evaluation order for :func:`check_capability_envelope` — callers get
+#: one verdict per dimension, always in this order.
+ENVELOPE_CONTROLS: tuple[str, ...] = (
+    "path",
+    "command",
+    "spend_timeout",
+    "network_domain",
+    "git_action",
+    "external_action",
+)
+
+_ADVISORY_REASON: str = (
+    "advisory only — no code-level enforcement mechanism confirmed this "
+    "release; recorded as a constraints-object statement only."
+)
+_UNSUPPORTED_REASON: str = "unsupported — no enforcement mechanism wired for this control."
+
+
+def control_status(control: str, host: str) -> str:
+    """Return the enforcement status for *control* on *host*.
+
+    Never raises and never yields a ``KeyError``: an unknown control, an
+    unknown host, or a non-string argument all degrade to ``"unsupported"`` —
+    the conservative answer, since an unrecognised pair demonstrably has no
+    enforcement mechanism behind it.
+    """
+    try:
+        return ENVELOPE_CONTROL_STATUS.get(str(control), {}).get(str(host), "unsupported")
+    except Exception:
+        return "unsupported"
+
+
+@dataclass(frozen=True)
+class EnvelopeVerdict:
+    """One control dimension's pre-dispatch verdict.
+
+    Same non-raising verdict shape convention :class:`SubagentVerdict` uses.
+    ``passed`` is only an enforcement claim when ``status == "enforced"`` —
+    for ``"verified_after"`` / ``"advisory"`` / ``"unsupported"`` a
+    ``passed=True`` means "this gate did not and cannot decide here", and
+    ``reason`` says so explicitly.
+    """
+
+    passed: bool
+    control: str
+    host: str
+    status: str
+    reason: str
+    violations: tuple[str, ...] = ()
+
+
+def _envelope_globs(allowed_targets: Any) -> tuple[str, ...]:
+    """Split a profile's ``allowed_targets`` string into fnmatch globs.
+
+    ``allowed_targets`` is a comma-separated human-readable field: several
+    profiles append a parenthetical annotation (``".renmark/reviews/**/*.md
+    (read-only review of any file)"``) and ``general-purpose`` declares the
+    sentinel ``"any (fallback — no target restriction)"``.  Annotations are
+    stripped so they can never become a glob that matches nothing, and an
+    empty result means "no restriction declared" — matching the module-wide
+    non-denial-by-default convention (see ``ProfileSpec.allowed_commands``).
+    """
+    if not isinstance(allowed_targets, str):
+        return ()
+    globs: list[str] = []
+    for chunk in allowed_targets.split(","):
+        piece = chunk.strip()
+        # Drop a trailing parenthetical annotation, then re-strip.
+        if "(" in piece:
+            piece = piece.split("(", 1)[0].strip()
+        if not piece or piece.lower() == "any":
+            continue
+        globs.append(piece)
+    return tuple(globs)
+
+
+def _envelope_path_verdict(role: str, requested_scope: dict, host: str) -> EnvelopeVerdict:
+    """Path-scope dimension — enforced on Claude, verified post-action on Codex."""
+    status = control_status("path", host)
+    if status != "enforced":
+        return EnvelopeVerdict(
+            passed=True,
+            control="path",
+            host=host,
+            status=status,
+            reason=(
+                f"{host}: path scope verified post-action via "
+                "fast_path.verify_worker_scope only, not pre-dispatch — "
+                "passed=True here is NOT an enforcement claim."
+            ),
+        )
+
+    paths = requested_scope.get("paths") or []
+    if not isinstance(paths, (list, tuple)):
+        paths = []
+    spec = subagent_profiles.profile_of(role)
+    globs = _envelope_globs(getattr(spec, "allowed_targets", None))
+    if not globs:
+        return EnvelopeVerdict(
+            passed=True,
+            control="path",
+            host=host,
+            status=status,
+            reason=f"role={role}: no target restriction declared — nothing to enforce",
+        )
+
+    violations = tuple(
+        str(p)
+        for p in paths
+        if not any(fnmatch.fnmatch(str(p).replace("\\", "/"), g) for g in globs)
+    )
+    if violations:
+        return EnvelopeVerdict(
+            passed=False,
+            control="path",
+            host=host,
+            status=status,
+            reason=(
+                f"role={role}: {len(violations)} requested path(s) outside "
+                f"allowed_targets ({', '.join(globs)})"
+            ),
+            violations=violations,
+        )
+    return EnvelopeVerdict(
+        passed=True,
+        control="path",
+        host=host,
+        status=status,
+        reason=f"role={role}: all {len(paths)} requested path(s) within allowed_targets",
+    )
+
+
+def _envelope_command_verdict(role: str, requested_scope: dict, host: str) -> EnvelopeVerdict:
+    """Command-allowlist dimension — enforced pre-dispatch on both hosts."""
+    status = control_status("command", host)
+    commands = requested_scope.get("commands") or []
+    if not isinstance(commands, (list, tuple)):
+        commands = []
+    spec = subagent_profiles.profile_of(role)
+    allowed = getattr(spec, "allowed_commands", ()) or ()
+    if not allowed:
+        return EnvelopeVerdict(
+            passed=True,
+            control="command",
+            host=host,
+            status=status,
+            reason=f"role={role}: empty allowed_commands — no command restriction declared",
+        )
+
+    allowed_set = {str(c) for c in allowed}
+    violations = tuple(str(c) for c in commands if str(c) not in allowed_set)
+    if violations:
+        return EnvelopeVerdict(
+            passed=False,
+            control="command",
+            host=host,
+            status=status,
+            reason=(
+                f"role={role}: {len(violations)} requested command(s) outside "
+                f"allowed_commands ({', '.join(sorted(allowed_set))})"
+            ),
+            violations=violations,
+        )
+    return EnvelopeVerdict(
+        passed=True,
+        control="command",
+        host=host,
+        status=status,
+        reason=f"role={role}: all {len(commands)} requested command(s) in allowed_commands",
+    )
+
+
+def _envelope_spend_verdict(role: str, requested_scope: dict, host: str) -> EnvelopeVerdict:
+    """Spend/timeout-ceiling dimension — delegates to ``cost.check_spend_timeout_ceiling``."""
+    status = control_status("spend_timeout", host)
+    verdict = cost.check_spend_timeout_ceiling(
+        requested_scope.get("budget"), tier=subagent_profiles.profile_tier(role)
+    )
+    return EnvelopeVerdict(
+        passed=bool(verdict.passed),
+        control="spend_timeout",
+        host=host,
+        status=status,
+        reason=str(verdict.reason),
+        violations=() if verdict.passed else (str(verdict.reason),),
+    )
+
+
+def check_capability_envelope(
+    role: str, requested_scope: dict, *, host: str = "claude"
+) -> tuple[EnvelopeVerdict, ...]:
+    """Evaluate EVERY capability-envelope control for *role* on *host*.
+
+    Returns one :class:`EnvelopeVerdict` per dimension in
+    :data:`ENVELOPE_CONTROLS` order — never a single collapsed verdict, because
+    a caller must be able to see which controls were actually enforced and
+    which merely reported ``passed=True`` because nothing enforces them here.
+
+    ``requested_scope`` is a caller-built dict with optional keys
+    ``paths: list[str]``, ``commands: list[str]``, ``budget: dict | None``.
+    A missing key means "nothing requested on that dimension" and passes.
+
+    Composability: this is a peer of :func:`justify_task` and
+    :func:`validate_r008_dispatch`, not a caller of either — the same
+    relationship those two already have with one another.  Run them together
+    in the pre-dispatch funnel and combine the results.
+
+    **Never raises.**  On any unexpected internal error it returns a single
+    conservative-failure verdict rather than silently passing.
+    """
+    try:
+        scope: dict = requested_scope if isinstance(requested_scope, dict) else {}
+        resolved_host = str(host)
+        role_name = str(role)
+        return (
+            _envelope_path_verdict(role_name, scope, resolved_host),
+            _envelope_command_verdict(role_name, scope, resolved_host),
+            _envelope_spend_verdict(role_name, scope, resolved_host),
+            EnvelopeVerdict(
+                passed=True,
+                control="network_domain",
+                host=resolved_host,
+                status=control_status("network_domain", resolved_host),
+                reason=_ADVISORY_REASON,
+            ),
+            EnvelopeVerdict(
+                passed=True,
+                control="git_action",
+                host=resolved_host,
+                status=control_status("git_action", resolved_host),
+                reason=_ADVISORY_REASON,
+            ),
+            EnvelopeVerdict(
+                passed=True,
+                control="external_action",
+                host=resolved_host,
+                status=control_status("external_action", resolved_host),
+                reason=_UNSUPPORTED_REASON,
+            ),
+        )
+    except Exception:
+        return (
+            EnvelopeVerdict(
+                passed=False,
+                control="unknown",
+                host=str(host) if isinstance(host, str) else "claude",
+                status="unsupported",
+                reason="gate could not classify — review before dispatch",
+            ),
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 6 tasks 3+4 (governed-orchestration-assurance) — check_capability_envelope + hardened hook
+**Request:** Tasks 3 and 4 of 9, Release 6 — the real 6-dimension capability-envelope evaluator, and hardening the Release 5 prototype hook for Bash calls + any role.
+**Built:** `subagent_gate.ENVELOPE_CONTROL_STATUS` + `control_status()` + `EnvelopeVerdict` + `check_capability_envelope(role, requested_scope, host=...)` — evaluates path/command/spend_timeout/network_domain/git_action/external_action per the approved status table, never raises, fails conservative on internal error. Deliberate deviation flagged by the implementing agent: `allowed_targets` is prose-ish (e.g. `general-purpose`'s "any (fallback — no target restriction)"), so glob extraction strips trailing parentheticals and the "any" sentinel before `fnmatch` — a naive comma-split would make `general-purpose` deny every path, contradicting the release's own non-denial-by-default convention. `.claude/hooks/capability_envelope_prototype.py` now judges `Bash` calls against `allowed_commands` and resolves any role from `PROFILES` (still not registered in `.claude/settings.json`).
+**Files changed:**
+- `renmark/subagent_gate.py` — capability envelope evaluator.
+- `.claude/hooks/capability_envelope_prototype.py` — Bash handling + multi-role.
+**Do not change:**
+- `check_capability_envelope` returns a 6-tuple in fixed order — never collapse it, and never read `passed=True` on a `verified_after`/`advisory`/`unsupported` dimension as real enforcement.
+**Known interim fallout (expected, closed by task 7):** `tests/test_capability_envelope_prototype.py::test_non_write_tool_defers` now fails — its `ls` example predates Bash-command judging (task 4) and is no longer a valid "non-judged tool" example now that Bash calls ARE judged. Task 7 fixes the test's premise, not a regression in task 3/4's own correctness (task 4 correctly denies `ls` for a role whose allowlist doesn't include it).
+
 ## [2026-08-05] — feat: rethink Release 6 tasks 1+2 (governed-orchestration-assurance) — allowed_commands field + spend/timeout ceiling
 **Request:** Tasks 1 and 2 of 9, Release 6 — real command allowlists per role and a pure spend/timeout ceiling check, both additive with no consumer wiring yet.
 **Built:** `ProfileSpec.allowed_commands: tuple[str, ...] = ()` on all 10 profiles (empty = no restriction declared, never silently deny). `cost.check_spend_timeout_ceiling(budget, tier=...) -> SpendTimeoutVerdict` + `DEFAULT_MAX_TOKENS_PER_DISPATCH`/`DEFAULT_MAX_TIMEOUT_S` per-tier constants — `budget is None` passes (nothing to enforce), a malformed budget (wrong type, negative, bool) fails closed (the one place in this module that fails closed rather than degrading leniently, since a budget ceiling's purpose is refusing an unverifiable spend). Existing `estimate_cost`/`requires_escalation`/`resolve_profile`/`profile_tier` untouched.

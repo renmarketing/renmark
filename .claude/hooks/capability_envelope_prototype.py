@@ -1,14 +1,24 @@
-"""PROTOTYPE / SPIKE ONLY — not wired into `.claude/settings.json`, not used
-by any renmark dispatch path; evidence artifact for Release 5 of the
-`governed-orchestration-assurance` roadmap.
+"""Still PROTOTYPE / SPIKE evidence for Release 6 of
+`governed-orchestration-assurance` — hardened per Release 6, but NOT
+registered in `.claude/settings.json`. Going live requires a SEPARATE,
+explicit Owner-approved step outside this program's task dispatch.
 
-Implements Claude Code's `PreToolUse` hook contract, scoped to ONE agent
-profile (`code-implementer`) from `renmark/subagent_profiles.py`. Reads a
-single JSON payload from stdin describing a proposed tool call and prints
-an `allow` / `deny` decision for `Write` / `Edit` calls whose `file_path`
-does, or does not, match that profile's `allowed_targets` globs. Any other
-tool call is passed through silently (no decision) so normal permission
-flow applies.
+Not wired into `.claude/settings.json`, not used by any renmark dispatch
+path.
+
+Implements Claude Code's `PreToolUse` hook contract. Reads a single JSON
+payload from stdin describing a proposed tool call, resolves the acting
+agent profile from `renmark/subagent_profiles.py` (via the hypothetical
+`renmark_role` payload field, falling back to `code-implementer` when
+absent), and prints an `allow` / `deny` decision for:
+
+- `Write` / `Edit` calls whose `file_path` does, or does not, match that
+  profile's `allowed_targets` globs.
+- `Bash` calls whose extracted command name does, or does not, appear in
+  that profile's `allowed_commands` tuple (empty tuple = no restriction).
+
+Any other tool call, or malformed input, is passed through silently (no
+decision) so normal permission flow applies.
 """
 
 from __future__ import annotations
@@ -61,10 +71,51 @@ def main() -> None:
     tool_name = payload.get("tool_name")
     tool_input = payload.get("tool_input")
 
-    if tool_name not in ("Write", "Edit"):
+    role = payload.get("renmark_role") or "code-implementer"
+    profile = PROFILES.get(role, PROFILES["code-implementer"])
+
+    if tool_name not in ("Write", "Edit", "Bash"):
         sys.exit(0)
 
     if not isinstance(tool_input, dict):
+        sys.exit(0)
+
+    if tool_name == "Bash":
+        command = tool_input.get("command")
+        if not isinstance(command, str) or not command.strip():
+            sys.exit(0)
+
+        allowed_commands = profile.allowed_commands
+        if not allowed_commands:
+            sys.exit(0)
+
+        first_token = command.strip().split()[0]
+        command_name = Path(first_token).name
+
+        if command_name in allowed_commands:
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                    "permissionDecisionReason": (
+                        f"command '{command_name}' matches {role} "
+                        "allowed_commands"
+                    ),
+                }
+            }
+        else:
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"command '{command_name}' not in {role} "
+                        f"allowed_commands: {allowed_commands}"
+                    ),
+                }
+            }
+
+        print(json.dumps(output))
         sys.exit(0)
 
     file_path = tool_input.get("file_path")
@@ -74,7 +125,7 @@ def main() -> None:
     cwd = tool_input.get("cwd") or payload.get("cwd")
     relative_path = _make_relative(file_path, cwd)
 
-    allowed_targets = PROFILES["code-implementer"].allowed_targets
+    allowed_targets = profile.allowed_targets
     globs = [g.strip() for g in allowed_targets.split(",") if g.strip()]
 
     matched = any(fnmatch.fnmatch(relative_path, glob) for glob in globs)
@@ -85,7 +136,7 @@ def main() -> None:
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "allow",
                 "permissionDecisionReason": (
-                    "path matches code-implementer allowed_targets"
+                    f"path matches {role} allowed_targets"
                 ),
             }
         }
@@ -95,7 +146,7 @@ def main() -> None:
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
                 "permissionDecisionReason": (
-                    "path does not match code-implementer allowed_targets: "
+                    f"path does not match {role} allowed_targets: "
                     f"{allowed_targets}"
                 ),
             }
