@@ -687,6 +687,67 @@ def check_capability_envelope(
         )
 
 
+# ── Inspector lens selection: which falsification perspective to apply ───────
+#
+# This answers a different question than everything above.  ``justify_task``
+# decides whether a subagent is warranted at all; ``validate_r008_dispatch``
+# checks a dispatch's required fields; ``check_capability_envelope`` decides
+# which controls are actually ENFORCED for what a Worker may touch.
+# :func:`resolve_lens_for` answers none of that — it picks which falsification
+# perspective an *Inspector* (the independent reviewer, not the Worker) should
+# apply when assessing a Work Result.  Same orbit, deliberately NOT wired into
+# ``check_capability_envelope`` and NOT the same function as, nor a caller of,
+# ``cost.requires_escalation`` — that decides model-tier escalation, this
+# decides review perspective.  A future reader should not try to merge them;
+# they answer different questions and are kept as separate, self-contained
+# table+function pairs, mirroring ``ENVELOPE_CONTROL_STATUS``/``control_status``
+# above.
+
+LensName = str
+
+#: The lens vocabulary named in the original proposal (survey.md Requirement 5:
+#: "maintainer lens", "skeptical user", "competitor lens").
+LENS_NAMES: tuple[str, ...] = ("maintainer", "skeptical_user", "competitor")
+
+
+def resolve_lens_for(work_order: Any) -> str:
+    """Return the falsification lens an Inspector should apply for *work_order*.
+
+    Duck-typed on ``work_order`` — reads ``getattr(work_order, "risk_tier",
+    None)`` and ``getattr(work_order, "file_scope", None)`` — never assumes a
+    real ``ledger.WorkOrder`` instance, so this module never needs to import
+    ``ledger`` at module import time.
+
+    Policy:
+      - ``risk_tier in ("high", "critical")`` → ``"skeptical_user"`` (an
+        outside adversarial read is warranted at elevated risk).
+      - ``risk_tier == "medium"`` and ``file_scope`` touches more than one
+        file → ``"competitor"`` (cross-file changes benefit from a
+        rival-implementation read).
+      - everything else, including ``risk_tier in (None, "low")`` or any
+        malformed/missing input → ``"maintainer"`` (the default, lowest-cost
+        lens).
+
+    Never raises: on ``None``, a missing ``risk_tier``, or any malformed
+    input, degrades to the safe default ``"maintainer"``.
+    """
+    try:
+        risk_tier = str(getattr(work_order, "risk_tier", None) or "").strip().lower()
+        if risk_tier in ("high", "critical"):
+            return "skeptical_user"
+        if risk_tier == "medium":
+            file_scope = getattr(work_order, "file_scope", None)
+            try:
+                scope_len = len(file_scope) if file_scope is not None else 0
+            except Exception:
+                scope_len = 0
+            if scope_len > 1:
+                return "competitor"
+        return "maintainer"
+    except Exception:
+        return "maintainer"
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI: ``python -m renmark.subagent_gate <plan.md>``.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 8 task 3 (governed-orchestration-assurance) — resolve_lens_for policy
+**Request:** Task 3 of 8, Release 8 — a new, separate policy function selecting a falsification lens for Inspector review, distinct from capability-envelope enforcement.
+**Built:** `LENS_NAMES = ("maintainer", "skeptical_user", "competitor")` (grounded in the original proposal's Requirement 5 vocabulary, per `survey.md`). `resolve_lens_for(work_order) -> str` — duck-typed, never raises, defaults to `"maintainer"`. Policy: `risk_tier in ("high", "critical")` → `skeptical_user`; `risk_tier == "medium"` with multi-file scope → `competitor`; everything else → `maintainer`. Explicitly documented as separate from `check_capability_envelope` and `cost.requires_escalation` — different concerns, not to be merged. 49/49 subagent_gate tests pass.
+**Files changed:**
+- `renmark/subagent_gate.py` — resolve_lens_for + LENS_NAMES.
+**Do not change:**
+- Do not wire `resolve_lens_for` into `check_capability_envelope` or `cost.requires_escalation` — capability envelope governs what a Worker may touch; lens selection governs Inspector review perspective. Different concerns.
+
 ## [2026-08-05] — feat: rethink Release 8 task 2 (governed-orchestration-assurance) — RiskTier + v3 classifier
 **Request:** Task 2 of 8, Release 8 — code the Owner-approved v3 risk-tier rule (v2 + 4 named fixes) as `renmark.ledger.classify_risk_tier`.
 **Built:** `RISK_TIERS = ("low", "medium", "high", "critical")` (mirrors `VERDICTS`'s plain-tuple style). `classify_risk_tier(work_order) -> str` implementing v3: test-check before the hard-complexity short-circuit (fixes the re-spike's branch-order bug), `renmark/lifecycle.py` added to the critical-module set, `plugin/skills/.shared/*.md` exempted from the doc floor alongside `SKILL.md`, and the medium-floor over-classification kept deliberately (documented as fail-safer, not a bug). Never raises — degrades to `"low"` on malformed input. `InspectionReport.risk_tier`/`.lens` added (additive, optional); `VERDICTS`/`verdict` untouched. 23/23 ledger tests pass.
