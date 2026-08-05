@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-08-05T05:09:01+00:00
-source_sha: 6d6bf8c110fefba56eb140da1ded6c49fb72a97c
+created_at: 2026-08-05T05:23:36+00:00
+source_sha: c0beedb8bd227620dc6aa1c3f035c753f1de3f9b
 related_plan: null
 generator: renmark-audit
 stale_after: null
@@ -39,7 +39,7 @@ schema_compliance: true
 | init | meta | aux | 2 | 251 | Use for the Project Setup pipeline (/renmark:init) to adopt renmark into a repo … |
 | inventory | audit | aux | 2 | 68 | Use to harvest a flat inventory of every renmark command and skill — typed as /r… |
 | loop | build | pipeline | 2 | 275 | Use when the user wants a bounded agentic loop toward a verifier — typed as /ren… |
-| orchestrate | build | pipeline | 2 | 474 | Use to execute a renmark plan — `/renmark:orchestrate` or \"execute the plan\", … |
+| orchestrate | build | pipeline | 2 | 476 | Use to execute a renmark plan — `/renmark:orchestrate` or \"execute the plan\", … |
 | plan | build | pipeline | 2 | 291 | Use when the user has a spec and wants it decomposed into an executable task lis… |
 | prd | build | pipeline | 2 | 195 | Use when the user wants to author or maintain the project's Product Requirements… |
 | resume | meta | aux | 2 | 276 | Use after /clear or /compact, or at the start of a fresh session, to discover wh… |

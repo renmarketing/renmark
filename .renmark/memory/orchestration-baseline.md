@@ -154,3 +154,123 @@ work, sends detailed worker context into the orchestrator, or weakens
 verification/completion/recovery behavior — unless the Owner grants an
 explicit, evidence-backed exception with a documented benefit and a rollback
 path.
+
+## REQ-30 overhead measurement — 2026-08-05
+
+Re-mines the four REQ-30 scenarios fresh against disk state as of this date,
+cross-checked against `.renmark/plans/refs/2026-08-05-release-7-measurement-notes.md`
+(planning-time notes for the same task). All queries below were re-run
+independently rather than copied from that file, and matched it exactly
+everywhere a live re-check was possible — no drift found. **No fresh
+pipeline was invoked; this is mining only**, per this file's existing rule.
+
+### (1) Rethink — `governed-orchestration-assurance`, Releases 1-6
+
+| Metric | Value |
+|---|---|
+| Dispatch count (plan files) | 26 tasks across Releases 1-6: release-1: 2, release-2: 1, release-3: 5, release-4: 6, release-5: 3, release-6: 9. |
+| Executor mix (plan files) | codex×9, haiku×3, opus×2, sonnet×12 (`grep -oh 'executor:\*\* [a-z]*' .renmark/plans/2026-08-0[4-5]-governed-orchestration-assurance-release-[1-6].plan.md \| sort \| uniq -c`). |
+| Token spend (`task-runs.jsonl`, `ts >= 2026-08-04`) | 2 rows, both sonnet, both `measured: false` (`source: local-observed`): task 2 = 10,000 tokens, task 1 = 11,800 tokens. Total 21,800 tokens, **unmeasured** — not a real per-token trace. No `codex` rows carry tokens anywhere in this log; codex stays token-blind (confirmed again, same gap as the 2026-08-02 audit). |
+| Ledger coverage (`.renmark/ledger/events.jsonl`) | 24 total rows, dated 2026-08-02 through 2026-08-05: 7 `work_order`, 7 `work_result` (all `status: complete`), 7 `inspection_report` (all `verdict: pass`), 3 `escalation` (all `reason: needs_agent`). This is materially fewer than the 26 planned tasks — a **ledger-coverage gap** (not every dispatch is ledgered), consistent with the reference notes' framing. |
+| Owner-gate count | Exactly 1: Stage 9 Execution Gate, `.renmark/rethink/governed-orchestration-assurance/roadmap.md` "## Execution Gate — decision (2026-08-04)" (single `AskUserQuestion` approval covering Releases 1+). `.renmark/state/delivery.json`'s `provenance_events` — 12 total, 0 with `ts >= 2026-08-04` — confirms zero additional routine per-work-package gates since, consistent with `feedback_wp_progression_no_gate`. |
+| Git evidence of completion | `git log --oneline --since=2026-08-04` shows real checkpoint/completion commits for Releases 1-6, ending in `7db717a` ("Release 6 — verification artifact") and `e03a8c3` ("Release 6 done, advance current_stage_id to Release 7") — **newer than the reference notes' `1d6787b` endpoint**, i.e. Release 6 has since closed. Release 7 is in flight (this task is part of it). |
+
+**This is still a Releases 1-6 partial total, not a closed Rethink-scenario
+run** — Release 7 (and any further releases in the 16-release sequence named
+at Stage 9) has not yet completed.
+
+### (2) Feature/Fix
+
+No fresher `measured: true` rows were found in `task-runs.jsonl` postdating
+the existing 502,107-token `orchestration-baseline-controls` capture (checked
+fresh: zero `measured: true` rows with `ts >= 2026-08-04`). One newer
+`feature-runs.jsonl` entry exists — `renmark-artifact-lifecycle`
+(`ts: 2026-08-04T18:41:35Z`, `status: completed`, `branch_disposition:
+merged-deleted`) — but its `token_cost` field is `{}` (empty), so it carries
+**no token figure to supersede or add to** the existing capture. The
+502,107-token figure (haiku 173,631 / sonnet 278,389 / opus 50,087, 12
+`measured: true` rows) is carried forward **unchanged**, with its existing
+"different feature" caveat intact (it belongs to `orchestration-baseline-
+controls`, not to whichever feature triggers a future REQ-30 comparison run).
+
+### (3) Orchestrate
+
+No data newer than the 2026-08-02 audit (M2 milestone, R-0.2, R-0.3) was
+found. A filesystem sweep for files newer than the audit and matching
+`*orchestrat*` surfaced only: this baseline file itself, Rethink plan/handoff
+files for `governed-orchestration-assurance` (which use the orchestrate
+*engine* internally but are Rethink-scenario data, already captured under
+(1) above, not a distinct Orchestrate-scenario record), and the
+`orchestration-baseline-controls` plan/report files (already reflected in
+(2) above). The Orchestrate row is carried forward **unchanged** from the
+2026-08-04 capture.
+
+### (4) Start
+
+Reconfirmed `unknown`. The one `renmark:start` string hit found on a
+freshness sweep (`.renmark/state/handoffs/2026-08-04-governed-orchestration-
+assurance-release-1-task-2.brief.md:14`) is an instruction telling that
+task's executor *not* to invoke `/renmark:start` — not an actual invocation
+record. No qualifying `/renmark:start` run exists anywhere in
+`.renmark/analytics/`, `.renmark/plans/`, or `.renmark/state/`.
+
+### AGENT_OVERHEAD_TOKENS drift check
+
+`renmark/cost.py:83` (`AGENT_OVERHEAD_TOKENS: int = 10_000`) and
+`renmark/roadmap.py:38` (`AGENT_OVERHEAD_TOKENS = 10_000`) are **unchanged**
+since the `ORCHESTRATION-BASELINE-2026-08` pin (`d9cccc5`, 2026-08-02):
+`git log -p --since="2026-08-02" -- renmark/cost.py renmark/roadmap.py`
+produces zero hits on `AGENT_OVERHEAD_TOKENS`. No drift.
+
+### Overhead vs. pin — honest assessment
+
+A full like-for-like measured comparison against the `10,000`-token
+per-dispatch overhead pin is **not computable from what's on disk**, for two
+structural reasons, not lack of effort:
+
+1. **The pin predates any numeric baseline.** `AGENT_OVERHEAD_TOKENS` was set
+   at the `d9cccc5` pin commit (2026-08-02) before this file recorded a
+   single real token figure (the first `measured: true` data landed the same
+   day, via `orchestration-baseline-controls`). There is no "before" state to
+   diff the constant against — only what has been captured since.
+2. **Codex — 9 of the 26 Rethink dispatches (35%), and an unknown share of
+   Feature/Fix and Orchestrate dispatches historically — never surfaces
+   tokens.** Any aggregate "actual vs. `10,000` pin" percentage computed only
+   from the sonnet/haiku/opus rows that do report tokens would silently
+   undercount total real spend and misrepresent itself as a full-system
+   figure. Naming this gap plainly is preferable to a fabricated blended
+   percentage.
+
+**What partial comparison IS computable:** the two Rethink task-run rows
+that do carry (unmeasured, `local-observed`) totals are 10,000 and 11,800
+tokens against a 10,000-token pin — i.e. one dispatch landed exactly at the
+pin and one landed ~18% over it, on a sample of 2 non-codex dispatches out
+of 26 total. This is too small a sample (2 of 26, both sonnet, both
+self-reported rather than provider-measured) to support any claim about
+whether the pin is well-calibrated system-wide.
+
+**Recommended overhead-budget line for the REQ-30 PRD amendment:** *"The
+`AGENT_OVERHEAD_TOKENS = 10,000` pin has zero measured drift since
+`d9cccc5` (2026-08-02) and is confirmed unchanged as of 2026-08-05, but
+remains unvalidated against real per-dispatch spend for ~35% of dispatch
+volume (codex) because codex does not surface token counts; any REQ-30
+comparison must either (a) restrict its "actual vs. pin" claim explicitly to
+non-codex executors, disclosing the excluded share, or (b) treat codex
+dispatches as a documented `unknown`-cost line item rather than assuming
+they track the pin — closing this gap requires new codex-side
+instrumentation, not a config change to the constant itself."*
+
+**Provenance.** Sources read/re-run fresh, 2026-08-05: `.renmark/plans/2026-
+08-0[4-5]-governed-orchestration-assurance-release-[1-6].plan.md` (executor
+grep), `.renmark/analytics/task-runs.jsonl` (post-2026-08-04 row scan),
+`.renmark/analytics/feature-runs.jsonl` (post-2026-08-04 row scan),
+`.renmark/ledger/events.jsonl` (full kind/status/verdict tally),
+`.renmark/state/delivery.json` (`provenance_events` freshness check),
+`.renmark/rethink/governed-orchestration-assurance/roadmap.md` (Execution
+Gate section), `git log --oneline --since=2026-08-04`, `git log -p
+--since=2026-08-02 -- renmark/cost.py renmark/roadmap.py`, `renmark/cost.py`,
+`renmark/roadmap.py`, and a `find -newer` freshness sweep for Orchestrate/
+Start scenario data. Cross-checked against, and found consistent with,
+`.renmark/plans/refs/2026-08-05-release-7-measurement-notes.md`. No fresh
+pipeline invocation; no fabricated or estimated figures — every number above
+traces to a specific file/command cited inline.

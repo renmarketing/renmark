@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — docs: rethink Release 7 task 1 (governed-orchestration-assurance) — REQ-30 overhead measurement
+**Request:** Task 1 of 1, Release 7 — mine real current per-dispatch overhead numbers across the 4 representative scenarios, honestly compared against the pinned ORCHESTRATION-BASELINE-2026-08.
+**Built:** New `## REQ-30 overhead measurement — 2026-08-05` section in `.renmark/memory/orchestration-baseline.md`. Rethink Releases 1-6 re-measured (26 tasks, executor mix codex9/haiku3/opus2/sonnet12, 24 ledger rows, 0 fresh Owner gates beyond Stage 9). Feature/Fix and Orchestrate carried forward unchanged (no fresher data). Start reconfirmed unknown. `AGENT_OVERHEAD_TOKENS=10,000` confirmed unchanged since the `d9cccc5` pin — no drift. Honest finding: a full like-for-like measured comparison against the pin isn't computable (the pin predates any numeric baseline; codex stays token-blind for ~35% of Rethink dispatches) — named as a real gap, no fabricated percentage. One recommended overhead-budget line written for the REQ-30 PRD amendment to cite. `PRD.md` untouched — out of scope for this task, amended separately via `/renmark:prd`'s own UPDATE gate.
+**Files changed:**
+- `.renmark/memory/orchestration-baseline.md` — new measurement section.
+**Do not change:**
+- Do not fabricate a like-for-like overhead percentage against the `d9cccc5` pin — the gap is real and must stay honestly named, not papered over.
+**Process note:** this dispatch's pre-dispatch `check_capability_envelope` call (the enforcement wired in Release 6, its first live use) caught a genuine plan mis-assignment — the plan assigned role `researcher` (`allowed_targets: .renmark/research/**/*.md`) for a task targeting `.renmark/memory/orchestration-baseline.md`, outside that role's scope. Corrected to `docs-editor` (`**/*.md`) before dispatch, which passed clean.
+
 ## [2026-08-05] — feat: rethink Release 6 task 9 (governed-orchestration-assurance) — enforcement wired into the live orchestrate flow, Release 6 complete
 **Request:** Task 9 of 9, Release 6 — the task that actually makes tasks 1-8's enforcement code reachable from real dispatches.
 **Built:** `plugin/skills/orchestrate/SKILL.md`'s "Host-agent dispatch shape" now calls `build_host_dispatch_plan_with_scope` instead of `build_host_dispatch_plan`, with a pre-dispatch `check_capability_envelope` denial check (command/spend_timeout dimensions) before any Agent/spawn_agent call. The "3c. Run verifier per task" step now calls `enforce_host_agent_dispatch_scope` post-commit for any scoped Claude Code dispatch, downgrading to FAIL on `WaveScopeViolationError` with the violation surfaced verbatim — never silently swallowed. No new Owner gate added; Layer-B (`fast_path.verify_worker_scope`) stays the authoritative post-action check on both hosts. No step renumbering, no other section touched. Full suite: 2007 passed, 31 skipped.
