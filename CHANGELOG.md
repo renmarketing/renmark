@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 12 task 3 (governed-orchestration-assurance) — hygiene.py 7-way categorization + failure-rule review sweep
+**Request:** Task 3 of 5, Release 12 — extend `hygiene.py` toward the proposal's 7-way category split, and surface Release 10's `failure_rules_due_for_review` in hygiene output.
+**Built:** `SEVEN_WAY_CATEGORIES`/`categorize_seven_way`/`compute_seven_way_report` map all 14 `ARTIFACT_REGISTRY` entries into 7 categories (verified 14-in/14-out, no drops/dupes). `budget` subcommand gains a non-breaking `CATEGORIES` line; `scan`/`all` gain a `FAILURE-RULES due_for_review=<n>` line (read-only, never mutates rule status, degrades to 0 on any error). 24/24 hygiene tests pass; `context.py` and existing registry/deletion logic untouched.
+**Files changed:**
+- `renmark/hygiene.py` — 7-way categorization + review-sweep surfacing.
+**Do not change:**
+- The review sweep is read-only surfacing only — never call `activate_failure_rule`/mutate `status`/`review_after` from hygiene.
+**Deferred, not fixed here:** live `scan` against this repo's real `.renmark/` tree crashes in `summary.is_stale` on a naive-vs-aware datetime compare — confirmed pre-existing (reproduced on `main` via git stash before this diff), logged to `bugs.md`, out of scope for this additive-only task.
+
 ## [2026-08-05] — docs: rethink Release 12 tasks 1+2 (governed-orchestration-assurance) — state-fragmentation spike + canonical-homes fix
 **Request:** Tasks 1 and 2 of 5, Release 12 — confirm whether CLAUDE.md's documented state-file set is stale relative to what actually exists on disk, and correct it if so.
 **Built:** Spike confirmed CLAUDE.md's "Canonical homes" list was stale — 6 categories already governed by `hygiene.py`'s `ARTIFACT_REGISTRY` and live on disk (`analytics`, `ledger`, `reports`, `rethink`, `roadmap`, `version`) were undocumented. Fixed with a single-sentence, narrow append (not a rewrite) to both `CLAUDE.md` and `AGENTS.md`'s identical "Canonical homes:" list, mirrored in the same commit per this repo's own mirror rule. `.renmark/memory/failure_rules.jsonl` (Release 10) confirmed already covered by the existing `memory→.renmark/memory/` bullet — no separate entry needed.

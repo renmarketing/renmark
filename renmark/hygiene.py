@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from renmark import lifecycle, memory, schemas, summary
+from renmark import lifecycle, memory, recurrence, schemas, summary
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -104,6 +104,105 @@ ARTIFACT_REGISTRY: tuple[ArtifactTypeSpec, ...] = (
 # Top-level names under .renmark/ that are never registry-governed content.
 _REGISTRY_SKIP_TOP_DIRS: frozenset[str] = frozenset({"archive", "logs"})
 _REGISTRY_SKIP_TOP_FILES: frozenset[str] = frozenset({"config.json", "README.md"})
+
+
+# ── 7-way categorization (additive reporting only — REQ-proposal) ──────────
+#
+# Pure additive view over ARTIFACT_REGISTRY: maps each existing registry
+# entry onto one of 7 higher-level proposal categories. Does not add
+# registry entries, does not change art_class/budget/owner on the existing
+# ArtifactTypeSpec tuples, and does not touch context.py.
+
+SEVEN_WAY_CATEGORIES: tuple[str, ...] = (
+    "stable_preferences",
+    "canonical_artifacts",
+    "lifecycle_state",
+    "bounded_task_context",
+    "failure_rule_registry",
+    "receipts",
+    "ephemeral_conversation",
+)
+
+# Explicit name -> category mapping for every current ARTIFACT_REGISTRY
+# entry. "failure_rule_registry" is intentionally absent here: no registry
+# entry is backed by it (the "memory" entry's glob is memory/*.md, which
+# never matches memory/failure_rules.jsonl) — see compute_seven_way_report
+# for how that file is surfaced instead.
+_SEVEN_WAY_BY_NAME: dict[str, str] = {
+    "memory": "stable_preferences",
+    "plans": "canonical_artifacts",
+    "reviews": "canonical_artifacts",
+    "specs": "canonical_artifacts",
+    "rethink": "canonical_artifacts",
+    "roadmap": "canonical_artifacts",
+    "version-zip": "canonical_artifacts",
+    "state-live": "lifecycle_state",
+    "state-scratch": "bounded_task_context",
+    "ledger": "receipts",
+    "reports": "receipts",
+    "audits": "receipts",
+    "debug": "ephemeral_conversation",
+    "version-unpacked": "ephemeral_conversation",
+}
+
+# The failure-rule registry file itself is not enumerated by any
+# ArtifactTypeSpec glob (see above) — it is surfaced as a synthetic name in
+# compute_seven_way_report when present on disk.
+_FAILURE_RULES_ARTIFACT_NAME = "failure_rules"
+
+
+def categorize_seven_way(spec: ArtifactTypeSpec) -> str:
+    """Map one ``ARTIFACT_REGISTRY`` entry onto a 7-way proposal category.
+
+    Pure/additive: reads ``spec.name``/``art_class``/``owner`` only, never
+    mutates the spec and never touches ``context.py``. Every current
+    registry entry is covered by ``_SEVEN_WAY_BY_NAME``; the fallback below
+    only applies to a hypothetical future entry not yet mapped explicitly,
+    so this never raises.
+    """
+    category = _SEVEN_WAY_BY_NAME.get(spec.name)
+    if category is not None:
+        return category
+    if spec.owner == "memory":
+        return "stable_preferences"
+    if spec.art_class == "canonical-evidence":
+        return "canonical_artifacts"
+    if spec.art_class == "active-context":
+        return "lifecycle_state"
+    if spec.art_class == "ephemeral" and spec.owner == "dispatch":
+        return "bounded_task_context"
+    if spec.owner in ("ledger", "reports", "audit"):
+        return "receipts"
+    return "ephemeral_conversation"
+
+
+def compute_seven_way_report(repo: Path) -> dict[str, list[str]]:
+    """Category name -> list of registry ``name``s in it, plus the
+    synthetic ``failure_rules`` entry under ``failure_rule_registry`` when
+    ``.renmark/memory/failure_rules.jsonl`` exists on disk. Read-only,
+    additive; does not touch ``ARTIFACT_REGISTRY`` or ``context.py``."""
+    repo = Path(repo)
+    report: dict[str, list[str]] = {cat: [] for cat in SEVEN_WAY_CATEGORIES}
+    for spec in ARTIFACT_REGISTRY:
+        report[categorize_seven_way(spec)].append(spec.name)
+    failure_rules_path = repo / ".renmark" / "memory" / "failure_rules.jsonl"
+    if failure_rules_path.exists():
+        report["failure_rule_registry"].append(_FAILURE_RULES_ARTIFACT_NAME)
+    return report
+
+
+def _failure_rules_due(repo: Path) -> int:
+    """Count of active failure rules due for review — read-only surfacing.
+
+    Never calls ``activate_failure_rule`` and never changes a rule's
+    ``status``/``review_after``. Wrapped defensively: the recurrence module
+    or the underlying file may not exist in every repo state, and this must
+    never cause hygiene to raise.
+    """
+    try:
+        return len(recurrence.failure_rules_due_for_review(repo))
+    except Exception:
+        return 0
 
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -679,6 +778,9 @@ def main(argv: list[str] | None = None) -> int:
                 f"BUDGET  {entry.name}  count={entry.count}/{cap_count}  "
                 f"bytes={entry.total_bytes}/{cap_bytes}  status={entry.status}"
             )
+        seven_way = compute_seven_way_report(repo)
+        categories_line = "  ".join(f"{cat}={len(seven_way[cat])}" for cat in SEVEN_WAY_CATEGORIES)
+        print(f"CATEGORIES  {categories_line}")
         return 0
 
     if sub == "validate":
@@ -709,6 +811,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         # prune-only invocation still wants a header line.
         print(f"HYGIENE  mode={mode_label}  scanned=0  archived=0  kept=0  ghost_refs=0")
+
+    if run_scan:
+        print(f"FAILURE-RULES  due_for_review={_failure_rules_due(repo)}")
 
     if prune_report is not None:
         files_csv = ",".join(n.removesuffix(".md") for n in prune_report.files_touched)

@@ -50,6 +50,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ## Fixed
 
+### 2026-08-05 — summary.is_stale crashes on naive-vs-aware datetime compare against this repos real .renmark tree
+
+**Severity:** medium
+**Symptom:** Running renmark.hygiene.py scan against this live repo crashes inside summary.is_stale on a naive-vs-aware datetime comparison. Reproduced as pre-existing (not introduced by Release 12 task 3s hygiene.py changes) via git stash + re-run on main before the diff.
+**Root cause:** (unconfirmed, not investigated in depth) summary.is_stale likely compares a timezone-naive datetime.now() or similar against a timezone-aware timestamp parsed from an artifacts stale_after/created_at metadata field (or the reverse), which raises TypeError: can not compare offset-naive and offset-aware datetimes in Python.
+**Fix:** (pending) route through /renmark:debug to reproduce with a real traceback and fix summary.is_stale to normalize both operands to the same awareness (prefer UTC-aware throughout, matching this programs own established convention in recurrence.py/ledger.py).
+**Lesson:** Found via live dogfooding of Release 12s hygiene.py extension -- the additive change itself is correct and isolated, but running it against the real repo surfaced a genuine pre-existing defect in a function outside this releases scope. Logged rather than silently fixed inline, per this programs own out-of-scope-finding convention.
+
+---
+
 ### 2026-08-05 — docs-editor allowed_targets glob (**/*.md) never matches root-level .md files
 
 **Severity:** medium
