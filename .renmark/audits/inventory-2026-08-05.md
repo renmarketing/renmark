@@ -1,8 +1,8 @@
 ---
 artifact_type: audit
 schema_version: 1
-created_at: 2026-08-05T16:54:41+00:00
-source_sha: eff47f328038f00c74b52f63aa74ce6a3f9c3adf
+created_at: 2026-08-05T17:31:58+00:00
+source_sha: 92c3c6c2c4fe5bb72e0857ccfb7c7eb0adc9ed6f
 related_plan: null
 generator: renmark-audit
 stale_after: null

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 10 task 3 (governed-orchestration-assurance) — subagent_gate.py consumes active FailureRules
+**Request:** Task 3 of 5, Release 10 — a fourth independent pre-dispatch check consuming only `active` FailureRules, alongside (not replacing) the existing three checks.
+**Built:** `FailureRuleVerdict` + `check_failure_rule_constraints(repo, applicability, host=...)` — matches only `status == "active"` rules via case-insensitive whitespace-token overlap; `proposed`/`deprecated` never match. `apply_failure_rule_constraints` returns a new dict (never mutates in place) for attaching to `WorkOrder.constraints`. Neither function composes prompt text — `dispatch.build_subagent_input` stays the sole prompt-composition path. 54/54 subagent_gate tests pass.
+**Files changed:**
+- `renmark/subagent_gate.py` — 4th pre-dispatch check.
+**Do not change:**
+- A `proposed` or `deprecated` FailureRule must never match at dispatch time — only `active` rules are load-bearing.
+
 ## [2026-08-05] — feat: rethink Release 10 task 2 (governed-orchestration-assurance) — FailureRule registry
 **Request:** Task 2 of 5, Release 10 — the core `FailureRule` registry: types, lifecycle, dedup/contradiction detection, review-date surfacing, and a read-only `durable_guard` evidence bridge.
 **Built:** `FailureRule`/`FailureRuleEnforcement`/`RuleConflict` frozen dataclasses. Storage at `.renmark/memory/failure_rules.jsonl` (curated/versioned, own lock/state pair — distinct from `recurrences.json`'s gitignored runtime state). `load_failure_rules`, `propose_failure_rule`/`activate_failure_rule`/`deprecate_failure_rule` (forward-only lifecycle, raises on unknown id or illegal transition — no silent no-op), `detect_failure_rule_conflicts` (pure, flags never auto-resolves), `failure_rules_due_for_review` (read-only), `durable_guard_seed_candidates` (read-only bridge into `recurrences.json`, never mutates it). REQ-24's existing functions/schema fully unchanged — verified via full pytest run. 11/11 recurrence tests + full suite (2038 passed) green, ruff clean.

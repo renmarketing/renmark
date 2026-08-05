@@ -27,10 +27,12 @@ The 4 questions (deterministic-first.md), answered mechanically where possible:
 from __future__ import annotations
 
 import fnmatch
+import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from renmark import cost, subagent_profiles
+from renmark import cost, recurrence, subagent_profiles
 
 # Complexity labels that, on their own, justify a subagent (Q4).
 _SUBAGENT_JUSTIFYING_COMPLEXITY: frozenset[str] = frozenset({"hard", "medium"})
@@ -409,6 +411,10 @@ def enforce_r008_dispatch(dispatch_spec: Any, *, strict: bool = False) -> list[s
 # and decides on the combined result; keeping them independent means a caller
 # that only needs one does not pay for the other two, and adding a control
 # dimension here never perturbs the justification or R-008 verdicts.
+# A fourth, equally independent check, :func:`check_failure_rule_constraints`,
+# joins this same funnel further below — it answers "does any active,
+# curated failure rule constrain this dispatch's applicability" and likewise
+# calls none of the other three.
 #
 # The honesty requirement is the point of this table: a ``passed=True`` on a
 # dimension whose status is ``"advisory"``, ``"unsupported"``, or
@@ -685,6 +691,131 @@ def check_capability_envelope(
                 reason="gate could not classify — review before dispatch",
             ),
         )
+
+
+# ── Failure-rule constraints: does an active curated rule bind this dispatch ─
+#
+# A fourth, independent, zero-LLM, pure, never-raising check — a peer of
+# ``justify_task``, ``validate_r008_dispatch``, and ``check_capability_envelope``
+# in the same pre-dispatch funnel, calling none of them.  It answers "does any
+# ACTIVE curated failure rule (``renmark.recurrence.load_failure_rules``)
+# constrain the applicability this dispatch is asking for" — a ``proposed`` or
+# ``deprecated`` rule is never matched, only ``status == "active"``.
+
+
+@dataclass(frozen=True)
+class FailureRuleVerdict:
+    """The failure-rule-constraint verdict for one dispatch's applicability.
+
+    Same non-raising verdict-shape convention :class:`SubagentVerdict` /
+    :class:`EnvelopeVerdict` already use in this file. ``challenge`` is
+    non-None (and names each matched rule's ``rule_id`` + ``prohibited_failure``)
+    when one or more active rules match; ``reason`` always names the matched
+    ``rule_id``(s) when any exist, never a bare summary with no id.
+    """
+
+    passed: bool
+    matched_rule_ids: tuple[str, ...]
+    challenge: str | None
+    reason: str
+
+
+def check_failure_rule_constraints(
+    repo: str | os.PathLike[str], applicability: str, *, host: str = "claude"
+) -> FailureRuleVerdict:
+    """Check *applicability* against the repo's ACTIVE curated failure rules.
+
+    Matches a rule when its ``applicability`` string and the caller's
+    ``applicability`` argument share at least one case-insensitive
+    whitespace-split token — simple, deterministic keyword overlap, no fuzzy
+    matching, no LLM call. Only ``status == "active"`` rules are ever matched;
+    a ``proposed`` or ``deprecated`` rule is never matched.
+
+    **Never raises.** On any error reading the registry (missing repo,
+    malformed state, etc.) this degrades to the conservative "no constraints"
+    answer — matching this module's never-raises, safe-degrade convention —
+    rather than blocking a dispatch on a registry the gate cannot read.
+    """
+    try:
+        rules = recurrence.load_failure_rules(repo)
+    except Exception:
+        return FailureRuleVerdict(
+            passed=True,
+            matched_rule_ids=(),
+            challenge=None,
+            reason="failure-rule registry unavailable; treated as no constraints",
+        )
+
+    try:
+        caller_tokens = {tok.lower() for tok in str(applicability or "").split()}
+        matched: list[recurrence.FailureRule] = []
+        for rule in rules:
+            if rule.status != "active":
+                continue
+            rule_tokens = {tok.lower() for tok in str(rule.applicability or "").split()}
+            if caller_tokens & rule_tokens:
+                matched.append(rule)
+
+        if not matched:
+            return FailureRuleVerdict(
+                passed=True,
+                matched_rule_ids=(),
+                challenge=None,
+                reason=f"no active failure rule matches applicability={applicability!r}",
+            )
+
+        matched_ids = tuple(rule.rule_id for rule in matched)
+        challenge = "; ".join(
+            f"{rule.rule_id}: {rule.prohibited_failure}" for rule in matched
+        )
+        reason = f"matched active failure rule(s): {', '.join(matched_ids)}"
+        return FailureRuleVerdict(
+            passed=False,
+            matched_rule_ids=matched_ids,
+            challenge=challenge,
+            reason=reason,
+        )
+    except Exception:
+        return FailureRuleVerdict(
+            passed=True,
+            matched_rule_ids=(),
+            challenge=None,
+            reason="failure-rule registry unavailable; treated as no constraints",
+        )
+
+
+def apply_failure_rule_constraints(
+    existing_constraints: dict | None,
+    verdict: FailureRuleVerdict,
+    rules: Sequence[Any],
+) -> dict:
+    """Return a NEW constraints dict with matched failure rules attached.
+
+    Pure — never mutates ``existing_constraints`` in place. Populates a
+    ``"failure_rules"`` key listing, for each id in
+    ``verdict.matched_rule_ids``, a small ``{"rule_id", "required_behavior",
+    "prohibited_failure"}`` dict pulled from ``rules``. This is the function a
+    caller uses to populate ``WorkOrder.constraints`` (Release 3's placeholder
+    field) — it does not call ``dispatch.build_subagent_input`` or write
+    prompt text anywhere; the existing ``dispatch.build_subagent_input``
+    funnel remains the sole prompt-composition pathway.
+    """
+    result = dict(existing_constraints or {})
+    by_id = {getattr(rule, "rule_id", None): rule for rule in rules}
+    failure_rules: list[dict[str, str]] = []
+    for rule_id in verdict.matched_rule_ids:
+        rule = by_id.get(rule_id)
+        if rule is None:
+            continue
+        failure_rules.append(
+            {
+                "rule_id": rule.rule_id,
+                "required_behavior": rule.required_behavior,
+                "prohibited_failure": rule.prohibited_failure,
+            }
+        )
+    result["failure_rules"] = failure_rules
+    return result
 
 
 # ── Inspector lens selection: which falsification perspective to apply ───────
