@@ -14,6 +14,8 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
+- (2026-08-05, bug) **researcher role allowed_targets does not cover .renmark/rethink/** (2nd occurrence)** — Live dogfooding caught the same capability-envelope gap twice in a row (Release 7 task 1, Release 8 task 1) -- a real, systemic role/target mismatch for this repos own rethink pipeline, not a one-off plan authoring mistake. When check_capability_envelope denies a path twice for the same role across different releases, treat it as a profile-definition bug, not a per-task fix.
+
 - (2026-08-05, .renmark/reviews/2026-08-05-60d2a4c.verification.md) model `verify`: **verify-governed-orchestration-assurance-release-7-task-1** — 3/3 measurement behaviors verified; failed: none; regressions: 0; Release 7 still needs the /renmark:prd amendment step to be complete
 
 - (2026-08-05, bug) **enforce_host_agent_dispatch_scope has no bookkeeping-path allowlist** — Live dogfooding of newly-wired enforcement inside the very program building it caught a real gap on first real use: the orchestrator commit-bundling practice used throughout this whole session (task diff + CHANGELOG + plan + audits in one commit) is incompatible with a strict single-task-scope post-action check as currently written. Test enforcement logic against REAL commit shapes, not just synthetic single-file test fixtures.

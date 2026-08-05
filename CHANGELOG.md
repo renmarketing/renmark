@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — docs: rethink Release 8 task 1 (governed-orchestration-assurance) — risk-tier spike finding
+**Request:** Task 1 of 8, Release 8 — design and hand-validate a deterministic risk-tier classifier against real historical dispatches; report disagreement rate, do not decide acceptability.
+**Built:** `release-8-risk-tier-spike-finding.md` — v1 classifier rule (file_scope + fixed critical-module set + complexity) hand-validated against 20 real dispatches (Releases 1-7 plans + 2 earlier). Disagreement rate 5/20 = 25%, all under-classifications, clustered in 2 fixable causes (too-narrow critical-module list; blunt doc/config floor). A v2 fix is proposed but explicitly flagged as unvalidated/circular (fit to the same sample, not tested against a fresh set). Closing classification: **genuine Owner judgment call** — not decided by the spike, flagged for review before dispatching Release 8's schema/policy tasks (2-8).
+**Files changed:**
+- `.renmark/rethink/governed-orchestration-assurance/release-8-risk-tier-spike-finding.md` — new.
+**Do not change:**
+- Do not treat v2's proposed 0/20 disagreement rate as validated — it needs a fresh, non-overlapping sample before Task 2 codes it.
+
 ## [2026-08-05] — PRD updated: REQ-30 clause (j) + governed-orchestration-assurance overhead budget
 **Request:** Amend REQ-30 for the governed-orchestration-assurance program's Release 7 — formally name its Critical-tier gate as an allowed named gate and record a measured overhead-budget methodology, per the 2026-08-04 exception check-in decision.
 **Built:** Reconciled REQ-30 of PRD.md. New clause (j): a rethink-approved transformation program may name its own Execution-Gate-approved Critical-tier gate as an allowed named gate, scoped to that program's own releases. New "Governed-orchestration-assurance overhead budget" bullet: `AGENT_OVERHEAD_TOKENS = 10,000` has zero drift since the pin but is unvalidated for ~35% of dispatch volume (codex, token-blind); comparisons must either restrict to non-codex executors or record codex spend as `unknown`. Releases 8-16 must each demonstrate compliance before shipping. Bumped `last_reviewed` to 2026-08-05.
