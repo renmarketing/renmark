@@ -46,6 +46,45 @@ def test_create_or_reuse_task_is_idempotent_resume_reuse(tmp_path: Path):
     assert second.artifact_path == "out"
 
 
+def test_create_or_reuse_task_persists_order_id(tmp_path: Path):
+    rec = tt.create_or_reuse_task(
+        tmp_path,
+        "t1",
+        title="Do X",
+        role="sonnet",
+        scope="a",
+        verification_expectation="v",
+        order_id="run-1-3",
+    )
+    assert rec.order_id == "run-1-3"
+    assert tt.read_tasks(tmp_path)["t1"].order_id == "run-1-3"
+
+
+def test_create_or_reuse_task_keeps_original_order_id_on_resume_reuse(tmp_path: Path):
+    first = tt.create_or_reuse_task(
+        tmp_path,
+        "t1",
+        title="Do X",
+        role="sonnet",
+        scope="a",
+        verification_expectation="v",
+        order_id="run-1-3",
+    )
+    second = tt.create_or_reuse_task(
+        tmp_path,
+        "t1",
+        title="Do X again",
+        role="sonnet",
+        scope="a",
+        verification_expectation="v",
+        order_id="run-2-3",
+    )
+
+    assert first.order_id == "run-1-3"
+    assert second.order_id == "run-1-3"
+    assert tt.read_tasks(tmp_path)["t1"].order_id == "run-1-3"
+
+
 def test_lifecycle_pending_to_in_progress_to_completed(tmp_path: Path):
     tt.create_or_reuse_task(
         tmp_path, "t1", title="X", role="sonnet", scope="a", verification_expectation="v"

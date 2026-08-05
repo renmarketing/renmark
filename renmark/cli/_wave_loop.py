@@ -150,6 +150,7 @@ def _track_worker_dispatch(
     worker_task_id: str,
     parent_task_id: str,
     dispatch_identity: str,
+    order_id: str,
 ) -> None:
     """REQ-31: one native task per dispatch, reused unchanged on resume.
 
@@ -166,6 +167,7 @@ def _track_worker_dispatch(
             verification_expectation=task.verifier,
             parent_id=parent_task_id,
             dispatch_identity=dispatch_identity,
+            order_id=order_id,
         )
         _task_tracking.mark_in_progress(repo, worker_task_id)
     except Exception:
@@ -370,6 +372,7 @@ def _run_waves(
             worker_task_id=worker_task_id,
             parent_task_id=parent_task_id,
             dispatch_identity=work_result_dispatch_identity,
+            order_id=order_id,
         )
 
         ok, reason, used, sha = _get_engine()._execute_task(

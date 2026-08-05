@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — feat: rethink Release 4 tasks 2+4+6 (governed-orchestration-assurance) — order_id wiring + regression tests
+**Request:** Tasks 2, 4, 6 of 6, Release 4 — thread `order_id` through the real dispatch call site and add regression tests for both task 1's order_id binding and task 3's selector enforced mode.
+**Built:** Task 2: `_wave_loop.py`'s `_track_worker_dispatch` gains an `order_id: str` param, wired at its single call site in `_runner` using the already-computed local `order_id` (same value already passed to `_emit_work_order`/`_emit_work_result`). Task 4: `test_task_tracking.py` gains 2 tests — order_id persists through create + re-read, and resume-reuse never overwrites an existing record's order_id. Task 6: `test_interaction.py` gains 3 tests — `enforce_native=True` raises `SelectorBypassError` for the real 2026-06-14 bug shape; `enforce_native=False` (default) is unaffected; `enforce_native=True` does not raise for a legitimate fallback (single-choice) unrelated to caller suppression. Full suite green.
+**Files changed:**
+- `renmark/cli/_wave_loop.py` — order_id param + call-site wiring.
+- `tests/test_task_tracking.py` — order_id persistence + resume-reuse tests.
+- `tests/test_interaction.py` — enforced-mode regression tests.
+**Do not change:**
+- `_create_parent_task` keeps its default empty order_id — the milestone-level parent task has no corresponding per-dispatch WorkOrder.
+
 ## [2026-08-05] — feat: rethink Release 4 tasks 1+3 (governed-orchestration-assurance) — order_id binding + selector enforced mode
 **Request:** Tasks 1 and 3 of 6, Release 4 — bind task-tracker records to `WorkOrder.order_id` and add an enforced-selector mode that catches a caller suppressing an available native picker.
 **Built:** Task 1: `TaskRecord.order_id: str = ""` (new field, next to `dispatch_identity`); `create_or_reuse_task(..., order_id="")` threads it to new-record construction only — resume-reuse contract untouched, an existing record's `order_id` is never overwritten by a later call. Task 3: `interaction.SelectorBypassError(ChoiceError)` + `build_selector(..., enforce_native=False)` — when `enforce_native=True` and the caller passed `tool_available=False` while the host genuinely has a native picker (checked via a raw, un-overridden `capabilities_for` call), raises `SelectorBypassError` instead of silently falling back; every other legitimate fallback reason (single-choice, multi-option requirement, host capacity) is unaffected; default `enforce_native=False` path is byte-for-byte unchanged, preserving the roadmap's named rollback path. Named after the real 2026-06-14 "Hand-off picker not re-rendered on continuation turns" incident.

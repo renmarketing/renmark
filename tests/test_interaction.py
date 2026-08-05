@@ -8,6 +8,7 @@ from renmark.hosts import HostKind, resolve_host
 from renmark.interaction import (
     Choice,
     ChoiceError,
+    SelectorBypassError,
     build_selector,
     continue_selector,
     normalize_choices,
@@ -98,6 +99,32 @@ def test_missing_codex_selector_is_fallback_not_headless() -> None:
     assert "headless" not in result
 
 
+def test_claude_native_selector_bypass_is_rejected_when_enforced() -> None:
+    with pytest.raises(SelectorBypassError):
+        build_selector(
+            "What next?",
+            _choices(),
+            host="claude",
+            tool_available=False,
+            enforce_native=True,
+        )
+
+
+def test_claude_missing_selector_stays_in_fallback_mode_by_default() -> None:
+    result = build_selector(
+        "What next?", _choices(), host="claude", tool_available=False
+    )
+    assert result["mode"] == "fallback"
+    assert result["host"] == "claude"
+    assert result["question"] == "What next?"
+    assert result["options"] == render_numbered(_choices())
+    assert result["reason"] == "selector_unavailable"
+    assert result["page"]["count"] == 1
+    assert result["semantic"]["decision_id"] == "renmark_choice"
+    assert "Reply with the exact number, code, or label." in result["instructions"]
+    assert "headless" not in result
+
+
 @pytest.mark.parametrize("host", [None, HostKind.CLAUDE_CODE, HostKind.CODEX])
 def test_unavailable_selector_uses_runtime_resolved_host(
     host: HostKind | None,
@@ -113,6 +140,20 @@ def test_unavailable_selector_uses_runtime_resolved_host(
     assert result["host"] == resolve_host(host).value
     assert result["page"]["index"] == 0
     assert result["options"] == render_numbered(_choices())
+
+
+def test_single_choice_fallback_still_works_with_native_enforcement() -> None:
+    single_choice = (Choice("y", "Yes", "accept", recommended=True),)
+    result = build_selector(
+        "What next?",
+        single_choice,
+        host="claude",
+        enforce_native=True,
+    )
+    assert result["mode"] == "fallback"
+    assert result["reason"] == "single_choice_requires_fallback"
+    assert result["options"] == render_numbered(single_choice)
+    assert result["semantic"]["decision_id"] == "renmark_choice"
 
 
 def test_selection_accepts_reordered_number_and_code() -> None:
