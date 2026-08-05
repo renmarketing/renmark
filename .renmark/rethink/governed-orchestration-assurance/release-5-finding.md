@@ -64,3 +64,14 @@ roadmap's stated stop condition, this is a partial "proceed" — Release 6
 should proceed with the Claude Code path as designed and treat the Codex
 path as post-action-only (existing Layer-B) unless the Owner explicitly
 approves new Codex wrapper scope.
+
+---
+
+## Owner scope decision — 2026-08-05
+
+**Decision:** Proceed Claude-only. Release 6 wires real pre-action `PreToolUse`
+enforcement on Claude Code; Codex keeps its existing post-action Layer-B
+(`fast_path.verify_worker_scope`) as the backstop, with an honest
+`advisory`/`unsupported` status reported for Codex's missing pre-action
+layer — matching Release 6's own honest-per-control-status requirement.
+No new Codex wrapper work added to Release 6's scope.
