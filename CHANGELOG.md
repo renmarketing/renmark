@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-05] — docs: rethink Release 8 re-spike (governed-orchestration-assurance) — v2 fresh validation, still 25%
+**Request:** Owner-directed re-spike (the roadmap's one allowed re-spike) — validate v2's risk-tier rule against a fresh, non-overlapping sample before coding it, rather than trusting the circular 0/20 v1 reported.
+**Built:** Appended a "Re-spike — v2 fresh validation" section: 20 fresh dispatches, v2 applied as written, hand-judgment formed blind first. Fresh disagreement rate: 5/20 = 25% — same rate as v1, but different composition (3 over-classifications including a real branch-order bug; 2 new under-classifications — `renmark/lifecycle.py` missing from the critical set, `plugin/skills/.shared/*.md` fragments not covered by the pipeline-skill exception). Verdict: needs further refinement, not acceptable to code as-is — 4 concrete fixes named. Explicitly does not request a third re-spike (the roadmap's stop condition allows only one).
+**Files changed:**
+- `.renmark/rethink/governed-orchestration-assurance/release-8-risk-tier-spike-finding.md` — Re-spike section appended.
+**Do not change:**
+- Do not code v2 verbatim as scored in v1 — the 4 named fixes (branch-order, +lifecycle.py, .shared/*.md exception, accept the medium-floor trade-off) must land in Task 2's actual implementation.
+
 ## [2026-08-05] — docs: rethink Release 8 task 1 (governed-orchestration-assurance) — risk-tier spike finding
 **Request:** Task 1 of 8, Release 8 — design and hand-validate a deterministic risk-tier classifier against real historical dispatches; report disagreement rate, do not decide acceptability.
 **Built:** `release-8-risk-tier-spike-finding.md` — v1 classifier rule (file_scope + fixed critical-module set + complexity) hand-validated against 20 real dispatches (Releases 1-7 plans + 2 earlier). Disagreement rate 5/20 = 25%, all under-classifications, clustered in 2 fixable causes (too-narrow critical-module list; blunt doc/config floor). A v2 fix is proposed but explicitly flagged as unvalidated/circular (fit to the same sample, not tested against a fresh set). Closing classification: **genuine Owner judgment call** — not decided by the spike, flagged for review before dispatching Release 8's schema/policy tasks (2-8).
