@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 10/16 · task 0/6 done · current: Release 10: Failure-derived constraint registry_
+_mode: staged · Stage 11/16 · task 0/2 done · current: Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -77,17 +77,17 @@ _phases: plan → build → verify → review → release_
 - [x] Add order-randomization to pairwise/comparison calls, recorded per call
 - [x] Add InspectionReport.judge_evidence: JudgeEvidenceRef | None — Attachment, not a merge; never overrides InspectionReport.verdict.
 
-## ○ Release 10: Failure-derived constraint registry — serves AC-7 (REQ-7) **(current)**
+## ● Release 10: Failure-derived constraint registry — serves AC-7 (REQ-7)
 _phases: plan → build → verify → review → release_
 
-- [ ] Write the ADR distinguishing Req 7 (curated cross-run failure-rule registry) from REQ-24 (recurrence.py's per-run/fingerprint role) — precondition for the rest of this release — Flagged as needed 'before Release E' by prd-acceptance-map.md (Gap 4).
-- [ ] Add a genuinely new FailureRule structure inside recurrence.py (rule_id, status, trigger, applicability, required_behavior, prohibited_failure, source_evidence, enforcement, regression_test_ref, created_at, last_triggered_at, review_after) — No new top-level module. Distinct from DurableGuard/durable_guard, not a wrapper over it (Gap 4).
-- [ ] Wire recurrence.py's existing durable_guard entries as ONE input signal that can seed a FailureRule's source_evidence — Never treated as the registry itself.
-- [ ] Add dedup/contradiction detection over FailureRule entries and a review_after-driven review mechanism via /renmark:hygiene — Lifecycle: proposed -> active -> deprecated. Reuses release 12's hygiene extension point.
-- [ ] Wire subagent_gate.py to consume only status:active FailureRule entries from the pre-dispatch funnel, populating WorkOrder.constraints — Same funnel release 6 added check_capability_envelope to; consumes release 3's WorkOrder.constraints placeholder field.
-- [ ] Author 'failure-rule injection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
+- [x] Write the ADR distinguishing Req 7 (curated cross-run failure-rule registry) from REQ-24 (recurrence.py's per-run/fingerprint role) — precondition for the rest of this release — Flagged as needed 'before Release E' by prd-acceptance-map.md (Gap 4).
+- [x] Add a genuinely new FailureRule structure inside recurrence.py (rule_id, status, trigger, applicability, required_behavior, prohibited_failure, source_evidence, enforcement, regression_test_ref, created_at, last_triggered_at, review_after) — No new top-level module. Distinct from DurableGuard/durable_guard, not a wrapper over it (Gap 4).
+- [x] Wire recurrence.py's existing durable_guard entries as ONE input signal that can seed a FailureRule's source_evidence — Never treated as the registry itself.
+- [x] Add dedup/contradiction detection over FailureRule entries and a review_after-driven review mechanism via /renmark:hygiene — Lifecycle: proposed -> active -> deprecated. Reuses release 12's hygiene extension point.
+- [x] Wire subagent_gate.py to consume only status:active FailureRule entries from the pre-dispatch funnel, populating WorkOrder.constraints — Same funnel release 6 added check_capability_envelope to; consumes release 3's WorkOrder.constraints placeholder field.
+- [x] Author 'failure-rule injection' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling — serves AC-9 (REQ-9)
+## ○ Release 11: Routing-overlap spike (#18) + policy-aware dispatch scheduling — serves AC-9 (REQ-9) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Bounded 1-pass spike: read global_routing.py and codex_routing.py fully, produce a one-page overlap finding — 'No overlap, boundary is X' or 'overlap found at Y, recommend merging into Z'; a recommended merge becomes its own scoped item, not decided here.
