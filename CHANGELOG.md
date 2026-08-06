@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — PRD updated
+**Request:** Amend REQ-28 for Release 16 (final release, governed-orchestration-assurance program) — close AC-12 (Req 12)'s PRD wording gap by adding a mandatory pre-Execution-Gate independent-Inspector challenge step to `/renmark:rethink`'s nine-stage pipeline.
+**Built:** Reconciled REQ-28: inserted a new sentence between stage (h) (roadmap production) and stage (i) (Execution Gate) — an independent Inspector challenge reviews the roadmap against the PRD acceptance contract, external-benchmark findings, and modularity assessment before the Execution Gate is presented, using the existing read-only Inspector role/InspectionReport shape (extends REQ-26); the Inspector may only report findings for a bounded correction pass, never revise the roadmap itself. The Execution Gate's presented content now also includes the Inspector challenge's findings/disposition. Distinct from the 3 existing Owner approval gates — an adversarial review step, not a 4th approval gate. Bumped `last_reviewed`.
+**Files changed:**
+- `PRD.md` — REQ-28 amended.
+**Do not change:**
+- The Inspector challenge stays read-only/verdict-only — it must never gain write/repair authority over the roadmap it reviews.
+- The 3 existing Owner gates (Discovery Direction, Solution, Execution) remain the sole approval authority; the Inspector step is advisory input to the Execution Gate, not a substitute for Owner approval.
+
 ## [2026-08-06] — verify: rethink Release 15 (governed-orchestration-assurance) — 14/14 tasks verified
 **Request:** `/renmark:verify` smoke pass for Release 15.
 **Built:** Re-ran fresh: `pytest -q` (2098 passed, 32 skipped), `renmark-execute --behavior` (16/16 passed), `tests/test_behavior_ci_gating.py` (1 passed), visually confirmed the CI workflow step. Wrote `.renmark/reviews/2026-08-05-26f0fd3.verification.md`, `lifecycle.json` stage=`verified`.

@@ -448,11 +448,22 @@ first-class hosts for the same product workflow, not separate product forks.
     independently-usable, user-testable releases, each carrying PRD-traceable
     acceptance scenarios, a compatibility/rollback path, and a verification
     method — never a big-bang rewrite, and old/new components may coexist
-    temporarily; (i) an **Execution Gate** presenting that roadmap — release
-    outcomes, PRD criteria, compatibility guarantees, dependencies, migration,
-    verification, observability, rollback, and Owner acceptance scenarios —
-    and obtaining one explicit Owner approval before any target production
-    code changes or Agency execution begins. A cross-cutting **exception
+    temporarily. Before the roadmap is presented at the Execution Gate, an
+    **independent Inspector challenge** reviews it against the PRD
+    acceptance contract, the external-benchmark findings, and the
+    modularity assessment — surfacing unverified claims, unresolved
+    dependencies, and material gaps between the roadmap and the evidence
+    gathered in stages (a)-(g) — using the same read-only, verdict-only
+    Inspector role and InspectionReport shape already governing dispatched
+    work (extends REQ-26); the Inspector may not revise the roadmap itself,
+    only report findings back to the roadmap author for a bounded
+    correction pass before the gate is presented; (i) an **Execution Gate**
+    presenting that roadmap — release outcomes, PRD criteria, compatibility
+    guarantees, dependencies, migration, verification, observability,
+    rollback, Owner acceptance scenarios, and the Inspector challenge's
+    findings/disposition — and obtaining one explicit Owner approval before
+    any target production code changes or Agency execution begins. A
+    cross-cutting **exception
     check-in** interrupts the current stage immediately — pausing only the
     affected decision, discarding no completed work — on a material PRD/
     Owner-intent conflict, unreliable or blocked research, a major cost/
