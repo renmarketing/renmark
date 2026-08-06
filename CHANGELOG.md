@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-06] — release: bump version 0.42.0 -> 0.43.0
+**Request:** `/renmark:finish` release lane for the completed `governed-orchestration-assurance` 16-release program.
+**Built:** Bumped all 8 canonical version locations (VERSION, pyproject.toml, renmark/__init__.py, both plugin manifests, marketplace.json's two entries, README.md header). `python -m renmark.release check`: all 8 in sync. Fixed 4 ruff/mypy regressions this program introduced (dispatch.py's `analytics = None` module-reassignment + 2 `try/except-pass` blocks, recurrence.py's 2 list-concatenation patterns) — confirmed against the Release 13 baseline that all remaining lint/type findings pre-existed, unrelated to this program. Full suite: 2099 passed, 32 skipped. All deterministic gates green: pytest, ruff check, mypy, `renmark-execute --behavior`, shadow regression net, drift check, plugin lint.
+**Files changed:**
+- `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md` — version bump.
+- `renmark/dispatch.py`, `renmark/recurrence.py` — lint fixes, no behavior change.
+**Do not change:**
+- All 8 version locations must always move together — `python -m renmark.release check` is the drift gate.
+**Ships v0.43.0: the full `governed-orchestration-assurance` program** — capability-envelope enforcement, risk-tiered inspection, calibrated judge, failure-rule registry, durable-events recovery (incl. the resume skip-list identity fix), guardrail metrics, a real 16-case behavioral eval suite with CI-gating, and rethink's own self-governance (independent-Inspector challenge).
+
 ## [2026-08-06] — verify: rethink Release 16 (governed-orchestration-assurance) — PROGRAM COMPLETE
 **Request:** `/renmark:verify` smoke pass for Release 16, the final release of the 16-release program.
 **Built:** Re-ran fresh: full suite (2099 passed, 32 skipped), governance-wiring + dangerous-gate tests (6 passed), live heading-order confirmation (`### 8.` < `### 8a.` < `### 9.`). Wrote `.renmark/reviews/2026-08-06-7e3293b.verification.md`, `lifecycle.json` stage=`verified`.
