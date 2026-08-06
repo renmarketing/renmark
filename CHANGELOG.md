@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-06] — rethink: cross-host-native-tool-leverage — Solution Gate approved, roadmap built, Inspector-challenged
+**Request:** `/renmark:rethink` pass inventorying native Claude Code / Codex tools renmark could leverage instead of re-engineering (Hermes deferred — no reference found anywhere; Owner scoped to Claude+Codex this pass).
+**Built:** Full 9-stage pipeline through the Execution Gate's threshold: Transformation Intake → survey (5 host-branch decision points, hand-rolled cron/worktree/task-tracking mechanisms with zero native-tool references found) → baseline (2101 passed/32 skipped; ~220-test host/dispatch/interaction fast-gate subset) → PRD acceptance contract (exception check-in: REQ-31 amended to apply "native tools per host, substitute where absent" rather than Claude-only) → external benchmark (confirms renmark's SubagentOutput/WorkOrder/capability-envelope contract fills a real gap neither host closes natively — not redundant scaffolding) → modularity assessment (found `dispatch.py` duplicates `hosts.py`'s host-type encoding independently — real drift risk) → Discovery Direction Gate (targeted adoption, no new abstraction layer) → classification (8 Keep / 4 Improve / 1 out-of-scope spike, every row evidence-cited) → target blueprint (corrected the classification's original REQ-31 fix, which would have violated a documented dispatch invariant, to a new CLI-subcommand design) → Solution Gate (approved) → roadmap (4 releases, built as a `renmark.program`) → **Stage 8a Independent Inspector challenge** — its first live exercise since Release 16 shipped it: first pass returned `fail` (3 real findings: ScheduleWakeup overstated as confirmed, a dropped spike contingency, a REQ-30 misattribution), one bounded correction pass applied, re-challenged, **passed**.
+**Files changed:**
+- `.renmark/rethink/cross-host-native-tool-leverage/*.md` — 9 new stage artifacts.
+- `.renmark/roadmap/program.md` — new 4-release program (baseline coverage, `dispatch.py`/`hosts.py` consolidation, `ExitWorktree` adoption + `ScheduleWakeup` spike, REQ-31 Codex task-tracking CLI wrapper).
+- `.renmark/ledger/events.jsonl` — 2 `inspection_report` events (fail, then pass after correction).
+**Do not change:**
+- `ScheduleWakeup`'s live-invokability is inferred, not confirmed — no release may treat it as a committed capability until the Release 3 spike closes it.
+- The Inspector-challenge step is one bounded correction pass, then re-challenge once — never a silent third attempt.
+**Awaiting the Execution Gate** — no target production code changes begin until that explicit Owner approval.
+
 ## [2026-08-06] — PRD updated
 **Request:** Clarify REQ-31 per the `cross-host-native-tool-leverage` rethink's Stage 3 exception check-in — resolve whether REQ-31 covers a live, interactive Codex session (which has no confirmed native task-visibility primitive).
 **Built:** Reconciled REQ-31: mechanism (i) now scopes to "any host whose native tool surface actually provides task-visibility primitives" (today: Claude Code only) instead of naming Claude Code exclusively; mechanism (ii)'s scope widens from "the one dispatch path with no live session at all" to "any dispatch path lacking a native task-visibility primitive" — covering both the existing headless codex/subprocess executor AND a live interactive session on a host with no native equivalent (Codex today). Substance unchanged (still two non-substitutable mechanisms, same lifecycle). Bumped `last_reviewed`.
