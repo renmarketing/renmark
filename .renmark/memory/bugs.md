@@ -4,6 +4,19 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ## Open
 
+### 2026-08-05 — AC-13 closure path: 2 of 5 guardrail metrics still unmeasured after Release 14
+
+**Severity:** major (blocks AC-13 / Req 13 closure)
+**Symptom:** Release 14 (governed-orchestration-assurance) instruments 3 of 5 named guardrail metrics (scope-violation rate, unknown-usage rate, false-pass/reopen rate) with a real, window-aligned measured value in `analytics._agg_guardrail_metrics`. `owner_interruptions_per_milestone` and `duplicate_artifact_rate` remain `None`+documented `_note` — no durable data source exists for either. AC-13 stays `partial` (Owner-confirmed 2026-08-05: "AC-13 cannot close with 2/5 metrics unmeasured").
+**Root cause:** No skill call site records an `AskUserQuestion`/gate-interaction event to any durable log, and no analytics/ledger path correlates a re-dispatched task against an already-completed one by `(feature, target, index)` to detect a duplicate artifact emission.
+**Fix (scoped, not yet scheduled to a specific release):**
+- **Owner-interruptions-per-milestone**: wire the handoff-menu contract (`plugin/skills/.shared/handoff-menu.md`) so every `AskUserQuestion` gate call records `analytics.record_event(repo, ts=..., kind="owner_gate", milestone=<current milestone/feature id if available>)` — additive, one new event kind, read the same way Release 14's `scope_check` events are read. Aggregate as `owner_gate_events_in_window / max(1, milestones_in_window)`.
+- **duplicate-artifact rate**: correlate `task-runs.jsonl` rows by `(feature, target, index)` — a second `status: PASS` row for a tuple that already has one PASS row within the window is a duplicate/re-dispatch. Aggregate as `duplicate_task_runs_in_window / max(1, total_task_runs_in_window)`. This directly measures the failure mode Release 13's Finding A demonstrated was real (a resume/skip-list identity gap can cause exactly this).
+**Next step:** propose as its own bounded, Owner-approved release (number TBD — not unilaterally inserted into the existing 16-release sequence) before AC-13 can be marked `done`. Cross-reference this entry from any future `/renmark:roadmap` pass over `governed-orchestration-assurance`.
+
+---
+
+
 ### 2026-06-09 — classify_usage_pause: unparseable now yields 1970 resume_after
 
 **Severity:** nit

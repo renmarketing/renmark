@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 14/16 · task 0/1 done · current: Release 14: Guardrail metrics_
+_mode: staged · Stage 15/16 · task 0/3 done · current: Release 15: 20-case behavioral eval suite authorship_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -108,12 +108,12 @@ _phases: plan → build → verify → review → release_
 - [ ] Reconcile analytics.py to read from ledger.py as its source for guardrail metrics — Instead of maintaining a second parallel event system.
 - [ ] Author 'retry/rework survives resume' behavioral-eval fixture(s) (Gap 6 fixture-split) — For Release 15 to wire into the full 20-case suite.
 
-## ○ Release 14: Guardrail metrics — serves AC-13 (REQ-13) **(current)**
+## ● Release 14: Guardrail metrics — serves AC-13 (REQ-13)
 _phases: plan → build → verify → review → release_
 
 - [ ] Extend _agg_features/_agg_tasks/_agg_loops/_agg_events/_agg_usage/build_health_report with named guardrail fields — False-pass/reopen rate, scope-violation rate, Owner-interruptions-per-milestone, percentage-of-dispatches-with-unknown-usage, duplicate-artifact rate. Define renmark's own measured baseline per metric; do NOT import the proposal's cited external '43%' figure.
 
-## ○ Release 15: 20-case behavioral eval suite authorship — serves AC-8 (REQ-8)
+## ○ Release 15: 20-case behavioral eval suite authorship — serves AC-8 (REQ-8) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Author remaining behavioral-eval fixtures not claimed by an earlier release (worker replan-refusal, inspector-can't-repair, judge-can't-override-deterministic-fail, etc.) — Gap 6 fixture-split — fast-path (R1), task-tracker (R4), capability-envelope (R6), risk-tier/lens (R8), judge (R9), failure-rule (R10), retry/rework-resume (R13) authored alongside their own releases; only the remainder lands here.

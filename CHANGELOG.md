@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-05] — verify: rethink Release 14 (governed-orchestration-assurance) — 3/3 (this release's scope) verified
+**Request:** `/renmark:verify` smoke pass for Release 14, including the plan-required REQ-30 overhead checklist.
+**Built:** Re-ran fresh: `test_dispatch.py` (32 passed), `test_recurrence.py` (22 passed), `test_reports_analytics.py`+`test_analytics_ledger_guardrails.py` (16 passed), `test_analytics_guardrail_metrics.py` (5 passed), full suite (2097 passed, 32 skipped). REQ-30 checklist: all 3 non-codex (sonnet) dispatches landed 22-38% over the 10k-token pin; the 3 codex dispatches recorded as `unknown`-cost (codex stays token-blind), never assumed compliant. Wrote `.renmark/reviews/2026-08-05-c7adc2a.verification.md`, `lifecycle.json` stage=`verified`.
+**Files changed:**
+- `.renmark/reviews/2026-08-05-c7adc2a.verification.md` — new.
+**Do not change:**
+- `scope_violation_rate`'s denominator stays "total scope checks performed", never "total tasks dispatched".
+- `reopen_rate`/`_agg_guardrail_metrics` must keep windowing timestamped events independently, never gate on one per-entry timestamp.
+**Release 14 verified — this release's own scope is `done`.** AC-13 (Req 13) stays `partial` by design (2/5 metrics tracked as a future scoped release, not a shortfall of this one).
+
 ## [2026-08-05] — test: rethink Release 14 tasks 4-6 (governed-orchestration-assurance) — full coverage, Release 14 complete
 **Request:** Tasks 4-6 of 6, Release 14 — test coverage for the windowed guardrail_metrics aggregation, the scope-check event recording, and the recurrence reopen/resolve timestamp tracking.
 **Built:** `tests/test_analytics_guardrail_metrics.py` (5 tests — confirms `scope_violation_rate`'s denominator is total scope-check events, not total tasks; window exclusion of stale rows; recurrence reopen accounting via `reopen_rate`; empty-repo zero degrade; `guardrail_metrics` added without disturbing existing summary/health shapes). `tests/test_dispatch.py` (+6 tests — scope-check events recorded for both passing and failing dispatches, not just violations; unscoped dispatches record nothing; `WaveScopeViolationError`'s shape unchanged; best-effort recording never masks the real outcome). `tests/test_recurrence.py` (+6 tests — `reopen_count`/`reopen_timestamps`/`resolved_timestamps` fields; the core windowing fix: a 60-day-old resolution and a 5-day-old reopen on the same entry are windowed independently, not gated on one coarse `last_observed_at`). Full suite: 2097 passed, 32 skipped (up from 2080, +17 net new tests, no regressions).
