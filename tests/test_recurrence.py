@@ -22,13 +22,14 @@ def _observation(
     rule_id: str = "verifier-failure",
     target: str = "tests/test_widget.py",
     signal: str = "stable failure",
+    title: str | None = None,
     run_id: str = "run-1",
 ) -> recurrence.IssueObservation:
     return recurrence.IssueObservation(
         check="codex-retry",
         rule_id=rule_id,
         target=target,
-        title=f"Codex {rule_id}",
+        title=title or f"Codex {rule_id}",
         summary_text=signal,
         source="test",
         run_id=run_id,
@@ -45,6 +46,15 @@ def _observe_twice(
         repo,
         _observation(rule_id=rule_id, run_id="run-2"),
     )
+
+
+def _recurrence_entry(repo: Path, key: str) -> dict[str, object]:
+    payload = json.loads((repo / ".renmark/state/recurrences.json").read_text(encoding="utf-8"))
+    return payload["entries"][key]
+
+
+def _zulu(dt: datetime) -> str:
+    return dt.isoformat().replace("+00:00", "Z")
 
 
 def test_identity_matches_scan_and_persisted_state_excludes_raw_signal(tmp_path: Path) -> None:
@@ -141,6 +151,154 @@ def test_remediation_acknowledgement_resolution_and_one_time_retry(tmp_path: Pat
     )
     assert permitted is not None and permitted.retry_blocked is False
     assert blocked_again is not None and blocked_again.retry_blocked is True
+
+
+def test_fresh_observe_issue_initializes_reopen_tracking_fields(tmp_path: Path) -> None:
+    decision = recurrence.observe_issue(tmp_path, _observation())
+
+    entry = _recurrence_entry(tmp_path, decision.key)
+    assert entry["reopen_count"] == 0
+    assert entry["reopen_timestamps"] == []
+    assert entry["resolved_timestamps"] == []
+
+
+def test_resolve_issue_appends_resolved_timestamp_and_equivalent_reobserve_marks_reopen(
+    tmp_path: Path,
+) -> None:
+    observation = _observation()
+    decision = recurrence.observe_issue(tmp_path, observation)
+    resolved = recurrence.resolve_issue(
+        tmp_path,
+        key=decision.key,
+        action="patch",
+        fingerprint=decision.fingerprint,
+        run_id="resolved-1",
+    )
+
+    assert resolved is not None
+    entry = _recurrence_entry(tmp_path, decision.key)
+    assert len(entry["resolved_timestamps"]) == 1
+    assert entry["resolved_timestamps"][-1] == entry["resolved_at"]
+
+    reopened = recurrence.observe_issue(tmp_path, _observation(run_id="run-2"))
+    assert reopened.occurrence_count == 1
+
+    entry = _recurrence_entry(tmp_path, decision.key)
+    assert entry["reopen_count"] == 1
+    assert entry["reopen_timestamps"] == [entry["last_observed_at"]]
+    assert len(entry["resolved_timestamps"]) == 1
+
+
+def test_observe_issue_with_different_fingerprint_starts_fresh_issue_after_resolve(
+    tmp_path: Path,
+) -> None:
+    decision = recurrence.observe_issue(tmp_path, _observation())
+    recurrence.resolve_issue(
+        tmp_path,
+        key=decision.key,
+        action="patch",
+        fingerprint=decision.fingerprint,
+        run_id="resolved-1",
+    )
+
+    changed = recurrence.observe_issue(
+        tmp_path,
+        _observation(title="different title", signal="different summary", run_id="run-2"),
+    )
+
+    entry = _recurrence_entry(tmp_path, decision.key)
+    assert changed.occurrence_count == 1
+    assert entry["reopen_count"] == 0
+    assert entry["reopen_timestamps"] == []
+    assert entry["resolved_timestamps"] == []
+
+
+def test_two_full_resolve_then_reobserve_cycles_accumulate_both_timestamp_lists(
+    tmp_path: Path,
+) -> None:
+    observation = _observation()
+    decision = recurrence.observe_issue(tmp_path, observation)
+
+    recurrence.resolve_issue(
+        tmp_path,
+        key=decision.key,
+        action="patch",
+        fingerprint=decision.fingerprint,
+        run_id="resolved-1",
+    )
+    recurrence.observe_issue(tmp_path, _observation(run_id="run-2"))
+    recurrence.resolve_issue(
+        tmp_path,
+        key=decision.key,
+        action="patch",
+        fingerprint=decision.fingerprint,
+        run_id="resolved-2",
+    )
+    recurrence.observe_issue(tmp_path, _observation(run_id="run-3"))
+
+    entry = _recurrence_entry(tmp_path, decision.key)
+    assert entry["reopen_count"] == 2
+    assert len(entry["reopen_timestamps"]) == 2
+    assert len(entry["resolved_timestamps"]) == 2
+
+
+def test_reopen_rate_defaults_to_zero_without_state_file_and_counts_recent_reopen(
+    tmp_path: Path,
+) -> None:
+    empty_rate = recurrence.reopen_rate(tmp_path)
+    assert empty_rate["resolved_total"] == 0
+    assert empty_rate["reopened_total"] == 0
+    assert empty_rate["window_days"] == 30
+    assert "window_start" in empty_rate
+    assert "window_end" in empty_rate
+
+    decision = recurrence.observe_issue(tmp_path, _observation())
+    recurrence.resolve_issue(
+        tmp_path,
+        key=decision.key,
+        action="patch",
+        fingerprint=decision.fingerprint,
+        run_id="resolved-1",
+    )
+    recurrence.observe_issue(tmp_path, _observation(run_id="run-2"))
+
+    rate = recurrence.reopen_rate(tmp_path)
+    assert rate["resolved_total"] == 1
+    assert rate["reopened_total"] == 1
+    assert rate["window_days"] == 30
+
+
+def test_reopen_rate_windows_resolved_and_reopened_timestamps_independently(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
+    decision = recurrence.observe_issue(tmp_path, _observation())
+    recurrence.resolve_issue(
+        tmp_path,
+        key=decision.key,
+        action="patch",
+        fingerprint=decision.fingerprint,
+        run_id="resolved-1",
+    )
+
+    state_path = tmp_path / ".renmark/state/recurrences.json"
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    entry = payload["entries"][decision.key]
+    resolved_at = _zulu(now - timedelta(days=60))
+    reopened_at = _zulu(now - timedelta(days=5))
+    entry["resolved_timestamps"] = [resolved_at]
+    entry["reopen_timestamps"] = [reopened_at]
+    entry["resolved_at"] = resolved_at
+    entry["last_observed_at"] = _zulu(now)
+    entry["reopen_count"] = 1
+    state_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    rate = recurrence.reopen_rate(tmp_path, window_days=30, now=_zulu(now))
+    assert rate["resolved_total"] == 0
+    assert rate["reopened_total"] == 1
+    assert rate["window_days"] == 30
+    assert rate["window_start"] == _zulu(now - timedelta(days=30))
+    assert rate["window_end"] == _zulu(now)
 
 
 def test_failure_rule_lifecycle_persists_and_rejects_duplicate_ids(

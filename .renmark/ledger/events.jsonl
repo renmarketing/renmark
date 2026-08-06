@@ -22,3 +22,4 @@
 {"kind": "inspection_report", "ts": "2026-08-05T01:05:59+00:00", "subject_ref": "20260805-010004-45a1-1", "verdict": "pass", "findings": ["..                                                                       [100%]\n2 passed in 43.99s\n"], "generator": "inspector", "dispatch_identity": "renmark-verifier"}
 {"kind": "escalation", "ts": "2026-08-05T01:05:59+00:00", "reason": "needs_agent", "originating_skill": "renmark-execute", "blocking": true, "is_replannable": false, "replan_evidence": null}
 {"kind": "escalation", "ts": "2026-08-05T03:40:03+00:00", "reason": "needs_agent", "originating_skill": "renmark-execute", "blocking": true, "is_replannable": false, "replan_evidence": null}
+{"kind": "escalation", "ts": "2026-08-06T00:12:28+00:00", "reason": "needs_agent", "originating_skill": "renmark-execute", "blocking": true, "is_replannable": false, "replan_evidence": null, "schema_version": 1, "attempt_id": null, "correlation_id": null}

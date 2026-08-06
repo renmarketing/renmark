@@ -8,8 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from renmark import analytics
 from renmark import dispatch
 from renmark.dispatch import TaskResult
+from renmark.fast_path import ScopeVerdict, ScopeViolation, WorkerScope
 from renmark.parser import Task
 
 
@@ -33,6 +35,39 @@ def _task(
         complexity="simple",
         parallel_group=parallel_group,
     )
+
+
+def _passing_scope_verdict() -> ScopeVerdict:
+    return ScopeVerdict(passed=True)
+
+
+def _failing_scope_verdict() -> ScopeVerdict:
+    return ScopeVerdict(
+        passed=False,
+        violations=(
+            ScopeViolation(
+                status_code="?",
+                path="<unverifiable>",
+                kind="diff_unavailable",
+            ),
+        ),
+    )
+
+
+def _capture_scope_events(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    raises: Exception | None = None,
+) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+
+    def record_event(repo: str | Path, **fields: object) -> None:
+        events.append({"repo": repo, **fields})
+        if raises is not None:
+            raise raises
+
+    monkeypatch.setattr(analytics, "record_event", record_event)
+    return events
 
 
 def test_group_tasks_by_wave_default_serial() -> None:
@@ -308,6 +343,162 @@ def test_host_prompt_carries_canonical_reasoning_instruction() -> None:
 def test_host_dispatch_plan_rejects_unknown_host() -> None:
     with pytest.raises(ValueError, match="unsupported host"):
         dispatch.build_host_dispatch_plan([_task(1, "src/a.py", executor="sonnet")], host="other")
+
+
+def test_enforce_host_agent_dispatch_scope_records_scope_checks_for_each_passing_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = _capture_scope_events(monkeypatch)
+    monkeypatch.setattr(
+        dispatch.fast_path,
+        "verify_worker_scope",
+        lambda scope, repo, base_sha: _passing_scope_verdict(),
+    )
+
+    plan = dispatch.build_host_dispatch_plan_with_scope(
+        [_task(1, "src/a.py", executor="sonnet")],
+        host="claude",
+    )
+    plan.scoped_dispatches[2] = WorkerScope(frozenset({"src/b.py"}))
+
+    dispatch.enforce_host_agent_dispatch_scope(plan, tmp_path, "base")
+
+    assert len(events) == 2
+    assert [event["task_index"] for event in events] == [1, 2]
+    assert all(event["kind"] == "scope_check" for event in events)
+    assert all(event["passed"] is True for event in events)
+
+
+def test_enforce_wave_dispatch_scopes_records_scope_checks_for_each_passing_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = _capture_scope_events(monkeypatch)
+    monkeypatch.setattr(
+        dispatch.fast_path,
+        "verify_worker_scope",
+        lambda scope, repo, base_sha: _passing_scope_verdict(),
+    )
+
+    plan = dispatch.build_host_dispatch_plan_with_scope(
+        [_task(1, "src/a.py", executor="sonnet")],
+        host="claude",
+    )
+
+    dispatch.enforce_host_agent_dispatch_scope(plan, tmp_path, "base")
+
+    assert len(events) == 1
+    assert events[0]["task_index"] == 1
+    assert events[0]["kind"] == "scope_check"
+    assert events[0]["passed"] is True
+
+
+def test_enforce_host_agent_dispatch_scope_records_passing_and_failing_scope_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = _capture_scope_events(monkeypatch)
+
+    def verifier(scope: WorkerScope, repo: Path, base_sha: str) -> ScopeVerdict:
+        if scope.allowed_paths == frozenset({"src/a.py"}):
+            return _passing_scope_verdict()
+        return _failing_scope_verdict()
+
+    monkeypatch.setattr(dispatch.fast_path, "verify_worker_scope", verifier)
+
+    plan = dispatch.build_host_dispatch_plan_with_scope(
+        [_task(1, "src/a.py", executor="sonnet")],
+        host="claude",
+    )
+    plan.scoped_dispatches[2] = WorkerScope(frozenset({"src/b.py"}))
+
+    with pytest.raises(
+        dispatch.WaveScopeViolationError,
+        match=r"wave scope violation\(s\) detected — task 2: 1 disallowed change\(s\)",
+    ) as excinfo:
+        dispatch.enforce_host_agent_dispatch_scope(plan, tmp_path, "base")
+
+    assert excinfo.value.violations == (
+        dispatch.WaveScopeViolation(task_index=2, verdict=_failing_scope_verdict()),
+    )
+    assert [(event["task_index"], event["passed"]) for event in events] == [(1, True), (2, False)]
+    assert all(event["kind"] == "scope_check" for event in events)
+
+
+def test_enforce_wave_dispatch_scopes_skips_event_recording_for_unscoped_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = _capture_scope_events(monkeypatch)
+
+    def verifier(agent_dispatch, repo: Path, base_sha: str) -> ScopeVerdict | None:
+        if agent_dispatch.scope is None:
+            return None
+        return _passing_scope_verdict()
+
+    monkeypatch.setattr(dispatch, "verify_agent_dispatch_scope", verifier)
+
+    def runner(task: Task, repo: Path) -> TaskResult:
+        return TaskResult(task_index=task.index, executor=task.executor, status="passed")
+
+    wave = [_task(1, "src/a.py", executor="sonnet", parallel_group=1)]
+    wave_result = dispatch.dispatch_wave(wave, repo=tmp_path, run_task=runner)
+    wave_result.scoped_dispatches[1].scope = None
+
+    dispatch.enforce_wave_dispatch_scopes(wave_result, tmp_path, "base")
+
+    assert events == []
+
+
+def test_enforce_scope_check_recording_is_best_effort_for_passing_dispatches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = _capture_scope_events(monkeypatch, raises=RuntimeError("recording failed"))
+    monkeypatch.setattr(
+        dispatch.fast_path,
+        "verify_worker_scope",
+        lambda scope, repo, base_sha: _passing_scope_verdict(),
+    )
+
+    plan = dispatch.build_host_dispatch_plan_with_scope(
+        [_task(1, "src/a.py", executor="sonnet")],
+        host="claude",
+    )
+
+    dispatch.enforce_host_agent_dispatch_scope(plan, tmp_path, "base")
+
+    assert len(events) == 1
+    assert events[0]["task_index"] == 1
+    assert events[0]["kind"] == "scope_check"
+    assert events[0]["passed"] is True
+
+
+def test_enforce_scope_check_recording_does_not_mask_wave_scope_violation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = _capture_scope_events(monkeypatch, raises=RuntimeError("recording failed"))
+
+    def verifier(agent_dispatch, repo: Path, base_sha: str) -> ScopeVerdict:
+        return _failing_scope_verdict()
+
+    monkeypatch.setattr(dispatch, "verify_agent_dispatch_scope", verifier)
+
+    def runner(task: Task, repo: Path) -> TaskResult:
+        return TaskResult(task_index=task.index, executor=task.executor, status="passed")
+
+    wave = [_task(1, "src/a.py", executor="sonnet")]
+    wave_result = dispatch.dispatch_wave(wave, repo=tmp_path, run_task=runner)
+
+    with pytest.raises(
+        dispatch.WaveScopeViolationError,
+        match=r"wave scope violation\(s\) detected — task 1: 1 disallowed change\(s\)",
+    ) as excinfo:
+        dispatch.enforce_wave_dispatch_scopes(wave_result, tmp_path, "base")
+
+    assert excinfo.value.violations == (
+        dispatch.WaveScopeViolation(task_index=1, verdict=_failing_scope_verdict()),
+    )
+    assert len(events) == 1
+    assert events[0]["task_index"] == 1
+    assert events[0]["kind"] == "scope_check"
+    assert events[0]["passed"] is False
 
 
 # ── R-0.0 baseline-trace neutrality + positive tests (WP-4 stage 2) ──────────

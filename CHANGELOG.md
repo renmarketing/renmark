@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-05] — test: rethink Release 14 tasks 4-6 (governed-orchestration-assurance) — full coverage, Release 14 complete
+**Request:** Tasks 4-6 of 6, Release 14 — test coverage for the windowed guardrail_metrics aggregation, the scope-check event recording, and the recurrence reopen/resolve timestamp tracking.
+**Built:** `tests/test_analytics_guardrail_metrics.py` (5 tests — confirms `scope_violation_rate`'s denominator is total scope-check events, not total tasks; window exclusion of stale rows; recurrence reopen accounting via `reopen_rate`; empty-repo zero degrade; `guardrail_metrics` added without disturbing existing summary/health shapes). `tests/test_dispatch.py` (+6 tests — scope-check events recorded for both passing and failing dispatches, not just violations; unscoped dispatches record nothing; `WaveScopeViolationError`'s shape unchanged; best-effort recording never masks the real outcome). `tests/test_recurrence.py` (+6 tests — `reopen_count`/`reopen_timestamps`/`resolved_timestamps` fields; the core windowing fix: a 60-day-old resolution and a 5-day-old reopen on the same entry are windowed independently, not gated on one coarse `last_observed_at`). Full suite: 2097 passed, 32 skipped (up from 2080, +17 net new tests, no regressions).
+**Files changed:**
+- `tests/test_analytics_guardrail_metrics.py` — new.
+- `tests/test_dispatch.py` — additive.
+- `tests/test_recurrence.py` — additive.
+**Do not change:**
+- `scope_violation_rate`'s denominator must stay "total scope checks performed" (both pass and fail), never "total tasks dispatched" — most dispatches never go through the fast-path scope check at all.
+- `reopen_rate`/`_agg_guardrail_metrics` must keep windowing each timestamped event independently — never fall back to a single per-entry timestamp for filtering.
+**Release 14 complete.** AC-13 (Req 13) stays `partial` by design — scope-violation/unknown-usage/false-pass-reopen rates are now real, window-aligned measurements; Owner-interruptions-per-milestone and duplicate-artifact rate remain `null`+documented gap, tracked with a concrete implementation design in `.renmark/memory/bugs.md` ("AC-13 closure path", 2026-08-05) as its own future Owner-approved release.
+
 ## [2026-08-05] — verify: rethink Release 13 (governed-orchestration-assurance) — 3/3 requirements verified
 **Request:** `/renmark:verify` smoke pass for Release 13.
 **Built:** Re-ran fresh (not trusting self-reported wave PASS): `test_engine_resume_crosscheck.py` (15 passed), `test_ledger_field_completeness.py` (11 passed), `test_analytics_ledger_guardrails.py` (3 passed), `test_ledger.py`+`test_reports_analytics.py` compat (39 passed), full suite (2080 passed, 32 skipped). Wrote `.renmark/reviews/2026-08-05-7f89663.verification.md`, `lifecycle.json` stage=`verified`.
