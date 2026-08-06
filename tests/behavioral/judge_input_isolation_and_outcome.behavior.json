@@ -1,0 +1,18 @@
+{
+  "skill": "orchestrate",
+  "prompt": "An LLM judge evaluates an untrusted worker's response against a contract, with worker self-assessment fields redacted before the judge ever sees them and a genuine three-state (pass/fail/uncertain) outcome instead of a collapsed pass/fail.",
+  "deterministic": {
+    "call": "judge.input_isolation_and_outcome",
+    "assertions": [
+      "contains:\"outcome\": \"uncertain\"",
+      "contains:\"outcome\": \"fail\"",
+      "not_contains:REDACTED_WORKER_SECRET_9f2c1a",
+      "not_contains:self_assessment",
+      "not_contains:worker_confidence"
+    ]
+  },
+  "eval": {
+    "contract": "The judge redacts worker-authored self-assessment fields (self_assessment, worker_confidence, dispatch_identity, preferred_verdict, claimed_status) from any dict payload before composing its prompt, and reports a genuinely distinct 'uncertain' outcome for untrustworthy responses rather than silently collapsing it into 'fail' or 'pass'.",
+    "golden_ref": "judge_input_isolation_and_outcome.golden"
+  }
+}

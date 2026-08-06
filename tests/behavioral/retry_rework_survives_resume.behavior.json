@@ -1,0 +1,17 @@
+{
+  "skill": "orchestrate",
+  "prompt": "Resume a paused orchestrate run without silently skipping real work when a task index is reused across different plans.",
+  "deterministic": {
+    "call": "cli_engine.cross_check_skip_list",
+    "assertions": [
+      "contains:ambiguous",
+      "contains:safe_to_skip",
+      "matches:ambiguous.*\\b2\\b",
+      "not_contains:safe_to_skip.*\\b2\\b"
+    ]
+  },
+  "eval": {
+    "contract": "When a completed-task index is reused by the current plan under a different title, _cross_check_skip_list must route it to the ambiguous set (forcing a re-run) rather than the safe_to_skip set, guarding against silently re-running unrelated work as well as silently skipping real work.",
+    "golden_ref": "retry_rework_survives_resume.golden"
+  }
+}

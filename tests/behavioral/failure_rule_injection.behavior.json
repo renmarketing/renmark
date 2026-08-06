@@ -1,0 +1,20 @@
+{
+  "skill": "orchestrate",
+  "prompt": "Before dispatching a task, check its applicability against the repo's curated failure-derived constraint rules and attach any active match's required behavior to the dispatch.",
+  "deterministic": {
+    "call": "subagent_gate.failure_rule_injection",
+    "assertions": [
+      "contains:matched_rule_ids",
+      "contains:active-injection-rule",
+      "contains:failure_rules",
+      "contains:required_behavior",
+      "contains:prohibited_failure",
+      "not_contains:proposed-injection-rule",
+      "not_contains:deprecated-injection-rule"
+    ]
+  },
+  "eval": {
+    "contract": "A dispatch whose applicability keyword-overlaps an ACTIVE curated failure rule has that rule's required_behavior/prohibited_failure attached to its constraints, while a same-topic rule left in proposed or deprecated status is never attached.",
+    "golden_ref": "failure_rule_injection.golden"
+  }
+}

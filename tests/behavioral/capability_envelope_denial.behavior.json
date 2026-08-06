@@ -1,0 +1,21 @@
+{
+  "skill": "orchestrate",
+  "prompt": "Check whether a dispatch's requested scope (paths, commands) falls within the target role's declared capability envelope before the subagent is spawned.",
+  "deterministic": {
+    "call": "subagent_gate.check_capability_envelope",
+    "assertions": [
+      "contains:code-implementer",
+      "contains:path",
+      "contains:command",
+      "contains:False",
+      "contains:True",
+      "contains:docs/README.md",
+      "contains:renmark/subagent_gate.py",
+      "not_contains:Traceback"
+    ]
+  },
+  "eval": {
+    "contract": "A dispatch requesting a path or command outside the role's declared allowed_targets/allowed_commands produces at least one EnvelopeVerdict with passed=False naming the violation, while a dispatch fully within the role's envelope produces all-passing verdicts.",
+    "golden_ref": "capability_envelope_denial.golden"
+  }
+}

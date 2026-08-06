@@ -1,0 +1,18 @@
+{
+  "skill": "orchestrate",
+  "prompt": "Track a dispatched task from creation through in_progress, then refuse to complete it without evidence.",
+  "deterministic": {
+    "call": "task_tracking.transitions",
+    "assertions": [
+      "contains:pending",
+      "contains:in_progress",
+      "contains:MissingEvidenceError",
+      "contains:artifact_path",
+      "contains:result_summary"
+    ]
+  },
+  "eval": {
+    "contract": "A freshly created task starts pending, mark_in_progress moves it to in_progress, and completing it without both an artifact_path and a result_summary is refused via MissingEvidenceError rather than silently marking it completed.",
+    "golden_ref": "task_tracker_transitions.golden"
+  }
+}

@@ -23,3 +23,4 @@
 {"kind": "escalation", "ts": "2026-08-05T01:05:59+00:00", "reason": "needs_agent", "originating_skill": "renmark-execute", "blocking": true, "is_replannable": false, "replan_evidence": null}
 {"kind": "escalation", "ts": "2026-08-05T03:40:03+00:00", "reason": "needs_agent", "originating_skill": "renmark-execute", "blocking": true, "is_replannable": false, "replan_evidence": null}
 {"kind": "escalation", "ts": "2026-08-06T00:12:28+00:00", "reason": "needs_agent", "originating_skill": "renmark-execute", "blocking": true, "is_replannable": false, "replan_evidence": null, "schema_version": 1, "attempt_id": null, "correlation_id": null}
+{"kind": "escalation", "ts": "2026-08-06T03:08:10+00:00", "reason": "usage limit reached", "originating_skill": "governed-orchestration-assurance-release-15", "blocking": true, "is_replannable": false, "replan_evidence": null, "schema_version": 1, "attempt_id": null, "correlation_id": null}

@@ -1,0 +1,20 @@
+{
+  "skill": "plan",
+  "prompt": "Classify a candidate dispatch wave as fast-path eligible or not, per the 5-signal bounded-small-task check.",
+  "deterministic": {
+    "call": "fast_path.classify_fast_path",
+    "assertions": [
+      "contains:eligible=True",
+      "contains:eligible=False",
+      "contains:failed_signals=()",
+      "contains:scope_size",
+      "contains:action_type",
+      "not_contains:eligible=True, failed_signals=(scope_size",
+      "not_contains:eligible=True, failed_signals=(action_type"
+    ]
+  },
+  "eval": {
+    "contract": "A single-file, mode-B, non-critical-module task is classified eligible with no failed signals, while a multi-file or mode-A task is classified not eligible and names the specific signal(s) that failed.",
+    "golden_ref": "fast_path_accept_reject.golden"
+  }
+}
