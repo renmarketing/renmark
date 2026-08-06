@@ -620,9 +620,33 @@ def enforce_wave_dispatch_scopes(
     is a silent no-op: verification stays strictly opt-in per WP-8a, exactly
     matching R-0.1 behavior for anything that never declared a scope.
     """
-    violations = verify_wave_dispatch_scopes(wave_result.scoped_dispatches, repo, base_sha)
+    violations: list[WaveScopeViolation] = []
+    try:
+        from renmark import analytics
+        from datetime import datetime, timezone
+    except Exception:
+        analytics = None
+    for task_index, agent_dispatch in wave_result.scoped_dispatches.items():
+        scope_verdict = verify_agent_dispatch_scope(agent_dispatch, repo, base_sha)
+        if scope_verdict is None:
+            # Not opted in for this dispatch -- no check was performed,
+            # so there is nothing to record (matches R-0.1: None != pass).
+            continue
+        passed = scope_verdict.passed
+        if not passed:
+            violations.append(WaveScopeViolation(task_index=task_index, verdict=scope_verdict))
+        if analytics is not None:
+            try:
+                analytics.record_event(
+                    repo, ts=datetime.now(timezone.utc).isoformat(),
+                    kind="scope_check",
+                    task_index=task_index,
+                    passed=passed,
+                )
+            except Exception:
+                pass
     if violations:
-        raise WaveScopeViolationError(violations)
+        raise WaveScopeViolationError(tuple(violations))
 
 
 def verify_agent_dispatch_scope(
@@ -1174,10 +1198,26 @@ def enforce_host_agent_dispatch_scope(
     not "verified clean".
     """
     violations: list[WaveScopeViolation] = []
+    try:
+        from renmark import analytics
+        from datetime import datetime, timezone
+    except Exception:
+        analytics = None
     for task_index, scope in host_plan.scoped_dispatches.items():
         scope_verdict = fast_path.verify_worker_scope(scope, repo, base_sha)
-        if not scope_verdict.passed:
+        passed = scope_verdict.passed
+        if not passed:
             violations.append(WaveScopeViolation(task_index=task_index, verdict=scope_verdict))
+        if analytics is not None:
+            try:
+                analytics.record_event(
+                    repo, ts=datetime.now(timezone.utc).isoformat(),
+                    kind="scope_check",
+                    task_index=task_index,
+                    passed=passed,
+                )
+            except Exception:
+                pass
     if violations:
         raise WaveScopeViolationError(tuple(violations))
 

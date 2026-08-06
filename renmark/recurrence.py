@@ -15,7 +15,7 @@ import warnings
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -28,6 +28,7 @@ STATE_VERSION = 1
 MAX_ENTRIES = 512
 MAX_SUMMARY_LINES = 5
 MAX_SUMMARY_LINE_CHARS = 240
+_MAX_EVENT_TIMESTAMPS = 50
 LOCK_TIMEOUT_SECONDS = 2.0
 _SHORT_FINGERPRINT_CHARS = 16
 _MAX_SOURCE_CHARS = 160
@@ -136,6 +137,19 @@ def observe_issue(repo: str | os.PathLike[str], observation: IssueObservation) -
         )
         if starts_fresh:
             entry = _new_entry(key, fingerprint, observation, observed_at)
+            if previous is not None and bool(previous.get("resolved")) and previous.get(
+                "fingerprint"
+            ) == fingerprint:
+                entry["reopen_count"] = _positive_int(previous.get("reopen_count"), 0) + 1
+                entry["reopen_timestamps"] = (
+                    list(previous.get("reopen_timestamps", [])) + [observed_at]
+                )[-_MAX_EVENT_TIMESTAMPS:]
+                # Carry forward resolved-event history across the reopen so
+                # trailing-window guardrail metrics (reopen_rate) can still
+                # see resolutions that predate this reopen.
+                entry["resolved_timestamps"] = list(previous.get("resolved_timestamps", []))[
+                    -_MAX_EVENT_TIMESTAMPS:
+                ]
         else:
             entry = dict(previous)
             entry["occurrence_count"] = _positive_int(entry.get("occurrence_count"), 1) + 1
@@ -274,6 +288,9 @@ def resolve_issue(
         entry["resolved"] = True
         timestamp = _normalise_timestamp(resolved_at)
         entry["resolved_at"] = timestamp
+        entry["resolved_timestamps"] = (
+            list(raw_entry.get("resolved_timestamps", [])) + [timestamp]
+        )[-_MAX_EVENT_TIMESTAMPS:]
         entry["resolved_run_id"] = _bounded_text(run_id, _MAX_RUN_ID_CHARS)
         entry["retry_once_available"] = False
         entry["retry_once_consumed_at"] = None
@@ -310,6 +327,9 @@ def _new_entry(
         "resolved": False,
         "resolved_at": None,
         "resolved_run_id": None,
+        "reopen_count": 0,
+        "reopen_timestamps": [],
+        "resolved_timestamps": [],
     }
 
 
@@ -440,6 +460,74 @@ def _normalise_timestamp(value: datetime | str | None) -> str:
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    candidate = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def reopen_rate(
+    repo: str | os.PathLike[str],
+    *,
+    window_days: int = 30,
+    now: str | None = None,
+) -> dict[str, object]:
+    """Count in-window resolve/reopen events across all recurrence entries.
+
+    Counts individual events (not entries) whose timestamp parses and falls
+    within ``[window_start, now]`` inclusive. Never raises; degrades to a
+    zeroed result with a best-effort window on any error.
+    """
+
+    try:
+        now_dt = _parse_timestamp(now) if now is not None else datetime.now(timezone.utc)
+        if now_dt is None:
+            now_dt = datetime.now(timezone.utc)
+    except Exception:
+        now_dt = datetime.now(timezone.utc)
+
+    window_start_dt = now_dt - timedelta(days=window_days)
+    window_start = _normalise_timestamp(window_start_dt)
+    window_end = _normalise_timestamp(now_dt)
+
+    try:
+        state_path, _ = _state_paths(repo)
+        state, _ = _read_state(state_path)
+        resolved_total = 0
+        reopened_total = 0
+        for entry in state["entries"].values():
+            for timestamp in entry.get("resolved_timestamps", []) or []:
+                parsed = _parse_timestamp(timestamp)
+                if parsed is not None and window_start_dt <= parsed <= now_dt:
+                    resolved_total += 1
+            for timestamp in entry.get("reopen_timestamps", []) or []:
+                parsed = _parse_timestamp(timestamp)
+                if parsed is not None and window_start_dt <= parsed <= now_dt:
+                    reopened_total += 1
+        return {
+            "resolved_total": resolved_total,
+            "reopened_total": reopened_total,
+            "window_days": window_days,
+            "window_start": window_start,
+            "window_end": window_end,
+        }
+    except Exception:
+        return {
+            "resolved_total": 0,
+            "reopened_total": 0,
+            "window_days": window_days,
+            "window_start": window_start,
+            "window_end": window_end,
+        }
+
+
 def _state_paths(repo: str | os.PathLike[str]) -> tuple[Path, Path]:
     state_dir = Path(repo) / ".renmark" / "state"
     return state_dir / "recurrences.json", state_dir / "recurrences.lock"
@@ -518,6 +606,9 @@ def _clean_entry(raw_key: object, raw_entry: object) -> dict[str, Any] | None:
         "resolved": bool(raw_entry.get("resolved")),
         "resolved_at": _optional_bounded(raw_entry.get("resolved_at")),
         "resolved_run_id": _optional_bounded(raw_entry.get("resolved_run_id"), _MAX_RUN_ID_CHARS),
+        "reopen_count": _positive_int(raw_entry.get("reopen_count"), 0),
+        "reopen_timestamps": _clean_timestamp_list(raw_entry.get("reopen_timestamps")),
+        "resolved_timestamps": _clean_timestamp_list(raw_entry.get("resolved_timestamps")),
     }
 
 
@@ -526,6 +617,13 @@ def _optional_bounded(value: object, limit: int = 64) -> str | None:
         return None
     bounded = _bounded_text(value, limit)
     return bounded or None
+
+
+def _clean_timestamp_list(value: object) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    cleaned = [str(item) for item in value if isinstance(item, str) and item.strip()]
+    return cleaned[-_MAX_EVENT_TIMESTAMPS:]
 
 
 def _prune_entries(entries: Mapping[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -1105,5 +1203,6 @@ __all__ = [
     "observe_issue",
     "pre_attempt",
     "propose_failure_rule",
+    "reopen_rate",
     "resolve_issue",
 ]
