@@ -30,6 +30,7 @@ import json
 import os
 import tempfile
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .state import read_usage
@@ -578,6 +579,7 @@ def _agg_events(rows: list[dict[str, object]]) -> dict[str, object]:
         "resume_events": kind_c.get("resume", 0),
         "rate_limit_events": kind_c.get("rate_limit", 0),
         "quota_events": kind_c.get("quota", 0),
+        "scope_check_events": kind_c.get("scope_check", 0),
     }
 
 
@@ -622,6 +624,122 @@ def _agg_ledger_guardrails(repo: str | Path) -> dict[str, object]:
         "inspection_verdicts": dict(verdict_c),
         "inspection_total": inspection_total,
     }
+
+
+def _parse_ts(value: object) -> datetime | None:
+    """Parse an ISO8601 ``ts`` field into an aware UTC datetime. ``None`` on failure.
+
+    Mirrors ``renmark.recurrence._parse_timestamp``'s convention (``Z`` ->
+    ``+00:00``, naive timestamps assumed UTC).
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    candidate = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _agg_guardrail_metrics(
+    repo: str | Path,
+    *,
+    task_rows: list[dict[str, object]],
+    event_rows: list[dict[str, object]],
+    now: str,
+    window_days: int = 30,
+) -> dict[str, object]:
+    """Roll up guardrail-effectiveness rates over one shared trailing window.
+
+    Computes three MEASURED rates — ``scope_violation_rate``,
+    ``unknown_usage_rate``, ``false_pass_reopen_rate`` — all over the SAME
+    ``[now - window_days, now]`` window, never mixing a windowed numerator
+    with an all-time denominator. Two further rates
+    (``owner_interruptions_per_milestone``, ``duplicate_artifact_rate``) have
+    no durable log yet, so they report ``None`` with an explanatory note.
+    Never raises — degrades to safe zero/None defaults on any error, matching
+    every other ``_agg_*`` helper in this module.
+    """
+    owner_note = (
+        "no durable log of Owner gate (AskUserQuestion) interactions exists yet — "
+        "out of this release's bounded scope, tracked as a follow-up "
+        "(see .renmark/memory/bugs.md)"
+    )
+    dup_note = (
+        "no durable log of duplicate/re-dispatched artifact emission exists yet — "
+        "out of this release's bounded scope, tracked as a follow-up "
+        "(see .renmark/memory/bugs.md)"
+    )
+    defaults: dict[str, object] = {
+        "scope_violation_rate": 0.0,
+        "unknown_usage_rate": 0.0,
+        "false_pass_reopen_rate": 0.0,
+        "owner_interruptions_per_milestone": None,
+        "owner_interruptions_note": owner_note,
+        "duplicate_artifact_rate": None,
+        "duplicate_artifact_note": dup_note,
+        "window_days": window_days,
+        "window_start": now,
+        "window_end": now,
+    }
+    try:
+        now_dt = _parse_ts(now)
+        if now_dt is None:
+            now_dt = datetime.now(timezone.utc)
+        window_start_dt = now_dt - timedelta(days=window_days)
+        window_start_iso = window_start_dt.isoformat().replace("+00:00", "Z")
+        defaults["window_start"] = window_start_iso
+        defaults["window_end"] = now
+
+        def _in_window(row: dict[str, object]) -> bool:
+            ts_dt = _parse_ts(row.get("ts"))
+            return ts_dt is not None and window_start_dt <= ts_dt <= now_dt
+
+        windowed_tasks = [r for r in task_rows if _in_window(r)]
+        windowed_events = [r for r in event_rows if _in_window(r)]
+
+        checks = [r for r in windowed_events if r.get("kind") == "scope_check"]
+        if checks:
+            violations = sum(1 for r in checks if not _as_bool(r.get("passed")))
+            scope_violation_rate = round(violations / max(1, len(checks)), 4)
+        else:
+            scope_violation_rate = 0.0
+
+        if windowed_tasks:
+            unmeasured = sum(1 for r in windowed_tasks if not _as_bool(r.get("measured")))
+            unknown_usage_rate = round(unmeasured / max(1, len(windowed_tasks)), 4)
+        else:
+            unknown_usage_rate = 0.0
+
+        false_pass_reopen_rate = 0.0
+        try:
+            from renmark import recurrence
+
+            reopen = recurrence.reopen_rate(repo, window_days=window_days, now=now)
+            resolved_total = _as_int(reopen.get("resolved_total"))
+            reopened_total = _as_int(reopen.get("reopened_total"))
+            if resolved_total:
+                false_pass_reopen_rate = round(reopened_total / max(1, resolved_total), 4)
+        except Exception:
+            false_pass_reopen_rate = 0.0
+
+        return {
+            "scope_violation_rate": scope_violation_rate,
+            "unknown_usage_rate": unknown_usage_rate,
+            "false_pass_reopen_rate": false_pass_reopen_rate,
+            "owner_interruptions_per_milestone": None,
+            "owner_interruptions_note": owner_note,
+            "duplicate_artifact_rate": None,
+            "duplicate_artifact_note": dup_note,
+            "window_days": window_days,
+            "window_start": window_start_iso,
+            "window_end": now,
+        }
+    except Exception:
+        return defaults
 
 
 def _agg_usage(repo: str | Path) -> dict[str, object]:
@@ -696,11 +814,16 @@ def aggregate(repo: str | Path, *, now: str) -> dict[str, object]:
     """
     base = analytics_dir(repo)
     features = _agg_features(read_jsonl(base / FEATURE_RUNS_LEDGER))
-    tasks = _agg_tasks(read_jsonl(base / TASK_RUNS_LEDGER))
+    task_rows = read_jsonl(base / TASK_RUNS_LEDGER)
+    tasks = _agg_tasks(task_rows)
     loops = _agg_loops(read_jsonl(base / LOOP_RUNS_LEDGER))
-    events = _agg_events(read_jsonl(base / EVENTS_LEDGER))
+    event_rows = read_jsonl(base / EVENTS_LEDGER)
+    events = _agg_events(event_rows)
     usage = _agg_usage(repo)
     guardrails = _agg_ledger_guardrails(repo)
+    guardrail_metrics = _agg_guardrail_metrics(
+        repo, task_rows=task_rows, event_rows=event_rows, now=now
+    )
     summary: dict[str, object] = {
         "generated_at": now,
         "source": DEFAULT_SOURCE,
@@ -708,6 +831,7 @@ def aggregate(repo: str | Path, *, now: str) -> dict[str, object]:
         "tasks": tasks,
         "loops": loops,
         "guardrails": guardrails,
+        "guardrail_metrics": guardrail_metrics,
         "backlog": {
             "completed": events["backlog_completed"],
             "blocked": events["backlog_blocked"],
@@ -790,6 +914,7 @@ def build_health_report(repo: str | Path, *, now: str) -> dict[str, object]:
         "total_tokens": _as_int(tokens.get("total")),
         "common_failure_reasons": tasks.get("common_failure_reasons", []),
         "guardrails": summary.get("guardrails", {}),
+        "guardrail_metrics": summary.get("guardrail_metrics", {}),
     }
 
 
@@ -817,6 +942,7 @@ def render_health_md(report: dict[str, object]) -> str:
     by_feature = _dict(r.get("tokens_by_feature"))
     failures = _list(r.get("common_failure_reasons"))
     guardrails = _dict(r.get("guardrails"))
+    guardrail_metrics = _dict(r.get("guardrail_metrics"))
 
     lines: list[str] = ["# renmark analytics"]
     gen = _as_str(r.get("generated_at"))
@@ -856,6 +982,14 @@ def render_health_md(report: dict[str, object]) -> str:
             f"({_as_int(guardrails.get('escalations_blocking'))} blocking), "
             f"{_as_int(guardrails.get('inspection_total'))} inspections"
             + (f" [{verdicts_str}]" if verdicts_str else "")
+        )
+    if guardrail_metrics:
+        vr = _as_float(guardrail_metrics.get("scope_violation_rate", 0.0))
+        ur = _as_float(guardrail_metrics.get("unknown_usage_rate", 0.0))
+        rr = _as_float(guardrail_metrics.get("false_pass_reopen_rate", 0.0))
+        lines.append(
+            f"- Guardrail metrics: scope-violation {vr:.1%}, unknown-usage {ur:.1%}, "
+            f"reopen {rr:.1%} (Owner-interruptions and duplicate-artifact rate: not yet measured)"
         )
 
     return "\n".join(lines) + "\n"
