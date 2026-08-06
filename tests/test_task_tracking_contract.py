@@ -195,7 +195,11 @@ def test_req31_splits_live_host_tools_from_python_mirror_mechanism():
     norm = _normalized(PRD_PATH)
     assert "two distinct, non-substitutable" in norm
     assert "no Python module can invoke a host's tools on" in norm
-    assert "Mechanism (ii) is scoped strictly to that headless path" in norm
+    # Widened 2026-08-06 (cross-host-native-tool-leverage rethink, exception
+    # check-in): mechanism (ii) now covers any dispatch path lacking a native
+    # task-visibility primitive, not just the headless subprocess path.
+    assert "is the acceptable substitute wherever (i) has nothing to call" in norm
+    assert "never substitutes for (i) on a host that actually has native task tools" in norm
 
 
 def test_req31_bound_by_req30_no_regression():
