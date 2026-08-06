@@ -828,6 +828,176 @@ def _render_capability_envelope_denial(repo: Path, case: Case) -> str:
     return "\n".join(lines)
 
 
+def _render_judge_input_isolation_and_outcome(repo: Path, case: Case) -> str:
+    """Render live worker-field redaction plus the judge's 3-state outcome parse.
+
+    Exercises the REAL ``judge._redact_worker_fields`` / ``judge._render_payload``
+    on a worker-authored payload carrying a self-assessment secret marker
+    (``REDACTED_WORKER_SECRET_9f2c1a``) nested under ``self_assessment`` and
+    ``worker_confidence`` keys -- proving the redacted form (the only thing
+    ``judge._build_prompt`` ever serializes into a live judge prompt) drops
+    both keys and the marker they carry, so only the redacted JSON is rendered
+    below, never the raw payload. It also exercises the REAL
+    ``judge._parse_response`` on two synthetic model responses: a well-formed
+    ``{"outcome": "fail", ...}`` response, which parses to a validated "fail",
+    and an empty response, which parses to a genuinely distinct "uncertain"
+    outcome rather than a silently collapsed "fail"/"pass" -- the module's
+    three-state contract. No logic is hand-copied here; every value below is
+    the real functions' real return.
+    """
+    from . import judge
+
+    _ = repo, case
+    worker_payload: dict[str, object] = {
+        "task_id": "task-7",
+        "result_summary": "did the thing",
+        "self_assessment": "I nailed it, marker=REDACTED_WORKER_SECRET_9f2c1a",
+        "worker_confidence": "high, marker=REDACTED_WORKER_SECRET_9f2c1a",
+        "dispatch_identity": "worker-42",
+        "preferred_verdict": "pass",
+        "claimed_status": "complete",
+    }
+    redacted = judge._redact_worker_fields(worker_payload)
+    redacted_json = json.dumps(redacted, indent=2, sort_keys=True, default=str)
+    rendered_for_prompt = judge._render_payload(worker_payload)
+
+    fail_verdict = judge._parse_response(
+        '{"outcome": "fail", "confidence": "high", '
+        '"rationale": "the with-skill output drops the required field"}'
+    )
+    uncertain_verdict = judge._parse_response("")
+
+    return (
+        f"redacted_payload_keys={sorted(redacted.keys())!r}\n"
+        f"redacted_payload_json={redacted_json}\n"
+        f"rendered_payload_for_prompt={rendered_for_prompt}\n"
+        f'fail_verdict: "outcome": "{fail_verdict.outcome}" '
+        f"confidence={fail_verdict.confidence} "
+        f"validation_status={fail_verdict.validation_status}\n"
+        f'uncertain_verdict: "outcome": "{uncertain_verdict.outcome}" '
+        f"confidence={uncertain_verdict.confidence} "
+        f"validation_status={uncertain_verdict.validation_status}\n"
+    )
+
+
+def _render_failure_rule_injection(repo: Path, case: Case) -> str:
+    """Render live failure-rule matching + constraint injection for a dispatch.
+
+    Exercises the REAL ``recurrence.propose_failure_rule`` /
+    ``recurrence.activate_failure_rule`` / ``recurrence.deprecate_failure_rule``
+    plus ``subagent_gate.check_failure_rule_constraints`` /
+    ``apply_failure_rule_constraints`` end to end, in an isolated scratch repo
+    under ``.renmark/state/`` so the real project's curated registry is never
+    touched. Three same-topic rules share applicability tokens with the
+    dispatch under test -- an ``active`` rule, a ``proposed`` rule (never
+    activated), and a ``deprecated`` rule -- and only the REAL classifier's own
+    ``status == "active"`` filter decides which one matches. No logic is
+    hand-copied here.
+    """
+    import shutil
+
+    from . import recurrence
+    from .subagent_gate import apply_failure_rule_constraints, check_failure_rule_constraints
+
+    _ = case
+    tmp = repo / ".renmark" / "state" / "_behavior-failure-rule-injection"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        recurrence.activate_failure_rule(
+            tmp,
+            recurrence.propose_failure_rule(
+                tmp,
+                rule_id="active-injection-rule",
+                trigger="a prior dispatch injected an unescaped shell argument",
+                applicability="dispatch shell injection risk",
+                required_behavior="quote or shlex.escape every interpolated argument",
+                prohibited_failure="unescaped shell interpolation",
+                source_evidence=("incident-1",),
+            ).rule_id,
+        )
+        recurrence.propose_failure_rule(
+            tmp,
+            rule_id="proposed-injection-rule",
+            trigger="a candidate rule not yet reviewed",
+            applicability="dispatch shell injection risk",
+            required_behavior="candidate behavior, not yet binding",
+            prohibited_failure="candidate failure, not yet binding",
+            source_evidence=("incident-2",),
+        )
+        deprecated_id = recurrence.propose_failure_rule(
+            tmp,
+            rule_id="deprecated-injection-rule",
+            trigger="a retired rule superseded by active-injection-rule",
+            applicability="dispatch shell injection risk",
+            required_behavior="retired behavior, no longer binding",
+            prohibited_failure="retired failure, no longer binding",
+            source_evidence=("incident-0",),
+        ).rule_id
+        recurrence.deprecate_failure_rule(tmp, deprecated_id, reason="superseded")
+
+        rules = recurrence.load_failure_rules(tmp)
+        verdict = check_failure_rule_constraints(
+            tmp, "dispatch shell injection risk audit", host="claude"
+        )
+        constraints = apply_failure_rule_constraints(None, verdict, rules)
+
+        return (
+            f"passed={verdict.passed} "
+            f"matched_rule_ids={verdict.matched_rule_ids!r}\n"
+            f"reason={verdict.reason}\n"
+            f"constraints={json.dumps(constraints, sort_keys=True)}\n"
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _render_retry_rework_survives_resume(repo: Path, case: Case) -> str:
+    """Render live resume skip-list cross-checking for a reused task index.
+
+    Exercises the REAL ``cli._engine._cross_check_skip_list`` -- the fix for
+    the single most severe bug found in this program's history: a resume
+    skip-list that matched a completed-task index alone (not the task's
+    identity) could silently skip real work whenever a later plan reused an
+    earlier plan's task number. Task 1's git-observed title matches the
+    current plan, so it lands in ``safe_to_skip``; task 2's index is
+    "completed" in git history under a DIFFERENT title (a different plan
+    reused index 2), so the real function must route it to ``ambiguous``
+    rather than silently trusting the index. No logic is hand-copied here --
+    every set below is the real function's real return.
+    """
+    from .cli._engine import _cross_check_skip_list
+    from .parser import Task
+    from .state import normalize_task_title
+
+    _ = repo, case
+    tasks = [
+        Task(
+            index=1, title="fix auth bug", mode="B", target="renmark/auth.py",
+            executor="sonnet", spec="fix the bug", verifier="true",
+        ),
+        Task(
+            index=2, title="add rate limiter", mode="B", target="renmark/ratelimit.py",
+            executor="sonnet", spec="add rate limiting", verifier="true",
+        ),
+    ]
+    done = {1, 2, 3}
+    done_titles = {
+        1: {normalize_task_title("fix auth bug")},
+        # index 2 was "completed" under a DIFFERENT plan's task title --
+        # a reused index, not the same work.
+        2: {normalize_task_title("rewrite the changelog generator")},
+        # index 3 has no counterpart in the current plan at all.
+    }
+    safe_to_skip, ambiguous = _cross_check_skip_list(done, tasks, done_titles)
+
+    return (
+        f"done={sorted(done)!r}\n"
+        f"safe_to_skip={sorted(safe_to_skip)!r}\n"
+        f"ambiguous={sorted(ambiguous)!r}\n"
+    )
+
+
 def _render_selector(repo: Path, case: Case, host: str) -> str:
     """Render one live host selector contract as bounded JSON text."""
     import json
@@ -1178,6 +1348,9 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "fast_path.classify_fast_path": _render_fast_path_accept_reject,
     "task_tracking.transitions": _render_task_tracker_transitions,
     "subagent_gate.check_capability_envelope": _render_capability_envelope_denial,
+    "judge.input_isolation_and_outcome": _render_judge_input_isolation_and_outcome,
+    "subagent_gate.failure_rule_injection": _render_failure_rule_injection,
+    "cli_engine.cross_check_skip_list": _render_retry_rework_survives_resume,
 }
 
 
