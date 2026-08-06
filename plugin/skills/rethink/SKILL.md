@@ -458,6 +458,48 @@ real, runnable compatibility tests — not any architecture replacement. Only an
 explicit Owner override, backed by stage 3/4/5 evidence, may reorder it, and
 the override plus its justification is recorded on the program.
 
+### 8a. Independent Inspector challenge
+
+Before the roadmap (stage 8) is presented at the Execution Gate (stage 9),
+dispatch **one isolated `renmark:inspector` subagent** (Agent tool, `role:
+inspector`) carrying **only bounded pointers** — file paths, never full
+bodies (REQ-5) — to:
+
+- the stage 3 PRD acceptance contract artifact
+- the stage 4 external-benchmark findings artifact
+- the stage 5 modularity/scalability/maintainability assessment artifact
+- the stage 8 roadmap artifact (the `Program` written by `renmark.program.write_program`)
+
+The Inspector reviews the roadmap against those three artifacts and returns a
+bounded verdict — one of `renmark.ledger.VERDICTS` (`pass`/`fail`/`escalate`)
+— plus findings: unverified claims, unresolved dependencies, and material
+gaps between the roadmap and the evidence gathered in stages 1–7. This is
+**read-only, verdict-only** — the Inspector role's declared tool scope
+(`plugin/agents/inspector.md`) excludes Write/Edit, so it cannot revise the
+roadmap itself; it may only report findings back to the roadmap author
+(stage 8) for a bounded correction pass, implementing the PRD's REQ-28
+constraint that the Inspector "may not revise the roadmap itself, only
+report findings."
+
+Record the verdict via `ledger.emit_inspection_verdict(repo,
+work_result_id=<roadmap artifact's identity>, work_order_id=<a stable
+rethink-scoped id>, verdict=<the Inspector's verdict>, evidence=<bounded
+findings list>, inspector_dispatch_identity="renmark:inspector",
+work_result_dispatch_identity=<the roadmap author's dispatch identity>,
+ts=<now>)`, producing an `InspectionReport`.
+
+- **On `pass`:** proceed straight to stage 9's Execution Gate, surfacing the
+  Inspector's verdict alongside the roadmap.
+- **On `fail`/`escalate`:** route the findings back to the roadmap author
+  (stage 8) for exactly **one** bounded correction pass, then re-run this
+  Inspector challenge once. If it still does not clear, treat it as an
+  **exception check-in** (above) — never a silent third attempt.
+
+This is **not** a fourth Owner-approval gate — it is a mechanical,
+subagent-only challenge step (extends REQ-26); the only Owner decision it can
+produce is the exception check-in above, and only after the one bounded
+correction pass fails to clear it.
+
 ### 9. Execution Gate, then hand off to milestone execution
 
 Before any stage transitions from planning to execution, present the
@@ -466,7 +508,10 @@ PRD criteria (stage 3) each satisfies, each release's compatibility
 guarantee, dependencies, migration steps, verification method, observability
 hook, rollback path, and Owner acceptance scenario — and require **one
 explicit `AskUserQuestion` approval** before any target production code
-changes or Agency execution begins. This is the REQ-4/REQ-12 human gate; it
+changes or Agency execution begins. The presented content also includes the
+stage 8a Inspector challenge's verdict and findings, pulled from the
+`InspectionReport` already written by `ledger.emit_inspection_verdict` —
+never a fresh ad-hoc summary. This is the REQ-4/REQ-12 human gate; it
 follows the milestone-approval pattern in
 `${CLAUDE_PLUGIN_ROOT}/skills/.shared/agency-delivery.md` (read by pointer — do
 not restate its mechanics here).
