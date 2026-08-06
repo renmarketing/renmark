@@ -29,6 +29,8 @@ jobs:
         run: mypy renmark/
       - name: pytest
         run: pytest -q
+      - name: behavioral eval suite (deterministic tier)
+        run: renmark-execute --behavior
       - name: shadow regression net
         run: python -m renmark.shadow run
       - name: drift check
