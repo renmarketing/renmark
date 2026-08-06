@@ -2,6 +2,19 @@
 
 Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`, `/renmark:codereview` (findings), and `/renmark:orchestrate` (escalations).
 
+## Fixed (this session)
+
+### 2026-08-06 — doctor.py: false "not installed" on Codex CLI builds that reject `plugin list --json`
+
+**Severity:** minor (false negative only — real install state was correct)
+**Symptom:** `/renmark:doctor` reported `[✗] Codex installed plugin: renmark@personal is available but not installed` immediately after a successful `codex plugin add renmark@personal` (confirmed installed via plain `codex plugin list`).
+**Root cause:** `check_codex_installed()` called `codex plugin list --json` unconditionally; on codex-cli 0.133.0 (this environment) that flag isn't supported (`error: unexpected argument '--json' found`, non-zero exit), so `payload = {}` and the entry lookup always came back empty — reported as "not installed" regardless of true state.
+**Fix:** On a non-zero `--json` exit, fall back to `codex plugin list` (plain) and parse the text table via a new `_parse_plain_codex_plugin_list()` (matches one of the three known status phrases — `installed, enabled` / `installed, disabled` / `not installed` — then reads the trailing version token). Never raises; returns `None` (genuinely-not-installed path preserved) when no matching row is found. `tests/test_doctor.py` covers the fallback path and all three status phrases.
+**Lesson:** A detection check that shells out to an external CLI's `--json` flag needs a plain-text fallback — CLI versions drift, and a hard dependency on an optional flag turns "cannot verify" into a false "broken."
+
+---
+
+
 ## Open
 
 ### 2026-08-05 — AC-13 closure path: 2 of 5 guardrail metrics still unmeasured after Release 14

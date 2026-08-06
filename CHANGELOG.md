@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-06] — fix: doctor.py false "not installed" on Codex CLI builds rejecting `plugin list --json`
+**Request:** Found live during post-release WSL install verification (`/renmark:doctor`) — `codex plugin add renmark@personal` succeeded and plain `codex plugin list` confirmed it, but doctor still reported "not installed."
+**Built:** `check_codex_installed()` now falls back to parsing `codex plugin list`'s plain-text table (`_parse_plain_codex_plugin_list()`) when the `--json` invocation exits non-zero, instead of trusting an empty/unusable JSON payload. Never raises; a genuinely-absent plugin still correctly reports "not installed." `tests/test_doctor.py` gains coverage for the fallback path and all three status phrases (`installed, enabled` / `installed, disabled` / `not installed`). Full suite: 2101 passed, 32 skipped.
+**Files changed:**
+- `renmark/doctor.py` — plain-text fallback parser.
+- `tests/test_doctor.py` — fallback + parser coverage.
+**Do not change:**
+- The fallback must only trigger on a non-zero `--json` exit, never unconditionally — an empty JSON `installed` list from a working `--json` call still means "not installed," not "try the fallback."
+
 ## [2026-08-06] — release: bump version 0.42.0 -> 0.43.0
 **Request:** `/renmark:finish` release lane for the completed `governed-orchestration-assurance` 16-release program.
 **Built:** Bumped all 8 canonical version locations (VERSION, pyproject.toml, renmark/__init__.py, both plugin manifests, marketplace.json's two entries, README.md header). `python -m renmark.release check`: all 8 in sync. Fixed 4 ruff/mypy regressions this program introduced (dispatch.py's `analytics = None` module-reassignment + 2 `try/except-pass` blocks, recurrence.py's 2 list-concatenation patterns) — confirmed against the Release 13 baseline that all remaining lint/type findings pre-existed, unrelated to this program. Full suite: 2099 passed, 32 skipped. All deterministic gates green: pytest, ruff check, mypy, `renmark-execute --behavior`, shadow regression net, drift check, plugin lint.

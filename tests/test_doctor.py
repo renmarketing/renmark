@@ -85,6 +85,53 @@ def test_codex_registry_check_requires_installed_and_enabled(monkeypatch):
     assert doctor.check_codex_installed().status == "pass"
 
 
+def test_codex_registry_check_falls_back_to_plain_text_when_json_unsupported(monkeypatch):
+    """codex-cli builds that reject `--json` on `plugin list` must not report
+    a false "not installed" — doctor should fall back to parsing the plain
+    table instead of trusting an empty/unusable JSON payload."""
+    monkeypatch.setattr(doctor.shutil, "which", lambda command: "/fake/codex")
+
+    plain_table = (
+        "Marketplace `personal`\n"
+        "/home/user/.agents/plugins/marketplace.json\n"
+        "\n"
+        "PLUGIN            STATUS              VERSION                            PATH\n"
+        "renmark@personal  installed, enabled  0.43.0+codex.local.20260806050132  /home/user/plugins/renmark\n"
+    )
+
+    def fake_run(args, **kwargs):
+        if "--json" in args:
+            return doctor.subprocess.CompletedProcess(
+                args=args, returncode=2, stdout="", stderr="error: unexpected argument '--json' found"
+            )
+        return doctor.subprocess.CompletedProcess(args=args, returncode=0, stdout=plain_table, stderr="")
+
+    monkeypatch.setattr(doctor.subprocess, "run", fake_run)
+    result = doctor.check_codex_installed()
+    assert result.status == "pass"
+    assert "renmark@personal" in result.detail
+
+
+def test_parse_plain_codex_plugin_list_recognizes_all_three_statuses():
+    installed_enabled = "renmark@personal  installed, enabled  1.0.0  /path\n"
+    entry = doctor._parse_plain_codex_plugin_list(installed_enabled, "renmark@personal")
+    assert entry == {"pluginId": "renmark@personal", "installed": True, "enabled": True, "version": "1.0.0"}
+
+    installed_disabled = "renmark@personal  installed, disabled  1.0.0  /path\n"
+    entry = doctor._parse_plain_codex_plugin_list(installed_disabled, "renmark@personal")
+    assert entry is not None
+    assert entry["installed"] is True
+    assert entry["enabled"] is False
+
+    not_installed = "renmark@personal  not installed        --  /path\n"
+    entry = doctor._parse_plain_codex_plugin_list(not_installed, "renmark@personal")
+    assert entry is not None
+    assert entry["installed"] is False
+    assert entry["enabled"] is False
+
+    assert doctor._parse_plain_codex_plugin_list("nothing matches here\n", "renmark@personal") is None
+
+
 def test_doctor_allows_unencodable_status_glyphs(monkeypatch):
     calls: list[dict[str, str]] = []
 

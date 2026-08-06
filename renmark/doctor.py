@@ -35,6 +35,7 @@ from __future__ import annotations
 import contextlib
 import datetime as _dt
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -266,11 +267,45 @@ def check_codex_plugin_source() -> Check:
     return Check("Codex plugin source", "pass", str(CODEX_PLUGIN_SOURCE))
 
 
+def _parse_plain_codex_plugin_list(text: str, plugin_id: str) -> dict[str, object] | None:
+    """Fallback parser for `codex plugin list`'s plain-text table (no --json).
+
+    Some Codex CLI builds (observed: codex-cli 0.133.0) reject `--json` on
+    `plugin list` with an arg-parse error, which would otherwise make
+    `check_codex_installed` report a false "not installed" (empty JSON
+    payload) even when the plugin genuinely is installed. This scans the
+    plain-text table for the row whose first column is *plugin_id*, matches
+    one of the three known status phrases, and reads the version token that
+    follows it. Returns ``None`` if no matching row is found (genuinely not
+    installed, or an unrecognized table shape) — never raises.
+    """
+    status_pattern = re.compile(r"(installed, enabled|installed, disabled|not installed)")
+    for line in text.splitlines():
+        if not line.startswith(plugin_id):
+            continue
+        rest = line[len(plugin_id) :]
+        m = status_pattern.search(rest)
+        if not m:
+            continue
+        status_str = m.group(1)
+        after_status = rest[m.end() :].split()
+        version = after_status[0] if after_status else None
+        return {
+            "pluginId": plugin_id,
+            "installed": status_str.startswith("installed"),
+            "enabled": status_str == "installed, enabled",
+            "version": version,
+        }
+    return None
+
+
 def check_codex_installed() -> Check:
     """Use Codex's JSON registry view to verify installed and enabled state."""
     cli = shutil.which("codex")
     if not cli:
         return Check("Codex installed plugin", "warn", "Codex CLI is not on PATH; install state cannot be checked")
+    plugin_id = "renmark@personal"
+    entry: dict[str, object] | None = None
     try:
         result = subprocess.run(
             [cli, "plugin", "list", "--json"],
@@ -279,14 +314,28 @@ def check_codex_installed() -> Check:
             timeout=15,
             check=False,
         )
-        payload = json.loads(result.stdout) if result.returncode == 0 else {}
+        if result.returncode == 0:
+            payload = json.loads(result.stdout)
+            installed = payload.get("installed", []) if isinstance(payload, dict) else []
+            entry = next(
+                (item for item in installed if isinstance(item, dict) and item.get("pluginId") == plugin_id),
+                None,
+            )
+        else:
+            # --json unsupported on this Codex CLI build (or another arg error) —
+            # fall back to parsing the plain-text table rather than reporting a
+            # false "not installed" on an empty/unusable JSON payload.
+            plain = subprocess.run(
+                [cli, "plugin", "list"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            if plain.returncode == 0:
+                entry = _parse_plain_codex_plugin_list(plain.stdout, plugin_id)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
         return Check("Codex installed plugin", "fail", f"could not read Codex plugin registry: {exc}")
-    installed = payload.get("installed", []) if isinstance(payload, dict) else []
-    entry = next(
-        (item for item in installed if isinstance(item, dict) and item.get("pluginId") == "renmark@personal"),
-        None,
-    )
     if not entry:
         return Check(
             "Codex installed plugin",
