@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-05] — fix: behavior.py — risk_tier_lens_selection.golden fixture was unreachable, silently red
+**Request:** Found while investigating Release 15 (behavioral eval suite) pre-flight: `plan/risk_tier_lens_selection.golden` had been FAILing with "unknown deterministic call 'ledger.work_order_for_task'" — presumably authored during Release 8 per the roadmap's fixture-split table, but its adapter was never wired into `behavior.py`'s `_DISPATCH` allow-list, so it's been red, unnoticed, this whole time.
+**Built:** Added `_render_risk_tier_lens_selection(repo, case)` — exercises the REAL `ledger.work_order_for_task` -> `ledger.classify_risk_tier` -> `subagent_gate.resolve_lens_for` chain end to end on two synthetic dispatches (one targeting the critical module `renmark/ledger.py`, landing on `risk_tier=high`/`lens=skeptical_user`; one targeting `README.md`, landing on `risk_tier=low`/`lens=maintainer`) — deliberately does not fake `complexity="hard"` to force a `"critical"` tier, so the rendered output stays honest to what the classifier actually does. Registered under `"ledger.work_order_for_task"` in `_DISPATCH`. `renmark-execute --behavior`: 7/7 passed (was 6/7). Full suite: 2097 passed, 32 skipped, no regressions.
+**Files changed:**
+- `renmark/behavior.py` — new adapter + `_DISPATCH` registration.
+**Do not change:**
+- The adapter must keep using the real classifier/lens functions, never a hand-copied approximation of their logic.
+**Also found (not yet fixed):** the behavioral eval suite has only 7 fixture cases on disk today, well short of the roadmap's "20-case suite" framing — flagged for Release 15's honest scoping, not silently padded to hit a number.
+
 ## [2026-08-05] — verify: rethink Release 14 (governed-orchestration-assurance) — 3/3 (this release's scope) verified
 **Request:** `/renmark:verify` smoke pass for Release 14, including the plan-required REQ-30 overhead checklist.
 **Built:** Re-ran fresh: `test_dispatch.py` (32 passed), `test_recurrence.py` (22 passed), `test_reports_analytics.py`+`test_analytics_ledger_guardrails.py` (16 passed), `test_analytics_guardrail_metrics.py` (5 passed), full suite (2097 passed, 32 skipped). REQ-30 checklist: all 3 non-codex (sonnet) dispatches landed 22-38% over the 10k-token pin; the 3 codex dispatches recorded as `unknown`-cost (codex stays token-blind), never assumed compliant. Wrote `.renmark/reviews/2026-08-05-c7adc2a.verification.md`, `lifecycle.json` stage=`verified`.

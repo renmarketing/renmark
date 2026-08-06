@@ -612,6 +612,57 @@ def _render_plan_lint(repo: Path, case: Case) -> str:
     return "\n".join(lines)
 
 
+def _render_risk_tier_lens_selection(repo: Path, case: Case) -> str:
+    """Render the live risk-tier/lens classification for two synthetic dispatches.
+
+    Exercises ``ledger.work_order_for_task`` -> ``ledger.classify_risk_tier``
+    (Release 8) end to end, using the REAL classifier (no hand-copied logic
+    here): one dispatch targets a declared critical module
+    (``renmark/ledger.py``) and gets no ``complexity`` signal, so it lands on
+    ``"high"`` (not ``"critical"`` — that tier additionally requires
+    ``complexity == "hard"``, which this adapter deliberately does not fake,
+    to keep the rendered tier honest to what the classifier actually does).
+    The other targets a plain non-pipeline-critical doc (``README.md``) and
+    lands on ``"low"``. Lens selection (``subagent_gate.resolve_lens_for``)
+    follows from each tier via the real, unmodified policy.
+    """
+    from .ledger import WorkOrder, classify_risk_tier, work_order_for_task
+    from .parser import Task
+    from .subagent_gate import resolve_lens_for
+
+    critical_task = Task(
+        index=1, title="edit critical module", mode="B",
+        target="renmark/ledger.py", executor="sonnet",
+        spec="edit the critical module", verifier="true",
+    )
+    critical_order = work_order_for_task(critical_task, "code-implementer")
+    critical_tier = critical_order.risk_tier or classify_risk_tier(critical_order)
+    critical_lens = (
+        critical_order.inspection_contract.lenses[0]
+        if critical_order.inspection_contract and critical_order.inspection_contract.lenses
+        else resolve_lens_for(WorkOrder(file_scope=critical_order.file_scope, risk_tier=critical_tier))
+    )
+
+    low_task = Task(
+        index=2, title="edit README", mode="B",
+        target="README.md", executor="haiku",
+        spec="edit the README", verifier="true",
+    )
+    low_order = work_order_for_task(low_task, "docs-editor")
+    low_tier = low_order.risk_tier or classify_risk_tier(low_order)
+    low_lens = (
+        low_order.inspection_contract.lenses[0]
+        if low_order.inspection_contract and low_order.inspection_contract.lenses
+        else resolve_lens_for(WorkOrder(file_scope=low_order.file_scope, risk_tier=low_tier))
+    )
+
+    return (
+        f"dispatch A: target={critical_order.file_scope} (critical module) "
+        f"risk_tier={critical_tier} lens={critical_lens}\n"
+        f"dispatch B: target={low_order.file_scope} risk_tier={low_tier} lens={low_lens}\n"
+    )
+
+
 def _render_selector(repo: Path, case: Case, host: str) -> str:
     """Render one live host selector contract as bounded JSON text."""
     import json
@@ -958,6 +1009,7 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "interaction.selector_codex": _render_selector_codex,
     "interaction.selector_cross_host_trajectory": _render_selector_cross_host_trajectory,
     "plan_lint": _render_plan_lint,
+    "ledger.work_order_for_task": _render_risk_tier_lens_selection,
 }
 
 
