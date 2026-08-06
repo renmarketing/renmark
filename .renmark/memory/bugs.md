@@ -17,6 +17,17 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ## Open
 
+### 2026-08-06 — flaky: test_scan_reports_due_for_review_without_mutating_rule_status (intermittent, unreproducible)
+
+**Severity:** nit (not reproducible, no code regression found)
+**Symptom:** One full-suite run showed `tests/test_hygiene_release12_categorization.py::test_scan_reports_due_for_review_without_mutating_rule_status` FAIL; passes cleanly in isolation and on an immediate full-suite re-run.
+**Root cause:** unknown — likely test-order/fixture-isolation flake (the test shells out to `python -m renmark.hygiene scan` as a subprocess against a `repo` fixture; possible race if that fixture isn't fully isolated per-worker). Confirmed NOT a regression from the `cross-host-native-tool-leverage` rethink pass's commits (baseline at the immediately-prior commit was clean; those commits are markdown/state-only, touch neither `hygiene.py` nor `recurrence.py`).
+**Fix:** none applied — not reproducible enough to root-cause further right now. If it recurs, capture `pytest -p no:randomly -q tests/test_hygiene_release12_categorization.py ... --lf -x` output and the full run's test order to isolate the interaction.
+**Lesson:** logged rather than silently ignored, per this project's evidence-before-claim discipline — a flake dismissed without a note is indistinguishable from a regression nobody investigated.
+
+---
+
+
 ### 2026-08-05 — AC-13 closure path: 2 of 5 guardrail metrics still unmeasured after Release 14
 
 **Severity:** major (blocks AC-13 / Req 13 closure)

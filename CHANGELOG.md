@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-06] — feat: cross-host-native-tool-leverage Release 1 — baseline and compatibility coverage
+**Request:** Release 1 of the cross-host-native-tool-leverage program (Execution Gate approved) — document the fast-gate test target releases 2-4 will cite.
+**Built:** `.renmark/memory/cross-host-fast-gate.md` — documents the broad fast-gate (`pytest -q -k "host or codex or claude or dispatch or interaction"`, 220 passed/17 skipped) and narrow fast-gate (5 core cross-host test files, 70 passed), both re-measured fresh and confirmed matching Stage 2's original baseline exactly. Test-only, no production code moves. Subagent-gate correctly flagged this single mechanical doc task as unjustified for dispatch — written directly instead. Also found and logged (not fixed, not reproducible) one intermittent flaky test unrelated to this release's scope.
+**Files changed:**
+- `.renmark/memory/cross-host-fast-gate.md` — new.
+**Do not change:**
+- This file is a static reference, not auto-regenerated like `dev-standards.md` — update manually if baselines are re-measured.
+**Release 1 complete.**
+
 ## [2026-08-06] — rethink: cross-host-native-tool-leverage — Solution Gate approved, roadmap built, Inspector-challenged
 **Request:** `/renmark:rethink` pass inventorying native Claude Code / Codex tools renmark could leverage instead of re-engineering (Hermes deferred — no reference found anywhere; Owner scoped to Claude+Codex this pass).
 **Built:** Full 9-stage pipeline through the Execution Gate's threshold: Transformation Intake → survey (5 host-branch decision points, hand-rolled cron/worktree/task-tracking mechanisms with zero native-tool references found) → baseline (2101 passed/32 skipped; ~220-test host/dispatch/interaction fast-gate subset) → PRD acceptance contract (exception check-in: REQ-31 amended to apply "native tools per host, substitute where absent" rather than Claude-only) → external benchmark (confirms renmark's SubagentOutput/WorkOrder/capability-envelope contract fills a real gap neither host closes natively — not redundant scaffolding) → modularity assessment (found `dispatch.py` duplicates `hosts.py`'s host-type encoding independently — real drift risk) → Discovery Direction Gate (targeted adoption, no new abstraction layer) → classification (8 Keep / 4 Improve / 1 out-of-scope spike, every row evidence-cited) → target blueprint (corrected the classification's original REQ-31 fix, which would have violated a documented dispatch invariant, to a new CLI-subcommand design) → Solution Gate (approved) → roadmap (4 releases, built as a `renmark.program`) → **Stage 8a Independent Inspector challenge** — its first live exercise since Release 16 shipped it: first pass returned `fail` (3 real findings: ScheduleWakeup overstated as confirmed, a dropped spike contingency, a REQ-30 misattribution), one bounded correction pass applied, re-challenged, **passed**.
