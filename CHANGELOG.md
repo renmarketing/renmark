@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-06] — test: rethink Release 16 task 3 (governed-orchestration-assurance) — governance-wiring regression test, Release 16 complete
+**Request:** Task 3 of 3, Release 16 — regression coverage proving the Inspector-challenge wiring is real, not just documented.
+**Built:** `tests/test_rethink_skill_governance_wiring.py` — pure file-content check (matches `tests/test_dangerous_gate_wiring.py`'s existing precedent, no import/execution of the skill): heading order (`### 8.` < `### 8a.` < `### 9.`), presence of `ledger.emit_inspection_verdict`/`work_order_for_task`/`resolve_lens_for`, the Inspector's write-restriction text, the unchanged "three named Owner decision gates" language, and confirms the Inspector heading itself never contains the word "Gate". Full suite: 2099 passed, 32 skipped (up from 2098, +1 net new test, no regressions).
+**Files changed:**
+- `tests/test_rethink_skill_governance_wiring.py` — new.
+**Do not change:**
+- The Inspector-challenge heading must never contain the literal word "Gate" — it is deliberately not a 4th Owner-approval gate; the regression test enforces this.
+**Release 16 complete.** All 16 releases of the `governed-orchestration-assurance` program are now built. REQ-28's PRD wording gap (AC-12) closes: the independent-Inspector challenge is wired operationally, not just documented, and rethink's own stage 5/6/7 dispatches now flow through the same work-order/lens contracts (Releases 3 and 8) it recommends for the rest of the codebase.
+
 ## [2026-08-05] — PRD updated
 **Request:** Amend REQ-28 for Release 16 (final release, governed-orchestration-assurance program) — close AC-12 (Req 12)'s PRD wording gap by adding a mandatory pre-Execution-Gate independent-Inspector challenge step to `/renmark:rethink`'s nine-stage pipeline.
 **Built:** Reconciled REQ-28: inserted a new sentence between stage (h) (roadmap production) and stage (i) (Execution Gate) — an independent Inspector challenge reviews the roadmap against the PRD acceptance contract, external-benchmark findings, and modularity assessment before the Execution Gate is presented, using the existing read-only Inspector role/InspectionReport shape (extends REQ-26); the Inspector may only report findings for a bounded correction pass, never revise the roadmap itself. The Execution Gate's presented content now also includes the Inspector challenge's findings/disposition. Distinct from the 3 existing Owner approval gates — an adversarial review step, not a 4th approval gate. Bumped `last_reviewed`.
