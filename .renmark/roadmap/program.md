@@ -7,13 +7,13 @@ source_sha: 3142267
 
 # Program — cross-host-native-tool-leverage
 
-_mode: staged · Stage 1/4 · task 0/1 done · current: Release 1: Baseline and compatibility coverage_
+_mode: staged · Stage 2/4 · task 0/2 done · current: Release 2: Consolidate dispatch.py HostName onto hosts.py HostKind_
 
-## ○ Release 1: Baseline and compatibility coverage — serves stage-2 baseline **(current)**
+## ● Release 1: Baseline and compatibility coverage — serves stage-2 baseline
 
 - [ ] Document host/dispatch/interaction fast-gate test target
 
-## ○ Release 2: Consolidate dispatch.py HostName onto hosts.py HostKind — serves Modularity finding (duplication fix)
+## ○ Release 2: Consolidate dispatch.py HostName onto hosts.py HostKind — serves Modularity finding (duplication fix) **(current)**
 
 - [ ] Replace dispatch.py HostName Literal with hosts.py HostKind imports
 - [ ] Add grep-based regression test guarding against re-duplication
