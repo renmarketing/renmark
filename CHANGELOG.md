@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-06] — verify: rethink Release 16 (governed-orchestration-assurance) — PROGRAM COMPLETE
+**Request:** `/renmark:verify` smoke pass for Release 16, the final release of the 16-release program.
+**Built:** Re-ran fresh: full suite (2099 passed, 32 skipped), governance-wiring + dangerous-gate tests (6 passed), live heading-order confirmation (`### 8.` < `### 8a.` < `### 9.`). Wrote `.renmark/reviews/2026-08-06-7e3293b.verification.md`, `lifecycle.json` stage=`verified`.
+**Files changed:**
+- `.renmark/reviews/2026-08-06-7e3293b.verification.md` — new.
+**Do not change:**
+- The Inspector-challenge heading must never contain the word "Gate".
+- Two deferred gaps stay open and tracked, not silently closed: AC-13's 2 remaining guardrail metrics, Release 11's CLI-wiring gap.
+**Release 16 verified — AC-12 (Req 12) closes. The 16-release `governed-orchestration-assurance` program is COMPLETE.** Started 2026-08-04 from `renmark-governed-orchestration-upgrade-proposal.md`; ran the full 9-stage rethink pipeline, a 16-release incremental Program, and every release's plan → orchestrate → verify cycle, catching and fixing real bugs via live dogfooding along the way (most notably Release 13's resume skip-list identity bug — the single most severe issue found).
+
 ## [2026-08-06] — test: rethink Release 16 task 3 (governed-orchestration-assurance) — governance-wiring regression test, Release 16 complete
 **Request:** Task 3 of 3, Release 16 — regression coverage proving the Inspector-challenge wiring is real, not just documented.
 **Built:** `tests/test_rethink_skill_governance_wiring.py` — pure file-content check (matches `tests/test_dangerous_gate_wiring.py`'s existing precedent, no import/execution of the skill): heading order (`### 8.` < `### 8a.` < `### 9.`), presence of `ledger.emit_inspection_verdict`/`work_order_for_task`/`resolve_lens_for`, the Inspector's write-restriction text, the unchanged "three named Owner decision gates" language, and confirms the Inspector heading itself never contains the word "Gate". Full suite: 2099 passed, 32 skipped (up from 2098, +1 net new test, no regressions).

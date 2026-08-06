@@ -120,7 +120,7 @@ _phases: plan → build → verify → review → release_
 - [ ] Wire the full 20-case suite together against renmark/behavior.py's existing deterministic/eval-tier split — Combines fixtures authored in releases 1, 4, 6, 8, 9, 10, 13 with this release's own.
 - [ ] Make the deterministic tier CI-gating (hard requirement, not merely green) — Eval tier remains opt-in via RENMARK_EVAL_RUNNER_CMD, unchanged. Deterministic tier stays CI-safe: no model call, no network, no spend by default.
 
-## ○ Release 16: /renmark:rethink self-upgrade — serves AC-12 (REQ-12) **(current)**
+## ● Release 16: /renmark:rethink self-upgrade — serves AC-12 (REQ-12) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Add a mandatory pre-Execution-Gate independent-Inspector challenge step to REQ-28 via /renmark:prd's UPDATE gate — Distinct from the 3 existing Owner gates (Discovery Direction / Solution / Execution).
