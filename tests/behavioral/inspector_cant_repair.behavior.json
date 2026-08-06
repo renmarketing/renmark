@@ -1,0 +1,23 @@
+{
+  "skill": "orchestrate",
+  "prompt": "Confirm the inspector role is structurally read-only — it can verify a Work Result but never repair it.",
+  "deterministic": {
+    "call": "subagent_profiles.inspector_cant_repair",
+    "assertions": [
+      "contains:Read, Grep, Glob, Bash",
+      "not_contains:Write",
+      "not_contains:Edit",
+      "contains:verdict",
+      "contains:findings",
+      "contains:subject_ref",
+      "contains:dispatch_identity",
+      "not_contains:patch",
+      "not_contains:diff",
+      "not_contains:fix"
+    ]
+  },
+  "eval": {
+    "contract": "The inspector's declared agent tool scope (Read, Grep, Glob, Bash — no Write/Edit) and its InspectionReport output shape (subject_ref/verdict/findings/dispatch_identity, no patch/diff/fix field) together make the role structurally incapable of repairing what it inspects.",
+    "golden_ref": "inspector_cant_repair.golden"
+  }
+}

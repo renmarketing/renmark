@@ -1,0 +1,18 @@
+{
+  "skill": "orchestrate",
+  "prompt": "Prove the eval-tier LLM judge can only add evidence alongside a deterministic-tier FAIL and can never flip its status to PASS.",
+  "deterministic": {
+    "call": "behavior.judge_cant_override_deterministic_fail",
+    "assertions": [
+      "contains:\"before_status\": \"FAIL\"",
+      "contains:\"after_status\": \"FAIL\"",
+      "contains:\"judge_verdict_present\": true",
+      "not_contains:\"after_status\": \"PASS\"",
+      "not_contains:\"before_status\": \"PASS\""
+    ]
+  },
+  "eval": {
+    "contract": "Escalating a deterministic FAIL to the LLM judge (run(..., judge=True)) only attaches a judge_verdict alongside the case's Result; it never rewrites Result.status from FAIL to PASS.",
+    "golden_ref": "judge_cant_override_deterministic_fail.golden"
+  }
+}

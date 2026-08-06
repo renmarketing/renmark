@@ -1,0 +1,18 @@
+{
+  "skill": "orchestrate",
+  "prompt": "A worker escalation correctly withholds any replan claim when it has no valid replan evidence, and the ledger schema validator flags a malformed replan claim as invalid rather than trusting it.",
+  "deterministic": {
+    "call": "ledger.worker_replan_refusal",
+    "assertions": [
+      "contains:is_replannable",
+      "contains:replan_evidence",
+      "contains:False",
+      "contains:'replan_evidence' must be a string or null, got int",
+      "not_contains:'is_replannable' must be a bool"
+    ]
+  },
+  "eval": {
+    "contract": "A default Escalation (is_replannable=False, replan_evidence=None) validates clean, while an Escalation that sets is_replannable=True but supplies non-string replan_evidence is rejected by ledger.validate_escalation with an explicit type-mismatch issue, so an unsubstantiated replan claim is never silently accepted.",
+    "golden_ref": "worker_replan_refusal.golden"
+  }
+}
