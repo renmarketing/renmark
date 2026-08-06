@@ -40,6 +40,7 @@ apply everywhere belongs in :func:`group_tasks_by_wave`.
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import json
 import os
 import time
@@ -47,6 +48,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from types import ModuleType
 
 from . import fast_path, ledger
 from .parser import Task
@@ -621,9 +623,9 @@ def enforce_wave_dispatch_scopes(
     matching R-0.1 behavior for anything that never declared a scope.
     """
     violations: list[WaveScopeViolation] = []
+    analytics: ModuleType | None
     try:
         from renmark import analytics
-        from datetime import datetime, timezone
     except Exception:
         analytics = None
     for task_index, agent_dispatch in wave_result.scoped_dispatches.items():
@@ -636,15 +638,13 @@ def enforce_wave_dispatch_scopes(
         if not passed:
             violations.append(WaveScopeViolation(task_index=task_index, verdict=scope_verdict))
         if analytics is not None:
-            try:
+            with contextlib.suppress(Exception):
                 analytics.record_event(
                     repo, ts=datetime.now(timezone.utc).isoformat(),
                     kind="scope_check",
                     task_index=task_index,
                     passed=passed,
                 )
-            except Exception:
-                pass
     if violations:
         raise WaveScopeViolationError(tuple(violations))
 
@@ -1198,9 +1198,9 @@ def enforce_host_agent_dispatch_scope(
     not "verified clean".
     """
     violations: list[WaveScopeViolation] = []
+    analytics: ModuleType | None
     try:
         from renmark import analytics
-        from datetime import datetime, timezone
     except Exception:
         analytics = None
     for task_index, scope in host_plan.scoped_dispatches.items():
@@ -1209,15 +1209,13 @@ def enforce_host_agent_dispatch_scope(
         if not passed:
             violations.append(WaveScopeViolation(task_index=task_index, verdict=scope_verdict))
         if analytics is not None:
-            try:
+            with contextlib.suppress(Exception):
                 analytics.record_event(
                     repo, ts=datetime.now(timezone.utc).isoformat(),
                     kind="scope_check",
                     task_index=task_index,
                     passed=passed,
                 )
-            except Exception:
-                pass
     if violations:
         raise WaveScopeViolationError(tuple(violations))
 

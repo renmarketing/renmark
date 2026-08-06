@@ -142,7 +142,7 @@ def observe_issue(repo: str | os.PathLike[str], observation: IssueObservation) -
             ) == fingerprint:
                 entry["reopen_count"] = _positive_int(previous.get("reopen_count"), 0) + 1
                 entry["reopen_timestamps"] = (
-                    list(previous.get("reopen_timestamps", [])) + [observed_at]
+                    [*previous.get("reopen_timestamps", []), observed_at]
                 )[-_MAX_EVENT_TIMESTAMPS:]
                 # Carry forward resolved-event history across the reopen so
                 # trailing-window guardrail metrics (reopen_rate) can still
@@ -289,7 +289,7 @@ def resolve_issue(
         timestamp = _normalise_timestamp(resolved_at)
         entry["resolved_at"] = timestamp
         entry["resolved_timestamps"] = (
-            list(raw_entry.get("resolved_timestamps", [])) + [timestamp]
+            [*raw_entry.get("resolved_timestamps", []), timestamp]
         )[-_MAX_EVENT_TIMESTAMPS:]
         entry["resolved_run_id"] = _bounded_text(run_id, _MAX_RUN_ID_CHARS)
         entry["retry_once_available"] = False
