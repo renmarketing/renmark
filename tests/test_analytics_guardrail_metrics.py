@@ -56,6 +56,7 @@ def _observation(
     target: str = "tests/test_widget.py",
     signal: str = "stable failure",
     run_id: str = "run-1",
+    observed_at: str | None = NOW,
 ) -> recurrence.IssueObservation:
     return recurrence.IssueObservation(
         check="codex-retry",
@@ -65,6 +66,7 @@ def _observation(
         summary_text=signal,
         source="test",
         run_id=run_id,
+        observed_at=observed_at,
     )
 
 
