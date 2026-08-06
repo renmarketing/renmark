@@ -7,7 +7,7 @@ source_sha: e6898917ddf3a30505bb01b1b0569c28a187d792
 
 # Program — governed-orchestration-assurance
 
-_mode: staged · Stage 15/16 · task 0/3 done · current: Release 15: 20-case behavioral eval suite authorship_
+_mode: staged · Stage 16/16 · task 0/4 done · current: Release 16: /renmark:rethink self-upgrade_
 
 ## ◑ Release 1: Baseline and compatibility coverage — serves REQ-30
 _phases: plan → build → verify → review → release_
@@ -113,14 +113,14 @@ _phases: plan → build → verify → review → release_
 
 - [ ] Extend _agg_features/_agg_tasks/_agg_loops/_agg_events/_agg_usage/build_health_report with named guardrail fields — False-pass/reopen rate, scope-violation rate, Owner-interruptions-per-milestone, percentage-of-dispatches-with-unknown-usage, duplicate-artifact rate. Define renmark's own measured baseline per metric; do NOT import the proposal's cited external '43%' figure.
 
-## ○ Release 15: 20-case behavioral eval suite authorship — serves AC-8 (REQ-8) **(current)**
+## ● Release 15: 20-case behavioral eval suite authorship — serves AC-8 (REQ-8)
 _phases: plan → build → verify → review → release_
 
 - [ ] Author remaining behavioral-eval fixtures not claimed by an earlier release (worker replan-refusal, inspector-can't-repair, judge-can't-override-deterministic-fail, etc.) — Gap 6 fixture-split — fast-path (R1), task-tracker (R4), capability-envelope (R6), risk-tier/lens (R8), judge (R9), failure-rule (R10), retry/rework-resume (R13) authored alongside their own releases; only the remainder lands here.
 - [ ] Wire the full 20-case suite together against renmark/behavior.py's existing deterministic/eval-tier split — Combines fixtures authored in releases 1, 4, 6, 8, 9, 10, 13 with this release's own.
 - [ ] Make the deterministic tier CI-gating (hard requirement, not merely green) — Eval tier remains opt-in via RENMARK_EVAL_RUNNER_CMD, unchanged. Deterministic tier stays CI-safe: no model call, no network, no spend by default.
 
-## ○ Release 16: /renmark:rethink self-upgrade — serves AC-12 (REQ-12)
+## ○ Release 16: /renmark:rethink self-upgrade — serves AC-12 (REQ-12) **(current)**
 _phases: plan → build → verify → review → release_
 
 - [ ] Add a mandatory pre-Execution-Gate independent-Inspector challenge step to REQ-28 via /renmark:prd's UPDATE gate — Distinct from the 3 existing Owner gates (Discovery Direction / Solution / Execution).

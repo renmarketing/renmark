@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-06] — verify: rethink Release 15 (governed-orchestration-assurance) — 14/14 tasks verified
+**Request:** `/renmark:verify` smoke pass for Release 15.
+**Built:** Re-ran fresh: `pytest -q` (2098 passed, 32 skipped), `renmark-execute --behavior` (16/16 passed), `tests/test_behavior_ci_gating.py` (1 passed), visually confirmed the CI workflow step. Wrote `.renmark/reviews/2026-08-05-26f0fd3.verification.md`, `lifecycle.json` stage=`verified`.
+**Files changed:**
+- `.renmark/reviews/2026-08-05-26f0fd3.verification.md` — new.
+**Do not change:**
+- Every `behavior.py` adapter must call real production code, never approximate it.
+- CI-gating must never relax the deterministic tier's zero-token/no-network contract.
+**Release 15 verified — AC-8 (Req 8) closes.** 16 real cases (7 pre-existing + 9 new), honestly not padded to the roadmap's "20-case" framing.
+
 ## [2026-08-06] — feat: rethink Release 15 (governed-orchestration-assurance) — behavioral eval suite + CI-gating
 **Request:** Release 15, revised in scope mid-flight per Owner decision (2026-08-05): the roadmap's fixture-split table claimed 7 fixture groups were "authored alongside" releases 1/4/6/8/9/10/13, but investigation found only 1 of 7 actually existed (and it was silently red). Owner chose to author all 9 missing/incomplete groups here (6 retroactive + 3 originally Release 15's own) and CI-gate the result, rather than descope.
 **Built:** 9 new `tests/behavioral/*.behavior.json` fixtures (fast-path accept/reject, task-tracker transitions, capability-envelope denial, judge input-isolation/3-state outcome, failure-rule injection, retry/rework survives resume [exercises the Release 13 Finding A fix directly], worker replan-refusal, inspector-can't-repair, judge-can't-override-deterministic-fail). 9 new `renmark/behavior.py` adapters, each calling real production functions — no hand-copied logic, wired across 3 sequential waves (same file). `.github/workflows/test.yml` gains a `behavioral eval suite (deterministic tier)` CI step after `pytest`, making `renmark-execute --behavior` (already exits non-zero on FAIL) CI-blocking. `tests/test_behavior_ci_gating.py` — subprocess regression test independent of the GitHub Actions file itself. Final honest count: 16/16 cases passing (7 pre-existing + 9 new) — not padded to a specific "20" number the roadmap's prose implied. Two genuine fixture defects found and fixed in-flight (not adapter defects): a substring-collision assertion (`not_contains:patch` vs. the required field name `dispatch_identity`), and Task 7's own finding that the schema has no cross-field `is_replannable`↔`replan_evidence` enforcement rule (only per-field type validation) — fixture adapted to real behavior. Full suite: 2098 passed, 32 skipped (up from 2097).
