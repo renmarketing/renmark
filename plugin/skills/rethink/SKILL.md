@@ -305,6 +305,14 @@ capacity, and maintainability — a justified boundary, not a fashionable one.
 Written to `.renmark/rethink/<slug>/modularity-assessment.md`; bounded ≤5-line
 return only (module count, top coupling/scaling risk, artifact path).
 
+**Elevated-risk lens.** When this stage's dispatch reads or assesses a module
+listed in `renmark.ledger._CRITICAL_MODULES` (or the target repo's equivalent
+critical set), the `WorkOrder` behind it carries the lens
+`subagent_gate.resolve_lens_for` resolves for the resulting risk tier —
+typically `skeptical_user` at `high`/`critical` — applying Release 8's lens
+mechanism to rethink's own architectural-assessment dispatch, not only to
+downstream build work.
+
 ### 5a. Discovery Direction Gate
 
 After stages 1–5 (survey, baseline, PRD acceptance contract, external
@@ -372,6 +380,12 @@ Written to `.renmark/rethink/<slug>/classification.md`. Every `Unknown` entry
 must carry its spike's question, scope, evidence requirement, budget, and stop
 condition — an unbounded `Unknown` is a defect in the classification, not a
 valid outcome.
+
+**Dispatch parity.** The subagent that performs this classification (and
+stage 7's blueprint dispatch) is built via `ledger.work_order_for_task` like
+any other renmark dispatch — extending Release 3's reconciled work-order
+funnel to rethink's own internal dispatches, not a parallel or exempt
+dispatch path.
 
 ### 7. Target modular blueprint
 
