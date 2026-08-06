@@ -663,6 +663,171 @@ def _render_risk_tier_lens_selection(repo: Path, case: Case) -> str:
     )
 
 
+def _render_fast_path_accept_reject(repo: Path, case: Case) -> str:
+    """Render live ``fast_path.classify_fast_path`` verdicts for two waves.
+
+    Exercises the REAL 5-signal classifier (no hand-copied logic here): one
+    wave is a single-file, mode-B, non-``renmark/``/``plugin/`` target with a
+    single-command verifier and no cross-file context — eligible with no
+    failed signals. The other wave is three tasks with three distinct targets
+    (trips ``scope_size``, signal 1 — more than ``MAX_FAST_PATH_FILES``) where
+    one task carries an invalid mode outside ``("A", "B")`` (trips
+    ``action_type``, signal 2), so both named failed signals come from the
+    real classifier's own logic, not this adapter.
+    """
+    from .fast_path import classify_fast_path
+    from .parser import Task
+
+    _ = repo
+    eligible_task = Task(
+        index=1,
+        title="update docs",
+        mode="B",
+        target="docs/README.md",
+        executor="haiku",
+        spec="fix a typo",
+        verifier="true",
+    )
+    eligible_verdict = classify_fast_path([eligible_task])
+
+    ineligible_tasks = [
+        Task(
+            index=1,
+            title="rewrite module one",
+            mode="D",  # invalid mode -> trips signal 2 (action_type)
+            target="docs/one.md",
+            executor="haiku",
+            spec="rewrite module one",
+            verifier="true",
+        ),
+        Task(
+            index=2,
+            title="rewrite module two",
+            mode="B",
+            target="docs/two.md",
+            executor="haiku",
+            spec="rewrite module two",
+            verifier="true",
+        ),
+        Task(
+            index=3,
+            title="rewrite module three",
+            mode="B",
+            # 3 distinct targets (> MAX_FAST_PATH_FILES=2) -> trips signal 1 (scope_size)
+            target="docs/three.md",
+            executor="haiku",
+            spec="rewrite module three",
+            verifier="true",
+        ),
+    ]
+    ineligible_verdict = classify_fast_path(ineligible_tasks)
+
+    return (
+        f"dispatch A (single-file, mode B, docs/README.md): "
+        f"eligible={eligible_verdict.eligible} "
+        f"failed_signals={eligible_verdict.failed_signals!r}\n"
+        f"dispatch B (multi-file, invalid mode): "
+        f"eligible={ineligible_verdict.eligible} "
+        f"failed_signals={ineligible_verdict.failed_signals!r}\n"
+    )
+
+
+def _render_task_tracker_transitions(repo: Path, case: Case) -> str:
+    """Render a live task-tracking lifecycle: create -> in_progress -> refused complete.
+
+    Exercises the REAL :mod:`renmark.task_tracking` state layer end to end in
+    an isolated scratch dir under ``.renmark/state/``: a freshly created task
+    starts ``pending``, :func:`task_tracking.mark_in_progress` moves it to
+    ``in_progress``, and calling :func:`task_tracking.complete_task` with
+    neither ``artifact_path`` nor ``result_summary`` raises
+    :class:`task_tracking.MissingEvidenceError` rather than silently marking
+    it completed. No logic is hand-copied here — every transition is the real
+    function's real return value or real raised exception.
+    """
+    import shutil
+
+    from . import task_tracking
+
+    _ = case
+    tmp = repo / ".renmark" / "state" / "_behavior-task-tracker"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        created = task_tracking.create_or_reuse_task(
+            tmp,
+            "task-1",
+            title="dispatch example task",
+            role="code-implementer",
+            scope="renmark/behavior.py",
+            verification_expectation="tests pass",
+        )
+        in_progress = task_tracking.mark_in_progress(tmp, "task-1")
+        try:
+            task_tracking.complete_task(
+                tmp, "task-1", artifact_path="", result_summary=""
+            )
+            refusal = "NOT RAISED (unexpected)"
+        except task_tracking.MissingEvidenceError as exc:
+            refusal = f"MissingEvidenceError: {exc}"
+
+        completed = task_tracking.complete_task(
+            tmp,
+            "task-1",
+            artifact_path="renmark/behavior.py",
+            result_summary="wired the fast-path/task-tracking/capability-envelope adapters",
+        )
+        return (
+            f"created status={created.status}\n"
+            f"in_progress status={in_progress.status}\n"
+            f"complete_task without evidence: {refusal}\n"
+            f"complete_task with evidence: status={completed.status} "
+            f"artifact_path={completed.artifact_path!r} "
+            f"result_summary={completed.result_summary!r}\n"
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _render_capability_envelope_denial(repo: Path, case: Case) -> str:
+    """Render live ``subagent_gate.check_capability_envelope`` verdicts for
+    an in-envelope and an out-of-envelope dispatch to the ``code-implementer``
+    role.
+
+    Exercises the REAL per-control table (:data:`subagent_gate.ENVELOPE_CONTROL_STATUS`)
+    via the real function — no hand-copied policy here. ``code-implementer``'s
+    declared ``allowed_targets`` (``renmark/**/*.py, bin/*, *.py``) and
+    ``allowed_commands`` (``python3, pytest, git, ruff, mypy``) mean a dispatch
+    requesting ``renmark/subagent_gate.py`` + ``pytest`` is fully within
+    envelope, while one requesting ``docs/README.md`` + ``rm`` names both a
+    path and a command violation with ``passed=False``.
+    """
+    from .subagent_gate import check_capability_envelope
+
+    _ = case
+    role = "code-implementer"
+
+    in_scope_scope = {"paths": ["renmark/subagent_gate.py"], "commands": ["pytest"]}
+    out_of_scope_scope = {"paths": ["docs/README.md"], "commands": ["rm"]}
+    in_scope = check_capability_envelope(role, in_scope_scope, host="claude")
+    out_of_scope = check_capability_envelope(role, out_of_scope_scope, host="claude")
+
+    lines = [f"role={role}"]
+    for label, requested, verdicts in (
+        ("in-scope dispatch", in_scope_scope, in_scope),
+        ("out-of-scope dispatch", out_of_scope_scope, out_of_scope),
+    ):
+        lines.append(
+            f"{label}: requested_paths={requested['paths']!r} "
+            f"requested_commands={requested['commands']!r}"
+        )
+        for v in verdicts:
+            lines.append(
+                f"  control={v.control} passed={v.passed} status={v.status} "
+                f"reason={v.reason} violations={v.violations!r}"
+            )
+    return "\n".join(lines)
+
+
 def _render_selector(repo: Path, case: Case, host: str) -> str:
     """Render one live host selector contract as bounded JSON text."""
     import json
@@ -1010,6 +1175,9 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "interaction.selector_cross_host_trajectory": _render_selector_cross_host_trajectory,
     "plan_lint": _render_plan_lint,
     "ledger.work_order_for_task": _render_risk_tier_lens_selection,
+    "fast_path.classify_fast_path": _render_fast_path_accept_reject,
+    "task_tracking.transitions": _render_task_tracker_transitions,
+    "subagent_gate.check_capability_envelope": _render_capability_envelope_denial,
 }
 
 
