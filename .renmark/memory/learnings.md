@@ -280,3 +280,26 @@ is safe and backward-compatible — the single most severe bug found this
 program (unbounded git-log index-only matching could silently skip real work
 on `--resume` once two plans reused the same task index, which this repo's
 own history now guarantees).
+
+### 2026-08-05 (2026-08-06 UTC wall-clock) — Release 14 wave 3: codex ad-hoc self-report FAIL/schema_compliance=false on 3/3 dispatches, all 3 files were actually fine
+
+Continuation of the codex-task-ad-hoc-unreliable finding above. All three
+Release 14 wave-3 codex dispatches (`renmark-execute --task <brief> --output
+<file>`) self-reported `completion_state: partial, confidence: low,
+validation_status: failed, schema_compliance: false` — yet independently
+re-running each target file's real pytest suite showed genuine, substantive,
+passing test additions in every case (test_analytics_guardrail_metrics.py: 5
+tests; test_dispatch.py: +6; test_recurrence.py: +6). This is the OPPOSITE
+failure mode from the earlier corrupted-YAML-frontmatter finding — here the
+generated code was fine but the self-reported JSON status was pessimistically
+wrong. Separately, one dispatch (task 5) was given a wrong `--output` path by
+the orchestrator (my own error, not codex's) — codex faithfully wrote real
+code to the wrong new filename AND self-appended a CHANGELOG.md entry for it
+unprompted (a third instance of the "workers self-integrate beyond scope"
+pattern). Both artifacts were discarded/reverted; task 5 was correctly
+redispatched to the right path. Lesson: (1) never trust either direction of
+this path's self-reported status — verify PASS claims (known) AND verify FAIL
+claims before discarding real work (new); (2) double-check `--output` paths
+against the plan's actual `target:` field before dispatching, especially for
+mode B (edit-existing) tasks where a wrong path silently creates a NEW file
+instead of erroring.
