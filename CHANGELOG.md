@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-06] — PRD updated
+**Request:** Clarify REQ-31 per the `cross-host-native-tool-leverage` rethink's Stage 3 exception check-in — resolve whether REQ-31 covers a live, interactive Codex session (which has no confirmed native task-visibility primitive).
+**Built:** Reconciled REQ-31: mechanism (i) now scopes to "any host whose native tool surface actually provides task-visibility primitives" (today: Claude Code only) instead of naming Claude Code exclusively; mechanism (ii)'s scope widens from "the one dispatch path with no live session at all" to "any dispatch path lacking a native task-visibility primitive" — covering both the existing headless codex/subprocess executor AND a live interactive session on a host with no native equivalent (Codex today). Substance unchanged (still two non-substitutable mechanisms, same lifecycle). Bumped `last_reviewed`.
+**Files changed:**
+- `PRD.md` — REQ-31 amended.
+**Do not change:**
+- Mechanism (ii) must never substitute for (i) on a host that actually has native task tools — the widened scope only covers hosts genuinely lacking one.
+**Note:** this is a wording clarification only — `renmark.task_tracking` is still not wired into any live interactive Codex dispatch path (confirmed absent in this rethink's Stage 1 survey). Closing that gap for real is separate follow-up work, expected to land as a roadmap item from this same rethink pass, not from this PRD edit.
+
 ## [2026-08-06] — release: bump version 0.43.0 -> 0.43.1
 **Request:** Patch release for the doctor.py Codex-detection fix.
 **Built:** Bumped all 8 canonical version locations. Fixed a test isolation bug found by the bump itself: `test_codex_registry_check_falls_back_to_plain_text_when_json_unsupported` hardcoded a version string that had to match the ambient `VERSION` file, so it broke the moment `VERSION` moved past `0.43.0` — now monkeypatches `doctor._current_version` so the test is isolated from real filesystem state. Full suite: 2101 passed, 32 skipped.

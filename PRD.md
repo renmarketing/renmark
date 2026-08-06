@@ -2,7 +2,7 @@
 artifact_type: prd
 schema_version: 1
 created_at: 2026-06-08
-last_reviewed: 2026-08-05
+last_reviewed: 2026-08-06
 status: draft
 ---
 
@@ -686,21 +686,26 @@ first-class hosts for the same product workflow, not separate product forks.
     mechanisms**, defined once in `${CLAUDE_PLUGIN_ROOT}/skills/.shared/
     task-tracking.md` and cited — never restated — by each pipeline's
     dispatch path via the existing `subagent-budget.md` contract:
-    (i) **the live host's own native Task tools** (Claude Code's
-    `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`) — whenever an interactive
-    session is itself executing a renmark skill and calls `Agent` to
-    dispatch a subagent, that session calls its own native tools around the
-    dispatch; this is a skill instruction to the executing agent, satisfied
-    only by that agent's real tool calls, and is the sole mechanism that
-    satisfies "before dispatching work, create a native task using the
-    available Task tools" — no Python module can invoke a host's tools on
-    an agent's behalf; and (ii) **`renmark.task_tracking`**
-    (`.renmark/state/tasks.json`), a real, tested Python mirror of the same
-    lifecycle wired into the one dispatch path that has no live session to
-    call native tools at all — `renmark.cli._engine.execute_plan`'s
-    `_runner`, which hands work to the headless `codex`/subprocess executor.
-    Mechanism (ii) is scoped strictly to that headless path; it never
-    substitutes for (i) when a live agent is present. One
+    (i) **the live host's own native Task tools**, on any host whose native
+    tool surface actually provides task-visibility primitives — today,
+    Claude Code's `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet` (Codex's
+    plugin surface has no confirmed equivalent as of 2026-08-06) — whenever
+    an interactive session on such a host is itself executing a renmark
+    skill and calls `Agent` to dispatch a subagent, that session calls its
+    own native tools around the dispatch; this is a skill instruction to
+    the executing agent, satisfied only by that agent's real tool calls,
+    and is the sole mechanism that satisfies "before dispatching work,
+    create a native task using the available Task tools" on a host that has
+    them — no Python module can invoke a host's tools on an agent's behalf;
+    and (ii) **`renmark.task_tracking`** (`.renmark/state/tasks.json`), a
+    real, tested Python mirror of the same lifecycle, wired into any
+    dispatch path lacking a native task-visibility primitive of its own —
+    both `renmark.cli._engine.execute_plan`'s `_runner` (the headless
+    `codex`/subprocess executor) and, on a host with no native equivalent
+    (Codex today), a live interactive session's own dispatch path. Mechanism
+    (ii) is the acceptable substitute wherever (i) has nothing to call; it
+    never substitutes for (i) on a host that actually has native task tools.
+    One
     parent task per milestone, one bounded task per dispatch — never a task
     for trivial internal reasoning or a deterministic check. Each dispatched
     task's content mirrors the dispatch packet's existing required fields
