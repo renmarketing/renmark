@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-08-06] — release: bump version 0.43.0 -> 0.43.1
+**Request:** Patch release for the doctor.py Codex-detection fix.
+**Built:** Bumped all 8 canonical version locations. Fixed a test isolation bug found by the bump itself: `test_codex_registry_check_falls_back_to_plain_text_when_json_unsupported` hardcoded a version string that had to match the ambient `VERSION` file, so it broke the moment `VERSION` moved past `0.43.0` — now monkeypatches `doctor._current_version` so the test is isolated from real filesystem state. Full suite: 2101 passed, 32 skipped.
+**Files changed:**
+- `VERSION`, `pyproject.toml`, `renmark/__init__.py`, `plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `README.md` — version bump.
+- `tests/test_doctor.py` — test isolation fix.
+**Do not change:**
+- Tests exercising `_current_version()`-dependent branches must monkeypatch it, never assume the ambient `VERSION` file's value.
+
 ## [2026-08-06] — fix: doctor.py false "not installed" on Codex CLI builds rejecting `plugin list --json`
 **Request:** Found live during post-release WSL install verification (`/renmark:doctor`) — `codex plugin add renmark@personal` succeeded and plain `codex plugin list` confirmed it, but doctor still reported "not installed."
 **Built:** `check_codex_installed()` now falls back to parsing `codex plugin list`'s plain-text table (`_parse_plain_codex_plugin_list()`) when the `--json` invocation exits non-zero, instead of trusting an empty/unusable JSON payload. Never raises; a genuinely-absent plugin still correctly reports "not installed." `tests/test_doctor.py` gains coverage for the fallback path and all three status phrases (`installed, enabled` / `installed, disabled` / `not installed`). Full suite: 2101 passed, 32 skipped.

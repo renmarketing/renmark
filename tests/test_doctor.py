@@ -90,13 +90,14 @@ def test_codex_registry_check_falls_back_to_plain_text_when_json_unsupported(mon
     a false "not installed" — doctor should fall back to parsing the plain
     table instead of trusting an empty/unusable JSON payload."""
     monkeypatch.setattr(doctor.shutil, "which", lambda command: "/fake/codex")
+    monkeypatch.setattr(doctor, "_current_version", lambda: "1.2.3")
 
     plain_table = (
         "Marketplace `personal`\n"
         "/home/user/.agents/plugins/marketplace.json\n"
         "\n"
         "PLUGIN            STATUS              VERSION                            PATH\n"
-        "renmark@personal  installed, enabled  0.43.0+codex.local.20260806050132  /home/user/plugins/renmark\n"
+        "renmark@personal  installed, enabled  1.2.3+codex.local.20260806050132  /home/user/plugins/renmark\n"
     )
 
     def fake_run(args, **kwargs):
