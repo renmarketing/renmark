@@ -1,5 +1,16 @@
 # Decisions (ADRs)
 
+## ADR-052 — Finished feature governed-orchestration-assurance
+
+**Date:** 2026-08-06
+**Status:** Accepted
+
+**Context.** Completed stages: plan-validated, created, verified, reviewed, plan-drafted
+
+**Decision.** Reached stage verified
+
+---
+
 ## ADR-051 — Failure-derived constraint registry (Req 7) is distinct from recurrence.py's REQ-24 recurrence-prevention
 
 **Date:** 2026-08-05
