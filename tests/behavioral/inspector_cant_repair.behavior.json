@@ -11,13 +11,12 @@
       "contains:findings",
       "contains:subject_ref",
       "contains:dispatch_identity",
-      "not_contains:patch",
       "not_contains:diff",
       "not_contains:fix"
     ]
   },
   "eval": {
-    "contract": "The inspector's declared agent tool scope (Read, Grep, Glob, Bash — no Write/Edit) and its InspectionReport output shape (subject_ref/verdict/findings/dispatch_identity, no patch/diff/fix field) together make the role structurally incapable of repairing what it inspects.",
+    "contract": "The inspector's declared agent tool scope (Read, Grep, Glob, Bash — no Write/Edit) and its InspectionReport output shape (subject_ref/verdict/findings/dispatch_identity, no diff/fix field) together make the role structurally incapable of repairing what it inspects. (A literal 'not_contains:patch' assertion is not usable here: the required field name 'dispatch_identity' itself contains the substring 'patch', so that check would be unsatisfiable regardless of the role's real read-only shape — removed as a fixture defect, not an adapter defect.)",
     "golden_ref": "inspector_cant_repair.golden"
   }
 }

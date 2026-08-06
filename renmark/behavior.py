@@ -1330,6 +1330,161 @@ def _render_selector_cross_host_trajectory(repo: Path, case: Case) -> str:
     return json.dumps(_selector_trajectory_payload(repo, case), sort_keys=True)
 
 
+def _render_worker_replan_refusal(repo: Path, case: Case) -> str:
+    """Render live ``ledger.validate_escalation`` behavior on a replan claim.
+
+    Exercises the REAL ``ledger.Escalation`` dataclass default and the REAL
+    ``ledger.validate_escalation`` schema check end to end -- no hand-copied
+    logic here. A default ``Escalation()`` (``is_replannable=False``,
+    ``replan_evidence=None``) validates clean: it makes no replan claim, so
+    there is nothing to substantiate. A second payload sets
+    ``is_replannable=True`` but supplies a non-string ``replan_evidence``
+    (an ``int``) -- an unsubstantiated/malformed replan claim -- and the real
+    validator flags it with an explicit type-mismatch issue via
+    ``_check_opt_str``, never a bool-shaped complaint (``is_replannable`` is a
+    genuine bool here, so that check must NOT fire).
+    """
+    from dataclasses import asdict
+
+    from .ledger import Escalation, validate_escalation
+
+    _ = repo
+
+    default_escalation = Escalation(reason="no replan requested")
+    default_issues = validate_escalation(asdict(default_escalation))
+
+    malformed_payload = asdict(
+        Escalation(reason="claims a replan", is_replannable=True)
+    )
+    malformed_payload["replan_evidence"] = 7  # non-string -> type-mismatch issue
+    malformed_issues = validate_escalation(malformed_payload)
+
+    return (
+        f"default Escalation: is_replannable={default_escalation.is_replannable} "
+        f"replan_evidence={default_escalation.replan_evidence!r} "
+        f"issues={default_issues!r}\n"
+        f"malformed replan claim: is_replannable={malformed_payload['is_replannable']} "
+        f"replan_evidence={malformed_payload['replan_evidence']!r} "
+        f"issues={malformed_issues!r}\n"
+    )
+
+
+def _render_inspector_cant_repair(repo: Path, case: Case) -> str:
+    """Render the inspector's live agent tool scope + InspectionReport shape.
+
+    Exercises the REAL declared agent frontmatter (``plugin/agents/inspector.md``
+    ``tools:`` line), the REAL ``subagent_profiles.PROFILES["inspector"]``
+    profile, and the REAL ``ledger.InspectionReport`` dataclass field set -- no
+    hand-copied policy here. The agent's declared tool scope is
+    ``Read, Grep, Glob, Bash`` (no ``Write``/``Edit``), and its output shape
+    is ``subject_ref``/``verdict``/``findings``/``dispatch_identity`` -- no
+    ``patch``/``diff``/``fix`` field -- together making the role structurally
+    incapable of repairing what it inspects.
+    """
+    from dataclasses import fields
+
+    from . import subagent_profiles
+    from .ledger import InspectionReport
+
+    _ = repo, case
+
+    agent_md = (
+        Path(__file__).resolve().parents[1] / "plugin" / "agents" / "inspector.md"
+    )
+    text = agent_md.read_text(encoding="utf-8")
+    tools_line = ""
+    for line in text.splitlines():
+        if line.strip().startswith("tools:"):
+            tools_line = line.split(":", 1)[1].strip().strip('"')
+            break
+
+    profile = subagent_profiles.PROFILES["inspector"]
+    report_fields = [f.name for f in fields(InspectionReport)]
+
+    return (
+        f"inspector.md declared tools: {tools_line}\n"
+        f"PROFILES['inspector'].allowed_targets: {profile.allowed_targets}\n"
+        f"PROFILES['inspector'].stop_condition: {profile.stop_condition}\n"
+        f"InspectionReport fields: {report_fields!r}\n"
+    )
+
+
+def _render_judge_cant_override_deterministic_fail(repo: Path, case: Case) -> str:
+    """Render a live proof that judge escalation never flips FAIL to PASS.
+
+    Exercises THIS module's own :func:`run` end to end (no hand-copied logic):
+    builds a deliberately-failing case (an unsatisfiable assertion against a
+    real ``lifecycle.next_steps`` render), records a synthetic eval golden so
+    the judge escalation path is reachable, then calls ``run(..., judge=True)``
+    with a stub runner whose raw response claims an emphatic PASS-shaped
+    verdict. ``run`` only ever attaches the resulting verdict to
+    ``result.judge_verdict`` -- it never rewrites ``result.status`` -- so the
+    case's status is asserted FAIL both before and after escalation, while a
+    judge verdict is genuinely present.
+    """
+    import shutil
+
+    _ = case
+
+    tmp = repo / ".renmark" / "state" / "_behavior-judge-cant-override"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        source = tmp / "synthetic.behavior.json"
+        failing_case = Case(
+            skill="roadmap",
+            prompt="render the next-steps menu",
+            deterministic=DeterministicSpec(
+                call="lifecycle.next_steps",
+                assertions=(
+                    "contains:THIS_STRING_WILL_NEVER_APPEAR_IN_A_REAL_RENDER",
+                ),
+            ),
+            eval=EvalSpec(
+                contract="the menu always marks a recommended tier0 option",
+                golden_ref="judge_cant_override_deterministic_fail_synthetic",
+            ),
+            source=source,
+        )
+
+        _write_snapshot(
+            _snapshot_path(failing_case, failing_case.eval.golden_ref),
+            "synthetic with-skill golden transcript",
+        )
+
+        before_results = run(cases=[failing_case], repo=tmp, on_fail_offer=False)
+        before_status = before_results[0].status
+
+        def _stub_runner(prompt: str) -> str:
+            _ = prompt
+            return (
+                '{"outcome": "pass", "confidence": "high", '
+                '"rationale": "stub runner emphatically claims PASS"}'
+            )
+
+        after_results = run(
+            cases=[failing_case],
+            repo=tmp,
+            judge=True,
+            subagent_runner=_stub_runner,
+        )
+        after_result = after_results[0]
+
+        payload = {
+            "before_status": before_status,
+            "after_status": after_result.status,
+            "judge_verdict_present": after_result.judge_verdict is not None,
+            "judge_verdict_outcome": (
+                after_result.judge_verdict.get("outcome")
+                if after_result.judge_verdict is not None
+                else None
+            ),
+        }
+        return json.dumps(payload, sort_keys=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # call key -> adapter(repo, case) -> rendered current output text.
 # EXPLICIT allow-list: an unresolved key is a FAIL (see _run_deterministic),
 # never an import-time surprise or a silent pass.
@@ -1351,6 +1506,11 @@ _DISPATCH: dict[str, Callable[[Path, Case], str]] = {
     "judge.input_isolation_and_outcome": _render_judge_input_isolation_and_outcome,
     "subagent_gate.failure_rule_injection": _render_failure_rule_injection,
     "cli_engine.cross_check_skip_list": _render_retry_rework_survives_resume,
+    "ledger.worker_replan_refusal": _render_worker_replan_refusal,
+    "subagent_profiles.inspector_cant_repair": _render_inspector_cant_repair,
+    "behavior.judge_cant_override_deterministic_fail": (
+        _render_judge_cant_override_deterministic_fail
+    ),
 }
 
 
