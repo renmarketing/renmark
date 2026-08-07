@@ -146,6 +146,7 @@ class TaskRecord:
     artifact_path: str | None = None
     result_summary: str | None = None
     close_reason: str | None = None
+    source: str = ""
     history: list[str] = field(default_factory=list)
 
     def _note(self, line: str) -> None:
@@ -219,6 +220,7 @@ def create_or_reuse_task(
     depends_on: tuple[str, ...] = (),
     dispatch_identity: str = "",
     order_id: str = "",
+    source: str = "",
 ) -> TaskRecord:
     """Create a task, or return the existing one unchanged (resume-reuse).
 
@@ -246,6 +248,7 @@ def create_or_reuse_task(
         depends_on=tuple(depends_on),
         dispatch_identity=dispatch_identity,
         order_id=order_id,
+        source=source,
     )
     rec._note(f"created (role={role})")
     tasks[task_id] = rec
