@@ -14,6 +14,7 @@ from typing import Any
 
 from renmark import hygiene
 from renmark import lifecycle as _lifecycle
+from renmark import task_tracking as _task_tracking
 
 from .commands import (
     cmd_analytics,
@@ -417,6 +418,52 @@ def _dispatch_compact_flags(args: argparse.Namespace, repo: Path) -> int | None:
             print("compact_gate_tokens set to 0 (gate disabled)")
         else:
             print(f"compact_gate_tokens set to {args.set_compact_gate_tokens}")
+        return 0
+    return None
+
+
+def _dispatch_task_tracking_flags(args: argparse.Namespace, repo: Path) -> int | None:
+    """Handle --task-create/--task-in-progress/--task-complete (REQ-31 Codex
+    live-session task tracking; cross-host-native-tool-leverage Release 4).
+
+    Wraps renmark.task_tracking for a live, interactive Codex session, which has
+    no native TaskCreate/TaskUpdate tool of its own. Tags every task it creates
+    with source="codex-live" to distinguish from the pre-existing headless
+    renmark-execute subprocess path (source="codex-headless").
+    """
+    if args.task_create:
+        rec = _task_tracking.create_or_reuse_task(
+            repo,
+            args.task_create,
+            title=args.title or "",
+            role=args.role or "",
+            scope=args.scope or "",
+            verification_expectation=args.verification_expectation or "",
+            parent_id=args.parent_id,
+            source="codex-live",
+        )
+        print(f"task {rec.task_id} tracked (status={rec.status})")
+        return 0
+    if args.task_in_progress:
+        try:
+            rec = _task_tracking.mark_in_progress(repo, args.task_in_progress)
+        except _task_tracking.UnknownTaskError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
+        print(f"task {rec.task_id} in_progress")
+        return 0
+    if args.task_complete:
+        try:
+            rec = _task_tracking.complete_task(
+                repo,
+                args.task_complete,
+                artifact_path=args.artifact_path or "",
+                result_summary=args.result_summary or "",
+            )
+        except (_task_tracking.UnknownTaskError, _task_tracking.MissingEvidenceError) as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
+        print(f"task {rec.task_id} completed (artifact={rec.artifact_path})")
         return 0
     return None
 
