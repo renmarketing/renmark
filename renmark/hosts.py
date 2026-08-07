@@ -40,6 +40,13 @@ class HostCapabilities:
     supports_clear: bool
     supports_resume: bool
     supports_compact: bool = False
+    # Additive (cross-host-native-tool-leverage Release 3). Declares whether this
+    # host exposes the ExitWorktree tool at all — it is NOT wired into any skill
+    # yet. finish/SKILL.md §3.6's worktree-cleanup target is a different, dead
+    # code path (no renmark skill creates a worktree via EnterWorktree), so this
+    # field currently has no consumer. See .renmark/rethink/
+    # cross-host-native-tool-leverage/roadmap.md Release 3.
+    supports_exit_worktree: bool = False
 
 
 _CAPABILITIES: dict[HostKind, HostCapabilities] = {
@@ -53,6 +60,7 @@ _CAPABILITIES: dict[HostKind, HostCapabilities] = {
         supports_clear=True,
         supports_resume=True,
         supports_compact=True,
+        supports_exit_worktree=True,
     ),
     HostKind.CODEX: HostCapabilities(
         render_surface="codex-default",

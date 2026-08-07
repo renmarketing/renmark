@@ -44,6 +44,7 @@ def test_explicit_host_wins_over_environment(monkeypatch: pytest.MonkeyPatch) ->
                 supports_clear=True,
                 supports_resume=True,
                 supports_compact=True,
+                supports_exit_worktree=True,
             ),
         ),
         (
@@ -146,6 +147,7 @@ def test_codex_capabilities_do_not_claim_clear_or_resume() -> None:
     assert capabilities.supports_clear is False
     assert capabilities.supports_resume is False
     assert capabilities.supports_compact is False
+    assert capabilities.supports_exit_worktree is False
 
 
 def test_claude_capabilities_preserve_existing_context_commands() -> None:
@@ -158,6 +160,7 @@ def test_claude_capabilities_preserve_existing_context_commands() -> None:
     assert capabilities.supports_clear is True
     assert capabilities.supports_resume is True
     assert capabilities.supports_compact is True
+    assert capabilities.supports_exit_worktree is True
 
 
 def test_unknown_host_is_conservative(monkeypatch: pytest.MonkeyPatch) -> None:
