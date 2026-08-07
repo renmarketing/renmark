@@ -111,6 +111,7 @@ def _create_parent_task(repo: Path, run_id: str, plan_path: str) -> str:
             role="orchestrator",
             scope=plan_path,
             verification_expectation="every dispatched task independently verified",
+            source="codex-headless",
         )
         _task_tracking.mark_in_progress(repo, parent_task_id)
     except Exception:
@@ -168,6 +169,7 @@ def _track_worker_dispatch(
             parent_id=parent_task_id,
             dispatch_identity=dispatch_identity,
             order_id=order_id,
+            source="codex-headless",
         )
         _task_tracking.mark_in_progress(repo, worker_task_id)
     except Exception:
@@ -292,6 +294,7 @@ def _inspect_and_track(
                 parent_id=parent_task_id,
                 depends_on=(worker_task_id,),
                 dispatch_identity=_INSPECTOR_DISPATCH_IDENTITY,
+                source="codex-headless",
             )
             _task_tracking.mark_in_progress(repo, verify_task_id)
             _task_tracking.complete_task(
