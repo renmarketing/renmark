@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-07] — feat: auto-proceed on unambiguous next steps, invisible routing
+**Request:** Owner feedback after living through a finish run with 5 sequential confirmations — renmark should feel invisible inside Claude Code (like a natural-language request that just runs), not commandy. A 6-way parallel audit classified every AskUserQuestion gate across debug/verify/feature/start/rethink/roadmap/finish/loop/orchestrate/plan/check-plan/brainstorm/prd; a follow-up verification pass confirmed which fixes were cheap (prose-only) vs needed new plumbing.
+**Built:** `next-steps.md` gets a `requires_decision`-gated auto-proceed path (skip the picker, one-line status, chain into the next step) — the same behavior headless mode already had, ported to interactive sessions. `finish/SKILL.md` folds the redundant tag/GitHub-publish re-confirms into the `[r]` menu selection. `brainstorm/SKILL.md` collapses section-by-section spec approval into one, and auto-chains into `/renmark:plan` when unambiguous. `renmark/global_routing.py`'s routing block gets a "Route invisibly" clause (no skill-launch announcements, no pipeline-naming questions, chain through routine transitions); `~/.claude/CLAUDE.md` synced to the current template (was stale on the plan/orchestrate/loop verbs too).
+**Deferred (real fixes, need new plumbing):** debug's "did scope change this session" signal — no field exists yet in `session.md`; roadmap's "one clear top candidate" — no score/margin exists in the ranking output yet. Investigated and ruled a false alarm: plan's step-8b vs. closing-menu "duplicate" — only one menu ever fires.
+**Files changed:**
+- `plugin/skills/.shared/next-steps.md` — auto-proceed contract + citation blocks.
+- `plugin/skills/finish/SKILL.md` — §4b/§4d folded into `[r]`.
+- `plugin/skills/brainstorm/SKILL.md` — Step 5 consolidated, Step 7 auto-chains.
+- `renmark/global_routing.py` — routing block body.
+- `~/.claude/CLAUDE.md` — synced (outside the repo; user's global instructions).
+**Do not change:** the auto-proceed exception is narrowly scoped to `requires_decision=false` AND a non-dangerous next step — it must never bypass merge/release/publish/install gates or a real scope-change signal. Don't widen it without re-running the same audit discipline.
+
 ## [2026-08-07] — fix: summary.is_stale crashed on naive-vs-aware datetime compare
 **Request:** `/renmark:finish` M6 re-verify — `pytest -q` failed on `test_scan_reports_due_for_review_without_mutating_rule_status`; root-caused rather than skipped, since a failed re-verify blocks finish.
 **Root cause:** `.renmark/plans/2026-08-05-governed-orchestration-assurance-release-11.plan.md` carries `stale_after: 2026-09-05` (date-only, no timezone). `summary.is_stale()` parsed it via `datetime.fromisoformat()` unconditionally, producing a naive `datetime` compared directly against an aware `datetime.now(timezone.utc)` — `TypeError`. This exact defect was logged-but-not-fixed on 2026-08-05 as an out-of-scope dogfooding finding; it became load-bearing once a routine `renmark.hygiene scan` (inside the test, and inside finish's own re-verify) exercised the same artifact.
