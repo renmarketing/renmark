@@ -1,5 +1,5 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-08-06 @ ab9dadd -->
+<!-- Last refreshed: 2026-08-07 @ 3f94f37 -->
 
 # Dev standards — renmark
 
@@ -21,7 +21,7 @@ What this project enforces about itself, detected from configuration files. Read
 ✅ **No gaps detected.** Linter, type checker, tests, and CI are all wired up.
 ## Modularity
 
-**305 modularity gaps** (23 major, 282 warn) — file-level size/complexity breaches. Advisory: these never block init.
+**308 modularity gaps** (24 major, 284 warn) — file-level size/complexity breaches. Advisory: these never block init.
 
 - 🚨 **Long function: `renmark/interaction.py` → `build_selector()` (107 code lines)** — `build_selector()` in `renmark/interaction.py` spans 107 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `build_selector()` into well-named helpers. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/doctor.py` → `main()` (23 branches)** — `main()` in `renmark/doctor.py` has a cyclomatic branch count of 23 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `main()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
@@ -37,13 +37,13 @@ What this project enforces about itself, detected from configuration files. Read
 - 🚨 **High cognitive complexity: `renmark/hygiene.py` → `validate_registry_compliance()` (score 36)** — `validate_registry_compliance()` in `renmark/hygiene.py` has a nesting-weighted cognitive-complexity score of 36 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `validate_registry_compliance()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/hygiene.py` → `scan_artifacts()` (30 branches)** — `scan_artifacts()` in `renmark/hygiene.py` has a cyclomatic branch count of 30 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `scan_artifacts()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High cognitive complexity: `renmark/hygiene.py` → `scan_artifacts()` (score 72)** — `scan_artifacts()` in `renmark/hygiene.py` has a nesting-weighted cognitive-complexity score of 72 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `scan_artifacts()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
-- 🚨 **High import fan-out: `renmark/dispatch.py` (26 imports)** — `renmark/dispatch.py` has 26 import statements (threshold 25). High fan-out signals a module coupled to many others — a change-amplifier and a refactoring hazard. _Reduce coupling in `renmark/dispatch.py`: extract a narrower interface, group related imports behind a facade, or move logic closer to its dependencies. Advisory._
+- 🚨 **High import fan-out: `renmark/dispatch.py` (27 imports)** — `renmark/dispatch.py` has 27 import statements (threshold 25). High fan-out signals a module coupled to many others — a change-amplifier and a refactoring hazard. _Reduce coupling in `renmark/dispatch.py`: extract a narrower interface, group related imports behind a facade, or move logic closer to its dependencies. Advisory._
 - 🚨 **High cyclomatic complexity: `renmark/ledger.py` → `_classify_risk_tier_inner()` (20 branches)** — `_classify_risk_tier_inner()` in `renmark/ledger.py` has a cyclomatic branch count of 20 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `_classify_risk_tier_inner()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High import fan-out: `renmark/cli/_engine.py` (62 imports)** — `renmark/cli/_engine.py` has 62 import statements (threshold 25). High fan-out signals a module coupled to many others — a change-amplifier and a refactoring hazard. _Reduce coupling in `renmark/cli/_engine.py`: extract a narrower interface, group related imports behind a facade, or move logic closer to its dependencies. Advisory._
-- 🚨 **Long function: `renmark/cli/_engine.py` → `main()` (237 code lines)** — `main()` in `renmark/cli/_engine.py` spans 237 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `main()` into well-named helpers. Advisory._
+- 🚨 **Long function: `renmark/cli/_engine.py` → `main()` (271 code lines)** — `main()` in `renmark/cli/_engine.py` spans 271 code lines (threshold 100). Long functions are hard to read in one pass and usually do more than one thing. _Extract cohesive blocks of `main()` into well-named helpers. Advisory._
+- 🚨 **High cyclomatic complexity: `renmark/cli/_engine.py` → `main()` (24 branches)** — `main()` in `renmark/cli/_engine.py` has a cyclomatic branch count of 24 (threshold 20). Many decision points mean many paths to test and many ways to be wrong. _Reduce branching in `main()`: early returns, guard clauses, table/dispatch dictionaries, or splitting the function. Advisory._
 - 🚨 **High cognitive complexity: `renmark/cli/_wave_loop.py` → `_run_waves()` (score 30)** — `_run_waves()` in `renmark/cli/_wave_loop.py` has a nesting-weighted cognitive-complexity score of 30 (threshold 30). Deep nesting is disproportionately hard for a human to follow. _Flatten nesting in `_run_waves()`: invert conditions to return early, extract nested blocks into helpers, and reduce branching depth. Advisory._
-- 🚨 **High import fan-out: `renmark/cli/_dispatch_flags.py` (30 imports)** — `renmark/cli/_dispatch_flags.py` has 30 import statements (threshold 25). High fan-out signals a module coupled to many others — a change-amplifier and a refactoring hazard. _Reduce coupling in `renmark/cli/_dispatch_flags.py`: extract a narrower interface, group related imports behind a facade, or move logic closer to its dependencies. Advisory._
-- _… +285 more (re-run for the full list)_
+- _… +288 more (re-run for the full list)_
 
 
 _Run `python -m renmark.init --deep` for deeper checks (commit-message style, etc.)._

@@ -1,11 +1,11 @@
 <!-- Managed by /renmark:init. Wholly regenerated on each run. Do not hand-edit. -->
-<!-- Last refreshed: 2026-08-06 @ ab9dadd -->
+<!-- Last refreshed: 2026-08-07 @ 3f94f37 -->
 
 # Project map — renmark
 
 **Stack:** Python >=3.10 (pyproject.toml) + Claude Code plugin
 **Entry points:** `renmark-execute (renmark.cli:main)`, `bin/renmark-browser`, `bin/renmark-execute`, `renmark/__main__.py`, `plugin/commands/*.md`
-**Languages:** python=215
+**Languages:** python=217
 
 ## Directory tree
 
