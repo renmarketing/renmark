@@ -105,6 +105,7 @@ from ._dispatch_flags import (
     _dispatch_mode_read_flags,
     _dispatch_proactive_mode_flags,
     _dispatch_query_flags,
+    _dispatch_task_tracking_flags,
 )
 from ._dispatch_flags import (
     _judge_est_cost as _judge_est_cost,
@@ -782,7 +783,40 @@ def main(argv: list[str] | None = None) -> int:
             ".renmark/state/handoffs/review-<base>-<head>.pkg.md, print ONLY the path"
         ),
     )
+    ap.add_argument(
+        "--task-create",
+        metavar="TASK_ID",
+        help="(REQ-31) create/reuse a tracked task for a live Codex session; requires --title, --role, --scope, --verification-expectation",
+    )
+    ap.add_argument("--title", metavar="TITLE", help="(with --task-create) task title")
+    ap.add_argument("--role", metavar="ROLE", help="(with --task-create) task role")
+    ap.add_argument("--scope", metavar="SCOPE", help="(with --task-create) task scope, e.g. target file")
+    ap.add_argument(
+        "--verification-expectation",
+        metavar="TEXT",
+        help="(with --task-create) what verification must exist before completion",
+    )
+    ap.add_argument("--parent-id", metavar="TASK_ID", help="(with --task-create) optional parent milestone task id")
+    ap.add_argument(
+        "--task-in-progress",
+        metavar="TASK_ID",
+        help="(REQ-31) mark an existing tracked task in_progress",
+    )
+    ap.add_argument(
+        "--task-complete",
+        metavar="TASK_ID",
+        help="(REQ-31) mark an existing tracked task completed; requires --artifact-path and --result-summary",
+    )
+    ap.add_argument("--artifact-path", metavar="PATH", help="(with --task-complete) artifact path evidencing completion")
+    ap.add_argument("--result-summary", metavar="TEXT", help="(with --task-complete) one-line result summary")
     args = ap.parse_args(argv)
+
+    if args.task_create and not (args.title and args.role and args.scope and args.verification_expectation):
+        print("--task-create requires --title, --role, --scope, and --verification-expectation", file=sys.stderr)
+        return 2
+    if args.task_complete and not (args.artifact_path and args.result_summary):
+        print("--task-complete requires --artifact-path and --result-summary", file=sys.stderr)
+        return 2
 
     if (args.propose or args.emit_cron) and not args.scan:
         print("--propose/--emit-cron require --scan", file=sys.stderr)
@@ -807,6 +841,7 @@ def main(argv: list[str] | None = None) -> int:
         lambda: _dispatch_compact_flags(args, repo),
         lambda: _dispatch_artifact_hygiene_flags(args, repo),
         lambda: _dispatch_handoff_flags(args, ap, repo),
+        lambda: _dispatch_task_tracking_flags(args, repo),
     ):
         _result = _handler()  # type: ignore[no-untyped-call]
         if _result is not None:
@@ -816,7 +851,8 @@ def main(argv: list[str] | None = None) -> int:
         ap.error(
             "plan path is required unless --usage / --delivery-state / --analytics / --roadmap / --logs / "
             "--scan / --heartbeat / --heartbeat-check-cron / --behavior / --task / --task-brief / --review-package / "
-            "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode"
+            "--set-proactive / --set-headless / --set-mode / --get-mode / --clear-mode / "
+            "--task-create / --task-in-progress / --task-complete"
         )
     return execute_plan(
         args.plan,
