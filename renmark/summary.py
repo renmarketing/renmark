@@ -305,6 +305,8 @@ def is_stale(path: Path | str, *, against_sha: str | None = None) -> bool:
     if stale_after and stale_after != "null":
         try:
             stale_dt = datetime.fromisoformat(stale_after.replace("Z", "+00:00"))
+            if stale_dt.tzinfo is None:
+                stale_dt = stale_dt.replace(tzinfo=timezone.utc)
             if datetime.now(timezone.utc) > stale_dt:
                 return True
         except (ValueError, AttributeError):

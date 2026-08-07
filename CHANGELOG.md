@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-07] — fix: summary.is_stale crashed on naive-vs-aware datetime compare
+**Request:** `/renmark:finish` M6 re-verify — `pytest -q` failed on `test_scan_reports_due_for_review_without_mutating_rule_status`; root-caused rather than skipped, since a failed re-verify blocks finish.
+**Root cause:** `.renmark/plans/2026-08-05-governed-orchestration-assurance-release-11.plan.md` carries `stale_after: 2026-09-05` (date-only, no timezone). `summary.is_stale()` parsed it via `datetime.fromisoformat()` unconditionally, producing a naive `datetime` compared directly against an aware `datetime.now(timezone.utc)` — `TypeError`. This exact defect was logged-but-not-fixed on 2026-08-05 as an out-of-scope dogfooding finding; it became load-bearing once a routine `renmark.hygiene scan` (inside the test, and inside finish's own re-verify) exercised the same artifact.
+**Built:** `summary.is_stale()` now normalizes a naive parsed `stale_dt` to UTC before comparing. New regression test `test_is_stale_naive_stale_after_does_not_raise` (`tests/test_summary.py`). Also root-caused and closed a second, unrelated false alarm from the same investigation: the test's intermittent `ModuleNotFoundError` failures were never a code flake — `which pytest` resolved to `~/.local/bin/pytest` (shebang `/usr/bin/python3`, no `renmark` install) instead of the project's actual venv (`~/projects/ai-storyteller/.venv`); running the venv's own pytest is green. No code fix needed for that half; noted in `.renmark/memory/bugs.md` so it isn't re-investigated as a flake again.
+**Files changed:**
+- `renmark/summary.py` — `is_stale()` naive-datetime normalization.
+- `tests/test_summary.py` — regression test.
+- `.renmark/memory/bugs.md`, `.renmark/memory/learnings.md` — resolved the 2026-08-05 pending entry, corrected the mischaracterized "flaky test" entry.
+**Do not change:** `is_stale()` still treats a malformed (non-ISO) `stale_after` as fresh (existing `except (ValueError, AttributeError): pass` behavior) — the fix only widens what counts as a parseable timestamp, it doesn't change the fail-open policy for genuinely unparseable ones.
+
 ## [2026-08-06] — fix: finish/SKILL.md §3.6 worktree-cleanup targeted a dead code path
 **Request:** Debug session (`/renmark:debug worktree-cleanup prose`) — the exact pre-diagnosed bug already logged in `.renmark/memory/bugs.md` during the cross-host-native-tool-leverage rethink pass.
 **Root cause:** Stale documentation drift: §3.6 instructed removing "the feature worktree that `/renmark:feature` created" via `git worktree remove`, but `/renmark:feature` only ever does a plain `git checkout -b` (branch, not worktree). Confirmed via repro: `git worktree list` on this repo shows only `main`, and `feature/SKILL.md` line 75 has no `git worktree add` anywhere. §3.6's remote-branch-delete content also fully duplicated step [m], which already runs `git branch -d`/`git push origin --delete`.

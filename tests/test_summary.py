@@ -165,6 +165,19 @@ def test_is_stale_past_stale_after(tmp_path: Path) -> None:
     assert summary.is_stale(path) is True
 
 
+def test_is_stale_naive_stale_after_does_not_raise(tmp_path: Path) -> None:
+    path = tmp_path / "naive.md"
+    summary.write_artifact(
+        path,
+        artifact_type="x",
+        body="b",
+        summary_lines=["s"],
+        generator="t",
+        stale_after="2020-01-01",  # date-only, no time/timezone component
+    )
+    assert summary.is_stale(path) is True
+
+
 def test_is_stale_sha_drift(tmp_path: Path) -> None:
     path = tmp_path / "drifted.md"
     summary.write_artifact(

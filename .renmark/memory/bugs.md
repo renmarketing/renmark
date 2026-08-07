@@ -14,16 +14,23 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ---
 
+### 2026-08-07 — summary.is_stale crashes on naive-vs-aware datetime compare (confirmed, fixed)
 
-## Open
+**Severity:** minor (crashed `renmark.hygiene scan` — blocked finish's M6 re-verify)
+**Symptom:** `python -m renmark.hygiene scan` raised `TypeError: can't compare offset-naive and offset-aware datetimes`, blocking `/renmark:finish` step 1 re-verify.
+**Root cause:** `.renmark/plans/2026-08-05-governed-orchestration-assurance-release-11.plan.md` carries `stale_after: 2026-09-05` (date-only, no timezone); `summary.is_stale()` parses it with `datetime.fromisoformat()` unconditionally, producing a naive `datetime` that's then compared directly against an aware `datetime.now(timezone.utc)`. This is the same defect flagged (but not fixed) in the 2026-08-05 learnings entry — now confirmed live and actually blocking a pipeline.
+**Fix:** `summary.is_stale()` now normalizes a naive parsed `stale_dt` to UTC (`stale_dt.replace(tzinfo=timezone.utc)`) before comparing. Regression test: `test_is_stale_naive_stale_after_does_not_raise` in `tests/test_summary.py`.
+**Lesson:** A pre-existing bug logged as "out of scope, dogfooding-only" can become load-bearing the moment routine ops (a finish re-verify) exercise the same code path — worth periodically checking whether "deferred" bugs have since become blocking.
 
-### 2026-08-06 — flaky: test_scan_reports_due_for_review_without_mutating_rule_status (intermittent, unreproducible)
+---
 
-**Severity:** nit (not reproducible, no code regression found)
-**Symptom:** One full-suite run showed `tests/test_hygiene_release12_categorization.py::test_scan_reports_due_for_review_without_mutating_rule_status` FAIL; passes cleanly in isolation and on an immediate full-suite re-run.
-**Root cause:** unknown — likely test-order/fixture-isolation flake (the test shells out to `python -m renmark.hygiene scan` as a subprocess against a `repo` fixture; possible race if that fixture isn't fully isolated per-worker). Confirmed NOT a regression from the `cross-host-native-tool-leverage` rethink pass's commits (baseline at the immediately-prior commit was clean; those commits are markdown/state-only, touch neither `hygiene.py` nor `recurrence.py`).
-**Fix:** none applied — not reproducible enough to root-cause further right now. If it recurs, capture `pytest -p no:randomly -q tests/test_hygiene_release12_categorization.py ... --lf -x` output and the full run's test order to isolate the interaction.
-**Lesson:** logged rather than silently ignored, per this project's evidence-before-claim discipline — a flake dismissed without a note is indistinguishable from a regression nobody investigated.
+### 2026-08-07 — "flaky" test_scan_reports_due_for_review_without_mutating_rule_status was actually a deterministic PATH/interpreter mismatch, not a code flake (resolved, no code change)
+
+**Severity:** nit (environment-only; no renmark code defect)
+**Symptom:** `tests/test_hygiene_release12_categorization.py::test_scan_reports_due_for_review_without_mutating_rule_status` failed deterministically (every run, including isolation) with `subprocess.CalledProcessError` wrapping `ModuleNotFoundError: No module named 'renmark'`.
+**Root cause:** `which pytest` in this shell resolves to `~/.local/bin/pytest`, whose shebang is `#!/usr/bin/python3` — the bare system interpreter, which has no `renmark` install. `renmark` is only pip-installed (editable) into `~/projects/ai-storyteller/.venv`. The test shells out via `subprocess.run([sys.executable, "-m", "renmark.hygiene", "scan"], cwd=<tmp fixture dir>)`; `sys.executable` inside the wrong pytest resolves to `/usr/bin/python3`, and with `cwd` pointed at a tmp dir (not the repo root) there's no implicit-cwd fallback to find the package. Other `sys.executable`-shelling tests in the suite happen to pass only because they don't override `cwd`, so it defaults to the repo root, which IS importable by `/usr/bin/python3` via cwd-path insertion. The earlier 2026-08-06 "intermittent, unreproducible" characterization of this same test was itself a symptom of the same root cause — whichever `pytest` happened to be first on `PATH` in that shell session.
+**Fix:** none needed in renmark source. Run the suite via the venv's own pytest (`/home/renmark/projects/ai-storyteller/.venv/bin/python3 -m pytest`, or activate the venv) — confirmed green: 2109 passed, 32 skipped.
+**Lesson:** when a `sys.executable`-subprocess test fails only via `ModuleNotFoundError` for the project's own package, suspect a stray non-venv `pytest`/`python3` on `PATH` before assuming a code-level flake — check `which pytest` and `head -1 $(which pytest)`.
 
 ---
 
@@ -117,13 +124,9 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 
 ---
 
-### 2026-08-05 — summary.is_stale crashes on naive-vs-aware datetime compare against this repos real .renmark tree
+### 2026-08-05 — summary.is_stale crashes on naive-vs-aware datetime compare against this repos real .renmark tree — RESOLVED 2026-08-07
 
-**Severity:** medium
-**Symptom:** Running renmark.hygiene.py scan against this live repo crashes inside summary.is_stale on a naive-vs-aware datetime comparison. Reproduced as pre-existing (not introduced by Release 12 task 3s hygiene.py changes) via git stash + re-run on main before the diff.
-**Root cause:** (unconfirmed, not investigated in depth) summary.is_stale likely compares a timezone-naive datetime.now() or similar against a timezone-aware timestamp parsed from an artifacts stale_after/created_at metadata field (or the reverse), which raises TypeError: can not compare offset-naive and offset-aware datetimes in Python.
-**Fix:** (pending) route through /renmark:debug to reproduce with a real traceback and fix summary.is_stale to normalize both operands to the same awareness (prefer UTC-aware throughout, matching this programs own established convention in recurrence.py/ledger.py).
-**Lesson:** Found via live dogfooding of Release 12s hygiene.py extension -- the additive change itself is correct and isolated, but running it against the real repo surfaced a genuine pre-existing defect in a function outside this releases scope. Logged rather than silently fixed inline, per this programs own out-of-scope-finding convention.
+**Status:** fixed. See the 2026-08-07 "summary.is_stale crashes on naive-vs-aware datetime compare (confirmed, fixed)" entry above for the confirmed root cause (a date-only `stale_after` string parses to a naive `datetime`) and the fix (normalize to UTC-aware before comparing, in `summary.is_stale()`), applied during `/renmark:finish`'s M6 re-verify.
 
 ---
 
