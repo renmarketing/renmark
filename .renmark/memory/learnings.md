@@ -14,7 +14,7 @@ Each entry: signal, observation, model that caught it, date.
 
 ## Learned this project
 
-- (2026-08-06, bug) **finish/SKILL.md §3.6 worktree-cleanup targets a dead code path** — When a native-tool-adoption pass finds a skill-prose target with no corresponding creation code, treat that as a separate pre-existing bug to fix (via /renmark:debug or a dedicated backlog item), not something to route native-tool wiring into.
+- (2026-08-06, bug, fixed) **finish/SKILL.md §3.6 worktree-cleanup targeted a dead code path** — /renmark:feature only ever checks out a branch (`git checkout -b`), never a worktree, so §3.6 was rewritten to stop assuming one exists: it now explains branch cleanup already happens in step [m], and reframes §3.6 as a narrow stray-worktree check via `renmark.worktree.stale_worktrees`. Lesson: when a skill's prose targets a code path that no other code ever creates, treat it as a documentation-drift bug, not something to design new tooling around.
 
 - (2026-08-05, bug) **renmark-execute --resume never consults the ledger, so dangling work_order events are invisible** — Surfaced by Release 13s orphan-detection spike; deferrable, not blocking. Ledger-resume reconciliation is exactly the kind of gap this program (governed-orchestration-assurance) exists to close -- good candidate for a dedicated future release if it recurs.
 

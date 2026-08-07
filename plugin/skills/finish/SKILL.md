@@ -377,23 +377,34 @@ If `install.sh` fails: log the error and continue — the release is already com
 
 ### 3.6 Clean worktrees (self-update and full lanes ONLY)
 
-After merge, remove the feature worktree that `/renmark:feature` created. This is a safe cleanup — the branch is already merged.
+`/renmark:feature` checks out a plain branch (`git checkout -b`), not a git
+worktree, so there is normally nothing here to remove — local and remote
+branch cleanup already happened in step [m]. This step exists only to catch
+a *stray* worktree left behind by something else (e.g. a debug/rethink
+session that used `EnterWorktree`/`git worktree add` directly and never
+cleaned up):
 
 ```bash
-# List worktrees to confirm the feature worktree is present
+# List worktrees; anything beyond main is a candidate
 git worktree list
-
-# Remove the feature worktree (safe: branch is already merged into main)
-git worktree remove <feature-worktree-path>
-
-# If the remote branch still exists and was pushed, delete it too
-# (git branch -d already ran in [m] for local; this handles any stale remote)
-git push origin --delete <branch> 2>/dev/null || true
 ```
 
-Use `git worktree remove` (not `--force`) — if the worktree has uncommitted changes, it will refuse and report, which is the correct safe behavior. Only escalate to `--force` if the user explicitly requests it.
+Or check `renmark.worktree.stale_worktrees(repo)` — it reports worktrees
+whose branch is already merged into the default branch and whose tree is
+clean, the same detector `finish_lanes._gate_stray_branches` surfaces
+informationally at release-readiness time. If it returns anything, remove
+it:
 
-After cleanup, confirm: `git worktree list` shows only `main` (and any other intentional worktrees).
+```bash
+# Remove a stray, merged worktree (safe: branch is already merged into main)
+git worktree remove <worktree-path>
+```
+
+Use `git worktree remove` (not `--force`) — if the worktree has uncommitted
+changes, it will refuse and report, which is the correct safe behavior. Only
+escalate to `--force` if the user explicitly requests it. If `stale_worktrees`
+reports nothing (the common case), this step is a no-op — confirm with
+`git worktree list` and move on.
 
 **Picking the next feature (post-merge / post-release hand-off).** Once the
 branch is closed (merged, released, or parked), do NOT dead-end on a generic

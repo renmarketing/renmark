@@ -17,15 +17,6 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ## Open
 
-### 2026-08-06 — finish/SKILL.md §3.6 worktree-cleanup targets a dead code path
-
-**Severity:** minor
-**Symptom:** §3.6 ("Clean worktrees", self-update/full lanes) instructs removing "the feature worktree that /renmark:feature created" via git worktree remove. No code in the repo ever creates such a worktree: feature/SKILL.md Step 1 does a plain git checkout -b (branch, not worktree); renmark/worktree.py only lists/checks staleness, never creates. git worktree list on this repo shows only main. Discovered while scoping cross-host-native-tool-leverage Release 3 (ExitWorktree adoption) — ExitWorktree could not be wired in because its target scenario never fires.
-**Root cause:** Stale documentation drift: an earlier design considered worktree-per-feature; the implementation shipped as branch-per-feature instead, and §3.6 was never updated to match — same failure shape as the 2026-08-04 stray-branch/worktree gate finding (a step existing only as prose intent, never enforced).
-**Lesson:** When a native-tool-adoption pass finds a skill-prose target with no corresponding creation code, treat that as a separate pre-existing bug to fix (via /renmark:debug or a dedicated backlog item), not something to route native-tool wiring into.
-
----
-
 ### 2026-08-06 — flaky: test_scan_reports_due_for_review_without_mutating_rule_status (intermittent, unreproducible)
 
 **Severity:** nit (not reproducible, no code regression found)
@@ -95,6 +86,16 @@ WSL-authored UTF-8 script silently breaks on the default Windows interpreter.
 ---
 
 ## Fixed
+
+### 2026-08-06 — finish/SKILL.md 3.6 worktree-cleanup targets a dead code path
+
+**Severity:** minor
+**Symptom:** Section 3.6 instructs removing "the feature worktree that /renmark:feature created" via git worktree remove, but /renmark:feature only ever does a plain branch checkout.
+**Root cause:** Stale documentation drift from an earlier worktree-per-feature design that shipped as branch-per-feature instead; 3.6 was never updated, and its remote-branch-delete content duplicated step [m].
+**Fix:** Rewrote 3.6 to stop claiming /renmark:feature creates a worktree. It now explains local/remote branch cleanup already happens in [m], and reframes 3.6 as a narrow stray-worktree check (via renmark.worktree.stale_worktrees / git worktree list) for worktrees created by something else, e.g. EnterWorktree during a debug/rethink session.
+**Lesson:** When a skills prose targets a code path that no other code ever creates, treat it as a documentation-drift bug, not something to design new tooling around.
+
+---
 
 ### 2026-08-05 — renmark-execute --resume never consults the ledger, so dangling work_order events are invisible
 

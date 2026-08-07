@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-06] — fix: finish/SKILL.md §3.6 worktree-cleanup targeted a dead code path
+**Request:** Debug session (`/renmark:debug worktree-cleanup prose`) — the exact pre-diagnosed bug already logged in `.renmark/memory/bugs.md` during the cross-host-native-tool-leverage rethink pass.
+**Root cause:** Stale documentation drift: §3.6 instructed removing "the feature worktree that `/renmark:feature` created" via `git worktree remove`, but `/renmark:feature` only ever does a plain `git checkout -b` (branch, not worktree). Confirmed via repro: `git worktree list` on this repo shows only `main`, and `feature/SKILL.md` line 75 has no `git worktree add` anywhere. §3.6's remote-branch-delete content also fully duplicated step [m], which already runs `git branch -d`/`git push origin --delete`.
+**Fix:** Rewrote §3.6 to stop claiming `/renmark:feature` creates a worktree. It now notes branch cleanup already happened in [m], and reframes §3.6 as a narrow stray-worktree check (`renmark.worktree.stale_worktrees` / `git worktree list`) for worktrees created by something else (e.g. a debug/rethink session using `EnterWorktree`) — a no-op in the common case.
+**Files changed:**
+- `plugin/skills/finish/SKILL.md` — §3.6 rewritten.
+- `.renmark/memory/bugs.md` — moved the pre-existing Open entry to Fixed via `debug.close_session`.
+- `.renmark/memory/learnings.md` — consolidated the duplicate learning entry.
+**Do not change:** §3.6 is intentionally a check, not an assumed action — do not reintroduce prose that assumes a feature-created worktree exists.
+
 ## [2026-08-06] — feat: cross-host-native-tool-leverage Release 1 — baseline and compatibility coverage
 **Request:** Release 1 of the cross-host-native-tool-leverage program (Execution Gate approved) — document the fast-gate test target releases 2-4 will cite.
 **Built:** `.renmark/memory/cross-host-fast-gate.md` — documents the broad fast-gate (`pytest -q -k "host or codex or claude or dispatch or interaction"`, 220 passed/17 skipped) and narrow fast-gate (5 core cross-host test files, 70 passed), both re-measured fresh and confirmed matching Stage 2's original baseline exactly. Test-only, no production code moves. Subagent-gate correctly flagged this single mechanical doc task as unjustified for dispatch — written directly instead. Also found and logged (not fixed, not reproducible) one intermittent flaky test unrelated to this release's scope.
