@@ -35,6 +35,8 @@ Opus and Fable are escalation-only executors — never default them for finish, 
 
 ## Learned overrides
 
+- (2026-08-06) `target=tests/**, complexity=simple, mode=A` → **codex** (passed, run=20260807-011500-35d8)
+
 - (2026-08-04) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260805-010004-45a1)
 
 - (2026-08-03) `target=tests/**, complexity=medium, mode=A` → **codex** (passed, run=20260804-011722-4061)
