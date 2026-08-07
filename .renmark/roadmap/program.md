@@ -7,7 +7,7 @@ source_sha: 3142267
 
 # Program — cross-host-native-tool-leverage
 
-_mode: staged · Stage 4/4 · task 0/2 done · current: Release 4: REQ-31 Codex task-tracking CLI wrapper + skill wiring_
+_mode: staged · Stage 4/4 · task 2/2 done · current: Release 4: REQ-31 Codex task-tracking CLI wrapper + skill wiring_
 
 ## ● Release 1: Baseline and compatibility coverage — serves stage-2 baseline
 
@@ -24,7 +24,7 @@ _mode: staged · Stage 4/4 · task 0/2 done · current: Release 4: REQ-31 Codex 
 - [x] Wire ExitWorktree instruction into finish/SKILL.md worktree cleanup
 - [x] Bounded spike: confirm ScheduleWakeup live-invokability (no committed code)
 
-## ○ Release 4: REQ-31 Codex task-tracking CLI wrapper + skill wiring — serves REQ-31 **(current)**
+## ● Release 4: REQ-31 Codex task-tracking CLI wrapper + skill wiring — serves REQ-31 **(current)**
 
-- [ ] Add renmark-execute --task-create/--task-in-progress/--task-complete subcommands
-- [ ] Wire live-Codex task-tracking instruction into orchestrate/SKILL.md
+- [x] Add renmark-execute --task-create/--task-in-progress/--task-complete subcommands
+- [x] Wire live-Codex task-tracking instruction into orchestrate/SKILL.md
