@@ -50,7 +50,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 
-from . import fast_path, ledger
+from . import fast_path, hosts, ledger
+from .hosts import HostKind
 from .parser import Task
 from .providers import claude_agent
 from .schemas import (
@@ -973,7 +974,7 @@ def build_workflow_fanout_args(
 # Host-native dispatch transport (Claude Code / Codex)
 # ─────────────────────────────────────────────────────────────────────────────
 
-HostName = Literal["claude", "codex"]
+HostName = HostKind
 HostDispatchStrategy = Literal["none", "single", "fanout"]
 
 # A task packet larger than this is not a bounded subagent prompt. Refuse it
@@ -1075,9 +1076,10 @@ def build_host_dispatch_plan(
     """
 
     normalized = str(host).strip().lower()
-    if normalized not in {"claude", "codex"}:
+    resolved_host = hosts.resolve_host(normalized) if normalized else HostKind.UNKNOWN
+    if resolved_host is HostKind.UNKNOWN:
         raise ValueError(f"unsupported host {host!r}; expected 'claude' or 'codex'")
-    host_name = cast(HostName, normalized)
+    host_name = resolved_host
 
     host_tasks = [task for task in wave if claude_agent.is_claude_executor(task.executor)]
     inputs = [
