@@ -17,6 +17,15 @@ Running log of bugs found and fixed. Newest at top. Updated by `/renmark:debug`,
 
 ## Open
 
+### 2026-08-06 — finish/SKILL.md §3.6 worktree-cleanup targets a dead code path
+
+**Severity:** minor
+**Symptom:** §3.6 ("Clean worktrees", self-update/full lanes) instructs removing "the feature worktree that /renmark:feature created" via git worktree remove. No code in the repo ever creates such a worktree: feature/SKILL.md Step 1 does a plain git checkout -b (branch, not worktree); renmark/worktree.py only lists/checks staleness, never creates. git worktree list on this repo shows only main. Discovered while scoping cross-host-native-tool-leverage Release 3 (ExitWorktree adoption) — ExitWorktree could not be wired in because its target scenario never fires.
+**Root cause:** Stale documentation drift: an earlier design considered worktree-per-feature; the implementation shipped as branch-per-feature instead, and §3.6 was never updated to match — same failure shape as the 2026-08-04 stray-branch/worktree gate finding (a step existing only as prose intent, never enforced).
+**Lesson:** When a native-tool-adoption pass finds a skill-prose target with no corresponding creation code, treat that as a separate pre-existing bug to fix (via /renmark:debug or a dedicated backlog item), not something to route native-tool wiring into.
+
+---
+
 ### 2026-08-06 — flaky: test_scan_reports_due_for_review_without_mutating_rule_status (intermittent, unreproducible)
 
 **Severity:** nit (not reproducible, no code regression found)

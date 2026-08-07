@@ -134,6 +134,39 @@ one-correction-pass rule.)*
   confirmed unavailable) before any decision to build the follow-up
   release.
 
+### Execution note — ExitWorktree wiring dropped (2026-08-07, Owner decision)
+
+At implementation time, `ExitWorktree`'s actual tool contract was checked
+directly (not just external-benchmark.md's existence claim) and found
+unusable for `finish/SKILL.md` §3.6's target scenario:
+
+- `ExitWorktree` only operates on a worktree created by `EnterWorktree`
+  **in the current session** — it explicitly excludes worktrees made with
+  `git worktree add`, and worktrees from a prior session (even ones
+  `EnterWorktree` made earlier in that prior session).
+- It takes no `path` parameter — there is no way to target an arbitrary
+  existing worktree by path at all.
+- Deeper finding: §3.6's own target scenario ("the feature worktree that
+  `/renmark:feature` created") does not exist in current renmark — no
+  code path creates a feature worktree at all (`feature/SKILL.md` does a
+  plain `git checkout -b`; `renmark/worktree.py` only lists/checks
+  staleness). `git worktree list` on this repo shows only `main`. §3.6 is
+  stale prose from an earlier worktree-per-feature design that was
+  replaced by branch-per-feature. Logged separately as an Open bug in
+  `.renmark/memory/bugs.md` ("finish/SKILL.md §3.6 worktree-cleanup
+  targets a dead code path") — out of this release's chartered scope to
+  fix.
+
+**Owner decision (AskUserQuestion):** ship the additive
+`supports_exit_worktree` capability field only (documents the tool's
+existence, `True` for `HostKind.CLAUDE_CODE`, `False` elsewhere, zero
+behavior change — matches the original compatibility guarantee exactly).
+Do **not** wire the §3.6 instruction — it would be dead wiring that never
+fires. This closes the ExitWorktree half of Release 3 as a documented
+Keep-as-is-but-flagged rather than a completed adoption; the field exists
+for a future release that either fixes §3.6's real worktree-creation gap
+or finds a different, in-session use for `ExitWorktree`.
+
 ## Release 4 — REQ-31 Codex task-tracking CLI wrapper + skill wiring
 
 - **Value**: closes REQ-31's Codex gap in code (the PRD text was already
