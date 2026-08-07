@@ -1,5 +1,51 @@
 # Decisions (ADRs)
 
+## ADR-053 — REQ-30 exception: auto-proceed on unambiguous next steps
+
+**Date:** 2026-08-07
+**Status:** Accepted (Owner exception, evidence-backed)
+
+**Context.** REQ-30 requires orchestration-behavior changes (gate frequency,
+dispatch policy) to go through `/renmark:prd`'s UPDATE gate, with pre-release
+blocking unless the Owner grants an explicit, evidence-backed exception with a
+documented benefit and rollback path. The Owner directed this change directly
+in conversation (2026-08-07), backed by a 6-way parallel gate audit plus a
+follow-up verification pass (see `.renmark/memory/learnings.md` and
+`CHANGELOG.md` [2026-08-07] "feat: auto-proceed..."), rather than through the
+formal PRD flow. This ADR is that documented exception.
+
+**Decision.** Adopt `requires_decision`-gated auto-proceed in
+`next-steps.md` + `finish/SKILL.md` §4b/§4d + `brainstorm/SKILL.md` Step 5/7 +
+the global `~/.claude/CLAUDE.md` routing block (commit `bb46650`, hardened in
+a follow-up commit fixing a class-2/3 ambiguity that could have let a
+non-owning skill auto-invoke `finish`). `requires_decision` is a judgment
+call, not a typed field — every resolution logs via
+`analytics.record_event(kind="next_step_decision", ...)` so drift is
+observable rather than anecdotal.
+
+**Benefit.** Removes redundant re-confirmations (up to 5 stops on a single
+`/renmark:finish` run observed live) without touching any real Pause-Policy
+gate (scope change, destructive action, merge/release/publish/install,
+missing information) — all of those still halt unconditionally.
+
+**Known gaps, not yet closed:** `debug/SKILL.md`'s closing menu still fires
+unconditionally (no session-level scope-change signal exists yet);
+`roadmap/SKILL.md`'s closing menu likewise (no ranking-margin logic exists
+yet). Both were investigated and explicitly deferred, not silently skipped.
+
+**Rollback path.** `git revert bb46650` (plus the class-2/3 hardening commit
+immediately after it) restores the prior unconditional-picker behavior in all
+four touched files; `~/.claude/CLAUDE.md` would need the "Route invisibly"
+paragraph manually removed since it lives outside the repo.
+
+**Revisit if:** `next_step_decision` events show auto-proceed firing on a run
+where the user would have wanted to weigh in — that's the wrong-direction
+failure mode, and the fix is tightening the "when in doubt, treat
+`requires_decision` as true" default already written into `next-steps.md`,
+not removing the mechanism outright.
+
+---
+
 ## ADR-052 — Finished feature governed-orchestration-assurance
 
 **Date:** 2026-08-06

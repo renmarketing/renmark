@@ -71,28 +71,53 @@ when **both** hold:
 1. **No Pause-Policy condition fired this run**: unclear intent, a scope/
    direction change, a destructive/irreversible action, a merge/release/
    publish/install action, a missing-information block, or an explicit
-   human-review gate. Every skill already tracks when one of these is live
-   (that's what its own gate logic exists for) — this reuses that existing
-   signal (`requires_decision`); it does not add a new one.
+   human-review gate. This is a judgment call the executing agent makes from
+   its own already-defined gate logic (each skill's own Step-N gates) — call
+   the result `requires_decision`. It is **not** a field any function
+   currently returns; do not claim it is. When in doubt, treat it as true
+   (render the picker) — false is the exception, not the safe default.
 2. **The recommended next command is not itself a dangerous gate** (merge,
    release, publish, install) — those always halt per the dangerous-gate
    rule regardless of `requires_decision`.
 
 When both hold, do not render `AskUserQuestion`. Print one line naming what
 happened and what's next (e.g. *"Fixed — resuming `/renmark:plan`."* or
-*"Spec approved — moving to `/renmark:plan`."*), then — for **class 1
-(pipeline) skills only** — proceed directly into that next command in the
-same turn. This is what lets a plain-English ask ("let's add X", "let's
-rethink Y") run end-to-end without the user typing any `/renmark:*` command:
-brainstorm → PRD → plan → orchestrate → verify → finish auto-chain, stopping
-only when `requires_decision` goes true at some stage, the next step is a
-dangerous gate, or there is no next step (pipeline complete). Class 2/3
-skills auto-proceed the same way but don't chain further themselves — they
-hand off to whichever pipeline skill is next.
+*"Spec approved — moving to `/renmark:plan`."*), then act:
+
+- **Class 1 (pipeline) skills** proceed directly into that next command in
+  the same turn. This is what lets a plain-English ask ("let's add X", "let's
+  rethink Y") run end-to-end without the user typing any `/renmark:*`
+  command: brainstorm → PRD → plan → orchestrate → verify → finish auto-chain,
+  stopping when `requires_decision` goes true at some stage, the next step is
+  a dangerous gate, or there is no next step (pipeline complete).
+- **Class 2/3 skills state the recommendation and stop — they never
+  auto-invoke the next skill themselves.** A `verify`/`debug`/`roadmap` run
+  that names `/renmark:finish` as its recommendation must NOT call finish
+  directly, even with `requires_decision=false` — finish can merge/release,
+  and only a class-1 pipeline already carrying that context (e.g. orchestrate
+  invoking finish as its own next stage) is allowed to chain into it. The
+  difference from today's behavior is purely that class 2/3 skips the
+  blocking picker in favor of a status line naming the recommended command —
+  it does not gain the ability to run that command itself.
 
 When either condition fails, render the full picker exactly as before — this
 section only narrows *when* the picker fires; it does not change how it
 renders or weaken any Pause-Policy gate.
+
+**Log the decision.** Since `requires_decision` is a judgment call rather than
+a typed field, it needs an audit trail so drift is visible instead of
+anecdotal. Every time this contract resolves (either branch), call:
+
+```python
+analytics.record_event(repo, ts=state.now_iso(), kind="next_step_decision",
+    skill="<skill>", mode="auto-proceed" if not requires_decision else "picker",
+    recommended="<the recommended command>")
+```
+
+Non-blocking (try/except, log + continue — same pattern as the other
+analytics call sites in `finish/SKILL.md`). This is what lets a later review
+check whether auto-proceed is over- or under-firing in practice, instead of
+relying on someone happening to notice.
 
 ---
 
@@ -179,15 +204,17 @@ deliberately. Never jump to an expensive tier silently.
 > *End by rendering the gate hand-off menu from
 > `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` (the next-step contract's
 > class 2 defers to it). Filter (rules 1–5). If `requires_decision` is false,
-> announce the recommendation in one line and hand off directly; otherwise
-> present via `AskUserQuestion` (rules 6–9), explicit choice required.*
+> announce the recommendation in one line and STOP — never invoke the
+> recommended command yourself, even a non-dangerous one; otherwise present via
+> `AskUserQuestion` (rules 6–9), explicit choice required.*
 
 **Aux / terminal skill** (class 3):
 
 > *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")`. If
 > `requires_decision` is false, announce the resume-pipeline recommendation in
-> one line and hand off directly (no local-action picker); otherwise render
-> per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 —
+> one line and STOP (no local-action picker, and never invoke the recommended
+> command yourself); otherwise render per
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 —
 > resume-pipeline + 1–2 local actions) via `AskUserQuestion` (handoff-menu.md
 > rules 6–9), explicit choice required.*
 
