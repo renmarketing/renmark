@@ -166,7 +166,11 @@ With trade-offs, **informed by the research**. Lead with your recommendation and
 
 ### 5. Present the design
 
-In sections, scaled to complexity. Get approval per section. Cover: architecture, components, data flow, error handling, testing.
+Present the whole design in one pass, in sections scaled to complexity —
+architecture, components, data flow, error handling, testing — then get a
+single approval for the full draft. Don't stop after each section; sections
+are for readability, not separate gates. If the user pushes back on one part,
+revise and re-present the whole thing once, not just the disputed section.
 
 ### 6. Write the spec + scope records
 
@@ -182,19 +186,10 @@ Also update `.renmark/memory/project.md` with any new project facts learned.
 
 ### 7. Hand off (wizard step)
 
-Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestrate (auto-verifies) → finish`. After writing the spec, render the 3 options per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules (Plan [p], Wait [w], No [n]). The rendering rules, picker vs. numbered-list fallback, and required-choice contract all live there — do not duplicate them here.
+Renmark is a wizard pipeline: `brainstorm → plan (auto-validates) → orchestrate (auto-verifies) → finish`. This hand-off follows the shared next-step contract (brainstorm is a class-1 pipeline skill, see `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md`):
 
-- **1 / p** → immediately invoke `/renmark:plan <path>`. Don't make the user retype the command.
-- **2 / w** → stop. Tell the user how to resume: `/renmark:plan <path>` when ready.
-- **3 / n** → stop, and log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
-
-This hand-off follows the shared next-step contract (brainstorm is a class-1 pipeline skill):
-
-> *End by calling `renmark.lifecycle.next_steps(repo, "brainstorm")` and render the
-> result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
-> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
-> 6–9); the state-derived next command is the `(Recommended)` option. Require an
-> explicit choice — never auto-proceed.*
+- **`requires_decision` false** (the normal case — spec approved in Step 5, nothing ambiguous about continuing) → skip the picker. Announce in one line (*"Spec written — moving to `/renmark:plan`."*) and immediately invoke `/renmark:plan <path>` in the same turn. Don't make the user retype the command or re-approve a decision Step 5 already made.
+- **`requires_decision` true** (e.g. the user's original ask was ambiguous about whether to continue past a spec, or Step 5's approval surfaced open questions) → render the 3 options per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` rules (Plan [p], Wait [w], No [n]). On **[w]**, tell the user how to resume (`/renmark:plan <path>`); on **[n]**, log a note in `.renmark/memory/decisions.md` that planning was deferred and why.
 
 ## Common Mistakes
 
@@ -203,7 +198,7 @@ This hand-off follows the shared next-step contract (brainstorm is a class-1 pip
 | Asking multiple questions at once | One at a time — easier to answer, less context churn |
 | Implementing during brainstorm | Brainstorm ends with a spec, not code. Implementation is `/renmark:orchestrate`'s job |
 | Skipping the bootstrap question | Empty projects benefit from CLAUDE.md + AGENTS.md before any work starts |
-| Writing the spec without user approval | Present the design, get section-by-section approval, then write |
+| Writing the spec without user approval | Present the full design in one pass, get one approval, then write |
 
 ## Reference
 

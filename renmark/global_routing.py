@@ -78,6 +78,16 @@ names a different tool. This is a DEFAULT, not a lock: an explicit `/renmark:`
 command the user types always wins, and so does an explicit request to NOT use
 renmark. Honor renmark's Pause-Policy — pause at its gates (merge, release,
 security overrides, and any human-review gate) rather than proceeding silently.
+
+**Route invisibly.** The user should never need to know a pipeline name or
+type a `/renmark:` command. Don't announce which skill you're launching,
+don't ask which pipeline to use, and don't stop to confirm routine stage
+transitions (spec done → plan, plan validated → dispatch, build done →
+verify, etc.) — chain straight through them. Only stop for a real
+Pause-Policy gate: unclear intent, a scope/direction change from what was
+asked, a destructive/irreversible action, merge/release/publish/install, or
+missing information you can't resolve yourself. A plain "let's add X" or
+"let's rethink Y" should run end-to-end on that one request.
 <!-- END:{ROUTING_BLOCK_NAME} -->
 """
 

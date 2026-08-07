@@ -451,11 +451,13 @@ if the 7 version locations disagree. Fix drift first.
 
 **4b. Tag the version (local; the parity anchor).** The tag name MUST equal
 `v<VERSION>` so the snapshot, the tag, and any GitHub release all carry the
-same version.
+same version. Picking `[r] Release` from the step 3 menu — whose own text
+already discloses "package this version... + tag it (+ GitHub release if
+available)" — IS the approval for tagging, packaging, and (per 4d) publishing.
+Do not re-ask here; tag directly and report it as a one-line status.
 ```bash
 git tag -a "v$(cat VERSION)" -m "renmark v$(cat VERSION)"
 ```
-Confirm with the user before tagging — tags are cheap but shared once pushed.
 
 **4c. Snapshot (always, offline, no deps — runs AFTER merge + verification).**
 ```bash
@@ -502,14 +504,15 @@ lifecycle.clear_lifecycle(Path('.'))
 git remote -v        # is there an 'origin'?
 command -v gh        # is the GitHub CLI installed + authed?
 ```
-- **Both present** → offer to push the tag and create the release with the zip attached:
+- **Both present** → push the tag and create the release with the zip attached.
+  Same rule as 4b: `[r] Release`'s own step-3 menu text already discloses this
+  step, so it's covered by that one approval — don't re-ask, just run it and
+  report the release URL as a one-line status:
   ```bash
   git push origin "v$(cat VERSION)"
   gh release create "v$(cat VERSION)" ".renmark/version/$(python -m renmark.release current | sed 's/^/<name>-v/').zip" \
       --title "v$(cat VERSION)" --notes-from-tag
   ```
-  (Pushing + publishing a release are shared/remote actions — get explicit user
-  approval before running, per the careful-action rule.)
 - **No remote or no `gh`** → do NOT fail. Report: *"No GitHub remote/gh detected —
   built local release at `.renmark/version/<name>-v<VERSION>.zip` and tagged
   `v<VERSION>` locally. Add a remote + gh later and re-run [r] to publish."* The

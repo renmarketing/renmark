@@ -8,7 +8,10 @@ cite — never paste.
 
 The umbrella rule: **every skill MUST end by recommending a state-derived next
 step.** No silent stop, no "you might want to…", no terminal cliff. The
-recommendation is always rendered as an explicit, selectable choice.
+recommendation is either rendered as an explicit, selectable choice, or — per
+the auto-proceed rule below — announced in one line and acted on directly.
+Either way the user is never left to guess what happens next or which
+command to type.
 
 ---
 
@@ -59,6 +62,40 @@ labelled `(Recommended)`.
 
 ---
 
+## Auto-proceed vs. explicit choice (interactive sessions)
+
+Rendering the picker (rules 6–9) is the default, but not unconditional. Skip
+it — and proceed straight into the recommended next step in the same turn —
+when **both** hold:
+
+1. **No Pause-Policy condition fired this run**: unclear intent, a scope/
+   direction change, a destructive/irreversible action, a merge/release/
+   publish/install action, a missing-information block, or an explicit
+   human-review gate. Every skill already tracks when one of these is live
+   (that's what its own gate logic exists for) — this reuses that existing
+   signal (`requires_decision`); it does not add a new one.
+2. **The recommended next command is not itself a dangerous gate** (merge,
+   release, publish, install) — those always halt per the dangerous-gate
+   rule regardless of `requires_decision`.
+
+When both hold, do not render `AskUserQuestion`. Print one line naming what
+happened and what's next (e.g. *"Fixed — resuming `/renmark:plan`."* or
+*"Spec approved — moving to `/renmark:plan`."*), then — for **class 1
+(pipeline) skills only** — proceed directly into that next command in the
+same turn. This is what lets a plain-English ask ("let's add X", "let's
+rethink Y") run end-to-end without the user typing any `/renmark:*` command:
+brainstorm → PRD → plan → orchestrate → verify → finish auto-chain, stopping
+only when `requires_decision` goes true at some stage, the next step is a
+dangerous gate, or there is no next step (pipeline complete). Class 2/3
+skills auto-proceed the same way but don't chain further themselves — they
+hand off to whichever pipeline skill is next.
+
+When either condition fails, render the full picker exactly as before — this
+section only narrows *when* the picker fires; it does not change how it
+renders or weaken any Pause-Policy gate.
+
+---
+
 ## Three skill classes
 
 Each renmark skill belongs to exactly one class. The class decides what
@@ -71,8 +108,10 @@ Each renmark skill belongs to exactly one class. The class decides what
 
 These advance the lifecycle. Their next step is the deterministic stage
 transition from `next_recommended()` (which reads `lifecycle.json` and applies
-`NEXT_BY_STAGE`). The recommended option is that command; offer 1–2 sibling
-pipeline steps (e.g. re-run, or jump back) as alternates plus `Nothing`.
+`NEXT_BY_STAGE`). Per the auto-proceed rule above, when `requires_decision` is
+false this is not just a picker with the command pre-selected — the skill
+chains directly into it. The picker (recommended option + 1–2 sibling steps +
+`Nothing`) only renders when `requires_decision` is true.
 
 ### 2. Quality gates — defer to the gate sub-menu
 
@@ -127,26 +166,30 @@ deliberately. Never jump to an expensive tier silently.
 
 **Pipeline skill** (class 1):
 
-> *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")` and render the
-> result per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 —
-> Tier-0 stage routing). Present via `AskUserQuestion` (handoff-menu.md rules
-> 6–9); the state-derived next command is the `(Recommended)` option. Require an
-> explicit choice — never auto-proceed.*
+> *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")`. If
+> `requires_decision` is false, announce the recommendation in one line and
+> chain directly into it — do not render a picker. Otherwise present via
+> `AskUserQuestion` (handoff-menu.md rules 6–9), state-derived next command as
+> `(Recommended)`, explicit choice required. See
+> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 1 — Tier-0 stage
+> routing + auto-proceed rule).*
 
 **Quality gate** (class 2):
 
 > *End by rendering the gate hand-off menu from
 > `${CLAUDE_PLUGIN_ROOT}/skills/.shared/handoff-menu.md` (the next-step contract's
-> class 2 defers to it). Filter (rules 1–5), then present via `AskUserQuestion`
-> (rules 6–9). Require an explicit choice.*
+> class 2 defers to it). Filter (rules 1–5). If `requires_decision` is false,
+> announce the recommendation in one line and hand off directly; otherwise
+> present via `AskUserQuestion` (rules 6–9), explicit choice required.*
 
 **Aux / terminal skill** (class 3):
 
-> *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")` and render per
-> `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 — resume-pipeline
-> + 1–2 local actions). The in-flight feature's next command is `(Recommended)`;
-> add the skill's local follow-ups. Render via `AskUserQuestion` (handoff-menu.md
-> rules 6–9); require an explicit choice.*
+> *End by calling `renmark.lifecycle.next_steps(repo, "<skill>")`. If
+> `requires_decision` is false, announce the resume-pipeline recommendation in
+> one line and hand off directly (no local-action picker); otherwise render
+> per `${CLAUDE_PLUGIN_ROOT}/skills/.shared/next-steps.md` (class 3 —
+> resume-pipeline + 1–2 local actions) via `AskUserQuestion` (handoff-menu.md
+> rules 6–9), explicit choice required.*
 
 Do not paste the rendering rules or the gate menu into the calling SKILL.md —
 cite the file.
